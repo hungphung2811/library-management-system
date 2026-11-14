@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping("/internal/users")
 public class ReaderProfileController {
 
     private final IssueReaderCardUseCase issueCard;
@@ -59,7 +59,7 @@ public class ReaderProfileController {
                                                        @Valid @RequestBody IssueReaderCardRequest request) {
         ReaderProfileResponse response = issueCard.execute(new IssueReaderCardCommand(userId, request.cardNo(),
                 request.fullName(), request.email(), request.readerType(), request.cardExpiryDate()));
-        return ResponseEntity.created(URI.create("/api/users/" + userId + "/reader-profile")).body(response);
+        return ResponseEntity.created(URI.create("/internal/users/" + userId + "/reader-profile")).body(response);
     }
 
     @PutMapping("/{userId}/reader-profile/card-expiry")

@@ -71,15 +71,15 @@ class AccessControlSecurityTest {
 
     @Test
     void khongTokenBi401() throws Exception {
-        mvc.perform(get("/api/roles")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/internal/roles")).andExpect(status().isUnauthorized());
     }
 
     @Test
     void khoaListRolesXemDuocNhungKhongTaoDuocRole() throws Exception {
         when(roles.list()).thenReturn(List.of());
 
-        mvc.perform(get("/api/roles").with(with("AccessControlController/listRoles"))).andExpect(status().isOk());
-        mvc.perform(post("/api/roles").with(with("AccessControlController/listRoles"))
+        mvc.perform(get("/internal/roles").with(with("AccessControlController/listRoles"))).andExpect(status().isOk());
+        mvc.perform(post("/internal/roles").with(with("AccessControlController/listRoles"))
                         .contentType(MediaType.APPLICATION_JSON).content(ROLE_BODY))
                 .andExpect(status().isForbidden());
     }
@@ -88,15 +88,15 @@ class AccessControlSecurityTest {
     void khoaDuocDangKyVoiTenControllerSlashMethod() throws Exception {
         when(roles.list()).thenReturn(List.of());
 
-        mvc.perform(get("/api/roles").with(with("AccessControlController/listRoles"))).andExpect(status().isOk());
+        mvc.perform(get("/internal/roles").with(with("AccessControlController/listRoles"))).andExpect(status().isOk());
 
         verify(registrar).ensureRegistered(argThat(d -> d.key().equals("AccessControlController/listRoles")
-                && d.source().equals("AUTO") && d.httpMethod().equals("GET") && d.pathPattern().equals("/api/roles")));
+                && d.source().equals("AUTO") && d.httpMethod().equals("GET") && d.pathPattern().equals("/internal/roles")));
     }
 
     @Test
     void thieuKhoaVanDuocDangKyDeNguoiQuanTriGanQuyen() throws Exception {
-        mvc.perform(post("/api/roles").with(with()).contentType(MediaType.APPLICATION_JSON).content(ROLE_BODY))
+        mvc.perform(post("/internal/roles").with(with()).contentType(MediaType.APPLICATION_JSON).content(ROLE_BODY))
                 .andExpect(status().isForbidden());
 
         verify(registrar).ensureRegistered(argThat(d -> d.key().equals("AccessControlController/createRole")));
@@ -108,20 +108,20 @@ class AccessControlSecurityTest {
         UUID role = UUID.randomUUID();
         String body = "{\"roleId\":\"" + role + "\"}";
 
-        mvc.perform(post("/api/access/users/" + user + "/roles").with(with("AccessControlController/grantPermission"))
+        mvc.perform(post("/internal/access/users/" + user + "/roles").with(with("AccessControlController/grantPermission"))
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isForbidden());
-        mvc.perform(post("/api/access/users/" + user + "/roles").with(with("AccessControlController/assignRole"))
+        mvc.perform(post("/internal/access/users/" + user + "/roles").with(with("AccessControlController/assignRole"))
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isNoContent());
-        mvc.perform(delete("/api/access/users/" + user + "/roles/" + role).with(with("AccessControlController/revokeRole")))
+        mvc.perform(delete("/internal/access/users/" + user + "/roles/" + role).with(with("AccessControlController/revokeRole")))
                 .andExpect(status().isNoContent());
     }
 
     @Test
     void duongDanNgoaiApiBiTuChoiConApiKhongCoHandlerLa404() throws Exception {
         mvc.perform(get("/khong-ton-tai").with(admin())).andExpect(status().isForbidden());
-        mvc.perform(get("/api/khong-ton-tai").with(admin())).andExpect(status().isNotFound());
+        mvc.perform(get("/internal/khong-ton-tai").with(admin())).andExpect(status().isNotFound());
     }
 
     @Test
@@ -136,7 +136,7 @@ class AccessControlSecurityTest {
         when(roles.create(any())).thenReturn(new RoleResponse(UUID.randomUUID(), "SUPERVISOR", "Quản trị", true, List.of()));
         String body = "{\"name\":\"SUPERVISOR\",\"description\":\"Quản trị\",\"isAdmin\":true}";
 
-        mvc.perform(post("/api/roles").with(with("AccessControlController/createRole"))
+        mvc.perform(post("/internal/roles").with(with("AccessControlController/createRole"))
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.isAdmin").value(true));
 
@@ -151,7 +151,7 @@ class AccessControlSecurityTest {
         when(roles.create(any())).thenReturn(new RoleResponse(UUID.randomUUID(), "SUPERVISOR", "Quản trị", true, List.of()));
         String body = "{\"name\":\"SUPERVISOR\",\"description\":\"Quản trị\",\"isAdmin\":true}";
 
-        mvc.perform(post("/api/roles").with(admin()).contentType(MediaType.APPLICATION_JSON).content(body))
+        mvc.perform(post("/internal/roles").with(admin()).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated());
 
         ArgumentCaptor<CreateRole> command = ArgumentCaptor.forClass(CreateRole.class);
@@ -163,7 +163,7 @@ class AccessControlSecurityTest {
     void khongGuiIsAdminThiMacDinhLaFalse() throws Exception {
         when(roles.create(any())).thenReturn(new RoleResponse(UUID.randomUUID(), "AUDITOR", "Kiểm toán", List.of()));
 
-        mvc.perform(post("/api/roles").with(admin()).contentType(MediaType.APPLICATION_JSON).content(ROLE_BODY))
+        mvc.perform(post("/internal/roles").with(admin()).contentType(MediaType.APPLICATION_JSON).content(ROLE_BODY))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.isAdmin").value(false));
 
         ArgumentCaptor<CreateRole> command = ArgumentCaptor.forClass(CreateRole.class);
@@ -176,10 +176,10 @@ class AccessControlSecurityTest {
         UUID user = UUID.randomUUID();
         String body = "{\"roleId\":\"" + UUID.randomUUID() + "\"}";
 
-        mvc.perform(post("/api/access/users/" + user + "/roles").with(with("AccessControlController/assignRole"))
+        mvc.perform(post("/internal/access/users/" + user + "/roles").with(with("AccessControlController/assignRole"))
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isNoContent());
-        mvc.perform(post("/api/access/users/" + user + "/roles").with(admin())
+        mvc.perform(post("/internal/access/users/" + user + "/roles").with(admin())
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isNoContent());
 

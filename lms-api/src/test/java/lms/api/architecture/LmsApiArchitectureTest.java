@@ -26,4 +26,17 @@ class LmsApiArchitectureTest {
     static final ArchRule catalogKhongBietContextKhac = noClasses()
             .that().resideInAPackage("lms.api.catalog..")
             .should().dependOnClassesThat().resideInAnyPackage("lms.api.identity..", "lms.api.circulation..", "lms.api.support..");
+
+    @ArchTest
+    static final ArchRule circulationKhongBietContextKhac = noClasses()
+            .that().resideInAPackage("lms.api.circulation..")
+            .should().dependOnClassesThat().resideInAnyPackage("lms.api.identity..", "lms.api.catalog..",
+                    "lms.api.support.client..", "lms.api.support.dto..", "lms.api.support.web..");
+
+    /** lms.api.support còn chứa TokenRelayInterceptor dùng chung nên chỉ cấm các tầng của context support. */
+    @ArchTest
+    static final ArchRule supportKhongBietContextKhac = noClasses()
+            .that().resideInAnyPackage("lms.api.support.client..", "lms.api.support.dto..", "lms.api.support.web..")
+            .should().dependOnClassesThat().resideInAnyPackage("lms.api.identity..", "lms.api.catalog..",
+                    "lms.api.circulation..");
 }

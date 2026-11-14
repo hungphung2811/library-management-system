@@ -10,11 +10,12 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * Một SecurityFilterChain cho cả service, chỉ lo XÁC THỰC: đường dẫn công khai (đăng nhập, làm mới, đăng xuất, JWKS,
- * đăng nhập ngoài, health, API nội bộ), còn lại phải có token hợp lệ. PHÂN QUYỀN theo endpoint do
- * {@code PermissionInterceptor} (security-common) đảm nhiệm: mỗi controller method có một khóa quyền
- * (customKey bằng {@code @RequirePermission} hoặc khóa tự sinh {@code TênController/tênPhươngThức}),
- * khóa được đăng ký vào bảng permissions và gán cho role. Đường dẫn ngoài /api và các đường dẫn công khai bị từ chối.
+ * Một SecurityFilterChain cho cả service, chỉ lo XÁC THỰC. Mọi API nghiệp vụ nằm dưới /internal/** (chỉ lms-api gọi,
+ * nginx chặn không cho ra ngoài), còn lại phải có token hợp lệ. Chỉ các đường dẫn cụ thể sau là công khai: đăng nhập,
+ * làm mới, đăng xuất, đăng nhập ngoài (trình duyệt chưa có token ở các bước này), JWKS, health và đăng ký khóa quyền
+ * (controller tự kiểm khóa chia sẻ). PHÂN QUYỀN theo endpoint do {@code PermissionInterceptor} (security-common) đảm
+ * nhiệm: mỗi controller method có một khóa quyền (customKey bằng {@code @RequirePermission} hoặc khóa tự sinh
+ * {@code TênController/tênPhươngThức}). Đường dẫn ngoài /internal và các đường dẫn công khai bị từ chối.
  */
 @Configuration
 public class SecurityConfiguration {
@@ -26,17 +27,17 @@ public class SecurityConfiguration {
                 .authorizeHttpRequests(a -> a
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         .requestMatchers("/.well-known/jwks.json").permitAll()
-                        // API nội bộ giữa các service: controller tự kiểm khóa chia sẻ; không route qua gateway
-                        .requestMatchers("/internal/**").permitAll()
+                        // Đúng một đường dẫn nội bộ có khóa chia sẻ riêng; KHÔNG mở cả /internal/**
+                        .requestMatchers(HttpMethod.POST, "/internal/permissions/registrations").permitAll()
 
-                        .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/refresh", "/api/auth/logout")
-                        .permitAll()
+                        .requestMatchers(HttpMethod.POST, "/internal/auth/login", "/internal/auth/refresh",
+                                "/internal/auth/logout").permitAll()
                         // đăng nhập ngoài (OIDC): trình duyệt chưa có token ở các bước này
-                        .requestMatchers(HttpMethod.GET, "/api/auth/external/providers",
-                                "/api/auth/external/*/start", "/api/auth/external/*/callback").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/external/exchange").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/internal/auth/external/providers",
+                                "/internal/auth/external/*/start", "/internal/auth/external/*/callback").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/internal/auth/external/exchange").permitAll()
 
-                        .requestMatchers("/api/**").authenticated()
+                        .requestMatchers("/internal/**").authenticated()
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(o -> o.jwt(j -> j.jwtAuthenticationConverter(PermissionJwtConverter.create())))
                 .build();

@@ -49,6 +49,26 @@ public class BookCopy {
         return true;
     }
 
+    /**
+     * Đổi trạng thái theo vòng đời mượn/trả (UC06-UC08). Idempotent: đã ở trạng thái đích thì không làm gì.
+     * Bảng chuyển hợp lệ: LOANED từ AVAILABLE/RESERVED; AVAILABLE từ LOANED/RESERVED/DAMAGED (trả về, nhả giữ, sửa xong);
+     * RESERVED từ AVAILABLE/LOANED (giữ chỗ, hoặc hoàn tác một lần mượn lỗi); DAMAGED và LOST chỉ từ LOANED.
+     * @return true nếu trạng thái thực sự đổi.
+     */
+    public boolean changeStatus(CopyStatus target) {
+        if (target == null) throw new InvalidCopyException("Trạng thái đích không được null");
+        if (status == target) return false;
+        boolean allowed = switch (target) {
+            case LOANED -> status == CopyStatus.AVAILABLE || status == CopyStatus.RESERVED;
+            case AVAILABLE -> status == CopyStatus.LOANED || status == CopyStatus.RESERVED || status == CopyStatus.DAMAGED;
+            case RESERVED -> status == CopyStatus.AVAILABLE || status == CopyStatus.LOANED;
+            case DAMAGED, LOST -> status == CopyStatus.LOANED;
+        };
+        if (!allowed) throw new IllegalCopyTransitionException(status, target);
+        status = target;
+        return true;
+    }
+
     public UUID id() { return id; }
     public UUID titleId() { return titleId; }
     public String barcode() { return barcode; }

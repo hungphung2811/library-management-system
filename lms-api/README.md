@@ -13,5 +13,6 @@ FE --> nginx (:8080: TLS, CORS, rate limit, chặn /internal) --> lms-api (:8085
   token của người dùng nên một nguồn sự thật duy nhất cho ma trận quyền.
 - Lỗi của service nội bộ được chuyển nguyên mã và nội dung (4xx); 5xx thành 502 `DEPENDENCY_ERROR`, không gọi được thành 503.
 
-Trạng thái chuyển đổi: catalog đã chuyển. identity, circulation, support còn được nginx route tạm thẳng vào service
-(xem `infrastructure/nginx/nginx.conf`, mục TẠM THỜI) cho tới khi chuyển xong.
+Trạng thái chuyển đổi: catalog, circulation (borrowings, reservations) và support (audit-logs) đã chuyển. identity còn được
+nginx route tạm thẳng vào service (xem `infrastructure/nginx/nginx.conf`, mục TẠM THỜI, nếu còn) cho tới khi chuyển xong.
+Quyết định kiến trúc: `docs/decisions/0005-lms-api-bff-va-nginx.md`.

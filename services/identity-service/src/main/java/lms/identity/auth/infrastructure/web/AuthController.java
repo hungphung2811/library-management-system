@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/internal/auth")
 public class AuthController {
 
     private final LoginUseCase login;
@@ -77,6 +77,6 @@ public class AuthController {
     public ResponseEntity<Map<String, UUID>> register(@Valid @RequestBody RegisterRequest request) {
         UUID userId = register.execute(request.userId(), request.username(), request.password(), request.departmentId(),
                 Boolean.TRUE.equals(request.mustChangePassword()));
-        return ResponseEntity.created(URI.create("/api/auth/credentials/" + userId)).body(Map.of("userId", userId));
+        return ResponseEntity.created(URI.create("/internal/auth/credentials/" + userId)).body(Map.of("userId", userId));
     }
 }

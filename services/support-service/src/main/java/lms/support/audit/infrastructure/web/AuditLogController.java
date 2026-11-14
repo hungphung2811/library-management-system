@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/audit-logs")
+@RequestMapping("/internal/audit-logs")
 public class AuditLogController {
 
     private final QueryAuditLogsUseCase query;

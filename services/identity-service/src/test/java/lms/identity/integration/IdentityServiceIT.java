@@ -34,6 +34,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * Cần Docker. Chạy: mvn test -Dtest=IdentityServiceIT -Dsurefire.failIfNoSpecifiedTests=false
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+        "spring.flyway.enabled=true",
+        "spring.flyway.locations=classpath:db/migration/identity",
         "spring.kafka.bootstrap-servers=localhost:1",
         "spring.kafka.listener.auto-startup=false",
         "spring.kafka.producer.properties.max.block.ms=300",
@@ -55,7 +57,7 @@ class IdentityServiceIT {
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> login(String username, String password, HttpStatus expected) {
-        ResponseEntity<Map> response = rest.postForEntity("/api/auth/login",
+        ResponseEntity<Map> response = rest.postForEntity("/internal/auth/login",
                 Map.of("username", username, "password", password), Map.class);
         assertThat(response.getStatusCode()).as("login %s", username).isEqualTo(expected);
         return response.getBody();
@@ -80,13 +82,13 @@ class IdentityServiceIT {
     /** Endpoint thử nghiệm KHÔNG gắn annotation quyền nào, nên dùng khóa tự sinh ProbeController/ping. */
     @RestController
     static class ProbeController {
-        @GetMapping("/api/e2e-probe/ping")
+        @GetMapping("/internal/e2e-probe/ping")
         public Map<String, String> ping() {
             return Map.of("pong", "ok");
         }
     }
 
-    private static final String PROBE = "/api/e2e-probe/ping";
+    private static final String PROBE = "/internal/e2e-probe/ping";
 
     private String accessToken(String username, String password) {
         return (String) login(username, password, HttpStatus.OK).get("accessToken");
@@ -94,18 +96,18 @@ class IdentityServiceIT {
 
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> permissionCatalog(String adminToken) {
-        return call(HttpMethod.GET, "/api/permissions", adminToken, null, List.class).getBody();
+        return call(HttpMethod.GET, "/internal/permissions", adminToken, null, List.class).getBody();
     }
 
     @SuppressWarnings("unchecked")
     private String roleId(String adminToken, String name) {
-        List<Map<String, Object>> roles = call(HttpMethod.GET, "/api/roles", adminToken, null, List.class).getBody();
+        List<Map<String, Object>> roles = call(HttpMethod.GET, "/internal/roles", adminToken, null, List.class).getBody();
         return (String) roles.stream().filter(r -> name.equals(r.get("name"))).findFirst().orElseThrow().get("id");
     }
 
     @SuppressWarnings("unchecked")
     private String createRole(String token, String name, boolean admin, HttpStatus expected) {
-        ResponseEntity<Map> response = call(HttpMethod.POST, "/api/roles", token,
+        ResponseEntity<Map> response = call(HttpMethod.POST, "/internal/roles", token,
                 Map.of("name", name, "description", "Role thử nghiệm " + name, "isAdmin", admin), Map.class);
         assertThat(response.getStatusCode()).as("tạo role %s", name).isEqualTo(expected);
         return response.getStatusCode().is2xxSuccessful() ? (String) response.getBody().get("id") : null;
@@ -113,14 +115,14 @@ class IdentityServiceIT {
 
     private UUID createUser(String adminToken, String username, String password) {
         UUID userId = UUID.randomUUID();
-        assertThat(call(HttpMethod.POST, "/api/auth/credentials", adminToken,
+        assertThat(call(HttpMethod.POST, "/internal/auth/credentials", adminToken,
                 Map.of("userId", userId, "username", username, "password", password), Map.class).getStatusCode())
                 .isEqualTo(HttpStatus.CREATED);
         return userId;
     }
 
     private void assign(String token, UUID userId, String roleId, HttpStatus expected) {
-        assertThat(call(HttpMethod.POST, "/api/access/users/" + userId + "/roles", token,
+        assertThat(call(HttpMethod.POST, "/internal/access/users/" + userId + "/roles", token,
                 Map.of("roleId", roleId), String.class).getStatusCode()).isEqualTo(expected);
     }
 
@@ -148,7 +150,7 @@ class IdentityServiceIT {
 
         // 3. admin tạo role, gán khóa cho role, gán role cho người dùng
         String role = createRole(admin, "PROBE_ROLE", false, HttpStatus.CREATED);
-        assertThat(call(HttpMethod.POST, "/api/roles/" + role + "/permissions", admin,
+        assertThat(call(HttpMethod.POST, "/internal/roles/" + role + "/permissions", admin,
                 Map.of("permissionCode", "ProbeController/ping"), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
         assign(admin, userId, role, HttpStatus.NO_CONTENT);
 
@@ -159,7 +161,7 @@ class IdentityServiceIT {
         assertThat(jwtDecoder.decode(after).getClaimAsStringList("permissions")).containsExactly("ProbeController/ping");
 
         // 5. gỡ khóa khỏi role: lần đăng nhập sau không còn quyền
-        assertThat(call(HttpMethod.DELETE, "/api/roles/" + role + "/permissions/ProbeController/ping", admin, null,
+        assertThat(call(HttpMethod.DELETE, "/internal/roles/" + role + "/permissions/ProbeController/ping", admin, null,
                 Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
         String revoked = accessToken("probe-user", "Probe@12345");
         assertThat(call(HttpMethod.GET, PROBE, revoked, null, String.class).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
@@ -171,7 +173,7 @@ class IdentityServiceIT {
         // người có quyền tạo role và gán role nhưng KHÔNG phải quản trị viên
         String assignerRole = createRole(admin, "ASSIGNER_ROLE", false, HttpStatus.CREATED);
         for (String key : List.of("AccessControlController/assignRole", "AccessControlController/createRole")) {
-            call(HttpMethod.POST, "/api/roles/" + assignerRole + "/permissions", admin,
+            call(HttpMethod.POST, "/internal/roles/" + assignerRole + "/permissions", admin,
                     Map.of("permissionCode", key), Map.class);
         }
         UUID assignerId = createUser(admin, "assigner", "Assign@12345");
@@ -248,11 +250,11 @@ class IdentityServiceIT {
     void apiPhanQuyenCanTokenVaPermission() {
         String adminToken = (String) login("admin", "Admin@12345", HttpStatus.OK).get("accessToken");
 
-        assertThat(call(HttpMethod.GET, "/api/roles", null, null, String.class).getStatusCode())
+        assertThat(call(HttpMethod.GET, "/internal/roles", null, null, String.class).getStatusCode())
                 .isEqualTo(HttpStatus.UNAUTHORIZED);
-        assertThat(call(HttpMethod.GET, "/api/roles", "token-gia", null, String.class).getStatusCode())
+        assertThat(call(HttpMethod.GET, "/internal/roles", "token-gia", null, String.class).getStatusCode())
                 .isEqualTo(HttpStatus.UNAUTHORIZED);
-        ResponseEntity<List> roles = call(HttpMethod.GET, "/api/roles", adminToken, null, List.class);
+        ResponseEntity<List> roles = call(HttpMethod.GET, "/internal/roles", adminToken, null, List.class);
         assertThat(roles.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(roles.getBody()).hasSizeGreaterThanOrEqualTo(5);
     }
@@ -263,14 +265,14 @@ class IdentityServiceIT {
         String adminToken = (String) login("admin", "Admin@12345", HttpStatus.OK).get("accessToken");
         UUID userId = UUID.randomUUID();
 
-        assertThat(call(HttpMethod.POST, "/api/auth/credentials", adminToken,
+        assertThat(call(HttpMethod.POST, "/internal/auth/credentials", adminToken,
                 Map.of("userId", userId, "username", "member1", "password", "Member@1234"), Map.class)
                 .getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
-        List<Map<String, Object>> roles = call(HttpMethod.GET, "/api/roles", adminToken, null, List.class).getBody();
+        List<Map<String, Object>> roles = call(HttpMethod.GET, "/internal/roles", adminToken, null, List.class).getBody();
         String memberRoleId = (String) roles.stream().filter(r -> "MEMBER".equals(r.get("name"))).findFirst()
                 .orElseThrow().get("id");
-        assertThat(call(HttpMethod.POST, "/api/access/users/" + userId + "/roles", adminToken,
+        assertThat(call(HttpMethod.POST, "/internal/access/users/" + userId + "/roles", adminToken,
                 Map.of("roleId", memberRoleId), Void.class).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
         String memberToken = (String) login("member1", "Member@1234", HttpStatus.OK).get("accessToken");
@@ -283,9 +285,9 @@ class IdentityServiceIT {
                 "BorrowingController/borrow", "BorrowingController/renew",
                 "ReservationController/reserve", "ReservationController/mine", "ReservationController/cancel");
         assertThat((Object) jwt.getClaim("admin")).isNull();
-        assertThat(call(HttpMethod.GET, "/api/roles", memberToken, null, String.class).getStatusCode())
+        assertThat(call(HttpMethod.GET, "/internal/roles", memberToken, null, String.class).getStatusCode())
                 .isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(call(HttpMethod.POST, "/api/auth/credentials", memberToken,
+        assertThat(call(HttpMethod.POST, "/internal/auth/credentials", memberToken,
                 Map.of("userId", UUID.randomUUID(), "username", "x1234", "password", "Whatever@123"), String.class)
                 .getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
@@ -295,22 +297,22 @@ class IdentityServiceIT {
         Map<String, Object> first = login("admin", "Admin@12345", HttpStatus.OK);
         String oldRefresh = (String) first.get("refreshToken");
 
-        ResponseEntity<Map> rotated = rest.postForEntity("/api/auth/refresh", Map.of("refreshToken", oldRefresh), Map.class);
+        ResponseEntity<Map> rotated = rest.postForEntity("/internal/auth/refresh", Map.of("refreshToken", oldRefresh), Map.class);
         assertThat(rotated.getStatusCode()).isEqualTo(HttpStatus.OK);
         String newRefresh = (String) rotated.getBody().get("refreshToken");
         assertThat(newRefresh).isNotEqualTo(oldRefresh);
 
         // dùng lại token cũ: bị từ chối và mọi phiên của admin bị thu hồi, kể cả token mới
-        assertThat(rest.postForEntity("/api/auth/refresh", Map.of("refreshToken", oldRefresh), Map.class)
+        assertThat(rest.postForEntity("/internal/auth/refresh", Map.of("refreshToken", oldRefresh), Map.class)
                 .getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-        assertThat(rest.postForEntity("/api/auth/refresh", Map.of("refreshToken", newRefresh), Map.class)
+        assertThat(rest.postForEntity("/internal/auth/refresh", Map.of("refreshToken", newRefresh), Map.class)
                 .getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test
     void khoaTaiKhoanSauNamLanSaiMatKhauVaLuuDuocTrongDatabase() {
         String adminToken = (String) login("admin", "Admin@12345", HttpStatus.OK).get("accessToken");
-        call(HttpMethod.POST, "/api/auth/credentials", adminToken,
+        call(HttpMethod.POST, "/internal/auth/credentials", adminToken,
                 Map.of("userId", UUID.randomUUID(), "username", "locky", "password", "Correct@123"), Map.class);
 
         for (int i = 0; i < 5; i++) login("locky", "sai-mat-khau", HttpStatus.UNAUTHORIZED);

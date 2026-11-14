@@ -31,6 +31,14 @@ class BookCopyAndAvailabilityTest {
 
         public BookCopy save(BookCopy c) { copies.removeIf(x -> x.id().equals(c.id())); copies.add(c); return c; }
         public java.util.Optional<BookCopy> findById(UUID id) { return copies.stream().filter(c -> c.id().equals(id)).findFirst(); }
+        public java.util.Optional<BookCopy> findByIdForUpdate(UUID id) { return findById(id); }
+        public java.util.Optional<lms.catalog.inventory.domain.CopyDetails> findDetailsById(UUID id) {
+            return findById(id).map(c -> new lms.catalog.inventory.domain.CopyDetails(c.id(), c.titleId(), "T", c.barcode(),
+                    c.status(), new java.math.BigDecimal("100000")));
+        }
+        public java.util.Optional<lms.catalog.inventory.domain.CopyDetails> findDetailsByBarcode(String b) {
+            return copies.stream().filter(c -> c.barcode().equals(b)).findFirst().flatMap(c -> findDetailsById(c.id()));
+        }
         public boolean existsByBarcode(String b) { return copies.stream().anyMatch(c -> c.barcode().equals(b)); }
         public boolean titleExists(UUID id) { return titles.contains(id); }
         public List<BookCopy> findByTitleId(UUID id) { return copies.stream().filter(c -> c.titleId().equals(id)).toList(); }
@@ -93,5 +101,45 @@ class BookCopyAndAvailabilityTest {
         BookCopy loaned = BookCopy.restore(UUID.randomUUID(), UUID.randomUUID(), "L1", CopyStatus.LOANED);
         assertEquals(false, loaned.hold());
         assertEquals(false, loaned.release());
+    }
+
+    @Test
+    void doiTrangThaiTheoVongDoiMuonTra() {
+        FakeRepo repo = new FakeRepo();
+        List<lms.common.kernel.DomainEvent> published = new ArrayList<>();
+        var change = new lms.catalog.inventory.application.ChangeCopyStatusUseCase(repo, published::add, java.time.Clock.systemUTC());
+        BookCopy copy = repo.save(BookCopy.register(UUID.randomUUID(), "S1"));
+
+        assertEquals(CopyStatus.LOANED, change.execute(copy.id(), CopyStatus.LOANED).status());
+        assertEquals(CopyStatus.LOANED, change.execute(copy.id(), CopyStatus.LOANED).status()); // idempotent
+        assertTrue(published.isEmpty());
+        assertEquals(CopyStatus.AVAILABLE, change.execute(copy.id(), CopyStatus.AVAILABLE).status());
+        assertEquals(1, published.size()); // trả về AVAILABLE thì phát CopyAvailableEvent (QĐ9)
+        change.execute(copy.id(), CopyStatus.AVAILABLE);
+        assertEquals(1, published.size());
+        // AVAILABLE không thể báo mất/hỏng trực tiếp
+        assertThrows(lms.catalog.inventory.domain.IllegalCopyTransitionException.class,
+                () -> change.execute(copy.id(), CopyStatus.LOST));
+        assertThrows(lms.catalog.inventory.domain.CopyNotFoundException.class,
+                () -> change.execute(UUID.randomUUID(), CopyStatus.LOANED));
+    }
+
+    @Test
+    void banSaoMatHoacHongKhongDuocChoMuonLai() {
+        BookCopy lost = BookCopy.restore(UUID.randomUUID(), UUID.randomUUID(), "X", CopyStatus.LOST);
+        assertThrows(lms.catalog.inventory.domain.IllegalCopyTransitionException.class, () -> lost.changeStatus(CopyStatus.LOANED));
+        BookCopy damaged = BookCopy.restore(UUID.randomUUID(), UUID.randomUUID(), "Y", CopyStatus.DAMAGED);
+        assertThrows(lms.catalog.inventory.domain.IllegalCopyTransitionException.class, () -> damaged.changeStatus(CopyStatus.LOANED));
+        assertTrue(damaged.changeStatus(CopyStatus.AVAILABLE)); // sửa xong
+    }
+
+    @Test
+    void traCuuBanSaoTheoIdVaMaVach() {
+        FakeRepo repo = new FakeRepo();
+        BookCopy copy = repo.save(BookCopy.register(UUID.randomUUID(), "Q1"));
+        var get = new lms.catalog.inventory.application.GetCopyUseCase(repo);
+        assertEquals(copy.id(), get.byBarcode("Q1").id());
+        assertEquals(new java.math.BigDecimal("100000"), get.byId(copy.id()).coverPrice());
+        assertThrows(lms.catalog.inventory.domain.CopyNotFoundException.class, () -> get.byBarcode("none"));
     }
 }

@@ -2,6 +2,7 @@ package lms.catalog.inventory.infrastructure.persistence;
 
 import lms.catalog.inventory.domain.BookCopy;
 import lms.catalog.inventory.domain.BookCopyRepository;
+import lms.catalog.inventory.domain.CopyDetails;
 import lms.catalog.inventory.domain.CopyStatus;
 import java.util.Collection;
 import java.util.HashMap;
@@ -30,6 +31,26 @@ class BookCopyPersistenceAdapter implements BookCopyRepository {
     @Override
     public Optional<BookCopy> findById(UUID id) {
         return jpa.findById(id).map(BookCopyPersistenceAdapter::toDomain);
+    }
+
+    @Override
+    public Optional<BookCopy> findByIdForUpdate(UUID id) {
+        return jpa.findByIdForUpdate(id).map(BookCopyPersistenceAdapter::toDomain);
+    }
+
+    @Override
+    public Optional<CopyDetails> findDetailsById(UUID id) {
+        return jpa.findDetailsById(id).map(BookCopyPersistenceAdapter::toDetails);
+    }
+
+    @Override
+    public Optional<CopyDetails> findDetailsByBarcode(String barcode) {
+        return jpa.findDetailsByBarcode(barcode).map(BookCopyPersistenceAdapter::toDetails);
+    }
+
+    private static CopyDetails toDetails(SpringDataBookCopyRepository.DetailsRow r) {
+        return new CopyDetails(r.getId(), r.getTitleId(), r.getTitleName(), r.getBarcode(),
+                CopyStatus.valueOf(r.getStatus()), r.getCoverPrice());
     }
 
     @Override

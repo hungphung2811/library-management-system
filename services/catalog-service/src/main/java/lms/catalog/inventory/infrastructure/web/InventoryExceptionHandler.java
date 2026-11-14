@@ -1,6 +1,8 @@
 package lms.catalog.inventory.infrastructure.web;
 
+import lms.catalog.inventory.domain.CopyNotFoundException;
 import lms.catalog.inventory.domain.CopyTitleNotFoundException;
+import lms.catalog.inventory.domain.IllegalCopyTransitionException;
 import lms.catalog.inventory.domain.DuplicateBarcodeException;
 import lms.catalog.inventory.domain.InvalidCopyException;
 import lms.common.kernel.ErrorResponse;
@@ -17,6 +19,16 @@ public class InventoryExceptionHandler {
     @ExceptionHandler(CopyTitleNotFoundException.class)
     ResponseEntity<ErrorResponse> handleNotFound(CopyTitleNotFoundException ex) {
         return build(HttpStatus.NOT_FOUND, "TITLE_NOT_FOUND", ex.getMessage());
+    }
+
+    @ExceptionHandler(CopyNotFoundException.class)
+    ResponseEntity<ErrorResponse> handleCopyNotFound(CopyNotFoundException ex) {
+        return build(HttpStatus.NOT_FOUND, "COPY_NOT_FOUND", ex.getMessage());
+    }
+
+    @ExceptionHandler(IllegalCopyTransitionException.class)
+    ResponseEntity<ErrorResponse> handleTransition(IllegalCopyTransitionException ex) {
+        return build(HttpStatus.CONFLICT, "COPY_STATUS_CONFLICT", ex.getMessage());
     }
 
     @ExceptionHandler(DuplicateBarcodeException.class)

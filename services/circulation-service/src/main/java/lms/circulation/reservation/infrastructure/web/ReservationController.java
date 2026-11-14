@@ -26,7 +26,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 /** Độc giả chỉ thao tác trên đặt trước của chính mình: readerId luôn lấy từ token, không nhận từ body. */
 @RestController
-@RequestMapping("/api/reservations")
+@RequestMapping("/internal/reservations")
 public class ReservationController {
 
     private final ReserveTitleUseCase reserve;
@@ -52,7 +52,7 @@ public class ReservationController {
     public ResponseEntity<ReservationResponse> reserve(@AuthenticationPrincipal Jwt jwt,
                                                        @Valid @RequestBody ReserveTitleRequest request) {
         ReservationResponse response = reserve.execute(readerId(jwt), request.titleId());
-        return ResponseEntity.created(URI.create("/api/reservations/" + response.id())).body(response);
+        return ResponseEntity.created(URI.create("/internal/reservations/" + response.id())).body(response);
     }
 
     @GetMapping

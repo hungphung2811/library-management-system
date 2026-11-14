@@ -19,7 +19,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /** Cần Docker. Surefire mặc định không chạy *IT; chạy bằng: mvn test -Dtest=BorrowingPersistenceAdapterIT. */
-@DataJpaTest
+@DataJpaTest(properties = {"spring.flyway.enabled=true", "spring.flyway.locations=classpath:db/migration/circulation"})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Testcontainers
 @Import(PersistenceConfiguration.class)

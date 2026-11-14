@@ -20,7 +20,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /** Cần Docker. Chạy bằng: mvn test -Dtest=CatalogApiIT -Dsurefire.failIfNoSpecifiedTests=false. Profile dev tắt security. */
-@SpringBootTest
+@SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.flyway.locations=classpath:db/migration/catalog"})
 @AutoConfigureMockMvc
 @Testcontainers
 class CatalogApiIT {

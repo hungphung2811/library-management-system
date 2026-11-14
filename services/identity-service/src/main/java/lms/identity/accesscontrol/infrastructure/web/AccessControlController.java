@@ -33,7 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
  * {@code AccessControlController/tênPhươngThức} (xem PermissionInterceptor ở security-common).
  */
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/internal")
 public class AccessControlController {
 
     private final PermissionManagementUseCase permissions;
@@ -53,7 +53,7 @@ public class AccessControlController {
     public ResponseEntity<PermissionResponse> createPermission(@Valid @RequestBody CreatePermissionRequest request) {
         PermissionResponse response = permissions.create(
                 new AccessCommands.CreatePermission(request.code(), request.description()));
-        return ResponseEntity.created(URI.create("/api/permissions/" + response.code())).body(response);
+        return ResponseEntity.created(URI.create("/internal/permissions/" + response.code())).body(response);
     }
 
     @GetMapping("/permissions")
@@ -67,7 +67,7 @@ public class AccessControlController {
                                                    @Valid @RequestBody CreateRoleRequest request) {
         RoleResponse response = roles.create(new AccessCommands.CreateRole(request.name(), request.description(),
                 Boolean.TRUE.equals(request.isAdmin()), callerIsAdmin(jwt)));
-        return ResponseEntity.created(URI.create("/api/roles/" + response.id())).body(response);
+        return ResponseEntity.created(URI.create("/internal/roles/" + response.id())).body(response);
     }
 
     @GetMapping("/roles")
@@ -88,12 +88,12 @@ public class AccessControlController {
     /** permissionCode có thể chứa dấu "/" (khóa Controller/method) nên dùng pattern bắt phần còn lại của đường dẫn. */
     @DeleteMapping("/roles/{roleId}/permissions/**")
     public RoleResponse revokePermission(@PathVariable UUID roleId, jakarta.servlet.http.HttpServletRequest request) {
-        String prefix = "/api/roles/" + roleId + "/permissions/";
+        String prefix = "/internal/roles/" + roleId + "/permissions/";
         String uri = java.net.URLDecoder.decode(request.getRequestURI(), java.nio.charset.StandardCharsets.UTF_8);
         return roles.revokePermission(roleId, uri.substring(uri.indexOf(prefix) + prefix.length()));
     }
 
-    /** Dùng prefix /api/access để không đụng route /api/users của user-service trên gateway. */
+    /** Dùng prefix /internal/access để không trùng route /internal/users. */
     @PostMapping("/access/users/{userId}/roles")
     public ResponseEntity<Void> assignRole(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID userId,
                                            @Valid @RequestBody AssignRoleRequest request) {

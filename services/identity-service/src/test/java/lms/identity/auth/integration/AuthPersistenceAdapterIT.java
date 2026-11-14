@@ -24,7 +24,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /** Cần Docker. Chạy: mvn test -Dtest=AuthPersistenceAdapterIT. Kiểm chứng migration + ánh xạ JPA (ddl validate). */
-@DataJpaTest
+@DataJpaTest(properties = {"spring.flyway.enabled=true", "spring.flyway.locations=classpath:db/migration/identity"})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Testcontainers
 @Import(AuthPersistenceAdapterIT.Config.class)

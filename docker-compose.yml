@@ -1,6 +1,7 @@
 # Hạ tầng local. Chạy service bằng IDE/Maven (profile dev) hoặc dùng profile "apps".
 #   docker compose up -d                          -> postgres, kafka, redis
-#   docker compose --profile apps up -d --build   -> thêm nginx, lms-api, các service
+#   docker compose --profile apps up -d --build   -> thêm nginx, lms-api, migration-service, các service
+# migration-service (chạy Flyway cho mọi DB) phải healthy trước khi identity/catalog/circulation/support khởi động.
 # Chỉ nginx (8080) publish port ra host cho FE; lms-api và các service khác chỉ gọi được trong mạng compose.
 services:
   postgres:
@@ -55,6 +56,42 @@ services:
       timeout: 3s
       retries: 10
 
+  # Runner migration tập trung: chạy Flyway lên identity_db, catalog_db, circulation_db, audit_db lúc khởi động.
+  # Health UP chỉ sau khi migrate xong nên các service khác chờ service_healthy rồi mới khởi động (chỉ validate schema).
+  migration-service:
+    profiles: [apps]
+    build:
+      context: .
+      dockerfile: services/migration-service/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      IDENTITY_DB_URL: jdbc:postgresql://postgres:5432/identity_db
+      IDENTITY_DB_USERNAME: identity
+      IDENTITY_DB_PASSWORD: identity
+      CATALOG_DB_URL: jdbc:postgresql://postgres:5432/catalog_db
+      CATALOG_DB_USERNAME: catalog
+      CATALOG_DB_PASSWORD: catalog
+      CIRCULATION_DB_URL: jdbc:postgresql://postgres:5432/circulation_db
+      CIRCULATION_DB_USERNAME: circulation
+      CIRCULATION_DB_PASSWORD: circulation
+      AUDIT_DB_URL: jdbc:postgresql://postgres:5432/audit_db
+      AUDIT_DB_USERNAME: audit
+      AUDIT_DB_PASSWORD: audit
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      IDENTITY_SERVICE_URL: http://identity-service:8081
+    healthcheck:
+      # eclipse-temurin:21-jre (Ubuntu) có sẵn curl
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8086/actuator/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    expose:
+      - "8086"
+
   identity-service:
     profiles: [apps]
     build:
@@ -62,6 +99,8 @@ services:
       dockerfile: services/identity-service/Dockerfile
     depends_on:
       postgres:
+        condition: service_healthy
+      migration-service:
         condition: service_healthy
       kafka:
         condition: service_started
@@ -87,6 +126,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migration-service:
+        condition: service_healthy
       kafka:
         condition: service_started
     environment:
@@ -110,6 +151,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migration-service:
+        condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://postgres:5432/catalog_db
@@ -128,6 +171,8 @@ services:
       dockerfile: services/support-service/Dockerfile
     depends_on:
       postgres:
+        condition: service_healthy
+      migration-service:
         condition: service_healthy
       mongo:
         condition: service_healthy

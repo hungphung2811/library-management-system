@@ -240,7 +240,7 @@ JPA; interface chung (`DatabaseConnection`) chỉ có tên, loại, health và c
   các command/response, `SaveAuditLogPort`, `RawEventArchivePort`, `AuditTransactions`.
 - `infrastructure/persistence/`: `AuditLogJpaEntity`, `SpringDataAuditLogRepository`, `AuditLogPersistenceAdapter`, `MongoRawEventArchive`.
 - `infrastructure/messaging/`: `AuditEventParser`, `AuditEventConsumer`; `infrastructure/web/`: `AuditLogController`, `AuditExceptionHandler`.
-- `infrastructure/config/`: `AuditBeanConfiguration`, `AuditPersistenceConfiguration`, `AuditFlywayConfiguration`; `lms/support/config/SecurityConfiguration`.
+- `infrastructure/config/`: `AuditBeanConfiguration`, `AuditPersistenceConfiguration` (Flyway không còn ở đây: migration-service chạy, xem ADR-0004); `lms/support/config/SecurityConfiguration`.
 - Resource: `db/migration/audit/V1__create_audit_logs.sql`, `application-dev.yml`, `application-prod.yml`.
 - Test: `AuditDomainTest`, `AuditUseCasesTest`, `AuditEventParserTest`, `AuditLogSecurityTest`, `ArchitectureTest`, `SupportServiceIT`.
 
@@ -358,8 +358,9 @@ Số liệu đo trong lần chạy cuối (JDK 27 trên máy, target Java 21; Ma
 
 - ⚠️ **Oracle** chưa được kiểm chứng trên instance Oracle thật của user: `OracleProviderIT` chỉ chạy khi đặt `ORACLE_TEST_URL`, `ORACLE_TEST_USERNAME`,
   `ORACLE_TEST_PASSWORD`. Trước khi user đổi hướng, một lần chạy Testcontainers tạm (image `gvenzl/oracle-free:slim-faststart`) đã qua (1/1, 213 giây); code `OracleProvider` không đổi từ đó.
-- ⚠️ **Flyway và Hibernate validate:** Flyway chạy thủ công sau khi thư viện đã tạo EntityManagerFactory, nên `support-service` phải đặt
-  `hibernate.hbm2ddl.auto=none` (không validate schema lúc khởi động). Cần cơ chế "hook trước khi tạo EMF" trong thư viện để migrate rồi mới validate.
+- ℹ️ **Flyway và Hibernate validate:** `support-service` không còn chạy Flyway; script `audit` nằm trong `migration-service` (chạy lúc khởi động, ADR-0004).
+  `support-service` vẫn đặt `hibernate.hbm2ddl.auto=none` vì EntityManagerFactory do `database-common` tạo và chưa có bước validate; muốn validate cần
+  thêm cơ chế riêng trong thư viện. `SupportServiceIT` tự migrate AUDIT_DB bằng bean test dùng script từ jar `migration-service` (test scope).
 - ⚠️ **Consumer Kafka chưa kiểm thử với broker thật:** `SupportServiceIT` tắt listener và gọi trực tiếp `AuditEventConsumer.onEvent(...)`. Việc phân giải
   `${app.kafka.topics.*}` và tạo listener container được kiểm chứng gián tiếp (context khởi động được), nhưng luồng message qua Kafka chưa chạy.
 - ⚠️ **Xử lý lỗi consumer:** lỗi hạ tầng tạm thời (Postgres) được ném ra cho Kafka giao lại, nhưng chưa cấu hình backoff, Dead Letter Queue hay giới hạn

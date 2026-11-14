@@ -1,0 +1,7 @@
+package lms.identity.user.domain;
+
+public class DuplicateUserException extends RuntimeException {
+    public DuplicateUserException(String message) {
+        super(message);
+    }
+}

@@ -55,13 +55,13 @@ class BorrowingSecurityTest {
 
     @Test
     void khongTokenBi401() throws Exception {
-        mvc.perform(post("/api/borrowings").contentType(MediaType.APPLICATION_JSON).content(BODY))
+        mvc.perform(post("/internal/borrowings").contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void thieuPermissionBorrowBookBi403() throws Exception {
-        mvc.perform(post("/api/borrowings").contentType(MediaType.APPLICATION_JSON).content(BODY)
+        mvc.perform(post("/internal/borrowings").contentType(MediaType.APPLICATION_JSON).content(BODY)
                         .with(jwt().jwt(j -> j.claim("permissions", List.of("BorrowingController/returnBook")))
                                 .authorities(new SimpleGrantedAuthority("BorrowingController/returnBook"))))
                 .andExpect(status().isForbidden());
@@ -71,7 +71,7 @@ class BorrowingSecurityTest {
     void duPermissionBorrowBookDuocTao() throws Exception {
         when(borrowBook.execute(any())).thenReturn(response());
 
-        mvc.perform(post("/api/borrowings").contentType(MediaType.APPLICATION_JSON).content(BODY)
+        mvc.perform(post("/internal/borrowings").contentType(MediaType.APPLICATION_JSON).content(BODY)
                         .with(jwt().jwt(j -> j.claim("permissions", List.of("BorrowingController/borrow")))
                                 .authorities(new SimpleGrantedAuthority("BorrowingController/borrow"))))
                 .andExpect(status().isCreated());
@@ -81,7 +81,7 @@ class BorrowingSecurityTest {
     void xemPhieuMuonChiCanDangNhap() throws Exception {
         when(getBorrowing.execute(any())).thenReturn(response());
 
-        mvc.perform(get("/api/borrowings/" + UUID.randomUUID()).with(jwt()))
+        mvc.perform(get("/internal/borrowings/" + UUID.randomUUID()).with(jwt()))
                 .andExpect(status().isOk());
     }
 }

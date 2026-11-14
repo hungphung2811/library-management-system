@@ -19,15 +19,23 @@ public class TokenService {
     private final SaveRefreshTokenPort refreshTokens;
     private final Clock clock;
     private final Duration refreshTokenTtl;
+    private final UserDirectoryPort userDirectory;
 
     public TokenService(UserAccessPort userAccessPort, TokenIssuerPort tokenIssuer, RefreshTokenCodecPort codec,
                         SaveRefreshTokenPort refreshTokens, Clock clock, Duration refreshTokenTtl) {
+        this(userAccessPort, tokenIssuer, codec, refreshTokens, clock, refreshTokenTtl, userId -> java.util.Optional.empty());
+    }
+
+    public TokenService(UserAccessPort userAccessPort, TokenIssuerPort tokenIssuer, RefreshTokenCodecPort codec,
+                        SaveRefreshTokenPort refreshTokens, Clock clock, Duration refreshTokenTtl,
+                        UserDirectoryPort userDirectory) {
         this.userAccessPort = userAccessPort;
         this.tokenIssuer = tokenIssuer;
         this.codec = codec;
         this.refreshTokens = refreshTokens;
         this.clock = clock;
         this.refreshTokenTtl = refreshTokenTtl;
+        this.userDirectory = userDirectory;
     }
 
     public TokenResponse issueFor(UserCredential credential) {
@@ -43,11 +51,19 @@ public class TokenService {
     }
 
     private TokenResponse issue(UserCredential credential, boolean mustChange) {
+        // Người dùng bị vô hiệu hóa ở context user thì không được cấp token mới (cả đăng nhập, làm mới và đăng nhập ngoài)
+        java.util.Optional<UserDirectoryPort.UserInfo> directory = userDirectory.find(credential.userId());
+        if (directory.isPresent() && directory.get().disabled()) {
+            throw new lms.identity.auth.domain.AccountDisabledException();
+        }
+        // Phòng ban hiện tại lấy từ hồ sơ người dùng (đổi phòng ban có hiệu lực ở lần cấp token kế tiếp)
+        java.util.UUID departmentId = directory.map(UserDirectoryPort.UserInfo::departmentId)
+                .orElse(credential.departmentId());
         UserAccessPort.UserAccess access = userAccessPort.fetch(credential.userId());
         // Phải đổi mật khẩu trước: token không mang permission nào nên mọi endpoint kiểm quyền (ở mọi service) đều
         // từ chối, chỉ còn các endpoint chỉ cần đăng nhập, như đổi mật khẩu.
         TokenIssuerPort.IssuedToken accessToken = tokenIssuer.issue(new TokenIssuerPort.Claims(
-                credential.userId(), credential.username(), credential.departmentId(),
+                credential.userId(), credential.username(), departmentId,
                 access.roles(), mustChange ? java.util.List.of() : access.permissions(), mustChange,
                 !mustChange && access.admin()));
 

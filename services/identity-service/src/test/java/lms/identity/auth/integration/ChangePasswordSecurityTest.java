@@ -29,7 +29,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-/** POST /api/auth/password chỉ cần đăng nhập (không cần permission), userId lấy từ token. */
+/** POST /internal/auth/password chỉ cần đăng nhập (không cần permission), userId lấy từ token. */
 @WebMvcTest(AuthController.class)
 @Import({SecurityConfiguration.class, AuthExceptionHandler.class, PermissionAutoConfiguration.class})
 class ChangePasswordSecurityTest {
@@ -50,13 +50,13 @@ class ChangePasswordSecurityTest {
 
     @Test
     void khongTokenBi401() throws Exception {
-        mvc.perform(post("/api/auth/password").contentType(MediaType.APPLICATION_JSON).content(BODY))
+        mvc.perform(post("/internal/auth/password").contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void tokenKhongCoPermissionVanDoiDuocMatKhauVaDungUserIdTrongToken() throws Exception {
-        mvc.perform(post("/api/auth/password").with(jwt().jwt(j -> j.subject(USER.toString())))
+        mvc.perform(post("/internal/auth/password").with(jwt().jwt(j -> j.subject(USER.toString())))
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isNoContent());
         verify(changePassword).execute(eq(USER), eq("OldPass123"), eq("NewPass456"));
@@ -66,10 +66,10 @@ class ChangePasswordSecurityTest {
     void saiMatKhauHienTaiTra422VaMatKhauMoiNganBi400() throws Exception {
         doThrow(new WrongCurrentPasswordException()).when(changePassword).execute(eq(USER), eq("OldPass123"), eq("NewPass456"));
         var token = jwt().jwt(j -> j.subject(USER.toString()));
-        mvc.perform(post("/api/auth/password").with(token).contentType(MediaType.APPLICATION_JSON).content(BODY))
+        mvc.perform(post("/internal/auth/password").with(token).contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("WRONG_CURRENT_PASSWORD"));
-        mvc.perform(post("/api/auth/password").with(token).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(post("/internal/auth/password").with(token).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"currentPassword\":\"a\",\"newPassword\":\"short\"}"))
                 .andExpect(status().isBadRequest());
     }

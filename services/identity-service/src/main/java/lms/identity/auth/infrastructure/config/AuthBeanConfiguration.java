@@ -7,6 +7,9 @@ import lms.identity.auth.application.RefreshTokenUseCase;
 import lms.identity.auth.application.RegisterCredentialUseCase;
 import lms.identity.auth.application.RevokeUserSessionsUseCase;
 import lms.identity.auth.application.TokenService;
+import lms.identity.auth.application.UserDirectoryPort;
+import lms.identity.auth.infrastructure.client.InProcessUserDirectoryAdapter;
+import lms.identity.user.application.GetUserDirectoryInfoUseCase;
 import lms.identity.accesscontrol.application.GetUserAccessUseCase;
 import lms.identity.auth.infrastructure.client.InProcessUserAccessAdapter;
 import lms.identity.auth.infrastructure.messaging.KafkaAuthEventPublisher;
@@ -56,6 +59,11 @@ public class AuthBeanConfiguration {
     }
 
     @Bean
+    InProcessUserDirectoryAdapter userDirectoryAdapter(GetUserDirectoryInfoUseCase getInfo) {
+        return new InProcessUserDirectoryAdapter(getInfo);
+    }
+
+    @Bean
     InProcessUserAccessAdapter userAccessAdapter(GetUserAccessUseCase getUserAccess) {
         return new InProcessUserAccessAdapter(getUserAccess);
     }
@@ -73,9 +81,9 @@ public class AuthBeanConfiguration {
 
     @Bean
     TokenService tokenService(InProcessUserAccessAdapter accessClient, JwtTokenIssuer issuer, SecureRefreshTokenCodec codec,
-                              AuthPersistenceAdapter persistence, Clock clock,
+                              AuthPersistenceAdapter persistence, Clock clock, UserDirectoryPort userDirectory,
                               @Value("${auth.refresh-token-ttl}") Duration refreshTtl) {
-        return new TokenService(accessClient, issuer, codec, persistence, clock, refreshTtl);
+        return new TokenService(accessClient, issuer, codec, persistence, clock, refreshTtl, userDirectory);
     }
 
     @Bean

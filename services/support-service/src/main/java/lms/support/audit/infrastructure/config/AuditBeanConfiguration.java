@@ -13,7 +13,6 @@ import lms.support.audit.infrastructure.persistence.MongoRawEventArchive;
 import lms.support.audit.infrastructure.persistence.SpringDataAuditLogRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.DependsOn;
 
 /** Composition root của ngữ cảnh audit: nối domain/application (không có annotation Spring) với adapter. */
 @Configuration
@@ -24,9 +23,8 @@ public class AuditBeanConfiguration {
         return Clock.systemUTC();
     }
 
-    /** Phụ thuộc auditFlyway để bảng audit_logs đã tồn tại trước khi dùng. */
+    /** Schema audit_logs do migration-service tạo sẵn (service này chỉ dùng, không chạy Flyway). */
     @Bean
-    @DependsOn("auditFlyway")
     AuditLogPersistenceAdapter auditLogPersistenceAdapter(SpringDataAuditLogRepository jpa) {
         return new AuditLogPersistenceAdapter(jpa);
     }

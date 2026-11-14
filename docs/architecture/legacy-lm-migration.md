@@ -39,7 +39,7 @@ cảnh báo và đặt trước vẫn `READY` (cần luồng `borrowing` đánh 
 |---|---|---|
 | Đổi mật khẩu | `POST /api/auth/password` (chỉ cần token hợp lệ) | Cần đúng mật khẩu hiện tại; mật khẩu mới ≥ 8 ký tự và khác mật khẩu cũ; đổi xong thu hồi mọi refresh token |
 | `must_change_password` | cột `credentials.must_change_password` (V7), claim `mustChangePassword`, trường `mustChangePassword` ở response đăng nhập | Token loại này **không mang permission nào** nên mọi endpoint kiểm quyền ở mọi service trả 403 cho tới khi đổi mật khẩu. Admin khởi tạo mặc định bị bắt đổi (tắt ở profile dev); `POST /api/auth/credentials` nhận `mustChangePassword` tùy chọn |
-| Kiểm JWT ở biên | `lms-api` (`SecurityConfiguration`); nginx chặn `/.well-known/**` | Request không có token hợp lệ bị 401; JWKS không lộ ra ngoài. (Trước đây làm ở `api-gateway`, nay thay bằng nginx + `lms-api`, xem ADR-0004.) Từng service vẫn kiểm lại token và tự kiểm quyền |
+| Kiểm JWT ở biên | `lms-api` (`SecurityConfiguration`); nginx chặn `/.well-known/**` | Request không có token hợp lệ bị 401; JWKS không lộ ra ngoài. (Trước đây làm ở `api-gateway`, nay thay bằng nginx + `lms-api`, xem ADR-0005.) Từng service vẫn kiểm lại token và tự kiểm quyền |
 
 ## Đã chuyển (lát cắt 4: đăng nhập ngoài, mục P5)
 

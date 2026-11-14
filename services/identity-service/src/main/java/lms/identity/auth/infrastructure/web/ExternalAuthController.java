@@ -62,7 +62,7 @@ import org.springframework.web.util.UriComponentsBuilder;
  */
 @AuthenticatedOnly
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/internal/auth")
 public class ExternalAuthController {
 
     static final String COOKIE = "lms_ext";
@@ -207,6 +207,7 @@ public class ExternalAuthController {
     }
 
     private ResponseCookie cookieBuilder(String value, Duration maxAge) {
+        // Đường dẫn công khai mà trình duyệt thấy (qua nginx và lms-api), không phải đường dẫn nội bộ /internal/auth
         return ResponseCookie.from(COOKIE, value).httpOnly(true).secure(properties.isCookieSecure()).sameSite("Lax")
                 .path("/api/auth").maxAge(maxAge).build();
     }

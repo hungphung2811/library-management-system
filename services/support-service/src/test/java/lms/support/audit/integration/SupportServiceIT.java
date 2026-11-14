@@ -30,6 +30,7 @@ import lms.support.audit.application.RecordAuditEventUseCase;
 import lms.support.audit.domain.AuditLogCriteria;
 import lms.support.audit.infrastructure.messaging.AuditEventConsumer;
 import org.bson.Document;
+import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +40,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.orm.jpa.JpaTransactionManager;
@@ -107,6 +109,22 @@ class SupportServiceIT {
         }
     }
 
+    /**
+     * Ở production migration-service chạy Flyway; trong IT phải tự migrate AUDIT_DB bằng script lấy từ jar
+     * migration-service (test classpath) trước khi các test dùng bảng audit_logs.
+     */
+    @TestConfiguration
+    static class AuditFlywayTestConfiguration {
+        @Bean(name = "auditFlyway", initMethod = "migrate")
+        @DependsOn("databaseLifecycleManager")
+        Flyway auditFlyway(DatabaseConnectionRegistry registry) {
+            return Flyway.configure()
+                    .dataSource(registry.require("AUDIT_DB", RelationalConnection.class).dataSource())
+                    .locations("classpath:db/migration/audit")
+                    .load();
+        }
+    }
+
     @Autowired TestRestTemplate rest;
     @Autowired ApplicationContext context;
     @Autowired DatabaseConnectionRegistry registry;
@@ -132,9 +150,10 @@ class SupportServiceIT {
     }
 
     @Test
-    void khoiDongMoCaHaiConnectionVaChayFlywayChoAuditDb() {
+    void khoiDongMoCaHaiConnectionVaSchemaAuditDbDuocBeanTestMigrate() {
         assertThat(registry.state("AUDIT_DB")).isEqualTo(ConnectionState.UP);
         assertThat(registry.state("LOG_DB")).isEqualTo(ConnectionState.UP);
+        // 1 bản ghi thành công do bean auditFlyway của test chạy (script từ jar migration-service)
         assertThat(new JdbcTemplate(auditDataSource)
                 .queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE success", Integer.class)).isEqualTo(1);
         assertThat(context.getBean("auditDbTransactionManager")).isInstanceOf(JpaTransactionManager.class)
@@ -153,17 +172,17 @@ class SupportServiceIT {
         assertThat(query.execute(new AuditLogCriteria(aggregate, null, 0, 20)).total()).isEqualTo(3);
 
         Map<String, Object> filtered = rest.getForObject(
-                "/api/audit-logs?aggregateId=" + aggregate + "&eventType=BookBorrowedEvent", Map.class);
+                "/internal/audit-logs?aggregateId=" + aggregate + "&eventType=BookBorrowedEvent", Map.class);
         assertThat(filtered.get("total")).isEqualTo(2);
         assertThat((List<Map<String, Object>>) filtered.get("items")).extracting(i -> i.get("eventType"))
                 .containsOnly("BookBorrowedEvent");
 
         Map<String, Object> secondPage = rest.getForObject(
-                "/api/audit-logs?aggregateId=" + aggregate + "&page=1&size=2", Map.class);
+                "/internal/audit-logs?aggregateId=" + aggregate + "&page=1&size=2", Map.class);
         assertThat(secondPage.get("total")).isEqualTo(3);
         assertThat((List<?>) secondPage.get("items")).hasSize(1);
 
-        assertThat(rest.getForEntity("/api/audit-logs?size=1000", Map.class).getStatusCode())
+        assertThat(rest.getForEntity("/internal/audit-logs?size=1000", Map.class).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 

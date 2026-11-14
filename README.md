@@ -9,7 +9,7 @@ Kiến trúc: Microservices + DDD + Hexagonal + Clean Architecture + RBAC.
 |---|---|
 | `infrastructure/nginx/` | Nginx: cổng vào duy nhất (8080): CORS, header bảo mật, giới hạn tốc độ đăng nhập, chặn `/internal` |
 | `lms-api/` | BFF: service duy nhất đưa API ra cho FE (cổng 8085, nội bộ), gọi các service qua API `/internal/**` |
-| `services/` | 4 microservice, mỗi service một database riêng |
+| `services/` | 4 microservice, mỗi service một database riêng, cộng `migration-service` (runner Flyway tập trung, giữ mọi file SQL) |
 | `shared-libraries/common-kernel` | Contract dùng chung (`DomainEvent`, `ErrorResponse`) |
 | `shared-libraries/security-common` | Danh mục permission, tên claim JWT, converter claim `permissions` |
 | `shared-libraries/messaging-common` | `EventEnvelope` và `KafkaEventPublisher` |
@@ -28,6 +28,23 @@ Mỗi service chứa nhiều bounded context; mỗi context là một package g�
 | catalog-service | 8082 | catalog_db | `catalog`, `inventory` | đã làm: đầu sách, tìm kiếm (UC02), nhập bản sao (UC11 một phần) |
 | circulation-service | 8083 | circulation_db | `borrowing`, `reservation`, `fine` | `borrowing` và `reservation` (UC03, UC04) đã làm; `fine` là khung |
 | support-service | 8084 | `audit_db` (PostgreSQL) + `LOG_DB` (MongoDB) | `notification`, `audit` | `audit` đã làm (dùng `database-common`); `notification` là khung |
+| migration-service | 8086 | không có DB riêng: ghi vào `identity_db`, `catalog_db`, `circulation_db`, `audit_db` | (không có context nghiệp vụ) | runner migration tập trung, xem bên dưới |
+
+### migration-service (migration tập trung)
+
+Giữ toàn bộ file SQL Flyway ở `services/migration-service/src/main/resources/db/migration/{identity,catalog,circulation,audit}/`
+và chạy Flyway lên từng DB lúc khởi động (cấu hình qua `IDENTITY_DB_*`, `CATALOG_DB_*`, `CIRCULATION_DB_*`, `AUDIT_DB_*`).
+`/actuator/health` chỉ UP sau khi migrate xong. Sổ cái là bảng `flyway_schema_history` sẵn có trong từng DB (không có DB riêng).
+Các service khác không chạy Flyway, chỉ dùng schema đã có. API tra cứu/chạy lại (target: `identity`, `catalog`, `circulation`, `audit`):
+
+| API | Ý nghĩa |
+|---|---|
+| `GET /api/migrations` | Trạng thái migration của mọi target |
+| `GET /api/migrations/{target}` | File nào đã chạy trên một target |
+| `POST /api/migrations/run` | Chạy migrate cho mọi target |
+| `POST /api/migrations/{target}/run` | Chạy migrate cho một target |
+
+Quyết định và đánh đổi: `docs/decisions/0004-migration-service-tap-trung.md`.
 
 ### Phân quyền (RBAC: Role-Based Access Control, kiểm soát truy cập theo vai trò)
 
@@ -77,6 +94,8 @@ Mongo là best-effort và không có atomicity xuyên DB. Chi tiết và kết q
 
 ```bash
 docker compose up -d                       # postgres, kafka, redis, mongo
+# Chạy migration-service TRƯỚC các service khác (các service chỉ validate schema, không tự migrate)
+mvn -pl services/migration-service -am spring-boot:run     # cổng 8086, migrate cả 4 DB rồi mới UP
 mvn -pl services/identity-service -am spring-boot:run      # profile dev
 mvn -pl services/catalog-service -am spring-boot:run       # profile dev, security tắt
 mvn -pl services/circulation-service -am spring-boot:run   # profile dev, security tắt (đặt trước vẫn cần Bearer token để biết người gọi)
@@ -89,7 +108,7 @@ Surefire mặc định không chạy `*IT`.
 ## Quy tắc
 
 - Domain không phụ thuộc Spring/JPA; application không phụ thuộc infrastructure (ArchUnit kiểm tra).
-- Không service nào truy cập database của service khác; tham chiếu chéo bằng ID hoặc event.
+- Không service nào truy cập database của service khác; tham chiếu chéo bằng ID hoặc event. Ngoại lệ có chủ đích: `migration-service` chỉ chạy DDL (Flyway) lên các DB, không đọc/ghi dữ liệu nghiệp vụ (ADR-0004).
 - Event có `eventId`, `eventType`, `aggregateId`, `occurredAt`, `version`; consumer phải idempotent.
 - Production cần Transactional Outbox thay cho publish trực tiếp (xem ADR-0001).
 - Gộp từ 11 service nhỏ xuống 4 service theo bounded context, xem ADR-0002.

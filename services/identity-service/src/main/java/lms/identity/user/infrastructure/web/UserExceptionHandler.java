@@ -2,6 +2,9 @@ package lms.identity.user.infrastructure.web;
 
 import lms.common.kernel.ErrorResponse;
 import lms.identity.user.domain.DuplicateReaderException;
+import lms.identity.user.domain.DuplicateUserException;
+import lms.identity.user.domain.InvalidUserException;
+import lms.identity.user.domain.UserNotFoundException;
 import lms.identity.user.domain.InvalidReaderException;
 import lms.identity.user.domain.ReaderProfileNotFoundException;
 import java.util.List;
@@ -27,6 +30,21 @@ public class UserExceptionHandler {
     @ExceptionHandler(InvalidReaderException.class)
     ResponseEntity<ErrorResponse> handleInvalid(InvalidReaderException ex) {
         return build(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_READER", ex.getMessage());
+    }
+
+    @ExceptionHandler(UserNotFoundException.class)
+    ResponseEntity<ErrorResponse> handleUserNotFound(UserNotFoundException ex) {
+        return build(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", ex.getMessage());
+    }
+
+    @ExceptionHandler(DuplicateUserException.class)
+    ResponseEntity<ErrorResponse> handleDuplicateUser(DuplicateUserException ex) {
+        return build(HttpStatus.CONFLICT, "DUPLICATE_USER", ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidUserException.class)
+    ResponseEntity<ErrorResponse> handleInvalidUser(InvalidUserException ex) {
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_USER", ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

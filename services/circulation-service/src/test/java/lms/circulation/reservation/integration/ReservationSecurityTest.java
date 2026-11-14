@@ -61,18 +61,18 @@ class ReservationSecurityTest {
 
     @Test
     void khongTokenBi401() throws Exception {
-        mvc.perform(post("/api/reservations").contentType(MediaType.APPLICATION_JSON).content(BODY))
+        mvc.perform(post("/internal/reservations").contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isUnauthorized());
-        mvc.perform(get("/api/reservations")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/internal/reservations")).andExpect(status().isUnauthorized());
     }
 
     @Test
     void thieuPermissionReserveBookBi403() throws Exception {
         var token = jwt().jwt(j -> j.subject(READER.toString())).authorities(new SimpleGrantedAuthority("BOOK_VIEW"));
-        mvc.perform(post("/api/reservations").with(token).contentType(MediaType.APPLICATION_JSON).content(BODY))
+        mvc.perform(post("/internal/reservations").with(token).contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isForbidden());
-        mvc.perform(get("/api/reservations").with(token)).andExpect(status().isForbidden());
-        mvc.perform(delete("/api/reservations/" + UUID.randomUUID()).with(token)).andExpect(status().isForbidden());
+        mvc.perform(get("/internal/reservations").with(token)).andExpect(status().isForbidden());
+        mvc.perform(delete("/internal/reservations/" + UUID.randomUUID()).with(token)).andExpect(status().isForbidden());
     }
 
     @Test
@@ -80,7 +80,7 @@ class ReservationSecurityTest {
         when(reserve.execute(eq(READER), eq(TITLE))).thenReturn(response());
         var token = jwt().jwt(j -> j.subject(READER.toString())).authorities(new SimpleGrantedAuthority("ReservationController/reserve"));
 
-        mvc.perform(post("/api/reservations").with(token).contentType(MediaType.APPLICATION_JSON).content(BODY))
+        mvc.perform(post("/internal/reservations").with(token).contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("WAITING"))
                 .andExpect(jsonPath("$.queuePosition").value(1));
@@ -93,14 +93,14 @@ class ReservationSecurityTest {
         when(listMine.execute(any())).thenReturn(List.of(response()));
         var token = jwt().jwt(j -> j.subject(READER.toString())).authorities(new SimpleGrantedAuthority("ReservationController/cancel"), new SimpleGrantedAuthority("ReservationController/mine"));
 
-        mvc.perform(delete("/api/reservations/" + id).with(token)).andExpect(status().isOk());
-        mvc.perform(get("/api/reservations").with(token)).andExpect(status().isOk()).andExpect(jsonPath("$[0].queuePosition").value(1));
+        mvc.perform(delete("/internal/reservations/" + id).with(token)).andExpect(status().isOk());
+        mvc.perform(get("/internal/reservations").with(token)).andExpect(status().isOk()).andExpect(jsonPath("$[0].queuePosition").value(1));
     }
 
     @Test
     void validationBodyThieuTitleIdBi400() throws Exception {
         var token = jwt().jwt(j -> j.subject(READER.toString())).authorities(new SimpleGrantedAuthority("ReservationController/reserve"));
-        mvc.perform(post("/api/reservations").with(token).contentType(MediaType.APPLICATION_JSON).content("{}"))
+        mvc.perform(post("/internal/reservations").with(token).contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -111,9 +111,9 @@ class ReservationSecurityTest {
         var librarian = jwt().jwt(j -> j.subject(UUID.randomUUID().toString()))
                 .authorities(new SimpleGrantedAuthority("ReservationController/expireNow"));
 
-        mvc.perform(post("/api/reservations/expirations")).andExpect(status().isUnauthorized());
-        mvc.perform(post("/api/reservations/expirations").with(reader)).andExpect(status().isForbidden());
-        mvc.perform(post("/api/reservations/expirations").with(librarian))
+        mvc.perform(post("/internal/reservations/expirations")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/internal/reservations/expirations").with(reader)).andExpect(status().isForbidden());
+        mvc.perform(post("/internal/reservations/expirations").with(librarian))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.expired").value(2));
     }
 }

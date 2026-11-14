@@ -13,6 +13,13 @@ public interface BookCopyRepository {
 
     Optional<BookCopy> findById(UUID id);
 
+    /** Đọc bản sao và khóa dòng (SELECT ... FOR UPDATE) để hai thao tác đổi trạng thái đồng thời không đè nhau. */
+    Optional<BookCopy> findByIdForUpdate(UUID id);
+
+    Optional<CopyDetails> findDetailsById(UUID id);
+
+    Optional<CopyDetails> findDetailsByBarcode(String barcode);
+
     boolean existsByBarcode(String barcode);
 
     boolean titleExists(UUID titleId);

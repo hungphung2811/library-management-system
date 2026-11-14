@@ -14,7 +14,8 @@ spring:
     hibernate:
       ddl-auto: validate
   flyway:
-    enabled: true
+    # Migration do migration-service chạy tập trung; service chỉ validate schema (ddl-auto: validate)
+    enabled: false
   kafka:
     producer:
       properties:
@@ -40,7 +41,8 @@ logging:
 
 app:
   security:
-    enabled: true
+    # Migration do migration-service chạy tập trung; service chỉ validate schema (ddl-auto: validate)
+    enabled: false
 
   kafka:
     topics:

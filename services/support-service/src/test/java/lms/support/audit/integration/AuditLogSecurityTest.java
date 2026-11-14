@@ -40,12 +40,12 @@ class AuditLogSecurityTest {
 
     @Test
     void khongTokenBi401() throws Exception {
-        mvc.perform(get("/api/audit-logs")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/internal/audit-logs")).andExpect(status().isUnauthorized());
     }
 
     @Test
     void thieuKhoaQuyenBi403() throws Exception {
-        mvc.perform(get("/api/audit-logs").with(jwt().authorities(new SimpleGrantedAuthority("BOOK_VIEW"))))
+        mvc.perform(get("/internal/audit-logs").with(jwt().authorities(new SimpleGrantedAuthority("BOOK_VIEW"))))
                 .andExpect(status().isForbidden());
     }
 
@@ -53,14 +53,14 @@ class AuditLogSecurityTest {
     void duKhoaQuyenDuocXem() throws Exception {
         when(query.execute(any())).thenReturn(new PageResponse<>(List.of(), 0, 0, 20));
 
-        mvc.perform(get("/api/audit-logs").param("aggregateId", "x")
+        mvc.perform(get("/internal/audit-logs").param("aggregateId", "x")
                         .with(jwt().authorities(new SimpleGrantedAuthority("AuditLogController/search"))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(0));
     }
 
     @Test
     void thamSoPhanTrangSaiBi400() throws Exception {
-        mvc.perform(get("/api/audit-logs").param("size", "1000")
+        mvc.perform(get("/internal/audit-logs").param("size", "1000")
                         .with(jwt().authorities(new SimpleGrantedAuthority("AuditLogController/search"))))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_AUDIT_QUERY"));
     }
@@ -75,7 +75,7 @@ class AuditLogSecurityTest {
     void adminDuocBoQuaKiemTraKhoaQuyen() throws Exception {
         when(query.execute(any())).thenReturn(new PageResponse<>(List.of(), 0, 0, 20));
 
-        mvc.perform(get("/api/audit-logs").with(jwt().jwt(j -> j.claim("admin", true))))
+        mvc.perform(get("/internal/audit-logs").with(jwt().jwt(j -> j.claim("admin", true))))
                 .andExpect(status().isOk());
     }
 }

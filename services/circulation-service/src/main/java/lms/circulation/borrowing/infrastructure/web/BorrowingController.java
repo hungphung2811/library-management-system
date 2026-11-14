@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/borrowings")
+@RequestMapping("/internal/borrowings")
 public class BorrowingController {
 
     private final BorrowBookUseCase borrowBook;
@@ -40,7 +40,7 @@ public class BorrowingController {
     @PostMapping
     public ResponseEntity<BorrowingResponse> borrow(@Valid @RequestBody BorrowBookRequest request) {
         BorrowingResponse response = borrowBook.execute(BorrowingMapper.toCommand(request));
-        return ResponseEntity.created(URI.create("/api/borrowings/" + response.id())).body(response);
+        return ResponseEntity.created(URI.create("/internal/borrowings/" + response.id())).body(response);
     }
 
     @PostMapping("/{id}/returns")

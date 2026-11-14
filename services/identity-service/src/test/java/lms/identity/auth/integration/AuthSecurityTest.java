@@ -62,7 +62,7 @@ class AuthSecurityTest {
     void dangNhapLaCongKhaiVaTraToken() throws Exception {
         when(login.execute("alice", "secret123")).thenReturn(TokenResponse.bearer("a", "r", 900));
 
-        mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(LOGIN_BODY))
+        mvc.perform(post("/internal/auth/login").contentType(MediaType.APPLICATION_JSON).content(LOGIN_BODY))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("a"))
                 .andExpect(jsonPath("$.tokenType").value("Bearer"));
@@ -72,7 +72,7 @@ class AuthSecurityTest {
     void saiThongTinTra401KhongLoChiTiet() throws Exception {
         when(login.execute(any(), any())).thenThrow(new InvalidCredentialsException());
 
-        mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(LOGIN_BODY))
+        mvc.perform(post("/internal/auth/login").contentType(MediaType.APPLICATION_JSON).content(LOGIN_BODY))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     }
@@ -81,7 +81,7 @@ class AuthSecurityTest {
     void taiKhoanBiKhoaTra423() throws Exception {
         when(login.execute(any(), any())).thenThrow(new AccountLockedException(Instant.now()));
 
-        mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(LOGIN_BODY))
+        mvc.perform(post("/internal/auth/login").contentType(MediaType.APPLICATION_JSON).content(LOGIN_BODY))
                 .andExpect(status().isLocked());
     }
 
@@ -89,12 +89,12 @@ class AuthSecurityTest {
     void taoCredentialCanDangNhapVaPermissionUserCreate() throws Exception {
         when(register.execute(any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean())).thenReturn(UUID.randomUUID());
 
-        mvc.perform(post("/api/auth/credentials").contentType(MediaType.APPLICATION_JSON).content(registerBody))
+        mvc.perform(post("/internal/auth/credentials").contentType(MediaType.APPLICATION_JSON).content(registerBody))
                 .andExpect(status().isUnauthorized());
-        mvc.perform(post("/api/auth/credentials").with(with("AuthController/changePasswordKhac"))
+        mvc.perform(post("/internal/auth/credentials").with(with("AuthController/changePasswordKhac"))
                         .contentType(MediaType.APPLICATION_JSON).content(registerBody))
                 .andExpect(status().isForbidden());
-        mvc.perform(post("/api/auth/credentials").with(with("AuthController/register"))
+        mvc.perform(post("/internal/auth/credentials").with(with("AuthController/register"))
                         .contentType(MediaType.APPLICATION_JSON).content(registerBody))
                 .andExpect(status().isCreated());
     }
@@ -102,6 +102,6 @@ class AuthSecurityTest {
     @Test
     void duongDanNgoaiApiBiTuChoiConApiKhongCoHandlerLa404() throws Exception {
         mvc.perform(get("/anything").with(with("AuthController/register"))).andExpect(status().isForbidden());
-        mvc.perform(get("/api/anything").with(with("AuthController/register"))).andExpect(status().isNotFound());
+        mvc.perform(get("/internal/anything").with(with("AuthController/register"))).andExpect(status().isNotFound());
     }
 }
