@@ -1,0 +1,141 @@
+# Hạ tầng local. Chạy service bằng IDE/Maven (profile dev) hoặc dùng profile "apps".
+#   docker compose up -d                          -> postgres, kafka, redis
+#   docker compose --profile apps up -d --build   -> thêm gateway, identity-service, circulation-service
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  kafka:
+    image: apache/kafka:3.9.0
+    ports:
+      - "29092:29092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,EXTERNAL://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  # LOG_DB của support-service. Mongo đơn lẻ là đủ vì use case chỉ ghi/upsert từng document; muốn dùng
+  # transaction của Mongo (MongoTransactionManager) thì phải chạy replica set.
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  identity-service:
+    profiles: [apps]
+    build:
+      context: .
+      dockerfile: services/identity-service/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://postgres:5432/identity_db
+      DB_USERNAME: identity
+      DB_PASSWORD: identity
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      # Bỏ trống thì không tạo admin khởi tạo. Khóa JWT bỏ trống thì dùng khóa tạm (chỉ phù hợp demo).
+      AUTH_BOOTSTRAP_ADMIN_PASSWORD: ${AUTH_BOOTSTRAP_ADMIN_PASSWORD:-}
+      AUTH_JWT_PRIVATE_KEY: ${AUTH_JWT_PRIVATE_KEY:-}
+      AUTH_JWT_PUBLIC_KEY: ${AUTH_JWT_PUBLIC_KEY:-}
+    ports:
+      - "8081:8081"
+
+  circulation-service:
+    profiles: [apps]
+    build:
+      context: .
+      dockerfile: services/circulation-service/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://postgres:5432/circulation_db
+      DB_USERNAME: circulation
+      DB_PASSWORD: circulation
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_JWK_SET_URI: http://identity-service:8081/.well-known/jwks.json
+    ports:
+      - "8083:8083"
+
+  support-service:
+    profiles: [apps]
+    build:
+      context: .
+      dockerfile: services/support-service/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      AUDIT_DB_URL: jdbc:postgresql://postgres:5432/audit_db
+      AUDIT_DB_USERNAME: audit
+      AUDIT_DB_PASSWORD: audit
+      LOG_DB_URI: mongodb://mongo:27017/audit_logs
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_JWK_SET_URI: http://identity-service:8081/.well-known/jwks.json
+    ports:
+      - "8084:8084"
+
+  api-gateway:
+    profiles: [apps]
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    environment:
+      IDENTITY_SERVICE_URL: http://identity-service:8081
+      CIRCULATION_SERVICE_URL: http://circulation-service:8083
+      SUPPORT_SERVICE_URL: http://support-service:8084
+    depends_on:
+      - identity-service
+      - circulation-service
+      - support-service
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:
+  mongodata:

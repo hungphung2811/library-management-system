@@ -1,0 +1,68 @@
+server:
+  port: 8084
+  shutdown: graceful
+
+spring:
+  application:
+    name: support-service
+  profiles:
+    default: dev
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  # Nguồn dữ liệu do database-common quản lý (database.connections.*), nên tắt các auto-config mặc định
+  # để không xung đột: DataSource/Hibernate/Flyway/Mongo/Repository tự cấu hình.
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration
+      - org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration
+      - org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoRepositoriesAutoConfiguration
+  kafka:
+    consumer:
+      group-id: support-service
+      auto-offset-reset: earliest
+
+database:
+  # true: lỗi mở connection critical làm app dừng. LOG_DB là connection phụ nên chỉ ghi nhận FAILED.
+  fail-on-startup-error: true
+  connections:
+    AUDIT_DB:
+      type: POSTGRESQL
+      critical: true
+      entity-packages: lms.support.audit.infrastructure.persistence
+      jpa-properties:
+        # Flyway chạy sau khi EntityManagerFactory được tạo nên không validate schema ở đây.
+        hibernate.hbm2ddl.auto: none
+    LOG_DB:
+      type: MONGODB
+      critical: false
+      retry:
+        max-attempts: 2
+        backoff: 500ms
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  pattern:
+    level: "%5p [%X{correlationId:-}]"
+
+app:
+  security:
+    enabled: true
+  kafka:
+    topics:
+      auth-events: auth.events
+      access-events: access-control.events
+      borrowing-events: borrowing.events

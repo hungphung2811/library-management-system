@@ -1,0 +1,109 @@
+package lms.identity.accesscontrol.infrastructure.persistence;
+
+import lms.identity.accesscontrol.application.SavePermissionPort;
+import lms.identity.accesscontrol.application.SaveRolePort;
+import lms.identity.accesscontrol.application.SaveUserRolePort;
+import lms.identity.accesscontrol.domain.UserRoleAssignment;
+import lms.identity.accesscontrol.domain.Permission;
+import lms.identity.accesscontrol.domain.Role;
+import lms.identity.accesscontrol.domain.RoleId;
+import lms.identity.accesscontrol.domain.PermissionRepository;
+import lms.identity.accesscontrol.domain.RoleRepository;
+import lms.identity.accesscontrol.domain.UserRoleRepository;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+/** Adapter persistence duy nhất cho cả ba aggregate; tách Domain Model khỏi Persistence Model. */
+public class AccessControlPersistenceAdapter implements RoleRepository, PermissionRepository, UserRoleRepository,
+        SaveRolePort, SavePermissionPort, SaveUserRolePort {
+
+    private final RoleJpaRepository roleJpa;
+    private final PermissionJpaRepository permissionJpa;
+    private final UserRoleJpaRepository userRoleJpa;
+
+    public AccessControlPersistenceAdapter(RoleJpaRepository roleJpa, PermissionJpaRepository permissionJpa,
+                                           UserRoleJpaRepository userRoleJpa) {
+        this.roleJpa = roleJpa;
+        this.permissionJpa = permissionJpa;
+        this.userRoleJpa = userRoleJpa;
+    }
+
+    // ---- Role ----
+
+    @Override
+    public Role save(Role role) {
+        roleJpa.save(new RoleJpaEntity(role.id().value(), role.name(), role.description(), role.permissionCodes()));
+        return role;
+    }
+
+    @Override
+    public Optional<Role> findById(RoleId id) {
+        return roleJpa.findById(id.value()).map(AccessControlPersistenceAdapter::toDomain);
+    }
+
+    @Override
+    public boolean existsByName(String name) {
+        return roleJpa.existsByName(name);
+    }
+
+    @Override
+    public List<Role> findAllByIds(Collection<RoleId> ids) {
+        return roleJpa.findAllById(ids.stream().map(RoleId::value).toList()).stream()
+                .map(AccessControlPersistenceAdapter::toDomain).toList();
+    }
+
+    @Override
+    public List<Role> findAll() {
+        return roleJpa.findAll().stream().map(AccessControlPersistenceAdapter::toDomain).toList();
+    }
+
+    // ---- Permission ----
+
+    @Override
+    public Permission save(Permission permission) {
+        permissionJpa.save(new PermissionJpaEntity(permission.code(), permission.description()));
+        return permission;
+    }
+
+    @Override
+    public boolean existsByCode(String code) {
+        return permissionJpa.existsById(code);
+    }
+
+    @Override
+    public List<Permission> findAllPermissions() {
+        return permissionJpa.findAll().stream().map(e -> new Permission(e.getCode(), e.getDescription())).toList();
+    }
+
+    // ---- UserRoleAssignment ----
+
+    @Override
+    public UserRoleAssignment save(UserRoleAssignment assignment) {
+        Set<UUID> wanted = assignment.roleIds().stream().map(RoleId::value).collect(Collectors.toSet());
+        Set<UUID> existing = userRoleJpa.findByUserId(assignment.userId()).stream()
+                .map(UserRoleJpaEntity::getRoleId).collect(Collectors.toCollection(HashSet::new));
+
+        existing.stream().filter(r -> !wanted.contains(r))
+                .forEach(r -> userRoleJpa.deleteById(new UserRoleJpaEntity.Key(assignment.userId(), r)));
+        wanted.stream().filter(r -> !existing.contains(r))
+                .forEach(r -> userRoleJpa.save(new UserRoleJpaEntity(assignment.userId(), r)));
+        return assignment;
+    }
+
+    @Override
+    public Optional<UserRoleAssignment> findByUserId(UUID userId) {
+        List<UserRoleJpaEntity> rows = userRoleJpa.findByUserId(userId);
+        if (rows.isEmpty()) return Optional.empty();
+        return Optional.of(UserRoleAssignment.restore(userId,
+                rows.stream().map(r -> new RoleId(r.getRoleId())).toList()));
+    }
+
+    private static Role toDomain(RoleJpaEntity e) {
+        return Role.restore(new RoleId(e.getId()), e.getName(), e.getDescription(), e.getPermissionCodes());
+    }
+}

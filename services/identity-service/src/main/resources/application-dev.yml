@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/identity_db
+    username: identity
+    password: identity
+  kafka:
+    bootstrap-servers: localhost:29092
+
+auth:
+  bootstrap-admin:
+    # Chỉ dùng ở dev. Đăng nhập: admin / Admin@12345
+    password: Admin@12345
+
+logging:
+  level:
+    lms.identity: DEBUG

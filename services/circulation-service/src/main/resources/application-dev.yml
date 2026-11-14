@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/circulation_db
+    username: circulation
+    password: circulation
+  kafka:
+    bootstrap-servers: localhost:29092
+    producer:
+      properties:
+        max.block.ms: 3000
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:8081/.well-known/jwks.json
+
+app:
+  security:
+    enabled: false
+
+logging:
+  level:
+    lms.circulation: DEBUG

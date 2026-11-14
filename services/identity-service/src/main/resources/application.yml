@@ -1,0 +1,58 @@
+server:
+  port: 8081
+  shutdown: graceful
+
+spring:
+  application:
+    name: identity-service
+  profiles:
+    default: dev
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  kafka:
+    producer:
+      properties:
+        # Không chặn request lâu khi broker sự cố; publish là best-effort (xem KafkaEventPublisher)
+        max.block.ms: 2000
+    consumer:
+      group-id: identity-service
+      auto-offset-reset: latest
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  pattern:
+    level: "%5p [%X{correlationId:-}]"
+
+auth:
+  jwt:
+    issuer: library-auth-service
+    access-token-ttl: PT15M
+    # PEM PKCS#8 / X.509. Bỏ trống thì sinh khóa tạm mỗi lần chạy (chỉ dùng cho dev).
+    private-key-pem: ${AUTH_JWT_PRIVATE_KEY:}
+    public-key-pem: ${AUTH_JWT_PUBLIC_KEY:}
+  refresh-token-ttl: P7D
+  bootstrap-admin:
+    user-id: 00000000-0000-0000-0000-000000000001
+    username: admin
+    password: ${AUTH_BOOTSTRAP_ADMIN_PASSWORD:}
+
+app:
+  kafka:
+    topics:
+      access-events: access-control.events
+      auth-events: auth.events

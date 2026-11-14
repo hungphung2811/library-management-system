@@ -1,0 +1,43 @@
+server:
+  port: 8083
+  shutdown: graceful
+
+spring:
+  application:
+    name: circulation-service
+  profiles:
+    default: dev
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  kafka:
+    producer:
+      properties:
+        # Không chặn request lâu khi broker sự cố; publish là best-effort (xem KafkaEventPublisher)
+        max.block.ms: 2000
+    consumer:
+      group-id: circulation-service
+      auto-offset-reset: earliest
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+app:
+  security:
+    enabled: true
+  kafka:
+    topics:
+      borrowing-events: borrowing.events
+      fine-events: fine.events

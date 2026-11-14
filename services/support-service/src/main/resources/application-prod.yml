@@ -1,0 +1,22 @@
+# Mọi secret chỉ lấy từ biến môi trường, không có giá trị mặc định.
+database:
+  connections:
+    AUDIT_DB:
+      url: ${AUDIT_DB_URL}
+      username: ${AUDIT_DB_USERNAME}
+      password: ${AUDIT_DB_PASSWORD}
+    LOG_DB:
+      uri: ${LOG_DB_URI}
+
+spring:
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${JWT_JWK_SET_URI}
+
+logging:
+  level:
+    root: INFO

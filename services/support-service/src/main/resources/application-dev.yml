@@ -1,0 +1,25 @@
+database:
+  connections:
+    AUDIT_DB:
+      url: jdbc:postgresql://localhost:5432/audit_db
+      username: audit
+      password: audit
+    LOG_DB:
+      uri: mongodb://localhost:27017/audit_logs
+
+spring:
+  kafka:
+    bootstrap-servers: localhost:29092
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:8081/.well-known/jwks.json
+
+app:
+  security:
+    enabled: false
+
+logging:
+  level:
+    lms.support: DEBUG
