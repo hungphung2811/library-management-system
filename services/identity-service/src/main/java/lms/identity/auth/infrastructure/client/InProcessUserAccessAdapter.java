@@ -22,7 +22,7 @@ public class InProcessUserAccessAdapter implements UserAccessPort {
     public UserAccess fetch(UUID userId) {
         try {
             UserAccessResponse response = getUserAccess.execute(userId);
-            return new UserAccess(response.userId(), response.roles(), response.permissions());
+            return new UserAccess(response.userId(), response.roles(), response.permissions(), response.admin());
         } catch (RuntimeException e) {
             throw new AuthenticationUnavailableException("Không tính được quyền của người dùng " + userId, e);
         }

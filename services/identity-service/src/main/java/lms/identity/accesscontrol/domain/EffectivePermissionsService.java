@@ -13,4 +13,9 @@ public class EffectivePermissionsService {
         roles.forEach(r -> permissions.addAll(r.permissionCodes()));
         return permissions;
     }
+
+    /** Người dùng là quản trị viên khi có ít nhất một role đánh dấu is_admin. */
+    public boolean isAdmin(Collection<Role> roles) {
+        return roles.stream().anyMatch(Role::isAdmin);
+    }
 }

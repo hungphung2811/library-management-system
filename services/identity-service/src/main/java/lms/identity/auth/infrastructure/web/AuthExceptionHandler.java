@@ -4,8 +4,10 @@ import lms.identity.auth.domain.AccountDisabledException;
 import lms.identity.auth.domain.AccountLockedException;
 import lms.identity.auth.domain.AuthenticationUnavailableException;
 import lms.identity.auth.domain.DuplicateUsernameException;
+import lms.identity.auth.domain.ExternalAuthException;
 import lms.identity.auth.domain.InvalidCredentialsException;
 import lms.identity.auth.domain.InvalidRefreshTokenException;
+import lms.identity.auth.domain.WrongCurrentPasswordException;
 import lms.common.kernel.ErrorResponse;
 import java.util.List;
 import org.slf4j.Logger;
@@ -24,6 +26,27 @@ public class AuthExceptionHandler {
     @ExceptionHandler({InvalidCredentialsException.class, InvalidRefreshTokenException.class})
     ResponseEntity<ErrorResponse> handleUnauthorized(RuntimeException ex) {
         return build(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", ex.getMessage());
+    }
+
+    @ExceptionHandler(WrongCurrentPasswordException.class)
+    ResponseEntity<ErrorResponse> handleWrongCurrentPassword(WrongCurrentPasswordException ex) {
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, "WRONG_CURRENT_PASSWORD", ex.getMessage());
+    }
+
+    @ExceptionHandler(ExternalAuthException.class)
+    ResponseEntity<ErrorResponse> handleExternal(ExternalAuthException ex) {
+        HttpStatus status = switch (ex.reason()) {
+            case PROVIDER_NOT_CONFIGURED, EXTERNAL_LOGIN_NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case RETURN_URL_NOT_ALLOWED, INVALID_STATE, EXCHANGE_FAILED -> HttpStatus.BAD_REQUEST;
+            case PROVIDER_UNAVAILABLE -> HttpStatus.BAD_GATEWAY;
+            case ACCOUNT_NOT_LINKED -> HttpStatus.FORBIDDEN;
+            case ALREADY_LINKED -> HttpStatus.CONFLICT;
+            case INVALID_TICKET -> HttpStatus.UNAUTHORIZED;
+        };
+        if (status == HttpStatus.BAD_GATEWAY) {
+            log.warn("Đăng nhập ngoài: {}", ex.getMessage(), ex);
+        }
+        return build(status, ex.reason().name(), ex.getMessage());
     }
 
     @ExceptionHandler(AccountLockedException.class)

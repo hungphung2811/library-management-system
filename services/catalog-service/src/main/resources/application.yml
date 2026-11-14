@@ -9,6 +9,20 @@ spring:
     default: dev
   lifecycle:
     timeout-per-shutdown-phase: 30s
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  kafka:
+    producer:
+      properties:
+        # Không chặn request lâu khi broker sự cố; publish là best-effort (xem KafkaEventPublisher)
+        max.block.ms: 2000
+    consumer:
+      group-id: catalog-service
+      auto-offset-reset: earliest
 
 management:
   endpoints:
@@ -20,5 +34,23 @@ management:
       probes:
         enabled: true
 
-# Database sở hữu riêng của service: catalog_db
-# TODO: cấu hình datasource, Flyway, Kafka khi bắt đầu hiện thực service.
+logging:
+  pattern:
+    level: "%5p [%X{correlationId:-}]"
+
+app:
+  security:
+    enabled: true
+
+  kafka:
+    topics:
+      inventory-events: inventory.events
+      reservation-events: reservation.events
+
+# Middleware phân quyền theo endpoint (security-common): khóa Controller/method được đăng ký về identity-service
+lms:
+  security:
+    permission:
+      service-name: ${spring.application.name}
+      identity-base-url: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+      internal-api-key: ${INTERNAL_API_KEY:}

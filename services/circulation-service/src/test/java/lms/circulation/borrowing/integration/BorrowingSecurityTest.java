@@ -14,6 +14,8 @@ import lms.circulation.borrowing.application.RenewBorrowingUseCase;
 import lms.circulation.borrowing.application.ReturnBookUseCase;
 import lms.circulation.borrowing.infrastructure.web.BorrowingController;
 import lms.circulation.config.SecurityConfiguration;
+import lms.security.permission.PermissionAutoConfiguration;
+import lms.security.permission.PermissionKeyRegistrar;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -30,8 +32,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 /** Kiểm chứng RBAC: không token, thiếu permission, đủ permission. Không cần Docker. */
 @WebMvcTest(BorrowingController.class)
-@Import(SecurityConfiguration.class)
-@TestPropertySource(properties = "app.security.enabled=true")
+@Import({SecurityConfiguration.class, PermissionAutoConfiguration.class})
+@TestPropertySource(properties = {"app.security.enabled=true", "lms.security.permission.enabled=true"})
 class BorrowingSecurityTest {
 
     @Autowired
@@ -42,6 +44,7 @@ class BorrowingSecurityTest {
     @MockitoBean RenewBorrowingUseCase renewBorrowing;
     @MockitoBean GetBorrowingUseCase getBorrowing;
     @MockitoBean JwtDecoder jwtDecoder;
+    @MockitoBean PermissionKeyRegistrar permissionKeyRegistrar;
 
     private static final String BODY = "{\"userId\":\"" + UUID.randomUUID() + "\",\"bookCopyIds\":[\"" + UUID.randomUUID() + "\"]}";
 
@@ -59,8 +62,8 @@ class BorrowingSecurityTest {
     @Test
     void thieuPermissionBorrowBookBi403() throws Exception {
         mvc.perform(post("/api/borrowings").contentType(MediaType.APPLICATION_JSON).content(BODY)
-                        .with(jwt().jwt(j -> j.claim("permissions", List.of("RETURN_BOOK")))
-                                .authorities(new SimpleGrantedAuthority("RETURN_BOOK"))))
+                        .with(jwt().jwt(j -> j.claim("permissions", List.of("BorrowingController/returnBook")))
+                                .authorities(new SimpleGrantedAuthority("BorrowingController/returnBook"))))
                 .andExpect(status().isForbidden());
     }
 
@@ -69,8 +72,8 @@ class BorrowingSecurityTest {
         when(borrowBook.execute(any())).thenReturn(response());
 
         mvc.perform(post("/api/borrowings").contentType(MediaType.APPLICATION_JSON).content(BODY)
-                        .with(jwt().jwt(j -> j.claim("permissions", List.of("BORROW_BOOK")))
-                                .authorities(new SimpleGrantedAuthority("BORROW_BOOK"))))
+                        .with(jwt().jwt(j -> j.claim("permissions", List.of("BorrowingController/borrow")))
+                                .authorities(new SimpleGrantedAuthority("BorrowingController/borrow"))))
                 .andExpect(status().isCreated());
     }
 

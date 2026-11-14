@@ -1,11 +1,9 @@
 package lms.support.config;
 
 import lms.security.PermissionJwtConverter;
-import lms.security.Permissions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -31,7 +29,8 @@ public class SecurityConfiguration {
         return http
                 .authorizeHttpRequests(a -> a
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/audit-logs").hasAuthority(Permissions.AUDIT_VIEW)
+                        // Chỉ xác thực ở đây; quyền theo endpoint (Controller/method) do PermissionInterceptor kiểm
+                        .requestMatchers("/api/**").authenticated()
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(o -> o.jwt(j -> j.jwtAuthenticationConverter(PermissionJwtConverter.create())))
                 .build();

@@ -15,7 +15,7 @@ class PermissionJwtConverterTest {
         Jwt.Builder builder = Jwt.withTokenValue("t").header("alg", "none")
                 .subject(UUID.randomUUID().toString())
                 .claim(JwtClaims.USERNAME, "alice")
-                .claim(JwtClaims.PERMISSIONS, List.of(Permissions.BORROW_BOOK, Permissions.BOOK_VIEW))
+                .claim(JwtClaims.PERMISSIONS, List.of("BORROW_BOOK", "BOOK_VIEW"))
                 .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(60));
         if (department != null) builder.claim(JwtClaims.DEPARTMENT_ID, department);
         return builder.build();

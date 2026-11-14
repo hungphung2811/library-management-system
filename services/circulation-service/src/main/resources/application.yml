@@ -37,7 +37,27 @@ management:
 app:
   security:
     enabled: true
+
   kafka:
     topics:
       borrowing-events: borrowing.events
       fine-events: fine.events
+      reservation-events: reservation.events
+      inventory-events: inventory.events
+  reservation:
+    # UC14: chạy đầu mỗi ngày (cron 6 trường)
+    expire-cron: "0 5 0 * * *"
+  # Gọi đồng bộ sang service khác để kiểm tra đặt trước (QĐ2: identity, QĐ5: catalog)
+  clients:
+    catalog:
+      base-url: ${CATALOG_SERVICE_URL:http://localhost:8082}
+    identity:
+      base-url: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+
+# Middleware phân quyền theo endpoint (security-common): khóa Controller/method được đăng ký về identity-service
+lms:
+  security:
+    permission:
+      service-name: ${spring.application.name}
+      identity-base-url: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+      internal-api-key: ${INTERNAL_API_KEY:}

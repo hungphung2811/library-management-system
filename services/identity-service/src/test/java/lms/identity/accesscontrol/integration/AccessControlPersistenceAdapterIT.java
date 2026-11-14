@@ -56,6 +56,39 @@ class AccessControlPersistenceAdapterIT {
         assertThat(roles).extracting(Role::name)
                 .contains("SUPER_ADMIN", "LIBRARY_ADMIN", "LIBRARIAN", "DEPARTMENT_MANAGER", "MEMBER");
         assertThat(superAdmin.permissionCodes()).hasSize(adapter.findAllPermissions().size());
+        // Cờ is_admin là dữ liệu: chỉ SUPER_ADMIN được seed là quản trị
+        assertThat(roles.stream().filter(Role::isAdmin).map(Role::name)).containsExactly("SUPER_ADMIN");
+    }
+
+    @Test
+    void migrationDoiMaPermissionCuSangKhoaEndpointVaGiuNguyenQuyenCuaRole() {
+        var codes = adapter.findAllPermissions().stream().map(Permission::code).toList();
+        Role member = adapter.findAll().stream().filter(r -> r.name().equals("MEMBER")).findFirst().orElseThrow();
+
+        assertThat(codes).doesNotContain("BORROW_BOOK", "USER_VIEW", "ROLE_ASSIGN", "AUDIT_VIEW");
+        assertThat(codes).contains("BorrowingController/borrow", "AccessControlController/assignRole");
+        assertThat(member.permissionCodes()).contains("BorrowingController/borrow", "ReservationController/reserve");
+        var borrow = adapter.findAllPermissions().stream()
+                .filter(p -> p.code().equals("BorrowingController/borrow")).findFirst().orElseThrow();
+        assertThat(borrow.source()).isEqualTo("AUTO");
+        assertThat(borrow.service()).isEqualTo("circulation-service");
+    }
+
+    @Test
+    void dangKyKhoaMoiIdempotentVaKhongGhiDeKhoaDaCo() {
+        var discovered = new Permission("ProbeController/ping", "GET /api/probe/ping (x)", "AUTO", "x-service", "GET",
+                "/api/probe/ping", java.time.Instant.parse("2026-01-01T00:00:00Z"));
+
+        adapter.registerDiscovered(discovered);
+        adapter.registerDiscovered(new Permission("ProbeController/ping", "mô tả khác", "AUTO", "y-service", "POST",
+                "/khac", java.time.Instant.parse("2026-06-01T00:00:00Z")));
+
+        var stored = adapter.findAllPermissions().stream()
+                .filter(p -> p.code().equals("ProbeController/ping")).toList();
+        assertThat(stored).hasSize(1);
+        assertThat(stored.get(0).service()).isEqualTo("x-service");
+        assertThat(stored.get(0).description()).isEqualTo("GET /api/probe/ping (x)");
+        assertThat(stored.get(0).firstSeenAt()).isEqualTo(java.time.Instant.parse("2026-01-01T00:00:00Z"));
     }
 
     @Test
@@ -65,7 +98,8 @@ class AccessControlPersistenceAdapterIT {
         var assignment = adapter.findByUserId(bootstrapAdmin).orElseThrow();
         var permissions = new EffectivePermissionsService().resolve(adapter.findAllByIds(assignment.roleIds()));
 
-        assertThat(permissions).contains("ROLE_ASSIGN", "BORROW_BOOK", "USER_DELETE");
+        assertThat(permissions).contains("AccessControlController/assignRole", "BorrowingController/borrow",
+                "ReaderProfileController/issue");
     }
 
     @Test

@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
+import lms.security.permission.AuthenticatedOnly;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -52,6 +53,7 @@ public class BorrowingController {
         return renewBorrowing.execute(id);
     }
 
+    @AuthenticatedOnly
     @GetMapping("/{id}")
     public BorrowingResponse get(@PathVariable UUID id) {
         return getBorrowing.execute(id);

@@ -5,6 +5,7 @@ import lms.identity.accesscontrol.application.AccessMapper;
 import lms.identity.accesscontrol.application.AccessCommands.CreateRole;
 import lms.identity.accesscontrol.application.AccessCommands.GrantPermission;
 import lms.identity.accesscontrol.application.SaveRolePort;
+import lms.identity.accesscontrol.domain.AccessControlForbiddenException;
 import lms.identity.accesscontrol.domain.AccessControlNotFoundException;
 import lms.identity.accesscontrol.domain.DuplicateAccessControlException;
 import lms.identity.accesscontrol.domain.Role;
@@ -29,7 +30,10 @@ public class RoleManagementUseCase {
 
     @Transactional
     public RoleResponse create(CreateRole command) {
-        Role role = Role.create(command.name(), command.description());
+        if (command.admin() && !command.requestedByAdmin()) {
+            throw new AccessControlForbiddenException("Chỉ quản trị viên mới tạo được role quản trị (isAdmin)");
+        }
+        Role role = Role.create(command.name(), command.description(), command.admin());
         if (roles.existsByName(role.name())) {
             throw new DuplicateAccessControlException("Role đã tồn tại: " + role.name());
         }

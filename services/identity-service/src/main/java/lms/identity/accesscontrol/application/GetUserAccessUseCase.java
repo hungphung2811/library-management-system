@@ -33,6 +33,7 @@ public class GetUserAccessUseCase {
                 .orElse(List.of());
         return new UserAccessResponse(userId,
                 AccessMapper.sorted(userRoles.stream().map(Role::name).toList()),
-                AccessMapper.sorted(permissionsService.resolve(userRoles)));
+                AccessMapper.sorted(permissionsService.resolve(userRoles)),
+                permissionsService.isAdmin(userRoles));
     }
 }

@@ -1,5 +1,6 @@
 package lms.identity.auth.infrastructure.config;
 
+import lms.identity.auth.application.ChangePasswordUseCase;
 import lms.identity.auth.application.LoginUseCase;
 import lms.identity.auth.application.LogoutUseCase;
 import lms.identity.auth.application.RefreshTokenUseCase;
@@ -97,6 +98,11 @@ public class AuthBeanConfiguration {
     @Bean
     RegisterCredentialUseCase registerCredentialUseCase(AuthPersistenceAdapter persistence, BcryptPasswordHasher hasher) {
         return new RegisterCredentialUseCase(persistence, persistence, hasher);
+    }
+
+    @Bean
+    ChangePasswordUseCase changePasswordUseCase(AuthPersistenceAdapter persistence, BcryptPasswordHasher hasher) {
+        return new ChangePasswordUseCase(persistence, persistence, persistence, hasher);
     }
 
     @Bean

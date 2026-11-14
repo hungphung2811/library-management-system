@@ -23,4 +23,17 @@ class IdentityArchitectureTest {
             .should().dependOnClassesThat().resideInAnyPackage(
                     "lms.identity.accesscontrol.domain..",
                     "lms.identity.accesscontrol.infrastructure..");
+
+    /** auth chỉ được dùng API (tầng application) của user. */
+    @ArchTest
+    static final ArchRule authChiDungTangApplicationCuaUser = noClasses()
+            .that().resideInAPackage("lms.identity.auth..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "lms.identity.user.domain..", "lms.identity.user.infrastructure..");
+
+    /** user là context độc lập: không biết auth hay accesscontrol. */
+    @ArchTest
+    static final ArchRule userKhongBietCacContextKhac = noClasses()
+            .that().resideInAPackage("lms.identity.user..")
+            .should().dependOnClassesThat().resideInAnyPackage("lms.identity.auth..", "lms.identity.accesscontrol..");
 }

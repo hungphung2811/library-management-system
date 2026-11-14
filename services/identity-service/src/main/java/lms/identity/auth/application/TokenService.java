@@ -31,13 +31,28 @@ public class TokenService {
     }
 
     public TokenResponse issueFor(UserCredential credential) {
+        return issue(credential, credential.mustChangePassword());
+    }
+
+    /**
+     * Đăng nhập ngoài không dùng mật khẩu nội bộ nên không bị ràng buộc "phải đổi mật khẩu" (mật khẩu tạm có thể
+     * người dùng chưa từng biết).
+     */
+    public TokenResponse issueForExternal(UserCredential credential) {
+        return issue(credential, false);
+    }
+
+    private TokenResponse issue(UserCredential credential, boolean mustChange) {
         UserAccessPort.UserAccess access = userAccessPort.fetch(credential.userId());
+        // Phải đổi mật khẩu trước: token không mang permission nào nên mọi endpoint kiểm quyền (ở mọi service) đều
+        // từ chối, chỉ còn các endpoint chỉ cần đăng nhập, như đổi mật khẩu.
         TokenIssuerPort.IssuedToken accessToken = tokenIssuer.issue(new TokenIssuerPort.Claims(
                 credential.userId(), credential.username(), credential.departmentId(),
-                access.roles(), access.permissions()));
+                access.roles(), mustChange ? java.util.List.of() : access.permissions(), mustChange,
+                !mustChange && access.admin()));
 
         String rawRefresh = codec.generate();
         refreshTokens.save(RefreshToken.issue(credential.userId(), codec.hash(rawRefresh), clock.instant(), refreshTokenTtl));
-        return TokenResponse.bearer(accessToken.value(), rawRefresh, accessToken.expiresInSeconds());
+        return TokenResponse.bearer(accessToken.value(), rawRefresh, accessToken.expiresInSeconds(), mustChange);
     }
 }

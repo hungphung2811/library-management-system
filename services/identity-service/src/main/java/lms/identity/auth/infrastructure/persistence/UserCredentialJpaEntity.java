@@ -33,11 +33,15 @@ class UserCredentialJpaEntity {
     @Column(name = "locked_until")
     private Instant lockedUntil;
 
+    @Column(name = "must_change_password", nullable = false)
+    private boolean mustChangePassword;
+
     protected UserCredentialJpaEntity() {
     }
 
     UserCredentialJpaEntity(UUID userId, String username, String passwordHash, UUID departmentId,
-                            boolean active, int failedAttempts, Instant lockedUntil) {
+                            boolean active, int failedAttempts, Instant lockedUntil,
+                            boolean mustChangePassword) {
         this.userId = userId;
         this.username = username;
         this.passwordHash = passwordHash;
@@ -45,6 +49,7 @@ class UserCredentialJpaEntity {
         this.active = active;
         this.failedAttempts = failedAttempts;
         this.lockedUntil = lockedUntil;
+        this.mustChangePassword = mustChangePassword;
     }
 
     UUID getUserId() { return userId; }
@@ -54,4 +59,5 @@ class UserCredentialJpaEntity {
     boolean isActive() { return active; }
     int getFailedAttempts() { return failedAttempts; }
     Instant getLockedUntil() { return lockedUntil; }
+    boolean isMustChangePassword() { return mustChangePassword; }
 }

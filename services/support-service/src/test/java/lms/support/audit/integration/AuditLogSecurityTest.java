@@ -7,6 +7,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import lms.security.permission.PermissionAutoConfiguration;
+import lms.security.permission.PermissionKeyRegistrar;
 import java.util.List;
 import lms.support.audit.application.PageResponse;
 import lms.support.audit.application.QueryAuditLogsUseCase;
@@ -23,13 +25,15 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-/** Kiểm chứng RBAC của support-service: 401 không token, 403 thiếu AUDIT_VIEW, 200 đủ quyền, denyAll mặc định. */
+/** Kiểm chứng RBAC của support-service: 401 không token, 403 thiếu khóa AuditLogController/search, 200 đủ quyền, denyAll mặc định. */
 @WebMvcTest(AuditLogController.class)
-@Import({SecurityConfiguration.class, AuditExceptionHandler.class})
-@TestPropertySource(properties = "app.security.enabled=true")
+@Import({SecurityConfiguration.class, AuditExceptionHandler.class, PermissionAutoConfiguration.class})
+@TestPropertySource(properties = {"app.security.enabled=true", "lms.security.permission.enabled=true"})
 class AuditLogSecurityTest {
 
     @Autowired MockMvc mvc;
+
+    @MockitoBean PermissionKeyRegistrar permissionKeyRegistrar;
 
     @MockitoBean QueryAuditLogsUseCase query;
     @MockitoBean JwtDecoder jwtDecoder;
@@ -40,30 +44,38 @@ class AuditLogSecurityTest {
     }
 
     @Test
-    void thieuQuyenAuditViewBi403() throws Exception {
+    void thieuKhoaQuyenBi403() throws Exception {
         mvc.perform(get("/api/audit-logs").with(jwt().authorities(new SimpleGrantedAuthority("BOOK_VIEW"))))
                 .andExpect(status().isForbidden());
     }
 
     @Test
-    void duQuyenAuditViewDuocXem() throws Exception {
+    void duKhoaQuyenDuocXem() throws Exception {
         when(query.execute(any())).thenReturn(new PageResponse<>(List.of(), 0, 0, 20));
 
         mvc.perform(get("/api/audit-logs").param("aggregateId", "x")
-                        .with(jwt().authorities(new SimpleGrantedAuthority("AUDIT_VIEW"))))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("AuditLogController/search"))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(0));
     }
 
     @Test
     void thamSoPhanTrangSaiBi400() throws Exception {
         mvc.perform(get("/api/audit-logs").param("size", "1000")
-                        .with(jwt().authorities(new SimpleGrantedAuthority("AUDIT_VIEW"))))
+                        .with(jwt().authorities(new SimpleGrantedAuthority("AuditLogController/search"))))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_AUDIT_QUERY"));
     }
 
     @Test
-    void duongDanKhongKhaiBaoBiDenyAllKeCaKhiCoToken() throws Exception {
-        mvc.perform(get("/api/khong-ton-tai").with(jwt().authorities(new SimpleGrantedAuthority("AUDIT_VIEW"))))
+    void duongDanNgoaiApiBiDenyAllKeCaKhiCoToken() throws Exception {
+        mvc.perform(get("/khong-ton-tai").with(jwt().authorities(new SimpleGrantedAuthority("AuditLogController/search"))))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void adminDuocBoQuaKiemTraKhoaQuyen() throws Exception {
+        when(query.execute(any())).thenReturn(new PageResponse<>(List.of(), 0, 0, 20));
+
+        mvc.perform(get("/api/audit-logs").with(jwt().jwt(j -> j.claim("admin", true))))
+                .andExpect(status().isOk());
     }
 }

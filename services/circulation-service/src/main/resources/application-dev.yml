@@ -18,6 +18,12 @@ app:
   security:
     enabled: false
 
+# Dev tắt kiểm quyền theo endpoint cùng với cờ bảo mật ở trên
+lms:
+  security:
+    permission:
+      enabled: false
+
 logging:
   level:
     lms.circulation: DEBUG

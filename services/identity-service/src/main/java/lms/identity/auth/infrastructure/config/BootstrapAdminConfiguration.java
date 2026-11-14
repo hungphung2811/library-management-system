@@ -23,10 +23,11 @@ public class BootstrapAdminConfiguration {
     ApplicationRunner bootstrapAdmin(RegisterCredentialUseCase register, UserCredentialRepository repository,
                                      @Value("${auth.bootstrap-admin.user-id}") UUID userId,
                                      @Value("${auth.bootstrap-admin.username}") String username,
-                                     @Value("${auth.bootstrap-admin.password:}") String password) {
+                                     @Value("${auth.bootstrap-admin.password:}") String password,
+                                     @Value("${auth.bootstrap-admin.must-change-password:true}") boolean mustChange) {
         return args -> {
             if (password.isBlank() || repository.existsByUserId(userId)) return;
-            register.execute(userId, username, password, null);
+            register.execute(userId, username, password, null, mustChange);
             log.info("Đã tạo tài khoản quản trị khởi tạo '{}'", username);
         };
     }

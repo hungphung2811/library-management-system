@@ -1,6 +1,7 @@
 # Hạ tầng local. Chạy service bằng IDE/Maven (profile dev) hoặc dùng profile "apps".
 #   docker compose up -d                          -> postgres, kafka, redis
-#   docker compose --profile apps up -d --build   -> thêm gateway, identity-service, circulation-service
+#   docker compose --profile apps up -d --build   -> thêm nginx, lms-api, các service
+# Chỉ nginx (8080) publish port ra host cho FE; lms-api và các service khác chỉ gọi được trong mạng compose.
 services:
   postgres:
     image: postgres:16
@@ -74,8 +75,9 @@ services:
       AUTH_BOOTSTRAP_ADMIN_PASSWORD: ${AUTH_BOOTSTRAP_ADMIN_PASSWORD:-}
       AUTH_JWT_PRIVATE_KEY: ${AUTH_JWT_PRIVATE_KEY:-}
       AUTH_JWT_PUBLIC_KEY: ${AUTH_JWT_PUBLIC_KEY:-}
-    ports:
-      - "8081:8081"
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+    expose:
+      - "8081"
 
   circulation-service:
     profiles: [apps]
@@ -94,8 +96,30 @@ services:
       DB_PASSWORD: circulation
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       JWT_JWK_SET_URI: http://identity-service:8081/.well-known/jwks.json
-    ports:
-      - "8083:8083"
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      CATALOG_SERVICE_URL: http://catalog-service:8082
+      IDENTITY_SERVICE_URL: http://identity-service:8081
+    expose:
+      - "8083"
+
+  catalog-service:
+    profiles: [apps]
+    build:
+      context: .
+      dockerfile: services/catalog-service/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://postgres:5432/catalog_db
+      DB_USERNAME: catalog
+      DB_PASSWORD: catalog
+      JWT_JWK_SET_URI: http://identity-service:8081/.well-known/jwks.json
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      IDENTITY_SERVICE_URL: http://identity-service:8081
+    expose:
+      - "8082"
 
   support-service:
     profiles: [apps]
@@ -117,19 +141,38 @@ services:
       LOG_DB_URI: mongodb://mongo:27017/audit_logs
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       JWT_JWK_SET_URI: http://identity-service:8081/.well-known/jwks.json
-    ports:
-      - "8084:8084"
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      IDENTITY_SERVICE_URL: http://identity-service:8081
+    expose:
+      - "8084"
 
-  api-gateway:
+  # Service duy nhất đưa API ra cho FE. Các service khác chỉ gọi được trong mạng compose (API nội bộ /internal/**).
+  lms-api:
     profiles: [apps]
     build:
       context: .
-      dockerfile: api-gateway/Dockerfile
+      dockerfile: lms-api/Dockerfile
     environment:
       IDENTITY_SERVICE_URL: http://identity-service:8081
+      CATALOG_SERVICE_URL: http://catalog-service:8082
       CIRCULATION_SERVICE_URL: http://circulation-service:8083
       SUPPORT_SERVICE_URL: http://support-service:8084
+      JWT_JWK_SET_URI: http://identity-service:8081/.well-known/jwks.json
     depends_on:
+      - identity-service
+      - catalog-service
+    expose:
+      - "8085"
+
+  # Cổng vào duy nhất ra host (8080): CORS, header bảo mật, giới hạn tốc độ đăng nhập, chặn /internal. Cấu hình ở infrastructure/nginx.
+  nginx:
+    profiles: [apps]
+    image: nginx:1.27-alpine
+    command: ["nginx", "-c", "/etc/nginx/lms/nginx.conf", "-g", "daemon off;"]
+    volumes:
+      - ./infrastructure/nginx:/etc/nginx/lms:ro
+    depends_on:
+      - lms-api
       - identity-service
       - circulation-service
       - support-service

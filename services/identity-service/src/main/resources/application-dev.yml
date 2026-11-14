@@ -10,6 +10,10 @@ auth:
   bootstrap-admin:
     # Chỉ dùng ở dev. Đăng nhập: admin / Admin@12345
     password: Admin@12345
+    must-change-password: false
+
+app:
+  internal-api-key: dev-internal-key
 
 logging:
   level:

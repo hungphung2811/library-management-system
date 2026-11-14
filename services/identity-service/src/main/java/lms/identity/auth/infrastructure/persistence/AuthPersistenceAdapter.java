@@ -26,7 +26,7 @@ public class AuthPersistenceAdapter implements UserCredentialRepository, SaveCre
     @Override
     public UserCredential save(UserCredential c) {
         credentials.save(new UserCredentialJpaEntity(c.userId(), c.username(), c.passwordHash(), c.departmentId(),
-                c.isActive(), c.failedAttempts(), c.lockedUntil()));
+                c.isActive(), c.failedAttempts(), c.lockedUntil(), c.mustChangePassword()));
         return c;
     }
 
@@ -72,6 +72,6 @@ public class AuthPersistenceAdapter implements UserCredentialRepository, SaveCre
 
     private static UserCredential toDomain(UserCredentialJpaEntity e) {
         return UserCredential.restore(e.getUserId(), e.getUsername(), e.getPasswordHash(), e.getDepartmentId(),
-                e.isActive(), e.getFailedAttempts(), e.getLockedUntil());
+                e.isActive(), e.getFailedAttempts(), e.getLockedUntil(), e.isMustChangePassword());
     }
 }

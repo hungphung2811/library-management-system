@@ -37,7 +37,8 @@ public class AccessControlPersistenceAdapter implements RoleRepository, Permissi
 
     @Override
     public Role save(Role role) {
-        roleJpa.save(new RoleJpaEntity(role.id().value(), role.name(), role.description(), role.permissionCodes()));
+        roleJpa.save(new RoleJpaEntity(role.id().value(), role.name(), role.description(), role.isAdmin(),
+                role.permissionCodes()));
         return role;
     }
 
@@ -66,8 +67,15 @@ public class AccessControlPersistenceAdapter implements RoleRepository, Permissi
 
     @Override
     public Permission save(Permission permission) {
-        permissionJpa.save(new PermissionJpaEntity(permission.code(), permission.description()));
+        permissionJpa.save(new PermissionJpaEntity(permission.code(), permission.description(), permission.source(),
+                permission.service(), permission.httpMethod(), permission.pathPattern(), permission.firstSeenAt()));
         return permission;
+    }
+
+    @Override
+    public void registerDiscovered(Permission permission) {
+        permissionJpa.registerDiscovered(permission.code(), permission.description(), permission.source(),
+                permission.service(), permission.httpMethod(), permission.pathPattern(), permission.firstSeenAt());
     }
 
     @Override
@@ -77,7 +85,10 @@ public class AccessControlPersistenceAdapter implements RoleRepository, Permissi
 
     @Override
     public List<Permission> findAllPermissions() {
-        return permissionJpa.findAll().stream().map(e -> new Permission(e.getCode(), e.getDescription())).toList();
+        return permissionJpa.findAll().stream()
+                .map(e -> new Permission(e.getCode(), e.getDescription(), e.getSource(), e.getService(),
+                        e.getHttpMethod(), e.getPathPattern(), e.getFirstSeenAt()))
+                .toList();
     }
 
     // ---- UserRoleAssignment ----
@@ -104,6 +115,7 @@ public class AccessControlPersistenceAdapter implements RoleRepository, Permissi
     }
 
     private static Role toDomain(RoleJpaEntity e) {
-        return Role.restore(new RoleId(e.getId()), e.getName(), e.getDescription(), e.getPermissionCodes());
+        return Role.restore(new RoleId(e.getId()), e.getName(), e.getDescription(), e.isAdmin(),
+                e.getPermissionCodes());
     }
 }

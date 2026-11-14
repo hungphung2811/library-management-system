@@ -12,12 +12,13 @@ public final class AccessMapper {
     }
 
     public static RoleResponse toResponse(Role role) {
-        return new RoleResponse(role.id().value(), role.name(), role.description(),
+        return new RoleResponse(role.id().value(), role.name(), role.description(), role.isAdmin(),
                 role.permissionCodes().stream().sorted().toList());
     }
 
     public static PermissionResponse toResponse(Permission permission) {
-        return new PermissionResponse(permission.code(), permission.description());
+        return new PermissionResponse(permission.code(), permission.description(), permission.source(),
+                permission.service(), permission.httpMethod(), permission.pathPattern(), permission.firstSeenAt());
     }
 
     public static java.util.List<String> sorted(java.util.Collection<String> values) {

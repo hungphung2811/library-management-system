@@ -17,6 +17,8 @@ import lms.identity.auth.domain.AccountLockedException;
 import lms.identity.auth.domain.InvalidCredentialsException;
 import lms.identity.auth.infrastructure.web.AuthController;
 import lms.identity.config.SecurityConfiguration;
+import lms.security.permission.PermissionAutoConfiguration;
+import lms.security.permission.PermissionKeyRegistrar;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -34,7 +36,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @WebMvcTest(AuthController.class)
-@Import(SecurityConfiguration.class)
+@Import({SecurityConfiguration.class, PermissionAutoConfiguration.class})
 class AuthSecurityTest {
 
     @Autowired MockMvc mvc;
@@ -43,7 +45,9 @@ class AuthSecurityTest {
     @MockitoBean RefreshTokenUseCase refresh;
     @MockitoBean LogoutUseCase logout;
     @MockitoBean RegisterCredentialUseCase register;
+    @MockitoBean lms.identity.auth.application.ChangePasswordUseCase changePassword;
     @MockitoBean JwtDecoder jwtDecoder;
+    @MockitoBean PermissionKeyRegistrar permissionKeyRegistrar;
 
     private static final String LOGIN_BODY = "{\"username\":\"alice\",\"password\":\"secret123\"}";
     private final String registerBody = "{\"userId\":\"" + UUID.randomUUID()
@@ -83,20 +87,21 @@ class AuthSecurityTest {
 
     @Test
     void taoCredentialCanDangNhapVaPermissionUserCreate() throws Exception {
-        when(register.execute(any(), any(), any(), any())).thenReturn(UUID.randomUUID());
+        when(register.execute(any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean())).thenReturn(UUID.randomUUID());
 
         mvc.perform(post("/api/auth/credentials").contentType(MediaType.APPLICATION_JSON).content(registerBody))
                 .andExpect(status().isUnauthorized());
-        mvc.perform(post("/api/auth/credentials").with(with("USER_VIEW"))
+        mvc.perform(post("/api/auth/credentials").with(with("AuthController/changePasswordKhac"))
                         .contentType(MediaType.APPLICATION_JSON).content(registerBody))
                 .andExpect(status().isForbidden());
-        mvc.perform(post("/api/auth/credentials").with(with("USER_CREATE"))
+        mvc.perform(post("/api/auth/credentials").with(with("AuthController/register"))
                         .contentType(MediaType.APPLICATION_JSON).content(registerBody))
                 .andExpect(status().isCreated());
     }
 
     @Test
-    void duongDanKhacBiTuChoi() throws Exception {
-        mvc.perform(get("/api/anything").with(with("USER_CREATE"))).andExpect(status().isForbidden());
+    void duongDanNgoaiApiBiTuChoiConApiKhongCoHandlerLa404() throws Exception {
+        mvc.perform(get("/anything").with(with("AuthController/register"))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/anything").with(with("AuthController/register"))).andExpect(status().isNotFound());
     }
 }

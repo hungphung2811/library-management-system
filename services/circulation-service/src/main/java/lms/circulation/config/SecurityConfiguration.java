@@ -1,19 +1,18 @@
 package lms.circulation.config;
 
-import lms.security.Permissions;
 import lms.security.PermissionJwtConverter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * RBAC dựa trên claim "permissions" trong JWT do auth-service phát hành.
- * Tắt bằng app.security.enabled=false (chỉ dùng cho profile dev).
+ * Chỉ lo xác thực JWT do identity-service phát hành. Phân quyền theo endpoint do PermissionInterceptor
+ * (security-common) kiểm theo khóa Controller/method. Tắt bằng app.security.enabled=false
+ * và lms.security.permission.enabled=false (chỉ dùng cho profile dev).
  */
 @Configuration
 public class SecurityConfiguration {
@@ -25,17 +24,20 @@ public class SecurityConfiguration {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
         if (!enabled) {
-            return http.authorizeHttpRequests(a -> a.anyRequest().permitAll()).build();
+            // Dev: không kiểm quyền, nhưng vẫn đọc Bearer token (nếu có) để các endpoint theo người dùng,
+            // như đặt trước, biết được ai đang gọi.
+            return http.authorizeHttpRequests(a -> a.anyRequest().permitAll())
+                    .oauth2ResourceServer(o -> o.jwt(j -> j.jwtAuthenticationConverter(PermissionJwtConverter.create())))
+                    .build();
         }
 
         return http
                 .authorizeHttpRequests(a -> a
                         .requestMatchers("/actuator/health/**", "/actuator/info", "/v3/api-docs/**", "/swagger-ui/**",
                                 "/swagger-ui.html").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/borrowings").hasAuthority(Permissions.BORROW_BOOK)
-                        .requestMatchers(HttpMethod.POST, "/api/borrowings/*/renewals").hasAuthority(Permissions.BORROW_BOOK)
-                        .requestMatchers(HttpMethod.POST, "/api/borrowings/*/returns").hasAuthority(Permissions.RETURN_BOOK)
-                        .anyRequest().authenticated())
+                        // Chỉ xác thực ở đây; quyền theo endpoint (Controller/method) do PermissionInterceptor kiểm
+                        .requestMatchers("/api/**").authenticated()
+                        .anyRequest().denyAll())
                 .oauth2ResourceServer(o -> o.jwt(j -> j.jwtAuthenticationConverter(PermissionJwtConverter.create())))
                 .build();
     }

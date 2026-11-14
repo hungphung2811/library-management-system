@@ -8,6 +8,11 @@ public interface UserAccessPort {
 
     UserAccess fetch(UUID userId);
 
-    record UserAccess(UUID userId, List<String> roles, List<String> permissions) {
+    /** admin: người dùng có ít nhất một role đánh dấu is_admin (bỏ qua kiểm tra permission theo endpoint). */
+    record UserAccess(UUID userId, List<String> roles, List<String> permissions, boolean admin) {
+
+        public UserAccess(UUID userId, List<String> roles, List<String> permissions) {
+            this(userId, roles, permissions, false);
+        }
     }
 }

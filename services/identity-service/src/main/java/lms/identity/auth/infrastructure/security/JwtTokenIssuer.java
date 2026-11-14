@@ -39,6 +39,13 @@ public class JwtTokenIssuer implements TokenIssuerPort {
                 .claim(JwtClaims.USERNAME, claims.username())
                 .claim(JwtClaims.ROLES, claims.roles())
                 .claim(JwtClaims.PERMISSIONS, claims.permissions());
+        if (claims.mustChangePassword()) {
+            builder.claim(JwtClaims.MUST_CHANGE_PASSWORD, true);
+        }
+        // Chỉ ghi claim khi true; token phải-đổi-mật-khẩu không bao giờ là admin dù người dùng có role quản trị
+        if (claims.admin() && !claims.mustChangePassword()) {
+            builder.claim(JwtClaims.ADMIN, true);
+        }
         if (claims.departmentId() != null) {
             builder.claim(JwtClaims.DEPARTMENT_ID, claims.departmentId().toString());
         }

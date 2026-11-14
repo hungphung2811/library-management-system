@@ -9,5 +9,5 @@ CREATE DATABASE circulation_db OWNER circulation;
 CREATE USER audit WITH PASSWORD 'audit';
 CREATE DATABASE audit_db OWNER audit;
 
--- Service còn là khung, chưa có user riêng.
-CREATE DATABASE catalog_db;
+CREATE USER catalog WITH PASSWORD 'catalog';
+CREATE DATABASE catalog_db OWNER catalog;

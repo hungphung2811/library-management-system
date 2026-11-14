@@ -3,6 +3,7 @@ package lms.identity.accesscontrol.application;
 import lms.identity.accesscontrol.application.AccessCommands.UserRole;
 import lms.identity.accesscontrol.application.PublishAccessEventPort;
 import lms.identity.accesscontrol.application.SaveUserRolePort;
+import lms.identity.accesscontrol.domain.AccessControlForbiddenException;
 import lms.identity.accesscontrol.domain.AccessControlNotFoundException;
 import lms.identity.accesscontrol.domain.UserRoleAssignment;
 import lms.identity.accesscontrol.domain.Role;
@@ -34,6 +35,7 @@ public class UserRoleUseCase {
     @Transactional
     public void assign(UserRole command) {
         Role role = loadRole(command);
+        requireAdminForAdminRole(role, command);
         UserRoleAssignment assignment = assignments.findByUserId(command.userId())
                 .orElseGet(() -> UserRoleAssignment.empty(command.userId()));
         assignment.assign(role.id(), role.name(), Instant.now(clock));
@@ -44,11 +46,19 @@ public class UserRoleUseCase {
     @Transactional
     public void revoke(UserRole command) {
         Role role = loadRole(command);
+        requireAdminForAdminRole(role, command);
         UserRoleAssignment assignment = assignments.findByUserId(command.userId())
                 .orElseThrow(() -> new AccessControlNotFoundException("Người dùng chưa có role nào: " + command.userId()));
         assignment.revoke(role.id(), role.name(), Instant.now(clock));
         savePort.save(assignment);
         assignment.pullEvents().forEach(eventPort::publish);
+    }
+
+    /** Người chỉ có ROLE_ASSIGN không được tự nâng mình hay người khác lên quản trị, hay hạ quản trị viên. */
+    private static void requireAdminForAdminRole(Role role, UserRole command) {
+        if (role.isAdmin() && !command.callerIsAdmin()) {
+            throw new AccessControlForbiddenException("Chỉ quản trị viên mới gán hoặc thu hồi được role quản trị");
+        }
     }
 
     private Role loadRole(UserRole command) {

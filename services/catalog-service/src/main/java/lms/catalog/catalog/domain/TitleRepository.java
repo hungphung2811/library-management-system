@@ -1,0 +1,20 @@
+package lms.catalog.catalog.domain;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+public interface TitleRepository {
+
+    Title save(Title title);
+
+    Optional<Title> findById(UUID id);
+
+    boolean existsByIsbn(String isbn);
+
+    /** Tìm theo tên hoặc tác giả, không phân biệt hoa thường; keyword rỗng/null thì lấy tất cả. */
+    List<Title> search(String keyword);
+
+    List<Title> findByIds(Collection<UUID> ids);
+}

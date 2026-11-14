@@ -2,6 +2,10 @@ package lms.identity.accesscontrol.infrastructure.config;
 
 import lms.identity.accesscontrol.application.GetUserAccessUseCase;
 import lms.identity.accesscontrol.application.PermissionManagementUseCase;
+import lms.identity.accesscontrol.application.RegisterPermissionKeyUseCase;
+import lms.identity.accesscontrol.infrastructure.security.LocalPermissionKeyRegistrar;
+import lms.security.permission.PermissionKeyRegistrar;
+import java.time.Duration;
 import lms.identity.accesscontrol.application.RoleManagementUseCase;
 import lms.identity.accesscontrol.application.UserRoleUseCase;
 import lms.identity.accesscontrol.domain.EffectivePermissionsService;
@@ -49,6 +53,17 @@ public class AccessControlBeanConfiguration {
     @Bean
     PermissionManagementUseCase permissionManagementUseCase(AccessControlPersistenceAdapter persistence) {
         return new PermissionManagementUseCase(persistence, persistence);
+    }
+
+    @Bean
+    RegisterPermissionKeyUseCase registerPermissionKeyUseCase(AccessControlPersistenceAdapter persistence) {
+        return new RegisterPermissionKeyUseCase(persistence);
+    }
+
+    /** Thay cho registrar REST mặc định của security-common: identity ghi thẳng vào DB của mình. */
+    @Bean
+    PermissionKeyRegistrar localPermissionKeyRegistrar(RegisterPermissionKeyUseCase useCase, Clock clock) {
+        return new LocalPermissionKeyRegistrar(useCase, clock, Duration.ofSeconds(30));
     }
 
     @Bean

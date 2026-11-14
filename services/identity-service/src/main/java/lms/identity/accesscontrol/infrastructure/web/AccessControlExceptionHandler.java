@@ -1,5 +1,6 @@
 package lms.identity.accesscontrol.infrastructure.web;
 
+import lms.identity.accesscontrol.domain.AccessControlForbiddenException;
 import lms.identity.accesscontrol.domain.AccessControlNotFoundException;
 import lms.identity.accesscontrol.domain.DuplicateAccessControlException;
 import lms.identity.accesscontrol.domain.InvalidAccessControlException;
@@ -17,6 +18,11 @@ public class AccessControlExceptionHandler {
     @ExceptionHandler(AccessControlNotFoundException.class)
     ResponseEntity<ErrorResponse> handleNotFound(AccessControlNotFoundException ex) {
         return build(HttpStatus.NOT_FOUND, "NOT_FOUND", ex.getMessage());
+    }
+
+    @ExceptionHandler(AccessControlForbiddenException.class)
+    ResponseEntity<ErrorResponse> handleForbidden(AccessControlForbiddenException ex) {
+        return build(HttpStatus.FORBIDDEN, "FORBIDDEN", ex.getMessage());
     }
 
     @ExceptionHandler(DuplicateAccessControlException.class)

@@ -22,7 +22,7 @@
         <module>shared-libraries/messaging-common</module>
         <module>shared-libraries/observability-common</module>
         <module>shared-libraries/database-common</module>
-        <module>api-gateway</module>
+        <module>lms-api</module>
         <module>services/identity-service</module>
         <module>services/catalog-service</module>
         <module>services/circulation-service</module>
