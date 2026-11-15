@@ -19,6 +19,7 @@
     <modules>
         <module>shared-libraries/common-kernel</module>
         <module>shared-libraries/security-common</module>
+        <module>shared-libraries/tenant-common</module>
         <module>shared-libraries/messaging-common</module>
         <module>shared-libraries/observability-common</module>
         <module>shared-libraries/database-common</module>
@@ -54,6 +55,11 @@
             <dependency>
                 <groupId>com.company</groupId>
                 <artifactId>security-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.company</groupId>
+                <artifactId>tenant-common</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

@@ -54,7 +54,7 @@ public class PermissionAutoConfiguration {
     @Bean
     PermissionInterceptor permissionInterceptor(PermissionKeyResolver resolver, PermissionKeyRegistrar registrar,
                                                 PermissionProperties properties) {
-        return new PermissionInterceptor(resolver, registrar, properties.getServiceName());
+        return new PermissionInterceptor(resolver, registrar, properties.getServiceName(), properties.isRequireTenant());
     }
 
     @Bean

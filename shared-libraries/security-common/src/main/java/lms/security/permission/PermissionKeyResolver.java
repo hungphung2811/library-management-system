@@ -10,7 +10,7 @@ import org.springframework.web.method.HandlerMethod;
 /** Xác định chế độ kiểm tra và khóa quyền của một handler (controller method). */
 public class PermissionKeyResolver {
 
-    public enum Mode { PUBLIC, AUTHENTICATED, PERMISSION }
+    public enum Mode { PUBLIC, AUTHENTICATED, PLATFORM_ADMIN, PERMISSION }
 
     public static final String SOURCE_AUTO = "AUTO";
     public static final String SOURCE_CUSTOM = "CUSTOM";
@@ -23,6 +23,7 @@ public class PermissionKeyResolver {
 
     private static final Resolved PUBLIC = new Resolved(Mode.PUBLIC, null, null, null);
     private static final Resolved AUTHENTICATED = new Resolved(Mode.AUTHENTICATED, null, null, null);
+    private static final Resolved PLATFORM_ADMIN = new Resolved(Mode.PLATFORM_ADMIN, null, null, null);
 
     public Resolved resolve(HandlerMethod handler) {
         Method method = handler.getMethod();
@@ -41,6 +42,7 @@ public class PermissionKeyResolver {
     private Resolved fromElement(java.lang.reflect.AnnotatedElement element, Class<?> controller) {
         if (find(element, PublicEndpoint.class) != null) return PUBLIC;
         if (find(element, AuthenticatedOnly.class) != null) return AUTHENTICATED;
+        if (find(element, PlatformAdminOnly.class) != null) return PLATFORM_ADMIN;
         RequirePermission require = find(element, RequirePermission.class);
         if (require == null) return null;
         if (require.value().isBlank()) {

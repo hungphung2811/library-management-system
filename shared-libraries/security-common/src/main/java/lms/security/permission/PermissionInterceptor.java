@@ -30,10 +30,19 @@ public class PermissionInterceptor implements HandlerInterceptor {
     private final PermissionKeyRegistrar registrar;
     private final String serviceName;
 
+    private final boolean requireTenant;
+
     public PermissionInterceptor(PermissionKeyResolver resolver, PermissionKeyRegistrar registrar, String serviceName) {
+        this(resolver, registrar, serviceName, false);
+    }
+
+    /** requireTenant: khi true, endpoint thường mà token thiếu claim tenantId bị từ chối 403 TENANT_REQUIRED. */
+    public PermissionInterceptor(PermissionKeyResolver resolver, PermissionKeyRegistrar registrar, String serviceName,
+                                 boolean requireTenant) {
         this.resolver = resolver;
         this.registrar = registrar;
         this.serviceName = serviceName;
+        this.requireTenant = requireTenant;
     }
 
     @Override
@@ -49,6 +58,15 @@ public class PermissionInterceptor implements HandlerInterceptor {
             return false;
         }
         if (resolved.mode() == PermissionKeyResolver.Mode.AUTHENTICATED) return true;
+        if (resolved.mode() == PermissionKeyResolver.Mode.PLATFORM_ADMIN) {
+            if (isPlatformAdmin(authentication)) return true;
+            reject(response, HttpServletResponse.SC_FORBIDDEN, "FORBIDDEN", "Chỉ dành cho quản trị nền tảng");
+            return false;
+        }
+        if (requireTenant && !hasTenant(authentication)) {
+            reject(response, HttpServletResponse.SC_FORBIDDEN, "TENANT_REQUIRED", "Token không thuộc tenant nào");
+            return false;
+        }
 
         // Đăng ký trước khi quyết định, kể cả khi sắp từ chối: để khóa mới hiện ra cho người quản trị gán quyền
         register(request, resolved);
@@ -77,6 +95,17 @@ public class PermissionInterceptor implements HandlerInterceptor {
     private static boolean isAdmin(Authentication authentication) {
         return authentication instanceof JwtAuthenticationToken jwt
                 && Boolean.TRUE.equals(jwt.getToken().getClaim(JwtClaims.ADMIN));
+    }
+
+    private static boolean isPlatformAdmin(Authentication authentication) {
+        return authentication instanceof JwtAuthenticationToken jwt
+                && Boolean.TRUE.equals(jwt.getToken().getClaim(JwtClaims.PLATFORM_ADMIN));
+    }
+
+    private static boolean hasTenant(Authentication authentication) {
+        if (!(authentication instanceof JwtAuthenticationToken jwt)) return false;
+        String tenant = jwt.getToken().getClaimAsString(JwtClaims.TENANT_ID);
+        return tenant != null && !tenant.isBlank();
     }
 
     private static boolean hasKey(Authentication authentication, String key) {

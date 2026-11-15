@@ -10,6 +10,8 @@ public class PermissionProperties {
 
     /** Tắt hẳn kiểm quyền theo endpoint (chỉ dùng cho profile dev). */
     private boolean enabled = true;
+    /** Bắt buộc token có claim tenantId trên endpoint thường (403 TENANT_REQUIRED); mặc định tắt cho tới khi service sẵn sàng. */
+    private boolean requireTenant = false;
     /** Tên service ghi vào danh mục permission, thường lấy từ spring.application.name. */
     private String serviceName = "unknown-service";
     /** Địa chỉ identity-service để đăng ký khóa; bỏ trống thì không đăng ký (chỉ cảnh báo). */
@@ -26,6 +28,8 @@ public class PermissionProperties {
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    public boolean isRequireTenant() { return requireTenant; }
+    public void setRequireTenant(boolean requireTenant) { this.requireTenant = requireTenant; }
     public String getServiceName() { return serviceName; }
     public void setServiceName(String serviceName) { this.serviceName = serviceName; }
     public String getIdentityBaseUrl() { return identityBaseUrl; }

@@ -143,6 +143,93 @@ class PermissionInterceptorTest {
         verify(registrar, never()).ensureRegistered(any());
     }
 
+    @RestController
+    static class PlatformController {
+
+        @PlatformAdminOnly
+        @GetMapping("/platform/tenants")
+        public String tenants() { return "ok"; }
+    }
+
+    private final MockMvc platformMvc = MockMvcBuilders.standaloneSetup(new SampleController(), new PlatformController())
+            .addInterceptors(new PermissionInterceptor(new PermissionKeyResolver(), registrar, "sample-service"))
+            .build();
+
+    private final MockMvc tenantMvc = MockMvcBuilders.standaloneSetup(new SampleController(), new PlatformController())
+            .addInterceptors(new PermissionInterceptor(new PermissionKeyResolver(), registrar, "sample-service", true))
+            .build();
+
+    private void loginWithClaims(java.util.Map<String, Object> claims, String... authorities) {
+        Jwt.Builder jwt = Jwt.withTokenValue("t").header("alg", "none").subject("user-1")
+                .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(60));
+        claims.forEach(jwt::claim);
+        List<GrantedAuthority> granted = java.util.Arrays.stream(authorities)
+                .<GrantedAuthority>map(SimpleGrantedAuthority::new).toList();
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt.build(), granted));
+    }
+
+    @Test
+    void platformAdminOnlyChoQuaKhiCoClaimPlatformAdmin() throws Exception {
+        loginWithClaims(java.util.Map.of(JwtClaims.PLATFORM_ADMIN, true));
+
+        platformMvc.perform(get("/platform/tenants")).andExpect(status().isOk());
+        verify(registrar, never()).ensureRegistered(any());
+    }
+
+    @Test
+    void platformAdminOnlyBi403KhiThieuClaim() throws Exception {
+        loginWith(false);
+
+        platformMvc.perform(get("/platform/tenants")).andExpect(status().isForbidden())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("\"code\":\"FORBIDDEN\"")));
+    }
+
+    @Test
+    void platformAdminOnlyChuaDangNhapBi401() throws Exception {
+        platformMvc.perform(get("/platform/tenants")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void claimPlatformAdminKhongThayTheQuyenEndpointThuong() throws Exception {
+        loginWithClaims(java.util.Map.of(JwtClaims.PLATFORM_ADMIN, true));
+
+        platformMvc.perform(get("/auto")).andExpect(status().isForbidden())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("\"code\":\"FORBIDDEN\"")));
+    }
+
+    @Test
+    void batRequireTenantThieuTenantIdBi403TenantRequired() throws Exception {
+        loginWith(true);
+
+        tenantMvc.perform(get("/auto")).andExpect(status().isForbidden())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("\"code\":\"TENANT_REQUIRED\"")));
+    }
+
+    @Test
+    void batRequireTenantCoTenantIdThiDuocQua() throws Exception {
+        loginWithClaims(java.util.Map.of(JwtClaims.ADMIN, true, JwtClaims.TENANT_ID, java.util.UUID.randomUUID().toString()));
+
+        tenantMvc.perform(get("/auto")).andExpect(status().isOk());
+    }
+
+    @Test
+    void batRequireTenantKhongChanEndpointCongKhaiVaChiCanDangNhapVaPlatformAdmin() throws Exception {
+        tenantMvc.perform(get("/public")).andExpect(status().isOk());
+
+        loginWith(false);
+        tenantMvc.perform(get("/me")).andExpect(status().isOk());
+
+        loginWithClaims(java.util.Map.of(JwtClaims.PLATFORM_ADMIN, true));
+        tenantMvc.perform(get("/platform/tenants")).andExpect(status().isOk());
+    }
+
+    @Test
+    void tatRequireTenantThiThieuTenantIdKhongBiChan() throws Exception {
+        loginWith(true);
+
+        mvc.perform(get("/auto")).andExpect(status().isOk());
+    }
+
     @Test
     void dangKyLoiKhongLamHongQuyetDinh() throws Exception {
         doThrow(new IllegalStateException("identity chết")).when(registrar).ensureRegistered(any());

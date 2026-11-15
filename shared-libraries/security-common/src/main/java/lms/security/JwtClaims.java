@@ -17,4 +17,8 @@ public final class JwtClaims {
      * không gắn với tên role nào. Token của tài khoản phải đổi mật khẩu không bao giờ mang claim này.
      */
     public static final String ADMIN = "admin";
+    /** Tenant mà token này thuộc về (UUID dạng chuỗi). Người vận hành nền tảng có thể không có claim này. */
+    public static final String TENANT_ID = "tenantId";
+    /** True khi người dùng là người vận hành nền tảng (platform admin); chỉ mở các endpoint {@code @PlatformAdminOnly}. */
+    public static final String PLATFORM_ADMIN = "platformAdmin";
 }
