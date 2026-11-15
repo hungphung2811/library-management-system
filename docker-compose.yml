@@ -2,6 +2,9 @@
 #   docker compose up -d                          -> postgres, kafka, redis
 #   docker compose --profile apps up -d --build   -> thêm nginx, lms-api, migration-service, các service
 # migration-service (chạy Flyway cho mọi DB) phải healthy trước khi identity/catalog/circulation/support khởi động.
+# Postgres: migration-service dùng vai trò chủ DB (identity, catalog, ...); các service chạy bằng vai trò *_app
+# (không phải chủ bảng, chịu Row-Level Security), tạo trong infrastructure/postgres/init-databases.sql.
+# Volume pgdata cũ chưa có *_app: `docker compose down -v` hoặc chạy tay phần CREATE USER ..._app của script đó.
 # Chỉ nginx (8080) publish port ra host cho FE; lms-api và các service khác chỉ gọi được trong mạng compose.
 services:
   postgres:
@@ -107,8 +110,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://postgres:5432/identity_db
-      DB_USERNAME: identity
-      DB_PASSWORD: identity
+      DB_USERNAME: identity_app
+      DB_PASSWORD: identity_app
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       # Bỏ trống thì không tạo admin khởi tạo. Khóa JWT bỏ trống thì dùng khóa tạm (chỉ phù hợp demo).
       AUTH_BOOTSTRAP_ADMIN_PASSWORD: ${AUTH_BOOTSTRAP_ADMIN_PASSWORD:-}
@@ -133,8 +136,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://postgres:5432/circulation_db
-      DB_USERNAME: circulation
-      DB_PASSWORD: circulation
+      DB_USERNAME: circulation_app
+      DB_PASSWORD: circulation_app
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       JWT_JWK_SET_URI: http://identity-service:8081/.well-known/jwks.json
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
@@ -156,8 +159,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://postgres:5432/catalog_db
-      DB_USERNAME: catalog
-      DB_PASSWORD: catalog
+      DB_USERNAME: catalog_app
+      DB_PASSWORD: catalog_app
       JWT_JWK_SET_URI: http://identity-service:8081/.well-known/jwks.json
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
       IDENTITY_SERVICE_URL: http://identity-service:8081
@@ -181,8 +184,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       AUDIT_DB_URL: jdbc:postgresql://postgres:5432/audit_db
-      AUDIT_DB_USERNAME: audit
-      AUDIT_DB_PASSWORD: audit
+      AUDIT_DB_USERNAME: audit_app
+      AUDIT_DB_PASSWORD: audit_app
       LOG_DB_URI: mongodb://mongo:27017/audit_logs
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       JWT_JWK_SET_URI: http://identity-service:8081/.well-known/jwks.json

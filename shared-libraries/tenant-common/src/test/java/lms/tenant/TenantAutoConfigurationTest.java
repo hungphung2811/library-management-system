@@ -45,6 +45,16 @@ class TenantAutoConfigurationTest {
             assertThat(context).doesNotHaveBean(FilterRegistrationBean.class);
             assertThat(context).doesNotHaveBean(HibernatePropertiesCustomizer.class);
             assertThat(context).doesNotHaveBean(TenantIdentifierResolver.class);
+            assertThat(context).doesNotHaveBean(TenantRlsConnectionInitializer.class);
+        });
+    }
+
+    @Test
+    void lopBocRlsMacDinhBatVaTatRiengDuoc() {
+        runner.run(context -> assertThat(context).hasSingleBean(TenantRlsConnectionInitializer.class));
+        runner.withPropertyValues("lms.tenant.rls.enabled=false").run(context -> {
+            assertThat(context).doesNotHaveBean(TenantRlsConnectionInitializer.class);
+            assertThat(context).hasSingleBean(TenantContextFilter.class);
         });
     }
 }

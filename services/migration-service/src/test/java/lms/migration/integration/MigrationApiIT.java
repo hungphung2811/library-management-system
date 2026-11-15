@@ -1,5 +1,7 @@
 package lms.migration.integration;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -49,6 +51,8 @@ class MigrationApiIT {
             try (Connection c = DriverManager.getConnection(postgres.getJdbcUrl(), postgres.getUsername(),
                     postgres.getPassword()); Statement s = c.createStatement()) {
                 s.execute("CREATE DATABASE " + db + "_db");
+                // Vai trò chạy ứng dụng như init-databases.sql: script R__grant_... cấp quyền cho nó
+                s.execute("CREATE USER " + db + "_app WITH PASSWORD '" + db + "_app' NOSUPERUSER NOBYPASSRLS");
             }
             String url = "jdbc:postgresql://" + postgres.getHost() + ":" + postgres.getFirstMappedPort() + "/" + db
                     + "_db";
@@ -64,9 +68,16 @@ class MigrationApiIT {
     @Autowired
     MockMvc mvc;
 
+    /** Số script versioned (V*) và repeatable (R__*) của target, đếm từ classpath. */
     private static int demScript(String target) throws Exception {
-        return new org.springframework.core.io.support.PathMatchingResourcePatternResolver()
-                .getResources("classpath:db/migration/" + target + "/V*.sql").length;
+        var resolver = new org.springframework.core.io.support.PathMatchingResourcePatternResolver();
+        return resolver.getResources("classpath:db/migration/" + target + "/V*.sql").length
+                + resolver.getResources("classpath:db/migration/" + target + "/R__*.sql").length;
+    }
+
+    private static Connection connect(String db, String user, String password) throws Exception {
+        String url = "jdbc:postgresql://" + postgres.getHost() + ":" + postgres.getFirstMappedPort() + "/" + db + "_db";
+        return DriverManager.getConnection(url, user, password);
     }
 
     @Test
@@ -108,24 +119,59 @@ class MigrationApiIT {
         Files.writeString(extraScripts.resolve("V2__them_cot_gia_lap.sql"),
                 "ALTER TABLE titles ADD COLUMN IF NOT EXISTS ghi_chu_migration VARCHAR(50);");
 
+        // Số đã áp dụng gồm cả script repeatable (R__grant_...); tìm script mới theo version thay vì vị trí
+        int catalog = demScript("catalog");
         mvc.perform(get("/api/migrations/catalog"))
-                .andExpect(jsonPath("$.applied").value(1))
+                .andExpect(jsonPath("$.applied").value(catalog))
                 .andExpect(jsonPath("$.pending").value(1))
-                .andExpect(jsonPath("$.scripts[1].version").value("2"))
-                .andExpect(jsonPath("$.scripts[1].state").value("PENDING"));
+                .andExpect(jsonPath("$.scripts[?(@.version=='2')].state").value("PENDING"));
 
         mvc.perform(post("/api/migrations/catalog/run"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.executed").value(1));
 
         mvc.perform(get("/api/migrations/catalog"))
-                .andExpect(jsonPath("$.applied").value(2))
+                .andExpect(jsonPath("$.applied").value(catalog + 1))
                 .andExpect(jsonPath("$.pending").value(0))
-                .andExpect(jsonPath("$.scripts[1].state").value("APPLIED"));
+                .andExpect(jsonPath("$.scripts[?(@.version=='2')].state").value("APPLIED"));
     }
 
     @Test
     @Order(3)
+    void vaiTroAppDuocCapQuyenDuLieuNhungKhongPhaiChuBang() throws Exception {
+        String[][] bangMau = {{"identity", "users"}, {"catalog", "titles"}, {"circulation", "borrowings"},
+                {"audit", "audit_logs"}};
+        for (String[] t : bangMau) {
+            String role = t[0] + "_app";
+            try (Connection c = connect(t[0], postgres.getUsername(), postgres.getPassword());
+                    Statement s = c.createStatement()) {
+                var rs = s.executeQuery("SELECT has_table_privilege('" + role + "', '" + t[1]
+                        + "', 'SELECT,INSERT,UPDATE,DELETE'), pg_get_userbyid(c.relowner) <> '" + role
+                        + "', (SELECT bool_and(has_table_privilege('" + role + "', format('%I', relname),"
+                        + " 'SELECT,INSERT,UPDATE,DELETE')) FROM pg_class WHERE relnamespace = 'public'::regnamespace"
+                        + " AND relkind = 'r' AND relname <> 'flyway_schema_history')"
+                        + " FROM pg_class c WHERE c.relname = '" + t[1] + "'");
+                rs.next();
+                assertThat(rs.getBoolean(1)).as(role + " DML trên " + t[1]).isTrue();
+                assertThat(rs.getBoolean(2)).as(role + " không là chủ").isTrue();
+                assertThat(rs.getBoolean(3)).as(role + " DML mọi bảng").isTrue();
+                // Bảng do migration sau (cùng vai trò chạy migration) tạo được cấp qua ALTER DEFAULT PRIVILEGES
+                s.execute("CREATE TABLE bang_cua_migration_sau (id bigserial PRIMARY KEY)");
+            }
+            try (Connection c = connect(t[0], role, role); Statement s = c.createStatement()) {
+                s.execute("INSERT INTO bang_cua_migration_sau DEFAULT VALUES");
+                var rs = s.executeQuery("SELECT count(*) FROM bang_cua_migration_sau");
+                rs.next();
+                assertThat(rs.getInt(1)).isEqualTo(1);
+                // Không có quyền DDL: không sở hữu bảng nên không DROP được
+                assertThatThrownBy(() -> s.execute("DROP TABLE " + t[1]))
+                        .hasMessageContaining("must be owner");
+            }
+        }
+    }
+
+    @Test
+    @Order(4)
     void targetLaBi404() throws Exception {
         mvc.perform(get("/api/migrations/khong-co")).andExpect(status().isNotFound());
         mvc.perform(post("/api/migrations/khong-co/run")).andExpect(status().isNotFound());

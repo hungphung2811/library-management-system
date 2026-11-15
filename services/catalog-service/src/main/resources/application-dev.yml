@@ -1,8 +1,8 @@
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/catalog_db
-    username: catalog
-    password: catalog
+    username: catalog_app
+    password: catalog_app
   kafka:
     bootstrap-servers: localhost:29092
   security:

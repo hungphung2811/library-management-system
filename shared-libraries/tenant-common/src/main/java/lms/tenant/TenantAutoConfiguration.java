@@ -12,7 +12,10 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/** Bật TenantContextFilter và (nếu có Hibernate) bộ phân giải tenant. Tắt bằng {@code lms.tenant.enabled=false}. */
+/**
+ * Bật TenantContextFilter, lớp bọc DataSource đặt {@code app.tenant_id} cho RLS và (nếu có Hibernate) bộ phân giải
+ * tenant. Tắt toàn bộ bằng {@code lms.tenant.enabled=false}.
+ */
 @AutoConfiguration
 @ConditionalOnProperty(prefix = "lms.tenant", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class TenantAutoConfiguration {
@@ -34,6 +37,18 @@ public class TenantAutoConfiguration {
             FilterRegistrationBean<TenantContextFilter> registration = new FilterRegistrationBean<>(filter);
             registration.setOrder(SecurityProperties.DEFAULT_FILTER_ORDER + 1);
             return registration;
+        }
+    }
+
+    /** Lớp 2 (RLS): bọc mọi DataSource để đặt {@code app.tenant_id}. Tắt riêng bằng {@code lms.tenant.rls.enabled=false}. */
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnProperty(prefix = "lms.tenant.rls", name = "enabled", havingValue = "true", matchIfMissing = true)
+    static class RlsConfiguration {
+
+        @Bean
+        @ConditionalOnMissingBean
+        static TenantRlsConnectionInitializer tenantRlsConnectionInitializer() {
+            return new TenantRlsConnectionInitializer();
         }
     }
 

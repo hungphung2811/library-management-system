@@ -2,8 +2,8 @@ database:
   connections:
     AUDIT_DB:
       url: jdbc:postgresql://localhost:5432/audit_db
-      username: audit
-      password: audit
+      username: audit_app
+      password: audit_app
     LOG_DB:
       uri: mongodb://localhost:27017/audit_logs
 
