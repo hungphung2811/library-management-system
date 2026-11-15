@@ -9,6 +9,7 @@ import lms.api.identity.dto.AuthDtos.LoginRequest;
 import lms.api.identity.dto.AuthDtos.ProviderView;
 import lms.api.identity.dto.AuthDtos.RefreshRequest;
 import lms.api.identity.dto.AuthDtos.RegisterCredentialRequest;
+import lms.api.identity.dto.AuthDtos.SwitchTenantRequest;
 import lms.api.identity.dto.AuthDtos.TokenView;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -40,8 +41,8 @@ public class HttpAuthClient implements AuthClient {
     }
 
     @Override
-    public TokenView login(String username, String password) {
-        return client.post().uri("/internal/auth/login").body(new LoginRequest(username, password)).retrieve()
+    public TokenView login(String username, String password, String tenantCode) {
+        return client.post().uri("/internal/auth/login").body(new LoginRequest(username, password, tenantCode)).retrieve()
                 .body(TokenView.class);
     }
 
@@ -54,6 +55,11 @@ public class HttpAuthClient implements AuthClient {
     @Override
     public void logout(String refreshToken) {
         client.post().uri("/internal/auth/logout").body(new RefreshRequest(refreshToken)).retrieve().toBodilessEntity();
+    }
+
+    @Override
+    public TokenView switchTenant(SwitchTenantRequest request) {
+        return client.post().uri("/internal/auth/switch-tenant").body(request).retrieve().body(TokenView.class);
     }
 
     @Override

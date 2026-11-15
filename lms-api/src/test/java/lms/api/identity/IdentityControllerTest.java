@@ -75,7 +75,7 @@ class IdentityControllerTest {
 
     @Test
     void cacDuongDanCongKhaiKhongCanToken() throws Exception {
-        when(auth.login("alice", "secret123")).thenReturn(new TokenView("a", "r", "Bearer", 900, false));
+        when(auth.login("alice", "secret123", null)).thenReturn(new TokenView("a", "r", "Bearer", 900, false));
         when(auth.refresh("r")).thenReturn(new TokenView("a", "r2", "Bearer", 900, false));
         when(auth.externalProviders()).thenReturn(List.of());
         when(auth.externalStart(any(), any())).thenReturn(ResponseEntity.status(302).body(new byte[0]));
@@ -132,7 +132,7 @@ class IdentityControllerTest {
 
     @Test
     void loi4xxCuaServiceChuyenNguyenMaVaNoiDung() throws Exception {
-        when(auth.login(any(), any())).thenThrow(error(HttpStatus.LOCKED,
+        when(auth.login(any(), any(), any())).thenThrow(error(HttpStatus.LOCKED,
                 "{\"code\":\"ACCOUNT_LOCKED\",\"message\":\"Tài khoản bị khóa\",\"details\":[]}"));
         mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(LOGIN))
                 .andExpect(status().isLocked())

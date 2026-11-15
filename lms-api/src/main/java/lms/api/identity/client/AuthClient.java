@@ -5,6 +5,7 @@ import lms.api.identity.dto.AuthDtos.CredentialCreated;
 import lms.api.identity.dto.AuthDtos.ExternalLoginView;
 import lms.api.identity.dto.AuthDtos.ProviderView;
 import lms.api.identity.dto.AuthDtos.RegisterCredentialRequest;
+import lms.api.identity.dto.AuthDtos.SwitchTenantRequest;
 import lms.api.identity.dto.AuthDtos.TokenView;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
@@ -15,11 +16,15 @@ import org.springframework.http.ResponseEntity;
  */
 public interface AuthClient {
 
-    TokenView login(String username, String password);
+    /** tenantCode có thể null (identity chọn tenant dùng gần nhất). */
+    TokenView login(String username, String password, String tenantCode);
 
     TokenView refresh(String refreshToken);
 
     void logout(String refreshToken);
+
+    /** Đổi tenant của phiên (cần token); trả cặp token mới của tenant đích. */
+    TokenView switchTenant(SwitchTenantRequest request);
 
     void changePassword(ChangePasswordRequest request);
 

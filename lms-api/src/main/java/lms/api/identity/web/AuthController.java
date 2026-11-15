@@ -6,6 +6,7 @@ import lms.api.identity.dto.AuthDtos.CredentialCreated;
 import lms.api.identity.dto.AuthDtos.LoginRequest;
 import lms.api.identity.dto.AuthDtos.RefreshRequest;
 import lms.api.identity.dto.AuthDtos.RegisterCredentialRequest;
+import lms.api.identity.dto.AuthDtos.SwitchTenantRequest;
 import lms.api.identity.dto.AuthDtos.TokenView;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -17,8 +18,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * API xác thực cho FE. login/refresh/logout là công khai (xem SecurityConfiguration); đổi mật khẩu và tạo credential
- * cần token, quyền do identity-service kiểm. Token trả về luôn kèm Cache-Control: no-store.
+ * API xác thực cho FE. login/refresh/logout là công khai (xem SecurityConfiguration); đổi tenant, đổi mật khẩu và tạo
+ * credential cần token, quyền do identity-service kiểm. Token trả về luôn kèm Cache-Control: no-store.
  */
 @RestController
 @RequestMapping("/api/auth")
@@ -32,12 +33,18 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<TokenView> login(@Valid @RequestBody LoginRequest request) {
-        return noStore(auth.login(request.username(), request.password()));
+        return noStore(auth.login(request.username(), request.password(), request.tenantCode()));
     }
 
     @PostMapping("/refresh")
     public ResponseEntity<TokenView> refresh(@Valid @RequestBody RefreshRequest request) {
         return noStore(auth.refresh(request.refreshToken()));
+    }
+
+    /** Đổi tenant đang dùng (body {tenantId, refreshToken}); identity kiểm quyền ở tenant đích và thu hồi token cũ. */
+    @PostMapping("/switch-tenant")
+    public ResponseEntity<TokenView> switchTenant(@Valid @RequestBody SwitchTenantRequest request) {
+        return noStore(auth.switchTenant(request));
     }
 
     @PostMapping("/logout")

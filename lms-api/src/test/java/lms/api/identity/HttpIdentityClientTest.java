@@ -71,7 +71,7 @@ class HttpIdentityClientTest {
         server.expect(requestTo("http://identity/internal/auth/password")).andExpect(method(HttpMethod.POST))
                 .andRespond(withNoContent());
 
-        var token = new HttpAuthClient(rc).login("alice", "pw");
+        var token = new HttpAuthClient(rc).login("alice", "pw", null);
         assertEquals("a", token.accessToken());
         assertTrue(token.mustChangePassword());
         assertEquals(5, new HttpUserClient(rc).search(new SearchUsersQuery("a b", null, null, null, 5)).size());
