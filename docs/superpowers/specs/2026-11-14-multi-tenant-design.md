@@ -63,7 +63,7 @@ Lý do chọn A: khớp "số lượng nhỏ trước". `@TenantId` kết hợp 
 
 ### 5.2 Đăng nhập, chọn tenant và token
 - Đăng nhập: xác thực xong, chọn tenant = `last_tenant_id` nếu còn thành viên ACTIVE và tenant ACTIVE; không thì tenant đầu tiên (xếp theo thời điểm tham gia) mà người dùng còn quyền. Phản hồi gồm token và danh sách tenant người này truy cập được.
-- `POST /api/auth/switch-tenant {tenantId}`: kiểm tra thành viên, lưu `last_tenant_id`, cấp access token và refresh token mới của tenant đó.
+- `POST /api/auth/switch-tenant {tenantId, refreshToken}`: kiểm tra thành viên, thu hồi refresh token hiện tại, lưu `last_tenant_id`, cấp access token và refresh token mới của tenant đó.
 - Token thêm claim `tenantId`; `permissions` và `admin` chỉ của tenant đó. Refresh token gắn `tenant_id`; refresh giữ nguyên tenant.
 - Tài khoản không còn tenant nào và không phải platform admin: không đăng nhập được (lỗi riêng, rõ nghĩa).
 - Token có thể mang claim `platformAdmin=true` (tài khoản có cờ `platform_admin`) và/hoặc `tenantId`. Endpoint nền tảng (`/api/platform/**`, đặt ở identity-service, `lms-api` và nginx định tuyến tới) yêu cầu `platformAdmin`; endpoint thuộc tenant yêu cầu `tenantId`. Platform admin không phải thành viên tenant nào thì token chỉ có `platformAdmin`; nếu họ cũng là thành viên thì token có cả hai. Cờ `platform_admin` chỉ đặt bằng cấu hình bootstrap, tài khoản `admin` dev hiện có **không** tự thành platform admin (người vận hành có tài khoản riêng). *(Lựa chọn của người viết.)*
