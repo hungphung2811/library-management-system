@@ -50,6 +50,29 @@ class KafkaEventPublisherTest {
     }
 
     @Test
+    void envelopeMangTenantIdCuaTenantDangChay() {
+        when(template.send(eq("topic.x"), eq("agg-1"), any())).thenReturn(new CompletableFuture<SendResult<String, String>>());
+        UUID tenant = UUID.randomUUID();
+
+        lms.tenant.TenantContext.runAs(tenant, () -> publisher.publish(event));
+
+        ArgumentCaptor<String> json = ArgumentCaptor.forClass(String.class);
+        verify(template).send(eq("topic.x"), eq("agg-1"), json.capture());
+        assertThat(json.getValue()).contains("\"tenantId\":\"" + tenant + "\"");
+    }
+
+    @Test
+    void khongCoTenantDangChayThiTenantIdLaNull() {
+        when(template.send(eq("topic.x"), eq("agg-1"), any())).thenReturn(new CompletableFuture<SendResult<String, String>>());
+
+        publisher.publish(event);
+
+        ArgumentCaptor<String> json = ArgumentCaptor.forClass(String.class);
+        verify(template).send(eq("topic.x"), eq("agg-1"), json.capture());
+        assertThat(json.getValue()).contains("\"tenantId\":null");
+    }
+
+    @Test
     void brokerKhongVoiTuocDuocThiKhongLamHongRequest() {
         when(template.send(any(String.class), any(String.class), any(String.class)))
                 .thenThrow(new TimeoutException("Topic not present in metadata after 300 ms."));

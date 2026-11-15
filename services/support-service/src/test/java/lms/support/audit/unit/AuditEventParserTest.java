@@ -24,9 +24,38 @@ class AuditEventParserTest {
     private final AuditEventParser parser = new AuditEventParser(objectMapper);
     private final UUID eventId = UUID.randomUUID();
 
+    private final UUID tenantId = UUID.randomUUID();
+
     private String envelope(String occurredAt) {
+        return envelope(occurredAt, tenantId);
+    }
+
+    private String envelope(String occurredAt, UUID tenant) {
         return "{\"eventId\":\"" + eventId + "\",\"eventType\":\"BookBorrowedEvent\",\"aggregateId\":\"b-1\","
-                + "\"occurredAt\":" + occurredAt + ",\"version\":1,\"payload\":{\"userId\":\"u-1\",\"n\":2}}";
+                + "\"occurredAt\":" + occurredAt + ",\"version\":1,\"payload\":{\"userId\":\"u-1\",\"n\":2}"
+                + (tenant == null ? "" : ",\"tenantId\":\"" + tenant + "\"") + "}";
+    }
+
+    @Test
+    void parseMangTenantIdVaConsumerGoiUseCaseTrongTenant() {
+        assertThat(parser.parse("t", envelope("\"2026-01-01T00:00:00Z\"")).orElseThrow().tenantId()).isEqualTo(tenantId);
+
+        IngestAuditEventUseCase ingest = mock(IngestAuditEventUseCase.class);
+        java.util.List<java.util.Optional<UUID>> seen = new java.util.ArrayList<>();
+        when(ingest.execute(any())).thenAnswer(i -> seen.add(lms.tenant.TenantContext.current()));
+        new AuditEventConsumer(parser, ingest).onEvent(envelope("\"2026-01-01T00:00:00Z\""), "t");
+
+        assertThat(seen).containsExactly(java.util.Optional.of(tenantId));
+        assertThat(lms.tenant.TenantContext.current()).isEmpty();
+    }
+
+    @Test
+    void eventThieuTenantIdKhongGoiUseCase() {
+        IngestAuditEventUseCase ingest = mock(IngestAuditEventUseCase.class);
+
+        new AuditEventConsumer(parser, ingest).onEvent(envelope("\"2026-01-01T00:00:00Z\"", null), "t");
+
+        verify(ingest, never()).execute(any());
     }
 
     @Test

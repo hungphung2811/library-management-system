@@ -1,5 +1,6 @@
 package lms.support.audit.infrastructure.messaging;
 
+import lms.messaging.TenantAwareEventHandler;
 import lms.support.audit.application.IngestAuditEventUseCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,10 +29,11 @@ public class AuditEventConsumer {
     @KafkaListener(topics = {"${app.kafka.topics.auth-events}", "${app.kafka.topics.access-events}",
             "${app.kafka.topics.borrowing-events}"}, groupId = "${spring.kafka.consumer.group-id:support-service}")
     public void onEvent(String message, @Header(KafkaHeaders.RECEIVED_TOPIC) String topic) {
-        parser.parse(topic, message).ifPresent(command -> {
-            boolean recorded = ingest.execute(command);
-            log.debug("Audit {} từ {} (eventId={}): {}", command.eventType(), topic, command.eventId(),
-                    recorded ? "đã ghi" : "bỏ qua vì đã có");
-        });
+        parser.parse(topic, message).ifPresent(command ->
+                TenantAwareEventHandler.handle(command.tenantId(), command.eventType(), command.eventId(), () -> {
+                    boolean recorded = ingest.execute(command);
+                    log.debug("Audit {} từ {} (eventId={}): {}", command.eventType(), topic, command.eventId(),
+                            recorded ? "đã ghi" : "bỏ qua vì đã có");
+                }));
     }
 }

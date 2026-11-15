@@ -4,6 +4,7 @@ import lms.circulation.reservation.application.HoldCopyForNextReservationUseCase
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.UUID;
+import lms.messaging.TenantAwareEventHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -32,8 +33,9 @@ public class InventoryEventConsumer {
     public void onEvent(String message) {
         UUID copyId;
         UUID titleId;
+        JsonNode root;
         try {
-            JsonNode root = mapper.readTree(message);
+            root = mapper.readTree(message);
             if (!"CopyAvailableEvent".equals(root.path("eventType").asText())) {
                 return;
             }
@@ -44,7 +46,9 @@ public class InventoryEventConsumer {
             log.warn("Bỏ qua message inventory.events không hợp lệ: {}", e.toString());
             return;
         }
-        boolean held = holdCopy.holdIfAnyoneWaiting(titleId, copyId);
-        log.debug("CopyAvailable copy={} title={}: {}", copyId, titleId, held ? "đã giữ cho người chờ" : "không có người chờ");
+        TenantAwareEventHandler.handle(root, () -> {
+            boolean held = holdCopy.holdIfAnyoneWaiting(titleId, copyId);
+            log.debug("CopyAvailable copy={} title={}: {}", copyId, titleId, held ? "đã giữ cho người chờ" : "không có người chờ");
+        });
     }
 }

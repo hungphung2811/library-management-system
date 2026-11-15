@@ -33,7 +33,7 @@ public class AuditEventParser {
             }
             String payload = objectMapper.writeValueAsString(envelope.payload() == null ? java.util.Map.of() : envelope.payload());
             return Optional.of(new IngestAuditEventCommand(envelope.eventId(), topic, envelope.eventType(),
-                    envelope.aggregateId(), envelope.occurredAt(), payload, message));
+                    envelope.aggregateId(), envelope.occurredAt(), payload, message, envelope.tenantId()));
         } catch (JsonProcessingException | RuntimeException e) {
             log.warn("Bỏ qua message không đọc được từ topic {}: {}", topic, e.getMessage());
             return Optional.empty();

@@ -1,6 +1,7 @@
 package lms.messaging;
 
 import lms.common.kernel.DomainEvent;
+import lms.tenant.TenantContext;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -30,7 +31,7 @@ public class KafkaEventPublisher {
     public void publish(DomainEvent event) {
         String json;
         try {
-            json = objectMapper.writeValueAsString(EventEnvelope.of(event));
+            json = objectMapper.writeValueAsString(EventEnvelope.of(event, TenantContext.current().orElse(null)));
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Không serialize được event " + event.eventType(), e);
         }

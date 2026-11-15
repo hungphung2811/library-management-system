@@ -4,6 +4,7 @@ import lms.identity.auth.application.RevokeUserSessionsUseCase;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.UUID;
+import lms.messaging.TenantAwareEventHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -33,7 +34,9 @@ public class AccessEventConsumer {
         if (!ROLE_REVOKED.equals(envelope.path("eventType").asText())) return;
 
         UUID userId = UUID.fromString(envelope.path("payload").path("userId").asText());
-        revokeSessions.execute(userId);
-        log.info("Đã thu hồi phiên của user {} do role bị thu hồi (eventId={})", userId, envelope.path("eventId").asText());
+        TenantAwareEventHandler.handle(envelope, () -> {
+            revokeSessions.execute(userId);
+            log.info("Đã thu hồi phiên của user {} do role bị thu hồi (eventId={})", userId, envelope.path("eventId").asText());
+        });
     }
 }

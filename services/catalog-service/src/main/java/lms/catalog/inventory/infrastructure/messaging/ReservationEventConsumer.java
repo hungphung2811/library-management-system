@@ -5,6 +5,7 @@ import lms.catalog.inventory.application.ReleaseCopyUseCase;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.UUID;
+import lms.messaging.TenantAwareEventHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -34,8 +35,9 @@ public class ReservationEventConsumer {
     public void onEvent(String message) {
         String type;
         UUID copyId;
+        JsonNode root;
         try {
-            JsonNode root = mapper.readTree(message);
+            root = mapper.readTree(message);
             type = root.path("eventType").asText();
             if (!"ReservationReadyEvent".equals(type) && !"CopyReleasedEvent".equals(type)) {
                 return;
@@ -45,10 +47,12 @@ public class ReservationEventConsumer {
             log.warn("Bỏ qua message reservation.events không hợp lệ: {}", e.toString());
             return;
         }
-        if ("ReservationReadyEvent".equals(type)) {
-            holdCopy.execute(copyId);
-        } else {
-            releaseCopy.execute(copyId);
-        }
+        TenantAwareEventHandler.handle(root, () -> {
+            if ("ReservationReadyEvent".equals(type)) {
+                holdCopy.execute(copyId);
+            } else {
+                releaseCopy.execute(copyId);
+            }
+        });
     }
 }

@@ -20,6 +20,10 @@
             <artifactId>common-kernel</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.company</groupId>
+            <artifactId>tenant-common</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka</artifactId>
         </dependency>
