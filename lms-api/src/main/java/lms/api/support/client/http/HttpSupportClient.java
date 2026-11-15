@@ -2,10 +2,12 @@ package lms.api.support.client.http;
 
 import lms.api.support.client.SupportClient;
 import lms.api.support.dto.AuditLogView;
+import lms.api.support.dto.NotificationView;
 import lms.api.support.dto.PageView;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.client.RestClient;
 
 /** Gọi API nội bộ /internal/audit-logs của support-service, ánh xạ sang DTO của FE. */
@@ -23,6 +25,13 @@ public class HttpSupportClient implements SupportClient {
 
     public HttpSupportClient(RestClient client) {
         this.client = client;
+    }
+
+    @Override
+    public List<NotificationView> myNotifications() {
+        List<NotificationView> result = client.get().uri("/internal/notifications/me").retrieve()
+                .body(new ParameterizedTypeReference<List<NotificationView>>() { });
+        return result == null ? List.of() : result;
     }
 
     @Override
