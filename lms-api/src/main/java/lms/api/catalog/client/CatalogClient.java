@@ -1,6 +1,8 @@
 package lms.api.catalog.client;
 
 import lms.api.catalog.dto.AddCopyRequest;
+import lms.api.catalog.dto.CopyDetailsView;
+import lms.api.catalog.dto.CopyStatus;
 import lms.api.catalog.dto.CopyView;
 import lms.api.catalog.dto.CreateTitleRequest;
 import lms.api.catalog.dto.TitleView;
@@ -19,4 +21,10 @@ public interface CatalogClient {
     List<CopyView> listCopies(UUID titleId);
 
     CopyView addCopy(AddCopyRequest request);
+
+    CopyDetailsView getCopy(UUID id);
+
+    CopyDetailsView getCopyByBarcode(String barcode);
+
+    CopyView changeCopyStatus(UUID id, CopyStatus status);
 }

@@ -9,6 +9,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import lms.api.catalog.client.http.HttpCatalogClient;
 import lms.api.catalog.dto.AddCopyRequest;
+import lms.api.catalog.dto.CopyStatus;
 import lms.api.support.TokenRelayInterceptor;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -56,6 +57,33 @@ class HttpCatalogClientTest {
         assertEquals(1, titles.size());
         assertEquals(3, titles.get(0).availableCopies());
         assertEquals("AVAILABLE", client.addCopy(new AddCopyRequest(title, "CC-1")).status());
+        server.verify();
+    }
+
+    @Test
+    void traBanSaoTheoIdMaVachVaDoiTrangThaiGoiDungDuongDanNoiBo() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://catalog")
+                .requestInterceptor(new TokenRelayInterceptor());
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        HttpCatalogClient client = new HttpCatalogClient(builder.build());
+
+        UUID copy = UUID.randomUUID();
+        UUID title = UUID.randomUUID();
+        String details = "{\"id\":\"" + copy + "\",\"titleId\":\"" + title + "\",\"titleName\":\"Clean Code\","
+                + "\"barcode\":\"CC-1\",\"status\":\"LOANED\",\"coverPrice\":250000.00}";
+        server.expect(requestTo("http://catalog/internal/book-copies/" + copy))
+                .andExpect(method(HttpMethod.GET)).andRespond(withSuccess(details, MediaType.APPLICATION_JSON));
+        server.expect(requestTo("http://catalog/internal/book-copies/by-barcode/CC-1"))
+                .andExpect(method(HttpMethod.GET)).andRespond(withSuccess(details, MediaType.APPLICATION_JSON));
+        server.expect(requestTo("http://catalog/internal/book-copies/" + copy + "/status"))
+                .andExpect(method(HttpMethod.PUT))
+                .andExpect(jsonPath("$.status").value("DAMAGED"))
+                .andRespond(withSuccess("{\"id\":\"" + copy + "\",\"titleId\":\"" + title
+                        + "\",\"barcode\":\"CC-1\",\"status\":\"DAMAGED\"}", MediaType.APPLICATION_JSON));
+
+        assertEquals("Clean Code", client.getCopy(copy).titleName());
+        assertEquals("CC-1", client.getCopyByBarcode("CC-1").barcode());
+        assertEquals("DAMAGED", client.changeCopyStatus(copy, CopyStatus.DAMAGED).status());
         server.verify();
     }
 }

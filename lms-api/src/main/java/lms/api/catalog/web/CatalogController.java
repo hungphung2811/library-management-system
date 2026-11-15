@@ -2,6 +2,8 @@ package lms.api.catalog.web;
 
 import lms.api.catalog.client.CatalogClient;
 import lms.api.catalog.dto.AddCopyRequest;
+import lms.api.catalog.dto.ChangeCopyStatusRequest;
+import lms.api.catalog.dto.CopyDetailsView;
 import lms.api.catalog.dto.CopyView;
 import lms.api.catalog.dto.CreateTitleRequest;
 import lms.api.catalog.dto.TitleView;
@@ -13,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -55,5 +58,23 @@ public class CatalogController {
     public ResponseEntity<CopyView> addCopy(@Valid @RequestBody AddCopyRequest request) {
         CopyView created = catalog.addCopy(request);
         return ResponseEntity.created(URI.create("/api/book-copies/" + created.id())).body(created);
+    }
+
+    /** Tra bản sao theo id: trạng thái, đầu sách và giá bìa. */
+    @GetMapping("/book-copies/{id}")
+    public CopyDetailsView copy(@PathVariable UUID id) {
+        return catalog.getCopy(id);
+    }
+
+    /** Tra bản sao theo mã vạch (thủ thư quét mã khi trả hoặc báo mất). */
+    @GetMapping("/book-copies/by-barcode/{barcode}")
+    public CopyDetailsView copyByBarcode(@PathVariable String barcode) {
+        return catalog.getCopyByBarcode(barcode);
+    }
+
+    /** Đổi trạng thái bản sao (ví dụ DAMAGED, LOST); sai vòng đời thì catalog-service trả 409. */
+    @PutMapping("/book-copies/{id}/status")
+    public CopyView changeStatus(@PathVariable UUID id, @Valid @RequestBody ChangeCopyStatusRequest request) {
+        return catalog.changeCopyStatus(id, request.status());
     }
 }

@@ -6,11 +6,15 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import lms.api.catalog.client.CatalogClient;
+import lms.api.catalog.dto.CopyDetailsView;
+import lms.api.catalog.dto.CopyStatus;
+import lms.api.catalog.dto.CopyView;
 import lms.api.catalog.dto.TitleView;
 import lms.api.catalog.web.CatalogController;
 import lms.api.config.SecurityConfiguration;
@@ -114,5 +118,49 @@ class CatalogControllerTest {
         mvc.perform(get("/api/book-copies").param("titleId", TITLE.toString()).with(jwt()))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.code").value("DEPENDENCY_UNAVAILABLE"));
+    }
+
+    @Test
+    void traBanSaoTheoIdVaMaVachChoFe() throws Exception {
+        UUID copy = UUID.randomUUID();
+        CopyDetailsView view = new CopyDetailsView(copy, TITLE, "Clean Code", "CC-1", "LOANED", new BigDecimal("250000"));
+        when(catalog.getCopy(copy)).thenReturn(view);
+        when(catalog.getCopyByBarcode("CC-1")).thenReturn(view);
+        mvc.perform(get("/api/book-copies/" + copy).with(jwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.titleName").value("Clean Code"))
+                .andExpect(jsonPath("$.status").value("LOANED"));
+        mvc.perform(get("/api/book-copies/by-barcode/CC-1").with(jwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.barcode").value("CC-1"));
+    }
+
+    @Test
+    void doiTrangThaiBanSaoChuyenDungTrangThaiVaTuChoiGiaTriSai() throws Exception {
+        UUID copy = UUID.randomUUID();
+        when(catalog.changeCopyStatus(copy, CopyStatus.DAMAGED))
+                .thenReturn(new CopyView(copy, TITLE, "CC-1", "DAMAGED"));
+        mvc.perform(put("/api/book-copies/" + copy + "/status").with(jwt()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"DAMAGED\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DAMAGED"));
+        mvc.perform(put("/api/book-copies/" + copy + "/status").with(jwt()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put("/api/book-copies/" + copy + "/status").with(jwt()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"BAY_BIEN\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void chuyenTrangThaiSaiVongDoiCuaServiceNoiBoThanh409() throws Exception {
+        UUID copy = UUID.randomUUID();
+        when(catalog.changeCopyStatus(copy, CopyStatus.LOST)).thenThrow(HttpClientErrorException.create(
+                HttpStatus.CONFLICT, "Conflict", HttpHeaders.EMPTY,
+                "{\"code\":\"ILLEGAL_COPY_TRANSITION\",\"message\":\"x\",\"details\":[]}"
+                        .getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8));
+        mvc.perform(put("/api/book-copies/" + copy + "/status").with(jwt()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"LOST\"}"))
+                .andExpect(status().isConflict());
     }
 }
