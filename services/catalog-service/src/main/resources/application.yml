@@ -14,7 +14,7 @@ spring:
     hibernate:
       ddl-auto: validate
   flyway:
-    # Migration do migration-service chạy tập trung; service chỉ validate schema (ddl-auto: validate)
+    # Migration do system-service chạy tập trung; service chỉ validate schema (ddl-auto: validate)
     enabled: false
   kafka:
     producer:
@@ -41,8 +41,8 @@ logging:
 
 app:
   security:
-    # Migration do migration-service chạy tập trung; service chỉ validate schema (ddl-auto: validate)
-    enabled: false
+    # Mặc định bật xác thực JWT; chỉ profile dev tắt (application-dev.yml)
+    enabled: true
 
   kafka:
     topics:
