@@ -46,16 +46,16 @@ class TenantPersistenceAdapterIT {
 
     @Test
     void luuTenantMoiVaTrungMaBiTuChoi() {
-        Tenant t = tenants.save(Tenant.create("lib-a", "Thư viện A", null));
+        Tenant t = tenants.save(Tenant.create(code("lib-a"), "Thư viện A", null));
 
         assertThat(tenants.findById(t.id())).isPresent();
-        assertThatThrownBy(() -> tenants.save(Tenant.create("lib-a", "Khác", null)))
+        assertThatThrownBy(() -> tenants.save(Tenant.create(t.code(), "Khác", null)))
                 .isInstanceOf(DuplicateTenantException.class);
     }
 
     @Test
     void membershipLuuTimVaChiLayActive() {
-        Tenant t = tenants.save(Tenant.create("lib-b", "Thư viện B", null));
+        Tenant t = tenants.save(Tenant.create(code("lib-b"), "Thư viện B", null));
         UUID user = UUID.randomUUID();
         Membership m = Membership.create(user, t.id(), null);
         memberships.save(m);
@@ -80,7 +80,7 @@ class TenantPersistenceAdapterIT {
         memberships.saveLastTenant(user, tenant);
         assertThat(memberships.findLastTenant(user)).contains(tenant);
 
-        UUID other = tenants.save(Tenant.create("lib-c", "Thư viện C", null)).id();
+        UUID other = tenants.save(Tenant.create(code("lib-c"), "Thư viện C", null)).id();
         memberships.saveLastTenant(user, other);
         assertThat(memberships.findLastTenant(user)).contains(other);
     }
@@ -96,6 +96,24 @@ class TenantPersistenceAdapterIT {
         memberships.saveLastTenant(user, tenant);
 
         assertThat(memberships.findLastTenant(user)).contains(tenant);
+    }
+
+    /** Mã tenant duy nhất mỗi lần gọi, tránh đụng unique(code) khi chạy lại hoặc dùng chung container. */
+    private static String code(String prefix) {
+        return prefix + "-" + UUID.randomUUID().toString().substring(0, 8);
+    }
+
+    @Test
+    void lastTenantVoiTaiKhoanChiCoTrongUsersKhongCoCredentialLaNoOp() {
+        UUID user = UUID.randomUUID();
+        jdbc.update("INSERT INTO users (id, username, full_name, email, status) VALUES (?, ?, 'N', ?, 'ACTIVE')",
+                user, "uo" + user, user + "@x.vn");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM credentials WHERE user_id = ?", Integer.class, user))
+                .isZero();
+
+        memberships.saveLastTenant(user, UUID.fromString("00000000-0000-0000-0000-0000000000d1"));
+
+        assertThat(memberships.findLastTenant(user)).isEmpty();
     }
 
     @Test

@@ -13,8 +13,12 @@ public interface MembershipRepository {
 
     Optional<Membership> find(UUID userId, UUID tenantId);
 
-    /** Ghi tenant dùng gần nhất của người dùng (credentials.last_tenant_id). Với userId không tồn tại (không có credential) thì không làm gì. */
+    /**
+     * Ghi tenant dùng gần nhất (credentials.last_tenant_id). Tài khoản đăng nhập được luôn có dòng credentials;
+     * với userId không có dòng credentials (không thể xác thực, không nhận được token) thì đây là no-op có chủ đích.
+     */
     void saveLastTenant(UUID userId, UUID tenantId);
 
+    /** Tenant dùng gần nhất; trả Optional.empty nếu chưa ghi hoặc userId không có dòng credentials. */
     Optional<UUID> findLastTenant(UUID userId);
 }

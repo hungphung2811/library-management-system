@@ -10,8 +10,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 /**
- * Membership qua JPA; credentials.last_tenant_id (mọi tài khoản đều có dòng credentials) đọc/ghi bằng SQL hẹp để không đụng
- * entity của context auth.
+ * Membership qua JPA; credentials.last_tenant_id đọc/ghi bằng SQL hẹp để không đụng entity của context auth.
+ * Mọi tài khoản xác thực được (mật khẩu hoặc đăng nhập ngoài) đều có dòng credentials; với userId không có dòng
+ * này (ví dụ chỉ có trong users, không thể nhận token) saveLastTenant là no-op có chủ đích và findLastTenant
+ * trả Optional.empty.
  */
 @Repository
 class MembershipPersistenceAdapter implements MembershipRepository {
