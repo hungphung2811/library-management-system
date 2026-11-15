@@ -84,6 +84,17 @@ Chú thích thuật ngữ dùng trong mục này:
 - Khi role bị thu hồi, `RoleRevokedEvent` làm `auth` thu hồi refresh token của người dùng đó.
 - Chạy local (profile `dev`): tài khoản `admin` / `Admin@12345` (role SUPER_ADMIN). Chỉ dùng ở dev.
 
+### Multi-tenant (ADR-0006)
+
+Nhiều thư viện (tenant) dùng chung DB: bảng nghiệp vụ có `tenant_id`, entity dùng `@TenantId`, PostgreSQL bật Row-Level Security (fail-closed). Quyết định và đánh đổi: `docs/decisions/0006-multi-tenant.md`.
+
+- Token (JWT) theo tenant: claim `tenantId`; `permissions`/`admin` tính theo role của tenant đó. Thiếu `tenantId` thì 403 `TENANT_REQUIRED` (trừ endpoint `@AuthenticatedOnly` như `switch-tenant`, `/api/me/tenants`).
+- Đổi tenant: `POST /api/auth/switch-tenant` body `{tenantId, refreshToken}` (bắt buộc có `refreshToken`).
+- Service chạy bằng vai trò DB `<svc>_app` (không phải chủ bảng, chịu RLS); `migration-service` chạy bằng chủ bảng. Vai trò tạo trong `infrastructure/postgres/init-databases.sql`: volume Postgres cũ cần `docker compose down -v` (hoặc chạy tay SQL đó) rồi mới `up`; sau khi pull thay đổi migration cần `mvn clean`.
+- Chạy local dùng tenant mặc định `00000000-0000-0000-0000-0000000000d1`. Profile dev tắt security thì không có JWT nên không có tenant; ghi vào bảng tenant sẽ bị chặn (fail-closed), cần Bearer token từ identity.
+- Dữ liệu cũ ngoài Postgres: `infrastructure/mongo/backfill-tenant-id.js` (Mongo), `infrastructure/redis/README.md` (Redis).
+- Giới hạn đã biết và kiểm chứng còn nợ (chưa chạy test theo R18/R21): xem mục "Kiểm chứng còn nợ" trong ADR-0006.
+
 ### Nhiều database trong một service
 
 `support-service` (ngữ cảnh `audit`) là service mẫu dùng `database-common`: `AUDIT_DB` (PostgreSQL, critical) cho
@@ -103,7 +114,8 @@ mvn test                                    # unit + ArchUnit + WebMvc test
 ```
 
 Integration test (cần Docker), ví dụ: `mvn test -Dtest=AuthPersistenceAdapterIT -Dsurefire.failIfNoSpecifiedTests=false`.
-Surefire mặc định không chạy `*IT`.
+Surefire mặc định không chạy `*IT`. IT có RLS tạo vai trò `<svc>_app` trong container và chạy service bằng vai trò đó (không dùng superuser).
+Với Docker 29 thêm `-DargLine=-Dapi.version=1.44`.
 
 ## Quy tắc
 

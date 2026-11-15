@@ -45,6 +45,16 @@ Không có hằng số permission và không dùng `hasAuthority`. `PermissionIn
 - `SecurityConfiguration` của mỗi service chỉ xác thực (`/internal/**` authenticated, còn lại denyAll; `/api/**` chỉ có ở lms-api và identity cho tới khi identity chuyển). Profile dev tắt kiểm khóa bằng `lms.security.permission.enabled=false`; test WebMvc phải bật lại (`@TestPropertySource`) và `@MockitoBean PermissionKeyRegistrar`.
 - Migration identity có đánh số liên tục (V9 đổi mã seed cũ sang khóa endpoint); thêm migration mới phải kiểm tra số kế tiếp vì nhiều người cùng sửa (file nằm ở `migration-service`, thư mục `identity`).
 
+### Multi-tenant (ADR-0006)
+
+- Dùng chung DB: bảng nghiệp vụ có `tenant_id`, entity `@TenantId` (Hibernate), PostgreSQL `ENABLE`+`FORCE ROW LEVEL SECURITY` theo biến phiên `app.tenant_id` (fail-closed). `TenantContext` (tenant-common) đặt từ claim JWT `tenantId`; không có tenant thì 403 `TENANT_REQUIRED` (trừ `@AuthenticatedOnly`).
+- Token theo tenant: `permissions`/`admin` tính theo role của tenant trong token. `POST /api/auth/switch-tenant` body `{tenantId, refreshToken}` (bắt buộc có `refreshToken`, token cũ bị thu hồi). Platform admin: token không có `tenantId`.
+- Service chạy bằng vai trò DB `<svc>_app` (NOSUPERUSER NOBYPASSRLS), tạo trong `infrastructure/postgres/init-databases.sql`; migration-service dùng chủ bảng và cấp quyền qua callback `afterMigrate.sql`. Volume Postgres cũ: `docker compose down -v` (hoặc chạy tay SQL). Sau khi pull thay đổi migration: `mvn clean`.
+- Chạy local dùng tenant mặc định `00000000-0000-0000-0000-0000000000d1`. Profile dev tắt security nên không có JWT và không có tenant: ghi bảng tenant bị chặn, cần Bearer token.
+- **Migration mới trên bảng có RLS**: FORCE RLS áp cả cho chủ bảng nên migration ghi dữ liệu vào bảng tenant phải đặt `app.tenant_id` (`set_config('app.tenant_id', '<uuid>', true)`) hoặc chạy bằng superuser; bảng mới có `tenant_id` phải bật RLS + FORCE, thêm `@TenantId` vào entity (ArchUnit `TenantArchitectureRulesTest` bắt thiếu). Bảng không `@TenantId` phải nằm trong `TenantArchitectureRules.TENANT_EXEMPT_TABLES`; không thêm native query ngoài danh sách đã rà.
+- IT chạy bằng vai trò app: Flyway chạy bằng chủ bảng/superuser trong container, sau đó tạo `<svc>_app` và nối DataSource của service bằng vai trò này (xem `AppRoleDatabase` trong IT của support/identity); đặt `TenantContext` hoặc JWT có `tenantId` cho mỗi lần gọi.
+- Giới hạn đã biết và lệnh chạy test bù: mục "Kiểm chứng còn nợ" trong `docs/decisions/0006-multi-tenant.md`.
+
 ### Nhiều database (`database-common`)
 
 Kết nối khai báo ở `database.connections.*` (PostgreSQL, Oracle, MongoDB, Redis; không có MySQL/SQL Server). Mỗi kết nối JPA có TransactionManager tên `<name>TransactionManager`. Không có atomicity xuyên DB: mỗi use case chỉ ghi một DB, bản Mongo là best-effort. Mẫu tham khảo: `support-service` (context `audit`, `AUDIT_DB` Postgres + `LOG_DB` Mongo), xem `docs/architecture/multi-database-report.md`.
