@@ -34,7 +34,9 @@ database:
     AUDIT_DB:
       type: POSTGRESQL
       critical: true
-      entity-packages: lms.support.audit.infrastructure.persistence
+      entity-packages:
+        - lms.support.audit.infrastructure.persistence
+        - lms.support.notification.infrastructure.persistence
       jpa-properties:
         # Không tự sinh/validate schema ở đây: schema do migration-service quản lý.
         hibernate.hbm2ddl.auto: none
@@ -70,6 +72,7 @@ app:
       auth-events: auth.events
       access-events: access-control.events
       borrowing-events: borrowing.events
+      reservation-events: reservation.events
 
 # Middleware phân quyền theo endpoint (security-common): khóa Controller/method được đăng ký về identity-service
 lms:

@@ -4,7 +4,9 @@ import lms.api.config.ServicesProperties;
 import lms.api.identity.client.AccessClient;
 import lms.api.identity.client.AuthClient;
 import lms.api.identity.client.DepartmentClient;
+import lms.api.identity.client.IdentityGatewayClient;
 import lms.api.identity.client.UserClient;
+import lms.api.identity.client.http.HttpIdentityGatewayClient;
 import lms.api.identity.client.http.HttpAccessClient;
 import lms.api.identity.client.http.HttpAuthClient;
 import lms.api.identity.client.http.HttpDepartmentClient;
@@ -55,6 +57,12 @@ public class IdentityClientConfiguration {
     @Bean
     UserClient userClient(ServicesProperties properties) {
         return new HttpUserClient(noRedirectClient(properties.identityUrl(), properties));
+    }
+
+    @Bean
+    IdentityGatewayClient identityGatewayClient(ServicesProperties properties) {
+        return new HttpIdentityGatewayClient(noRedirectClient(properties.identityUrl(), properties),
+                properties.identityUrl());
     }
 
     @Bean
