@@ -32,4 +32,6 @@ interface SpringDataReservationRepository extends JpaRepository<ReservationJpaEn
     List<ReservationJpaEntity> findByStatusAndHoldUntilBefore(ReservationStatus status, LocalDate date);
 
     boolean existsByCopyIdAndStatus(UUID copyId, ReservationStatus status);
+
+    Optional<ReservationJpaEntity> findFirstByCopyIdAndStatus(UUID copyId, ReservationStatus status);
 }

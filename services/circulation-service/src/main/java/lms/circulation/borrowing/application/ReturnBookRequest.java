@@ -1,7 +1,8 @@
 package lms.circulation.borrowing.application;
 
-import jakarta.validation.constraints.NotNull;
+import lms.circulation.borrowing.domain.ItemCondition;
 import java.util.UUID;
 
-public record ReturnBookRequest(@NotNull UUID bookCopyId) {
+/** Chỉ định bản sao bằng bookCopyId hoặc barcode (máy quét); condition mặc định GOOD, chỉ nhận GOOD hoặc DAMAGED. */
+public record ReturnBookRequest(UUID bookCopyId, String barcode, ItemCondition condition) {
 }

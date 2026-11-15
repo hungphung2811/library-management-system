@@ -32,6 +32,9 @@ class BorrowingJpaEntity {
     @Column(name = "renew_count", nullable = false)
     private int renewCount;
 
+    @Column(name = "loan_days", nullable = false)
+    private int loanDays;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "borrowing_items", joinColumns = @JoinColumn(name = "borrowing_id"))
     private List<BorrowingItemEmbeddable> items = new ArrayList<>();
@@ -39,8 +42,9 @@ class BorrowingJpaEntity {
     protected BorrowingJpaEntity() {
     }
 
-    BorrowingJpaEntity(UUID id, UUID userId, LocalDate borrowDate, LocalDate dueDate, int renewCount,
+    BorrowingJpaEntity(UUID id, UUID userId, LocalDate borrowDate, LocalDate dueDate, int renewCount, int loanDays,
                        List<BorrowingItemEmbeddable> items) {
+        this.loanDays = loanDays;
         this.id = id;
         this.userId = userId;
         this.borrowDate = borrowDate;
@@ -54,5 +58,6 @@ class BorrowingJpaEntity {
     LocalDate getBorrowDate() { return borrowDate; }
     LocalDate getDueDate() { return dueDate; }
     int getRenewCount() { return renewCount; }
+    int getLoanDays() { return loanDays; }
     List<BorrowingItemEmbeddable> getItems() { return items; }
 }

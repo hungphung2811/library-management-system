@@ -61,6 +61,9 @@ class ReservationUseCasesTest {
         public boolean existsReadyForCopy(UUID copyId) {
             return items.stream().anyMatch(r -> r.status() == ReservationStatus.READY && copyId.equals(r.copyId()));
         }
+        public Optional<Reservation> findReadyByCopyId(UUID copyId) {
+            return items.stream().filter(r -> r.status() == ReservationStatus.READY && copyId.equals(r.copyId())).findFirst();
+        }
         public long queuePosition(Reservation r) {
             if (r.status() != ReservationStatus.WAITING) return 0;
             return items.stream().filter(x -> x.titleId().equals(r.titleId()) && x.status() == ReservationStatus.WAITING

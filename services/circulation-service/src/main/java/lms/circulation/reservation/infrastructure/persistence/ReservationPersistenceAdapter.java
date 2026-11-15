@@ -74,6 +74,11 @@ class ReservationPersistenceAdapter implements ReservationRepository {
         return jpa.existsByCopyIdAndStatus(copyId, ReservationStatus.READY);
     }
 
+    @Override
+    public Optional<Reservation> findReadyByCopyId(UUID copyId) {
+        return jpa.findFirstByCopyIdAndStatus(copyId, ReservationStatus.READY).map(ReservationPersistenceAdapter::toDomain);
+    }
+
     private static Reservation toDomain(ReservationJpaEntity e) {
         return Reservation.restore(e.getId(), e.getReaderId(), e.getTitleId(), e.getReservedAt(), e.getStatus(),
                 e.getCopyId(), e.getHoldUntil());

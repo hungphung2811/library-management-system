@@ -96,6 +96,15 @@ public class Reservation {
         events.add(new ReservationExpiredEvent(UUID.randomUUID(), id, readerId, titleId, copyId, now));
     }
 
+    /** UC06 (4c): độc giả nhận đúng bản sao được giữ cho mình. READY -> FULFILLED. */
+    public void fulfill(Instant now) {
+        if (status != ReservationStatus.READY) {
+            throw new InvalidReservationException("Chỉ đặt trước READY mới nhận được bản sao (" + status + ")");
+        }
+        status = ReservationStatus.FULFILLED;
+        events.add(new ReservationFulfilledEvent(UUID.randomUUID(), id, readerId, titleId, copyId, now));
+    }
+
     /** UC04: rút khỏi hàng đợi. Chỉ đặt trước còn hiệu lực (WAITING, READY) mới hủy được. */
     public void cancel(Instant now) {
         if (!isActive()) {

@@ -3,9 +3,13 @@ package lms.circulation.borrowing.infrastructure.persistence;
 import lms.circulation.borrowing.application.SaveBorrowingPort;
 import lms.circulation.borrowing.domain.BorrowingId;
 import lms.circulation.borrowing.domain.BorrowingRecord;
+import lms.circulation.borrowing.domain.BorrowingRejectedException;
 import lms.circulation.borrowing.domain.BorrowingRepository;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.dao.DataIntegrityViolationException;
 
 public class BorrowingPersistenceAdapter implements SaveBorrowingPort, BorrowingRepository {
 
@@ -17,7 +21,13 @@ public class BorrowingPersistenceAdapter implements SaveBorrowingPort, Borrowing
 
     @Override
     public BorrowingRecord save(BorrowingRecord record) {
-        jpa.save(BorrowingPersistenceMapper.toEntity(record));
+        try {
+            jpa.saveAndFlush(BorrowingPersistenceMapper.toEntity(record));
+        } catch (DataIntegrityViolationException e) {
+            // unique index uq_borrowing_items_open_copy: bản sao đã thuộc một lượt mượn đang mở (ví dụ lập phiếu đồng thời ở quầy khác)
+            throw new BorrowingRejectedException("COPY_ALREADY_BORROWED",
+                    "Một bản sao đã được lập phiếu mượn ở nơi khác, bỏ bản sao đó ra và xác nhận lại");
+        }
         return record;
     }
 
@@ -27,7 +37,27 @@ public class BorrowingPersistenceAdapter implements SaveBorrowingPort, Borrowing
     }
 
     @Override
+    public Optional<BorrowingRecord> findByIdForUpdate(BorrowingId id) {
+        return jpa.findByIdForUpdate(id.value()).map(BorrowingPersistenceMapper::toDomain);
+    }
+
+    @Override
+    public Optional<BorrowingRecord> findOpenByCopyIdForUpdate(UUID bookCopyId) {
+        return jpa.findOpenByCopyIdForUpdate(bookCopyId).map(BorrowingPersistenceMapper::toDomain);
+    }
+
+    @Override
+    public List<BorrowingRecord> findByUserId(UUID userId) {
+        return jpa.findByUserIdOrdered(userId).stream().map(BorrowingPersistenceMapper::toDomain).toList();
+    }
+
+    @Override
     public long countActiveItemsByUserId(UUID userId) {
         return jpa.countActiveItemsByUserId(userId);
+    }
+
+    @Override
+    public long countOverdueItemsByUserId(UUID userId, LocalDate today) {
+        return jpa.countOverdueItemsByUserId(userId, today);
     }
 }

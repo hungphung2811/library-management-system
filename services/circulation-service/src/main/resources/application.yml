@@ -49,6 +49,11 @@ app:
   reservation:
     # UC14: chạy đầu mỗi ngày (cron 6 trường)
     expire-cron: "0 5 0 * * *"
+  # Mức phạt (QĐ3, QĐ4): đổi ở đây không cần sửa code. Hạn mức mượn theo loại độc giả nằm ở bảng borrow_rules.
+  fine:
+    late-fee-per-day: 5000
+    damaged-rate: 0.5
+    lost-rate: 1.5
   # Gọi đồng bộ sang service khác để kiểm tra đặt trước (QĐ2: identity, QĐ5: catalog)
   clients:
     catalog:
