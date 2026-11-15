@@ -39,10 +39,26 @@ class TenantPersistenceAdapter implements TenantRepository, TenantQueryRepositor
             jpa.saveAndFlush(new TenantJpaEntity(t.id(), t.code(), t.name(), t.organizationId(), t.status(),
                     t.createdAt()));
         } catch (DataIntegrityViolationException e) {
-            // unique(code): hai yêu cầu tạo cùng mã đồng thời
-            throw new DuplicateTenantException("Mã tenant đã tồn tại: " + t.code());
+            // unique(code): hai yêu cầu tạo cùng mã đồng thời; vi phạm khác (FK organization, check...) ném lại
+            if (isCodeUniqueViolation(e)) throw new DuplicateTenantException("Mã tenant đã tồn tại: " + t.code());
+            throw e;
         }
         return t;
+    }
+
+    /** Ràng buộc UNIQUE của tenants.code (tên mặc định PostgreSQL: tenants_code_key, V11). */
+    static final String CODE_UNIQUE_CONSTRAINT = "tenants_code_key";
+
+    private static boolean isCodeUniqueViolation(DataIntegrityViolationException e) {
+        for (Throwable c = e; c != null; c = c.getCause() == c ? null : c.getCause()) {
+            if (c instanceof org.hibernate.exception.ConstraintViolationException cve
+                    && cve.getConstraintName() != null) {
+                return cve.getConstraintName().toLowerCase().contains(CODE_UNIQUE_CONSTRAINT);
+            }
+            String message = c.getMessage();
+            if (message != null && message.toLowerCase().contains(CODE_UNIQUE_CONSTRAINT)) return true;
+        }
+        return false;
     }
 
     @Override
