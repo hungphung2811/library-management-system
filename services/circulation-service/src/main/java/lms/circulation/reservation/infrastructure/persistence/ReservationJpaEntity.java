@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 import org.hibernate.annotations.TenantId;
+import lms.tenant.TenantContext;
 
 /**
  * Đặt trước thuộc một tenant: tenant_id do Hibernate điền/lọc theo TenantContext (@TenantId), RLS lọc thêm ở DB.
@@ -51,6 +52,9 @@ class ReservationJpaEntity {
 
     ReservationJpaEntity(UUID id, UUID readerId, UUID titleId, Instant reservedAt, ReservationStatus status,
                          UUID copyId, LocalDate holdUntil) {
+        // Điền sẵn tenant của phiên: merge (save entity mới dựng) không ghi đè tenant_id thành null, insert khớp
+        // tenant phiên; không có tenant thì ném TenantRequiredException (fail-closed). Cột updatable=false.
+        this.tenantId = TenantContext.require();
         this.id = id;
         this.readerId = readerId;
         this.titleId = titleId;

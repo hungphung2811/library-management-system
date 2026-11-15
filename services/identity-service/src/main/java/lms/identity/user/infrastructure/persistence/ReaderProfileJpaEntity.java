@@ -11,6 +11,7 @@ import jakarta.persistence.Table;
 import java.time.LocalDate;
 import java.util.UUID;
 import org.hibernate.annotations.TenantId;
+import lms.tenant.TenantContext;
 
 /**
  * Hồ sơ độc giả của một người dùng trong một tenant. Khóa chính ở DB là (tenant_id, user_id); ở JPA chỉ cần user_id vì
@@ -53,6 +54,9 @@ class ReaderProfileJpaEntity {
 
     ReaderProfileJpaEntity(UUID userId, String cardNo, String fullName, String email, ReaderType readerType,
                            LocalDate cardExpiryDate, ReaderStatus status) {
+        // Điền sẵn tenant của phiên: merge (save entity mới dựng) không ghi đè tenant_id thành null, insert khớp
+        // tenant phiên; không có tenant thì ném TenantRequiredException (fail-closed). Cột updatable=false.
+        this.tenantId = TenantContext.require();
         this.userId = userId;
         this.cardNo = cardNo;
         this.fullName = fullName;

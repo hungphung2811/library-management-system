@@ -12,6 +12,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 import org.hibernate.annotations.TenantId;
+import lms.tenant.TenantContext;
 
 /** Role thuộc một tenant: tenant_id do Hibernate điền/lọc theo TenantContext (@TenantId), RLS lọc thêm ở DB. */
 @Entity
@@ -44,6 +45,9 @@ class RoleJpaEntity {
     }
 
     RoleJpaEntity(UUID id, String name, String description, boolean admin, Set<String> permissionCodes) {
+        // Điền sẵn tenant của phiên: merge (save entity mới dựng) không ghi đè tenant_id thành null, insert khớp
+        // tenant phiên; không có tenant thì ném TenantRequiredException (fail-closed). Cột updatable=false.
+        this.tenantId = TenantContext.require();
         this.id = id;
         this.name = name;
         this.description = description;

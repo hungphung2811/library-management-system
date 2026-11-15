@@ -9,6 +9,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.util.UUID;
 import org.hibernate.annotations.TenantId;
+import lms.tenant.TenantContext;
 
 /** Phòng ban thuộc một tenant (@TenantId + RLS); mã unique theo tenant, phòng ban cha cùng tenant (ràng buộc ở migration). */
 @Entity
@@ -39,6 +40,9 @@ class DepartmentJpaEntity {
     }
 
     DepartmentJpaEntity(UUID id, String code, String name, UUID parentId, DepartmentStatus status) {
+        // Điền sẵn tenant của phiên: merge (save entity mới dựng) không ghi đè tenant_id thành null, insert khớp
+        // tenant phiên; không có tenant thì ném TenantRequiredException (fail-closed). Cột updatable=false.
+        this.tenantId = TenantContext.require();
         this.id = id;
         this.code = code;
         this.name = name;

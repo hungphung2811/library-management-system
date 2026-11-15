@@ -9,6 +9,7 @@ import java.io.Serializable;
 import java.util.Objects;
 import java.util.UUID;
 import org.hibernate.annotations.TenantId;
+import lms.tenant.TenantContext;
 
 /**
  * Một dòng của bảng user_roles (userId, roleId) trong tenant hiện tại (@TenantId; khóa ngoại kép với roles bảo đảm
@@ -35,6 +36,9 @@ class UserRoleJpaEntity {
     }
 
     UserRoleJpaEntity(UUID userId, UUID roleId) {
+        // Điền sẵn tenant của phiên: merge (save entity mới dựng) không ghi đè tenant_id thành null, insert khớp
+        // tenant phiên; không có tenant thì ném TenantRequiredException (fail-closed). Cột updatable=false.
+        this.tenantId = TenantContext.require();
         this.userId = userId;
         this.roleId = roleId;
     }

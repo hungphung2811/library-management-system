@@ -9,6 +9,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.util.UUID;
 import org.hibernate.annotations.TenantId;
+import lms.tenant.TenantContext;
 
 /** Bản sao thuộc một tenant (@TenantId + RLS); mã vạch unique theo tenant (ràng buộc ở migration). */
 @Entity
@@ -36,6 +37,9 @@ class BookCopyJpaEntity {
     }
 
     BookCopyJpaEntity(UUID id, UUID titleId, String barcode, CopyStatus status) {
+        // Điền sẵn tenant của phiên: merge (save entity mới dựng) không ghi đè tenant_id thành null, insert khớp
+        // tenant phiên; không có tenant thì ném TenantRequiredException (fail-closed). Cột updatable=false.
+        this.tenantId = TenantContext.require();
         this.id = id;
         this.titleId = titleId;
         this.barcode = barcode;

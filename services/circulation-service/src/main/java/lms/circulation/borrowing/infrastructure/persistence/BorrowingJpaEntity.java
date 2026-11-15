@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.hibernate.annotations.TenantId;
+import lms.tenant.TenantContext;
 
 /**
  * Lượt mượn thuộc một tenant: tenant_id do Hibernate điền/lọc theo TenantContext (@TenantId), RLS lọc thêm ở DB.
@@ -51,6 +52,9 @@ class BorrowingJpaEntity {
 
     BorrowingJpaEntity(UUID id, UUID userId, LocalDate borrowDate, LocalDate dueDate, int renewCount,
                        List<BorrowingItemEmbeddable> items) {
+        // Điền sẵn tenant của phiên: merge (save entity mới dựng) không ghi đè tenant_id thành null, insert khớp
+        // tenant phiên; không có tenant thì ném TenantRequiredException (fail-closed). Cột updatable=false.
+        this.tenantId = TenantContext.require();
         this.id = id;
         this.userId = userId;
         this.borrowDate = borrowDate;
