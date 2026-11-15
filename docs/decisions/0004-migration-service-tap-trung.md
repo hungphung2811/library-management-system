@@ -1,6 +1,7 @@
 # ADR-0004: Migration tập trung trong `migration-service`
 
-- Trạng thái: chấp nhận
+- Trạng thái: chấp nhận; được mở rộng bởi ADR-0007 (đổi tên thành `system-service`, thêm `system_db` và context menu,
+  API chuyển sang `/internal/migrations`). Nội dung dưới đây giữ nguyên làm lịch sử quyết định.
 - Bối cảnh: mỗi service (identity, catalog, circulation, support) tự giữ file SQL Flyway và tự chạy Flyway lúc khởi động lên DB của mình
   (support-service còn phải chạy Flyway thủ công vì có nhiều nguồn dữ liệu). Việc này khiến lịch sử migration nằm rải rác, khó xem
   "DB nào đã chạy file nào", và khởi động nhiều bản sao của cùng một service cùng lúc đều tranh nhau migrate.
