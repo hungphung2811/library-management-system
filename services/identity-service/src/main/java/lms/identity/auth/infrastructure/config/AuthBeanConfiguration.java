@@ -117,8 +117,10 @@ public class AuthBeanConfiguration {
     @Bean
     SwitchTenantSessionUseCase switchTenantSessionUseCase(AuthPersistenceAdapter persistence,
                                                           InProcessTenantAccessAdapter tenantAccess,
+                                                          SecureRefreshTokenCodec codec,
                                                           TokenService tokenService, Clock clock) {
-        return new SwitchTenantSessionUseCase(persistence, tenantAccess, tokenService, clock);
+        return new SwitchTenantSessionUseCase(persistence, persistence, persistence, codec, tenantAccess, tokenService,
+                clock);
     }
 
     @Bean

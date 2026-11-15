@@ -37,7 +37,7 @@ public final class AuthDtos {
     public record RefreshRequest(@NotBlank String refreshToken) {
     }
 
-    public record SwitchTenantRequest(@NotNull UUID tenantId) {
+    public record SwitchTenantRequest(@NotNull UUID tenantId, @NotBlank String refreshToken) {
     }
 
     /** tenantId: tenant của phiên (null với phiên nền tảng); availableTenants: các tenant người dùng có thể đổi sang. */

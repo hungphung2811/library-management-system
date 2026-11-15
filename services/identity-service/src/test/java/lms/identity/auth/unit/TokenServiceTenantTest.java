@@ -204,27 +204,85 @@ class TokenServiceTenantTest {
 
     // ---- đổi tenant ----
 
-    @Test
-    void doiTenantCapCapTokenMoiChoTenantDo() {
-        when(credentials.findByUserId(userId)).thenReturn(Optional.of(credential(false, false)));
-        when(tenants.switchTo(userId, tenantB)).thenReturn(new TenantChoice(tenantB, List.of(summaryA, summaryB)));
-        SwitchTenantSessionUseCase switchTenant = new SwitchTenantSessionUseCase(credentials, tenants, service, clock);
+    private SwitchTenantSessionUseCase switchTenant() {
+        return new SwitchTenantSessionUseCase(credentials, refreshRepo, refreshSave, codec, tenants, service, clock);
+    }
 
-        TokenResponse response = switchTenant.execute(userId, tenantB);
-
-        assertThat(response.tenantId()).isEqualTo(tenantB);
-        assertThat(issued.get(0).tenantId()).isEqualTo(tenantB);
-        assertThat(savedRefresh.get(0).tenantId()).isEqualTo(tenantB);
+    private RefreshToken currentSession() {
+        return stored(RefreshToken.issueForTenant(userId, tenantA, "h-raw-cur", now.minusSeconds(60), Duration.ofDays(7)));
     }
 
     @Test
-    void doiSangTenantKhongCoQuyenBiTuChoi() {
+    void doiTenantCapCapTokenMoiChoTenantDoVaThuHoiRefreshTokenHienTai() {
+        RefreshToken current = currentSession();
+        when(credentials.findByUserId(userId)).thenReturn(Optional.of(credential(false, false)));
+        when(tenants.switchTo(userId, tenantB)).thenReturn(new TenantChoice(tenantB, List.of(summaryA, summaryB)));
+
+        TokenResponse response = switchTenant().execute(userId, tenantB, "raw-cur");
+
+        assertThat(response.tenantId()).isEqualTo(tenantB);
+        assertThat(issued.get(0).tenantId()).isEqualTo(tenantB);
+        assertThat(current.isRevoked()).isTrue();
+        assertThat(savedRefresh).contains(current);
+        assertThat(savedRefresh).anySatisfy(t -> assertThat(t.tenantId()).isEqualTo(tenantB));
+    }
+
+    @Test
+    void refreshTokenCuBiTuChoiSauKhiDoiTenant() {
+        currentSession();
+        when(credentials.findByUserId(userId)).thenReturn(Optional.of(credential(false, false)));
+        when(tenants.switchTo(userId, tenantB)).thenReturn(new TenantChoice(tenantB, List.of(summaryA, summaryB)));
+        switchTenant().execute(userId, tenantB, "raw-cur");
+        issued.clear();
+
+        assertThatThrownBy(() -> refresh().execute("raw-cur")).isInstanceOf(InvalidRefreshTokenException.class);
+        assertThat(issued).isEmpty();
+        assertThatThrownBy(() -> switchTenant().execute(userId, tenantB, "raw-cur"))
+                .isInstanceOf(InvalidRefreshTokenException.class);
+    }
+
+    @Test
+    void doiTenantVoiRefreshTokenCuaNguoiKhacBiTuChoiVaKhongThuHoi() {
+        RefreshToken others = stored(RefreshToken.issueForTenant(UUID.randomUUID(), tenantA, "h-raw-other",
+                now.minusSeconds(60), Duration.ofDays(7)));
+        when(credentials.findByUserId(userId)).thenReturn(Optional.of(credential(false, false)));
+        when(tenants.switchTo(userId, tenantB)).thenReturn(new TenantChoice(tenantB, List.of(summaryA, summaryB)));
+
+        assertThatThrownBy(() -> switchTenant().execute(userId, tenantB, "raw-other"))
+                .isInstanceOf(InvalidRefreshTokenException.class);
+
+        assertThat(others.isRevoked()).isFalse();
+        assertThat(issued).isEmpty();
+        assertThat(savedRefresh).isEmpty();
+    }
+
+    @Test
+    void doiTenantVoiRefreshTokenKhongTonTaiHoacHetHanBiTuChoi() {
+        stored(RefreshToken.issueForTenant(userId, tenantA, "h-raw-expired", now.minus(Duration.ofDays(8)), Duration.ofDays(7)));
+        when(credentials.findByUserId(userId)).thenReturn(Optional.of(credential(false, false)));
+        when(tenants.switchTo(userId, tenantB)).thenReturn(new TenantChoice(tenantB, List.of(summaryA, summaryB)));
+
+        assertThatThrownBy(() -> switchTenant().execute(userId, tenantB, "raw-unknown"))
+                .isInstanceOf(InvalidRefreshTokenException.class);
+        assertThatThrownBy(() -> switchTenant().execute(userId, tenantB, "raw-expired"))
+                .isInstanceOf(InvalidRefreshTokenException.class);
+        assertThat(issued).isEmpty();
+    }
+
+    @Test
+    void doiSangTenantKhongCoQuyenBiTuChoiVaRefreshTokenCuVanDungDuoc() {
+        RefreshToken current = currentSession();
         when(credentials.findByUserId(userId)).thenReturn(Optional.of(credential(false, false)));
         when(tenants.switchTo(userId, tenantB)).thenThrow(new NoTenantAccessException());
-        SwitchTenantSessionUseCase switchTenant = new SwitchTenantSessionUseCase(credentials, tenants, service, clock);
+        when(tenants.verify(userId, tenantA)).thenReturn(new TenantChoice(tenantA, List.of(summaryA)));
 
-        assertThatThrownBy(() -> switchTenant.execute(userId, tenantB)).isInstanceOf(NoTenantAccessException.class);
+        assertThatThrownBy(() -> switchTenant().execute(userId, tenantB, "raw-cur"))
+                .isInstanceOf(NoTenantAccessException.class);
+
         assertThat(issued).isEmpty();
+        assertThat(current.isRevoked()).isFalse();
+        assertThat(savedRefresh).isEmpty();
+        assertThat(refresh().execute("raw-cur").tenantId()).isEqualTo(tenantA);
     }
 
     // ---- tạo credential gắn membership ----

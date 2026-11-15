@@ -2,36 +2,60 @@ package lms.identity.auth.application;
 
 import lms.identity.auth.application.AuthDtos.TokenResponse;
 import lms.identity.auth.domain.InvalidCredentialsException;
+import lms.identity.auth.domain.InvalidRefreshTokenException;
+import lms.identity.auth.domain.RefreshToken;
+import lms.identity.auth.domain.RefreshTokenRepository;
 import lms.identity.auth.domain.UserCredential;
 import lms.identity.auth.domain.UserCredentialRepository;
+import lms.identity.tenant.application.TenantChoice;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.UUID;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * POST /internal/auth/switch-tenant: người đang đăng nhập đổi sang tenant khác. Context tenant kiểm tra membership
- * ACTIVE + tenant ACTIVE và ghi tenant dùng gần nhất; ở đây cấp cặp access + refresh token mới cho tenant đó. Các
- * refresh token khác của người dùng không bị thu hồi (request chỉ mang access token).
+ * ACTIVE + tenant ACTIVE và ghi tenant dùng gần nhất; ở đây cấp cặp access + refresh token mới cho tenant đó và
+ * thu hồi refresh token hiện tại (request mang kèm). Refresh token phải thuộc đúng người dùng và còn dùng được, nếu
+ * không thì 401 như refresh token không hợp lệ. Chỉ thu hồi sau khi tenant đích được chấp nhận (bị 403 thì token cũ
+ * giữ nguyên); các refresh token khác của người dùng không bị thu hồi.
  */
 public class SwitchTenantSessionUseCase {
 
     private final UserCredentialRepository credentials;
+    private final RefreshTokenRepository refreshRepository;
+    private final SaveRefreshTokenPort refreshSavePort;
+    private final RefreshTokenCodecPort codec;
     private final TenantAccessPort tenantAccess;
     private final TokenService tokenService;
     private final Clock clock;
 
-    public SwitchTenantSessionUseCase(UserCredentialRepository credentials, TenantAccessPort tenantAccess,
-                                      TokenService tokenService, Clock clock) {
+    public SwitchTenantSessionUseCase(UserCredentialRepository credentials, RefreshTokenRepository refreshRepository,
+                                      SaveRefreshTokenPort refreshSavePort, RefreshTokenCodecPort codec,
+                                      TenantAccessPort tenantAccess, TokenService tokenService, Clock clock) {
         this.credentials = credentials;
+        this.refreshRepository = refreshRepository;
+        this.refreshSavePort = refreshSavePort;
+        this.codec = codec;
         this.tenantAccess = tenantAccess;
         this.tokenService = tokenService;
         this.clock = clock;
     }
 
     @Transactional
-    public TokenResponse execute(UUID userId, UUID tenantId) {
+    public TokenResponse execute(UUID userId, UUID tenantId, String rawRefreshToken) {
+        Instant now = clock.instant();
+        RefreshToken current = refreshRepository.findByTokenHash(codec.hash(rawRefreshToken))
+                .filter(t -> t.userId().equals(userId))
+                .orElseThrow(() -> new InvalidRefreshTokenException("Refresh token không hợp lệ"));
+        current.ensureUsable(now);
+
         UserCredential credential = credentials.findByUserId(userId).orElseThrow(InvalidCredentialsException::new);
-        credential.ensureCanLogin(clock.instant());
-        return tokenService.issueForTenant(credential, tenantAccess.switchTo(userId, tenantId));
+        credential.ensureCanLogin(now);
+        TenantChoice choice = tenantAccess.switchTo(userId, tenantId); // ném NoTenantAccessException, token cũ giữ nguyên
+
+        current.revoke();
+        refreshSavePort.save(current);
+        return tokenService.issueForTenant(credential, choice);
     }
 }

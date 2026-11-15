@@ -346,8 +346,9 @@ class IdentityServiceIT {
         return rest.postForEntity("/internal/auth/login", body, Map.class);
     }
 
-    private ResponseEntity<Map> switchTo(String token, UUID tenantId) {
-        return call(HttpMethod.POST, "/internal/auth/switch-tenant", token, Map.of("tenantId", tenantId), Map.class);
+    private ResponseEntity<Map> switchTo(String token, UUID tenantId, String refreshToken) {
+        return call(HttpMethod.POST, "/internal/auth/switch-tenant", token,
+                Map.of("tenantId", tenantId, "refreshToken", refreshToken), Map.class);
     }
 
     private ResponseEntity<Map> refreshWith(String refreshToken) {
@@ -382,11 +383,13 @@ class IdentityServiceIT {
         assertThat(tenantClaim(first.get("accessToken"))).isEqualTo(DEFAULT_TENANT.toString());
         assertThat((List<Map<String, Object>>) first.get("availableTenants")).hasSize(2);
 
-        ResponseEntity<Map> switched = switchTo((String) first.get("accessToken"), second);
+        ResponseEntity<Map> switched = switchTo((String) first.get("accessToken"), second, (String) first.get("refreshToken"));
         assertThat(switched.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(tenantClaim(switched.getBody().get("accessToken"))).isEqualTo(second.toString());
         assertThat(jdbc.queryForObject("SELECT last_tenant_id FROM credentials WHERE user_id = ?", UUID.class, userId))
                 .isEqualTo(second);
+        // refresh token cũ (của tenant trước) bị thu hồi khi đổi tenant
+        assertThat(refreshWith((String) first.get("refreshToken")).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         // refresh token mới gắn tenant vừa chọn
         ResponseEntity<Map> refreshed = refreshWith((String) switched.getBody().get("refreshToken"));
         assertThat(refreshed.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -408,11 +411,14 @@ class IdentityServiceIT {
         String admin = accessToken("admin", "Admin@12345");
         createUser(admin, "tenant-outsider", "Outside@12345");
         UUID foreign = newTenant("it-foreign", "ACTIVE");
-        String token = accessToken("tenant-outsider", "Outside@12345");
+        Map<String, Object> session = login("tenant-outsider", "Outside@12345", HttpStatus.OK);
 
-        ResponseEntity<Map> denied = switchTo(token, foreign);
+        ResponseEntity<Map> denied = switchTo((String) session.get("accessToken"), foreign,
+                (String) session.get("refreshToken"));
         assertThat(denied.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(denied.getBody().get("code")).isEqualTo("NO_TENANT_ACCESS");
+        // bị 403 thì refresh token hiện tại giữ nguyên
+        assertThat(refreshWith((String) session.get("refreshToken")).getStatusCode()).isEqualTo(HttpStatus.OK);
 
         ResponseEntity<Map> byCode = loginTo("tenant-outsider", "Outside@12345", "it-foreign");
         ResponseEntity<Map> unknown = loginTo("tenant-outsider", "Outside@12345", "khong-ton-tai");
@@ -430,9 +436,10 @@ class IdentityServiceIT {
         UUID userId = createUser(admin, "tenant-refresher", "Refresh@12345");
         UUID suspendLater = newTenant("it-suspend", "ACTIVE");
         joinTenant(userId, suspendLater);
-        String token = accessToken("tenant-refresher", "Refresh@12345");
+        Map<String, Object> session = login("tenant-refresher", "Refresh@12345", HttpStatus.OK);
 
-        String inSuspended = (String) switchTo(token, suspendLater).getBody().get("refreshToken");
+        String inSuspended = (String) switchTo((String) session.get("accessToken"), suspendLater,
+                (String) session.get("refreshToken")).getBody().get("refreshToken");
         jdbc.update("UPDATE tenants SET status = 'SUSPENDED' WHERE id = ?", suspendLater);
         ResponseEntity<Map> refused = refreshWith(inSuspended);
         assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);

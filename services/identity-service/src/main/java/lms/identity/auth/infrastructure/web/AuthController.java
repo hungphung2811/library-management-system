@@ -80,12 +80,12 @@ public class AuthController {
 
     /**
      * Đổi tenant đang dùng: chỉ cần đăng nhập (token không có tenantId, như của platform admin, vẫn gọi được); quyền
-     * ở tenant đích do context tenant kiểm tra. Trả cặp token mới của tenant đó.
+     * ở tenant đích do context tenant kiểm tra. Body mang refresh token hiện tại để thu hồi. Trả cặp token mới của tenant đó.
      */
     @AuthenticatedOnly
     @PostMapping("/switch-tenant")
     public TokenResponse switchTenant(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody SwitchTenantRequest request) {
-        return switchTenant.execute(CurrentUser.from(jwt).userId(), request.tenantId());
+        return switchTenant.execute(CurrentUser.from(jwt).userId(), request.tenantId(), request.refreshToken());
     }
 
     /**

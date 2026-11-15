@@ -132,8 +132,8 @@ class AuthSecurityTest {
     void doiTenantChiCanDangNhapKeCaTokenKhongCoTenantId() throws Exception {
         UUID user = UUID.randomUUID();
         UUID tenant = UUID.randomUUID();
-        String body = "{\"tenantId\":\"" + tenant + "\"}";
-        when(switchTenant.execute(user, tenant)).thenReturn(TokenResponse.bearer("a2", "r2", 900, false, tenant, List.of()));
+        String body = "{\"tenantId\":\"" + tenant + "\",\"refreshToken\":\"r1\"}";
+        when(switchTenant.execute(user, tenant, "r1")).thenReturn(TokenResponse.bearer("a2", "r2", 900, false, tenant, List.of()));
 
         mvc.perform(post("/internal/auth/switch-tenant").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isUnauthorized());
@@ -148,14 +148,18 @@ class AuthSecurityTest {
     @Test
     void doiSangTenantKhongCoQuyenTra403VaThieuTenantIdTra400() throws Exception {
         UUID user = UUID.randomUUID();
-        when(switchTenant.execute(any(), any())).thenThrow(new NoTenantAccessException());
+        when(switchTenant.execute(any(), any(), any())).thenThrow(new NoTenantAccessException());
 
         mvc.perform(post("/internal/auth/switch-tenant").with(jwt().jwt(j -> j.subject(user.toString())))
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"tenantId\":\"" + UUID.randomUUID() + "\"}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"tenantId\":\"" + UUID.randomUUID() + "\",\"refreshToken\":\"r1\"}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("NO_TENANT_ACCESS"));
         mvc.perform(post("/internal/auth/switch-tenant").with(jwt().jwt(j -> j.subject(user.toString())))
                         .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+        // thiếu refreshToken cũng là 400
+        mvc.perform(post("/internal/auth/switch-tenant").with(jwt().jwt(j -> j.subject(user.toString())))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"tenantId\":\"" + UUID.randomUUID() + "\"}"))
                 .andExpect(status().isBadRequest());
     }
 
