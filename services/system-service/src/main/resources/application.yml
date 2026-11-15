@@ -1,0 +1,103 @@
+server:
+  port: 8086
+  shutdown: graceful
+
+spring:
+  application:
+    name: system-service
+  profiles:
+    default: dev
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    # Autoconfig Flyway của Boot không chạy: migration do runner của chính service này lo (MigrationInitializer),
+    # chạy trước EntityManagerFactory
+    enabled: false
+  # Cache menu (ADR-0007): Lettuce của Boot tự nối lại; timeout ngắn để Redis chết không làm chậm request
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 200ms
+      connect-timeout: 200ms
+      # Chỉ dùng làm cache; không quét repository Redis cạnh repository JPA
+      repositories:
+        enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    # Redis chỉ là cache phụ: Redis chết không được làm system-service DOWN (health là cổng service_healthy của stack)
+    redis:
+      enabled: false
+
+logging:
+  pattern:
+    level: "%5p [%X{correlationId:-}]"
+
+app:
+  security:
+    enabled: true
+
+# Runner migration tập trung: chạy Flyway lên từng DB theo thứ tự khai báo (sổ cái = flyway_schema_history của mỗi DB)
+migration:
+  run-on-startup: true
+  fail-fast: true
+  targets:
+    identity:
+      url: ${IDENTITY_DB_URL:jdbc:postgresql://localhost:5432/identity_db}
+      username: ${IDENTITY_DB_USERNAME:identity}
+      password: ${IDENTITY_DB_PASSWORD:identity}
+      locations: classpath:db/migration/identity
+    catalog:
+      url: ${CATALOG_DB_URL:jdbc:postgresql://localhost:5432/catalog_db}
+      username: ${CATALOG_DB_USERNAME:catalog}
+      password: ${CATALOG_DB_PASSWORD:catalog}
+      locations: classpath:db/migration/catalog
+    circulation:
+      url: ${CIRCULATION_DB_URL:jdbc:postgresql://localhost:5432/circulation_db}
+      username: ${CIRCULATION_DB_USERNAME:circulation}
+      password: ${CIRCULATION_DB_PASSWORD:circulation}
+      locations: classpath:db/migration/circulation
+    audit:
+      url: ${AUDIT_DB_URL:jdbc:postgresql://localhost:5432/audit_db}
+      username: ${AUDIT_DB_USERNAME:audit}
+      password: ${AUDIT_DB_PASSWORD:audit}
+      locations: classpath:db/migration/audit
+    # system_db (context menu, ADR-0007): khai báo cuối danh sách
+    system:
+      url: ${SYSTEM_DB_URL:jdbc:postgresql://localhost:5432/system_db}
+      username: ${SYSTEM_DB_USERNAME:system}
+      password: ${SYSTEM_DB_PASSWORD:system}
+      locations: classpath:db/migration/system
+
+# Middleware phân quyền theo endpoint (security-common): khóa Controller/method được đăng ký về identity-service
+lms:
+  security:
+    permission:
+      service-name: ${spring.application.name}
+      identity-base-url: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+      internal-api-key: ${INTERNAL_API_KEY:}
+      # Endpoint thường bắt buộc token có claim tenantId (403 TENANT_REQUIRED); @AuthenticatedOnly/@PublicEndpoint và
+      # @PlatformAdminOnly (API migration, token platform admin không có tenantId) không bị ảnh hưởng.
+      require-tenant: true
+  # tenant-common: TenantContext theo claim tenantId, Hibernate @TenantId và RLS (app.tenant_id)
+  tenant:
+    enabled: true
+  # Context menu (ADR-0007). cache.enabled=false thì không dùng Redis (luôn đọc DB)
+  system:
+    menu:
+      cache:
+        enabled: true
+        ttl: 10m

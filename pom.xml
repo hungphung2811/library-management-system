@@ -28,7 +28,7 @@
         <module>services/catalog-service</module>
         <module>services/circulation-service</module>
         <module>services/support-service</module>
-        <module>services/migration-service</module>
+        <module>services/system-service</module>
     </modules>
 
     <properties>

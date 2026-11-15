@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/system_db
+    username: system_app
+    password: system_app
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: http://localhost:8081/.well-known/jwks.json
+
+app:
+  security:
+    enabled: false
+
+# Dev tắt kiểm quyền theo endpoint cùng với cờ bảo mật ở trên
+lms:
+  security:
+    permission:
+      enabled: false
+
+logging:
+  level:
+    lms.system.migration: DEBUG

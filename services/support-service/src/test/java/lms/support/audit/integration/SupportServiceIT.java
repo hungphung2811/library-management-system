@@ -116,8 +116,8 @@ class SupportServiceIT {
     }
 
     /**
-     * Ở production migration-service chạy Flyway; trong IT phải tự migrate AUDIT_DB bằng script lấy từ jar
-     * migration-service (test classpath) trước khi các test dùng bảng audit_logs.
+     * Ở production system-service chạy Flyway; trong IT phải tự migrate AUDIT_DB bằng script lấy từ jar
+     * system-service (test classpath) trước khi các test dùng bảng audit_logs.
      */
     @TestConfiguration
     static class AuditFlywayTestConfiguration {
@@ -176,7 +176,7 @@ class SupportServiceIT {
     void khoiDongMoCaHaiConnectionVaSchemaAuditDbDuocBeanTestMigrate() {
         assertThat(registry.state("AUDIT_DB")).isEqualTo(ConnectionState.UP);
         assertThat(registry.state("LOG_DB")).isEqualTo(ConnectionState.UP);
-        // V1 + V2 thành công do bean auditFlyway của test chạy (script từ jar migration-service)
+        // V1 + V2 thành công do bean auditFlyway của test chạy (script từ jar system-service)
         assertThat(superuserJdbc()
                 .queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE success AND version IS NOT NULL",
                         Integer.class)).isEqualTo(2);

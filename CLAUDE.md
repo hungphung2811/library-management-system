@@ -11,7 +11,7 @@ docker compose up -d                                        # postgres, kafka, r
 mvn test                                                    # unit + ArchUnit + WebMvc (không chạy *IT)
 mvn -pl services/identity-service -am test                  # một module (luôn có -am để build shared-libraries)
 mvn -pl services/identity-service -am test -Dtest=AdminRoleAndPermissionKeyTest -Dsurefire.failIfNoSpecifiedTests=false
-mvn -pl services/migration-service -am spring-boot:run      # chạy TRƯỚC: migrate 4 DB (cổng 8086); các service chỉ validate schema
+mvn -pl services/system-service -am spring-boot:run      # chạy TRƯỚC: migrate 5 DB (cổng 8086); các service chỉ validate schema
 mvn -pl services/identity-service -am spring-boot:run       # profile dev
 ```
 
@@ -24,9 +24,9 @@ mvn -pl services/identity-service -am spring-boot:run       # profile dev
 
 4 service theo bounded context, mỗi service một database riêng (không truy cập DB của nhau, tham chiếu chéo bằng ID hoặc event Kafka):
 identity (`auth`, `accesscontrol`, `user`, `department`), catalog (`catalog`, `inventory`), circulation (`borrowing`, `reservation`, `fine`), support (`audit`, `notification`).
-Thêm `migration-service` (ADR-0004): runner Flyway tập trung, giữ mọi file SQL và chạy lên identity_db/catalog_db/circulation_db/audit_db lúc khởi động (ngoại lệ có chủ đích với luật "không truy cập DB của nhau", chỉ chạy DDL). Sổ cái là `flyway_schema_history` trong từng DB; API `GET /api/migrations[/{target}]`, `POST /api/migrations/run`, `POST /api/migrations/{target}/run` (target: identity, catalog, circulation, audit). Các service không chạy Flyway, chỉ validate schema.
+Thêm `system-service` (ADR-0004): runner Flyway tập trung, giữ mọi file SQL và chạy lên identity_db/catalog_db/circulation_db/audit_db/system_db lúc khởi động (ngoại lệ có chủ đích với luật "không truy cập DB của nhau", chỉ chạy DDL). `system_db` (vai trò `system_app`, RLS, ADR-0007) là DB riêng của context `menu` trong chính system-service: datasource Spring Boot chuẩn `spring.datasource.*`, và migration chạy trong bean khởi tạo mà `EntityManagerFactory` phụ thuộc (không dùng Flyway autoconfig, `spring.flyway.enabled=false`). API migration là `@PlatformAdminOnly`. Sổ cái là `flyway_schema_history` trong từng DB; API `GET /internal/migrations[/{target}]`, `POST /internal/migrations/run`, `POST /internal/migrations/{target}/run` (target: identity, catalog, circulation, audit, system). Các service không chạy Flyway, chỉ validate schema.
 
-**Thêm migration mới** = thêm file `V<n>__*.sql` vào `services/migration-service/src/main/resources/db/migration/<target>/` (không còn nằm trong từng service). Kiểm tra số `n` kế tiếp vì nhiều người cùng sửa; không sửa file đã chạy (đổi checksum). IT của service bật Flyway ở test scope (jar thường của migration-service) với location `classpath:db/migration/<target>`.
+**Thêm migration mới** = thêm file `V<n>__*.sql` vào `services/system-service/src/main/resources/db/migration/<target>/` (không còn nằm trong từng service). Kiểm tra số `n` kế tiếp vì nhiều người cùng sửa; không sửa file đã chạy (đổi checksum). IT của service bật Flyway ở test scope (jar thường của system-service) với location `classpath:db/migration/<target>`.
 
 Mỗi context là một package gốc phẳng `domain/`, `application/`, `infrastructure/{web,persistence,messaging,client,security,config}`:
 - `domain`: Java thuần, không Spring/jakarta/jackson.
@@ -43,13 +43,13 @@ Không có hằng số permission và không dùng `hasAuthority`. `PermissionIn
 - Đổi tên controller/method đổi khóa, role đã gán mất quyền; quyền mới của role chỉ có hiệu lực khi đăng nhập hoặc refresh token kế tiếp.
 - Quản trị viên là dữ liệu: role có cờ `is_admin` → JWT có claim `admin=true` và bỏ qua kiểm khóa. Không hardcode tên role. Chỉ admin được tạo/gán/thu hồi role `isAdmin`. Token của tài khoản `mustChangePassword` không mang `admin`/`permissions`.
 - `SecurityConfiguration` của mỗi service chỉ xác thực (`/internal/**` authenticated, còn lại denyAll; `/api/**` chỉ có ở lms-api; identity đã chuyển sang `/internal/**`, chỉ công khai các đường dẫn đăng nhập/làm mới/đăng xuất/đăng nhập ngoài, JWKS và `POST /internal/permissions/registrations`). Profile dev tắt kiểm khóa bằng `lms.security.permission.enabled=false`; test WebMvc phải bật lại (`@TestPropertySource`) và `@MockitoBean PermissionKeyRegistrar`.
-- Migration identity có đánh số liên tục (V9 đổi mã seed cũ sang khóa endpoint); thêm migration mới phải kiểm tra số kế tiếp vì nhiều người cùng sửa (file nằm ở `migration-service`, thư mục `identity`).
+- Migration identity có đánh số liên tục (V9 đổi mã seed cũ sang khóa endpoint); thêm migration mới phải kiểm tra số kế tiếp vì nhiều người cùng sửa (file nằm ở `system-service`, thư mục `identity`).
 
 ### Multi-tenant (ADR-0006)
 
 - Dùng chung DB: bảng nghiệp vụ có `tenant_id`, entity `@TenantId` (Hibernate), PostgreSQL `ENABLE`+`FORCE ROW LEVEL SECURITY` theo biến phiên `app.tenant_id` (fail-closed). `TenantContext` (tenant-common) đặt từ claim JWT `tenantId`; không có tenant thì 403 `TENANT_REQUIRED` (trừ `@AuthenticatedOnly`).
 - Token theo tenant: `permissions`/`admin` tính theo role của tenant trong token. `POST /api/auth/switch-tenant` body `{tenantId, refreshToken}` (bắt buộc có `refreshToken`, token cũ bị thu hồi). Platform admin: token không có `tenantId`.
-- Service chạy bằng vai trò DB `<svc>_app` (NOSUPERUSER NOBYPASSRLS), tạo trong `infrastructure/postgres/init-databases.sql`; migration-service dùng chủ bảng và cấp quyền qua callback `afterMigrate.sql`. Volume Postgres cũ: `docker compose down -v` (hoặc chạy tay SQL). Sau khi pull thay đổi migration: `mvn clean`.
+- Service chạy bằng vai trò DB `<svc>_app` (NOSUPERUSER NOBYPASSRLS), tạo trong `infrastructure/postgres/init-databases.sql`; system-service dùng chủ bảng và cấp quyền qua callback `afterMigrate.sql`. Volume Postgres cũ: `docker compose down -v` (hoặc chạy tay SQL). Sau khi pull thay đổi migration: `mvn clean`.
 - Chạy local dùng tenant mặc định `00000000-0000-0000-0000-0000000000d1`. Profile dev tắt security nên không có JWT và không có tenant: ghi bảng tenant bị chặn, cần Bearer token.
 - **Migration mới trên bảng có RLS**: FORCE RLS áp cả cho chủ bảng nên migration ghi dữ liệu vào bảng tenant phải đặt `app.tenant_id` (`set_config('app.tenant_id', '<uuid>', true)`) hoặc chạy bằng superuser; bảng mới có `tenant_id` phải bật RLS + FORCE, thêm `@TenantId` vào entity (ArchUnit `TenantArchitectureRulesTest` bắt thiếu). Bảng không `@TenantId` phải nằm trong `TenantArchitectureRules.TENANT_EXEMPT_TABLES`; không thêm native query ngoài danh sách đã rà.
 - IT chạy bằng vai trò app: Flyway chạy bằng chủ bảng/superuser trong container, sau đó tạo `<svc>_app` và nối DataSource của service bằng vai trò này (xem `AppRoleDatabase` trong IT của support/identity); đặt `TenantContext` hoặc JWT có `tenantId` cho mỗi lần gọi.

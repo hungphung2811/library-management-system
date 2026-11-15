@@ -71,7 +71,7 @@
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka</artifactId>
         </dependency>
-        <!-- Migration do migration-service chạy; Flyway và script (jar migration-service) chỉ dùng trong IT -->
+        <!-- Migration do system-service chạy; Flyway và script (jar system-service) chỉ dùng trong IT -->
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
@@ -84,9 +84,16 @@
         </dependency>
         <dependency>
             <groupId>com.company</groupId>
-            <artifactId>migration-service</artifactId>
+            <artifactId>system-service</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
+            <!-- Chỉ cần file SQL (classpath:db/migration/...), không kéo phụ thuộc bắc cầu của system-service -->
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.postgresql</groupId>

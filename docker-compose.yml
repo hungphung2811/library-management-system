@@ -1,11 +1,11 @@
 # Hạ tầng local. Chạy service bằng IDE/Maven (profile dev) hoặc dùng profile "apps".
 #   docker compose up -d                          -> postgres, kafka, redis
-#   docker compose --profile apps up -d --build   -> thêm nginx, lms-api, migration-service, các service
-# migration-service (chạy Flyway cho mọi DB) phải healthy trước khi identity/catalog/circulation/support khởi động.
-# Postgres: migration-service dùng vai trò chủ DB (identity, catalog, ...); các service chạy bằng vai trò *_app
+#   docker compose --profile apps up -d --build   -> thêm nginx, lms-api, system-service, các service
+# system-service (chạy Flyway cho mọi DB) phải healthy trước khi identity/catalog/circulation/support khởi động.
+# Postgres: system-service dùng vai trò chủ DB (identity, catalog, ...); các service chạy bằng vai trò *_app
 # (không phải chủ bảng, chịu Row-Level Security), tạo trong infrastructure/postgres/init-databases.sql.
 # Volume pgdata cũ chưa có *_app: `docker compose down -v`, hoặc chạy tay phần CREATE USER ..._app của script đó rồi
-# khởi động lại migration-service (callback afterMigrate.sql cấp quyền sau mỗi lần migrate, không cần GRANT tay).
+# khởi động lại system-service (callback afterMigrate.sql cấp quyền sau mỗi lần migrate, không cần GRANT tay).
 # Chỉ nginx (8080) publish port ra host cho FE; lms-api và các service khác chỉ gọi được trong mạng compose.
 services:
   postgres:
@@ -60,17 +60,22 @@ services:
       timeout: 3s
       retries: 10
 
-  # Runner migration tập trung: chạy Flyway lên identity_db, catalog_db, circulation_db, audit_db lúc khởi động.
+  # Runner migration tập trung: chạy Flyway lên identity_db, catalog_db, circulation_db, audit_db, system_db lúc khởi động.
   # Health UP chỉ sau khi migrate xong nên các service khác chờ service_healthy rồi mới khởi động (chỉ validate schema).
-  migration-service:
+  system-service:
     profiles: [apps]
     build:
       context: .
-      dockerfile: services/migration-service/Dockerfile
+      dockerfile: services/system-service/Dockerfile
     depends_on:
       postgres:
         condition: service_healthy
+      # Cache menu: chỉ cần khởi động, Redis chết không làm system-service hỏng (cache là phụ)
+      redis:
+        condition: service_started
     environment:
+      # Giới hạn heap để tiết kiệm RAM khi chạy local; đặt biến JAVA_TOOL_OPTIONS trong .env để ghi đè.
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xmx256m -XX:+UseSerialGC -XX:TieredStopAtLevel=1}
       SPRING_PROFILES_ACTIVE: prod
       IDENTITY_DB_URL: jdbc:postgresql://postgres:5432/identity_db
       IDENTITY_DB_USERNAME: identity
@@ -84,8 +89,18 @@ services:
       AUDIT_DB_URL: jdbc:postgresql://postgres:5432/audit_db
       AUDIT_DB_USERNAME: audit
       AUDIT_DB_PASSWORD: audit
+      SYSTEM_DB_URL: jdbc:postgresql://postgres:5432/system_db
+      SYSTEM_DB_USERNAME: system
+      SYSTEM_DB_PASSWORD: system
+      # Context menu chạy bằng vai trò app (chịu RLS) trên system_db
+      DB_URL: jdbc:postgresql://postgres:5432/system_db
+      DB_USERNAME: system_app
+      DB_PASSWORD: system_app
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
       IDENTITY_SERVICE_URL: http://identity-service:8081
+      JWT_JWK_SET_URI: http://identity-service:8081/.well-known/jwks.json
     healthcheck:
       # eclipse-temurin:21-jre (Ubuntu) có sẵn curl
       test: ["CMD-SHELL", "curl -fsS http://localhost:8086/actuator/health || exit 1"]
@@ -104,11 +119,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      migration-service:
+      system-service:
         condition: service_healthy
       kafka:
         condition: service_started
     environment:
+      # Giới hạn heap để tiết kiệm RAM khi chạy local; đặt biến JAVA_TOOL_OPTIONS trong .env để ghi đè.
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xmx256m -XX:+UseSerialGC -XX:TieredStopAtLevel=1}
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://postgres:5432/identity_db
       DB_USERNAME: identity_app
@@ -130,11 +147,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      migration-service:
+      system-service:
         condition: service_healthy
       kafka:
         condition: service_started
     environment:
+      # Giới hạn heap để tiết kiệm RAM khi chạy local; đặt biến JAVA_TOOL_OPTIONS trong .env để ghi đè.
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xmx256m -XX:+UseSerialGC -XX:TieredStopAtLevel=1}
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://postgres:5432/circulation_db
       DB_USERNAME: circulation_app
@@ -155,13 +174,16 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      migration-service:
+      system-service:
         condition: service_healthy
     environment:
+      # Giới hạn heap để tiết kiệm RAM khi chạy local; đặt biến JAVA_TOOL_OPTIONS trong .env để ghi đè.
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xmx256m -XX:+UseSerialGC -XX:TieredStopAtLevel=1}
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://postgres:5432/catalog_db
       DB_USERNAME: catalog_app
       DB_PASSWORD: catalog_app
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       JWT_JWK_SET_URI: http://identity-service:8081/.well-known/jwks.json
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
       IDENTITY_SERVICE_URL: http://identity-service:8081
@@ -176,13 +198,15 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      migration-service:
+      system-service:
         condition: service_healthy
       mongo:
         condition: service_healthy
       kafka:
         condition: service_started
     environment:
+      # Giới hạn heap để tiết kiệm RAM khi chạy local; đặt biến JAVA_TOOL_OPTIONS trong .env để ghi đè.
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xmx256m -XX:+UseSerialGC -XX:TieredStopAtLevel=1}
       SPRING_PROFILES_ACTIVE: prod
       AUDIT_DB_URL: jdbc:postgresql://postgres:5432/audit_db
       AUDIT_DB_USERNAME: audit_app
@@ -202,10 +226,13 @@ services:
       context: .
       dockerfile: lms-api/Dockerfile
     environment:
+      # Giới hạn heap để tiết kiệm RAM khi chạy local; đặt biến JAVA_TOOL_OPTIONS trong .env để ghi đè.
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xmx256m -XX:+UseSerialGC -XX:TieredStopAtLevel=1}
       IDENTITY_SERVICE_URL: http://identity-service:8081
       CATALOG_SERVICE_URL: http://catalog-service:8082
       CIRCULATION_SERVICE_URL: http://circulation-service:8083
       SUPPORT_SERVICE_URL: http://support-service:8084
+      SYSTEM_SERVICE_URL: http://system-service:8086
       JWT_JWK_SET_URI: http://identity-service:8081/.well-known/jwks.json
     depends_on:
       - identity-service

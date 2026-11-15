@@ -11,7 +11,7 @@ spring:
     timeout-per-shutdown-phase: 30s
   # Nguồn dữ liệu do database-common quản lý (database.connections.*), nên tắt các auto-config mặc định
   # để không xung đột: DataSource/Hibernate/Flyway/Mongo/Repository tự cấu hình.
-  # Flyway không chạy trong service này: schema AUDIT_DB do migration-service tạo (chạy trước khi service khởi động).
+  # Flyway không chạy trong service này: schema AUDIT_DB do system-service tạo (chạy trước khi service khởi động).
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
@@ -38,7 +38,7 @@ database:
         - lms.support.audit.infrastructure.persistence
         - lms.support.notification.infrastructure.persistence
       jpa-properties:
-        # Không tự sinh/validate schema ở đây: schema do migration-service quản lý.
+        # Không tự sinh/validate schema ở đây: schema do system-service quản lý.
         hibernate.hbm2ddl.auto: none
         # @TenantId của AuditLogJpaEntity lọc theo TenantContext (không có tenant: UUID nil, không khớp dòng nào)
         hibernate.tenant_identifier_resolver: lms.tenant.TenantIdentifierResolver

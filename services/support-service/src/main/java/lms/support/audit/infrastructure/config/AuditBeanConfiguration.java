@@ -23,7 +23,7 @@ public class AuditBeanConfiguration {
         return Clock.systemUTC();
     }
 
-    /** Schema audit_logs do migration-service tạo sẵn (service này chỉ dùng, không chạy Flyway). */
+    /** Schema audit_logs do system-service tạo sẵn (service này chỉ dùng, không chạy Flyway). */
     @Bean
     AuditLogPersistenceAdapter auditLogPersistenceAdapter(SpringDataAuditLogRepository jpa) {
         return new AuditLogPersistenceAdapter(jpa);
