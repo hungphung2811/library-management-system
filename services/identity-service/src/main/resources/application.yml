@@ -55,6 +55,10 @@ auth:
     must-change-password: true
     # Tenant của tài khoản quản trị khởi tạo: tenant mặc định do migration V11 tạo (id chỉ nằm ở cấu hình/migration)
     tenant-id: ${AUTH_BOOTSTRAP_ADMIN_TENANT_ID:00000000-0000-0000-0000-0000000000d1}
+  # Tài khoản người vận hành (credentials.platform_admin, không thuộc tenant nào). Bỏ trống thì không tạo.
+  bootstrap:
+    platform-admin-username: ${AUTH_BOOTSTRAP_PLATFORM_ADMIN_USERNAME:}
+    platform-admin-password: ${AUTH_BOOTSTRAP_PLATFORM_ADMIN_PASSWORD:}
   # Đăng nhập ngoài (OIDC). Nhà cung cấp chỉ bật khi có client-id; redirect URI đăng ký ở IdP:
   #   <public-base-url>/external/<tên>/callback (dev: http://localhost:8080/api/auth/external/google/callback)
   external:
@@ -79,6 +83,8 @@ app:
     topics:
       access-events: access-control.events
       auth-events: auth.events
+      # Vòng đời tenant (TenantCreated, TenantStatusChanged) + audit thao tác nền tảng; circulation nghe topic này
+      identity-events: identity-events
 
 # Middleware phân quyền theo endpoint (security-common). identity ghi khóa thẳng vào DB của mình.
 lms:

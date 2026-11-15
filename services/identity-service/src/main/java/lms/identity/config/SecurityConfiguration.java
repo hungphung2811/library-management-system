@@ -38,6 +38,9 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/internal/auth/external/exchange").permitAll()
 
                         .requestMatchers("/internal/**").authenticated()
+                        // API nền tảng cho người vận hành (nginx/lms-api định tuyến thẳng tới identity); claim
+                        // platformAdmin do PermissionInterceptor kiểm qua @PlatformAdminOnly
+                        .requestMatchers("/api/platform/**").authenticated()
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(o -> o.jwt(j -> j.jwtAuthenticationConverter(PermissionJwtConverter.create())))
                 .build();

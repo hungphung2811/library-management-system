@@ -38,4 +38,21 @@ public class BootstrapAdminConfiguration {
             log.info("Đã tạo tài khoản quản trị khởi tạo '{}'", username);
         };
     }
+
+    /**
+     * Tài khoản người vận hành (super admin, cờ credentials.platform_admin, không thuộc tenant nào) từ cấu hình
+     * {@code auth.bootstrap.platform-admin-username/password}; bỏ trống một trong hai thì không tạo, đã có tên đăng nhập
+     * thì bỏ qua (không nâng tài khoản có sẵn thành platform admin). Chỉ ghi credentials (bảng toàn cục).
+     */
+    @Bean
+    ApplicationRunner bootstrapPlatformAdmin(RegisterCredentialUseCase register, UserCredentialRepository repository,
+                                             @Value("${auth.bootstrap.platform-admin-username:}") String username,
+                                             @Value("${auth.bootstrap.platform-admin-password:}") String password) {
+        return args -> {
+            if (username.isBlank() || password.isBlank()) return;
+            if (repository.existsByUsername(username.trim().toLowerCase())) return;
+            register.registerPlatformAdmin(username, password);
+            log.info("Đã tạo tài khoản quản trị nền tảng '{}'", username.trim().toLowerCase());
+        };
+    }
 }

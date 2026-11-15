@@ -58,4 +58,20 @@ public class RegisterCredentialUseCase {
         }
         return created;
     }
+
+    /**
+     * Tạo tài khoản người vận hành (cờ platform_admin, không membership, không buộc đổi mật khẩu vì mật khẩu đến từ
+     * cấu hình triển khai). Chỉ gọi từ bootstrap cấu hình, không có API.
+     */
+    @Transactional
+    public UUID registerPlatformAdmin(String username, String rawPassword) {
+        if (rawPassword == null || rawPassword.length() < MIN_PASSWORD_LENGTH) {
+            throw new IllegalArgumentException("Mật khẩu phải có ít nhất " + MIN_PASSWORD_LENGTH + " ký tự");
+        }
+        String normalized = username == null ? "" : username.trim().toLowerCase();
+        if (repository.existsByUsername(normalized)) throw new DuplicateUsernameException(normalized);
+        UserCredential credential = UserCredential.restore(UUID.randomUUID(), normalized, hasher.hash(rawPassword),
+                null, true, 0, null, false, true);
+        return savePort.save(credential).userId();
+    }
 }
