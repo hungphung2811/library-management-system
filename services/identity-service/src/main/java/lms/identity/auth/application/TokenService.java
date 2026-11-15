@@ -22,6 +22,11 @@ import lms.tenant.TenantContext;
  * {@code TenantContext.callAs(<tenant đã chọn>, ...)} (role là dữ liệu thuộc tenant), bất kể tenant của request hiện tại
  * (đăng nhập không có tenant, đổi tenant đang ở tenant cũ). Phiên nền tảng (không tenant) không có role tenant nào.
  * Phòng ban trong token là phòng ban của membership ở tenant đã chọn.
+ *
+ * <p>Bất biến (R20): KHÔNG gọi TokenService bên trong một transaction đang mở. Mỗi bước đọc/ghi chạy transaction ngắn
+ * của riêng nó (một kết nối tại một thời điểm), bước đọc quyền mở transaction sau khi đã đặt tenant đã chọn. Gọi trong
+ * transaction ngoài sẽ giữ 2 kết nối cùng lúc mỗi lần cấp token (nguy cơ cạn pool khi đăng nhập dồn dập). Refresh
+ * token cũ (nếu có) được thu hồi cùng giao dịch với việc lưu refresh token mới ({@link SaveRefreshTokenPort#rotate}).
  */
 public class TokenService {
 
@@ -76,10 +81,23 @@ public class TokenService {
 
     /** Tenant đã được kiểm tra trước (đổi tenant, làm mới phiên); choice.tenantId null = phiên nền tảng. */
     public TokenResponse issueForTenant(UserCredential credential, TenantChoice choice) {
-        return issue(credential, credential.mustChangePassword(), () -> choice);
+        return issueForTenant(credential, choice, null);
+    }
+
+    /**
+     * Như {@link #issueForTenant(UserCredential, TenantChoice)}, đồng thời thu hồi refresh token hiện tại
+     * (replacedOrNull) trong cùng giao dịch lưu refresh token mới. Lỗi trước bước lưu thì token hiện tại giữ nguyên.
+     */
+    public TokenResponse issueForTenant(UserCredential credential, TenantChoice choice, RefreshToken replacedOrNull) {
+        return issue(credential, credential.mustChangePassword(), () -> choice, replacedOrNull);
     }
 
     private TokenResponse issue(UserCredential credential, boolean mustChange, Supplier<TenantChoice> tenantChoice) {
+        return issue(credential, mustChange, tenantChoice, null);
+    }
+
+    private TokenResponse issue(UserCredential credential, boolean mustChange, Supplier<TenantChoice> tenantChoice,
+                                RefreshToken replacedOrNull) {
         // Người dùng bị vô hiệu hóa ở context user thì không được cấp token mới (cả đăng nhập, làm mới và đăng nhập ngoài)
         Optional<UserDirectoryPort.UserInfo> directory = userDirectory.find(credential.userId());
         if (directory.isPresent() && directory.get().disabled()) {
@@ -109,7 +127,8 @@ public class TokenService {
         RefreshToken refresh = tenantId != null
                 ? RefreshToken.issueForTenant(credential.userId(), tenantId, hash, clock.instant(), refreshTokenTtl)
                 : RefreshToken.issueForPlatform(credential.userId(), hash, clock.instant(), refreshTokenTtl);
-        refreshTokens.save(refresh);
+        if (replacedOrNull != null) replacedOrNull.revoke();
+        refreshTokens.rotate(replacedOrNull, refresh);
         return TokenResponse.bearer(accessToken.value(), rawRefresh, accessToken.expiresInSeconds(), mustChange,
                 tenantId, choice.available());
     }

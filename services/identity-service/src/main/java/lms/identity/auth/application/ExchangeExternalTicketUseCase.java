@@ -8,9 +8,13 @@ import lms.identity.auth.domain.UserCredentialRepository;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
-import org.springframework.transaction.annotation.Transactional;
 
-/** Đổi mã dùng một lần lấy cặp token. Kiểm tra lại tài khoản còn dùng được ở thời điểm đổi. */
+/**
+ * Đổi mã dùng một lần lấy cặp token. Kiểm tra lại tài khoản còn dùng được ở thời điểm đổi.
+ *
+ * <p>Không có transaction bao ngoài (R20): mã được đánh dấu đã dùng trong transaction riêng của adapter (đã commit), rồi
+ * mới cấp token. Cấp token thất bại (ví dụ không còn tenant nào) thì mã vẫn đã dùng, người dùng đăng nhập lại.
+ */
 public class ExchangeExternalTicketUseCase {
 
     private final ExternalTicketPort tickets;
@@ -26,7 +30,6 @@ public class ExchangeExternalTicketUseCase {
         this.clock = clock;
     }
 
-    @Transactional
     public TokenResponse execute(String rawCode) {
         Instant now = clock.instant();
         UUID userId = tickets.redeem(rawCode, now).orElseThrow(() ->

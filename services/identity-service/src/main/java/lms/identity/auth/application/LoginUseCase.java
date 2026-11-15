@@ -9,7 +9,6 @@ import lms.identity.auth.domain.UserCredential;
 import lms.identity.auth.domain.UserCredentialRepository;
 import java.time.Clock;
 import java.time.Instant;
-import org.springframework.transaction.annotation.Transactional;
 
 public class LoginUseCase {
 
@@ -30,19 +29,19 @@ public class LoginUseCase {
         this.clock = clock;
     }
 
-    /**
-     * noRollbackFor: đăng nhập sai vẫn phải lưu số lần thất bại (để khóa tài khoản) dù ném exception.
-     */
     public TokenResponse execute(String username, String rawPassword) {
         return execute(username, rawPassword, null);
     }
 
     /**
      * tenantCodeOrNull: mã tenant muốn vào (tùy chọn). Không truy cập được tenant (hoặc không còn tenant nào) thì ném
-     * NoTenantAccessException của context tenant sau khi đã xác thực mật khẩu; giao dịch rollback nên không ghi nhận
-     * lần đăng nhập thành công.
+     * NoTenantAccessException của context tenant sau khi đã xác thực mật khẩu, và lần đăng nhập thành công không được
+     * ghi nhận (ghi sau khi cấp token).
+     *
+     * <p>Không có transaction bao ngoài (R20): đọc credential, kiểm bcrypt, ghi số lần sai/thành công và cấp token là
+     * các bước ngắn, mỗi bước tự có transaction, nên không giữ kết nối suốt bcrypt và TokenService không chạy trong
+     * transaction đang mở. Sai mật khẩu: số lần thất bại được lưu ngay (trước khi ném InvalidCredentialsException).
      */
-    @Transactional(noRollbackFor = InvalidCredentialsException.class)
     public TokenResponse execute(String username, String rawPassword, String tenantCodeOrNull) {
         Instant now = clock.instant();
         String normalized = username == null ? "" : username.trim().toLowerCase();
@@ -57,9 +56,9 @@ public class LoginUseCase {
             throw new InvalidCredentialsException();
         }
 
+        TokenResponse response = tokenService.issueFor(credential, tenantCodeOrNull);
         credential.recordSuccess(now);
         savePort.save(credential);
-        TokenResponse response = tokenService.issueFor(credential, tenantCodeOrNull);
         credential.pullEvents().forEach(eventPort::publish);
         return response;
     }

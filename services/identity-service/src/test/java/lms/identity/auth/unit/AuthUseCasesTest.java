@@ -82,7 +82,8 @@ class AuthUseCasesTest {
         ArgumentCaptor<TokenIssuerPort.Claims> claims = ArgumentCaptor.forClass(TokenIssuerPort.Claims.class);
         verify(issuer).issue(claims.capture());
         assertThat(claims.getValue().permissions()).containsExactly("BORROW_BOOK");
-        verify(saveRefresh).save(any(RefreshToken.class));
+        // refresh token mới lưu qua rotate (không có token cũ cần thu hồi khi đăng nhập)
+        verify(saveRefresh).rotate(org.mockito.ArgumentMatchers.isNull(), any(RefreshToken.class));
         verify(events).publish(any());
     }
 
@@ -127,6 +128,9 @@ class AuthUseCasesTest {
 
         assertThat(old.isRevoked()).isTrue();
         assertThat(response.refreshToken()).isEqualTo("raw-refresh");
+        // thu hồi token cũ và lưu token mới trong cùng một lời gọi (một giao dịch ở adapter thật)
+        verify(saveRefresh).rotate(org.mockito.ArgumentMatchers.eq(old), any(RefreshToken.class));
+        verify(saveRefresh, never()).save(any(RefreshToken.class));
     }
 
     @Test

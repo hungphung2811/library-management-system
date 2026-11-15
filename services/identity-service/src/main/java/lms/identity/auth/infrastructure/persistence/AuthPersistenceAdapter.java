@@ -8,6 +8,7 @@ import lms.identity.auth.domain.RefreshTokenRepository;
 import lms.identity.auth.domain.UserCredentialRepository;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 
 /** Adapter persistence cho credential và refresh token; tách Domain Model khỏi Persistence Model. */
 public class AuthPersistenceAdapter implements UserCredentialRepository, SaveCredentialPort,
@@ -67,9 +68,18 @@ public class AuthPersistenceAdapter implements UserCredentialRepository, SaveCre
                 e.getTokenHash(), e.getExpiresAt(), e.isRevoked(), e.getCreatedAt()));
     }
 
+    /** Câu UPDATE cần transaction: tự mở (transaction ngắn) khi người gọi không ở trong transaction nào. */
     @Override
+    @Transactional
     public void revokeAllByUserId(UUID userId) {
         refreshTokens.revokeAllByUserId(userId);
+    }
+
+    @Override
+    @Transactional
+    public void rotate(RefreshToken revokedOrNull, RefreshToken issued) {
+        if (revokedOrNull != null) save(revokedOrNull);
+        save(issued);
     }
 
     private static UserCredential toDomain(UserCredentialJpaEntity e) {

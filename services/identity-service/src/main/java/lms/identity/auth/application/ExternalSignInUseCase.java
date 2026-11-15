@@ -11,13 +11,16 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Đăng nhập bằng danh tính ngoài. Đã liên kết (provider, subject) thì đăng nhập đúng người đó, kể cả khi email ở IdP
  * đổi. Chưa liên kết thì chỉ tự liên kết khi email đã xác minh, tên miền được phép và có đúng một độc giả cùng email;
  * không bao giờ tự tạo tài khoản (độc giả do thủ thư cấp, UC10). Tài khoản bị khóa/vô hiệu hóa bị chặn trước khi tạo
  * liên kết. Không đụng bộ đếm sai mật khẩu. Trả mã dùng một lần để đổi lấy token.
+ *
+ * <p>Không có transaction bao ngoài (R20): tra hồ sơ độc giả chạy transaction riêng trong từng tenant; giữ transaction
+ * ngoài sẽ chiếm 2 kết nối cùng lúc. Mỗi bước ghi (liên kết, mã dùng một lần) tự có transaction; nếu tạo mã lỗi sau khi
+ * đã lưu liên kết thì lần sau đi theo nhánh "đã liên kết".
  */
 public class ExternalSignInUseCase {
 
@@ -44,7 +47,6 @@ public class ExternalSignInUseCase {
                 "Tài khoản ngoài chưa được liên kết với tài khoản nào trong hệ thống");
     }
 
-    @Transactional
     public String execute(ExternalIdentity identity) {
         Instant now = clock.instant();
 

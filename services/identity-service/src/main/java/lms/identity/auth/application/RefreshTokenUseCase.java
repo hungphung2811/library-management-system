@@ -9,13 +9,16 @@ import lms.identity.auth.domain.UserCredentialRepository;
 import lms.identity.tenant.application.TenantChoice;
 import java.time.Clock;
 import java.time.Instant;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Làm mới phiên có rotation: mỗi refresh token chỉ dùng một lần; dùng lại token cũ thì thu hồi mọi phiên. Phiên giữ
  * nguyên tenant của refresh token sau khi kiểm tra lại membership ACTIVE và tenant ACTIVE (không còn quyền thì 403
  * NO_TENANT_ACCESS, token không bị xoay vòng). Phiên nền tảng chỉ làm mới được khi tài khoản còn cờ platform_admin.
  * Refresh token không gắn tenant nào (phát hành trước khi có đa tenant) bị từ chối như token không hợp lệ.
+ *
+ * <p>Không có transaction bao ngoài (R20): phát hiện dùng lại thì thu hồi hàng loạt trong transaction riêng, đã commit
+ * trước khi ném InvalidRefreshTokenException (thay cho noRollbackFor trước đây); xoay vòng (thu hồi token cũ + lưu token
+ * mới) nằm trong cùng một giao dịch ở bước cuối của TokenService.
  */
 public class RefreshTokenUseCase {
 
@@ -39,8 +42,6 @@ public class RefreshTokenUseCase {
         this.clock = clock;
     }
 
-    /** noRollbackFor: việc thu hồi hàng loạt khi phát hiện dùng lại token phải được lưu. */
-    @Transactional(noRollbackFor = InvalidRefreshTokenException.class)
     public TokenResponse execute(String rawRefreshToken) {
         Instant now = clock.instant();
         RefreshToken token = refreshRepository.findByTokenHash(codec.hash(rawRefreshToken))
@@ -65,8 +66,6 @@ public class RefreshTokenUseCase {
             throw new InvalidRefreshTokenException("Refresh token không hợp lệ");
         }
 
-        token.revoke();
-        refreshSavePort.save(token);
-        return tokenService.issueForTenant(credential, choice);
+        return tokenService.issueForTenant(credential, choice, token);
     }
 }

@@ -259,6 +259,24 @@ class TokenServiceTenantTest {
     }
 
     @Test
+    void loiTruocBuocLuuThiRefreshTokenHienTaiKhongBiThuHoi() {
+        // R20: thu hồi token cũ chỉ xảy ra cùng giao dịch lưu token mới, ở bước cuối; lỗi đọc quyền trước đó thì giữ nguyên
+        TokenService failing = new TokenService(id -> { throw new IllegalStateException("DB lỗi"); },
+                c -> { issued.add(c); return new TokenIssuerPort.IssuedToken("jwt", 900); },
+                codec, refreshSave, clock, Duration.ofDays(7), id -> Optional.empty(), tenants);
+        RefreshToken old = stored(RefreshToken.issueForTenant(userId, tenantB, "h-raw-old", now.minusSeconds(60), Duration.ofDays(7)));
+        when(credentials.findByUserId(userId)).thenReturn(Optional.of(credential(false, false)));
+        when(tenants.verify(userId, tenantB)).thenReturn(new TenantChoice(tenantB, List.of(summaryB)));
+
+        assertThatThrownBy(() -> new RefreshTokenUseCase(refreshRepo, refreshSave, credentials, codec, failing, tenants,
+                clock).execute("raw-old")).isInstanceOf(IllegalStateException.class);
+
+        assertThat(old.isRevoked()).isFalse();
+        assertThat(savedRefresh).isEmpty();
+        assertThat(issued).isEmpty();
+    }
+
+    @Test
     void refreshKhiTenantTamNgungHoacMembershipTatBiTuChoiVaKhongXoayVong() {
         RefreshToken old = stored(RefreshToken.issueForTenant(userId, tenantB, "h-raw-old", now.minusSeconds(60), Duration.ofDays(7)));
         when(credentials.findByUserId(userId)).thenReturn(Optional.of(credential(false, false)));

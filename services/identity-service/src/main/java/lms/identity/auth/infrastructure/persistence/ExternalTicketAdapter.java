@@ -10,6 +10,7 @@ import java.util.HexFormat;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 /** Mã dùng một lần sống 60 giây, chỉ lưu băm SHA-256. */
 @Repository
@@ -39,6 +40,7 @@ class ExternalTicketAdapter implements ExternalTicketPort {
     }
 
     @Override
+    @Transactional
     public Optional<UUID> redeem(String rawCode, Instant now) {
         if (rawCode == null || rawCode.isBlank()) return Optional.empty();
         String h = hash(rawCode);

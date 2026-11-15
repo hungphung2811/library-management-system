@@ -17,9 +17,10 @@ import org.springframework.transaction.annotation.Transactional;
  * dữ liệu thuộc tenant (Hibernate @TenantId + RLS), nên chỉ role của tenant đang ở TenantContext được tính; không có
  * tenant thì không có role nào (fail-closed).
  *
- * <p>Luôn mở transaction mới (REQUIRES_NEW): tenant của phiên Hibernate và biến phiên RLS được chốt khi transaction
- * bắt đầu, nên người gọi đổi TenantContext (ví dụ cấp token cho tenant vừa chọn trong lúc đăng nhập, khi transaction
- * ngoài chưa có tenant) vẫn đọc đúng tenant.
+ * <p>Người gọi phải gọi ngoài mọi transaction đang mở (luồng cấp token tuân thủ từ R20), nên thực tế transaction này là
+ * transaction duy nhất, mở sau khi tenant đã được đặt. REQUIRES_NEW chỉ là lưới an toàn: tenant của phiên Hibernate và
+ * biến RLS được chốt khi transaction bắt đầu, nếu ai đó lỡ gọi lồng thì vẫn đọc đúng tenant (đổi lại giữ 2 kết nối),
+ * thay vì âm thầm trả quyền rỗng.
  */
 public class GetUserAccessUseCase {
 

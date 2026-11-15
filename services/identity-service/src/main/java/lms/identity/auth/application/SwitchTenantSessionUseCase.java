@@ -11,7 +11,6 @@ import lms.identity.tenant.application.TenantChoice;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * POST /internal/auth/switch-tenant: người đang đăng nhập đổi sang tenant khác. Context tenant kiểm tra membership
@@ -19,6 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
  * thu hồi refresh token hiện tại (request mang kèm). Refresh token phải thuộc đúng người dùng và còn dùng được, nếu
  * không thì 401 như refresh token không hợp lệ. Chỉ thu hồi sau khi tenant đích được chấp nhận (bị 403 thì token cũ
  * giữ nguyên); các refresh token khác của người dùng không bị thu hồi.
+ *
+ * <p>Không có transaction bao ngoài (R20): các bước đọc/kiểm tra tự có transaction ngắn; thu hồi token hiện tại và lưu
+ * token mới nằm trong cùng một giao dịch ở bước cuối của TokenService.
  */
 public class SwitchTenantSessionUseCase {
 
@@ -42,7 +44,6 @@ public class SwitchTenantSessionUseCase {
         this.clock = clock;
     }
 
-    @Transactional
     public TokenResponse execute(UUID userId, UUID tenantId, String rawRefreshToken) {
         Instant now = clock.instant();
         RefreshToken current = refreshRepository.findByTokenHash(codec.hash(rawRefreshToken))
@@ -54,8 +55,6 @@ public class SwitchTenantSessionUseCase {
         credential.ensureCanLogin(now);
         TenantChoice choice = tenantAccess.switchTo(userId, tenantId); // ném NoTenantAccessException, token cũ giữ nguyên
 
-        current.revoke();
-        refreshSavePort.save(current);
-        return tokenService.issueForTenant(credential, choice);
+        return tokenService.issueForTenant(credential, choice, current);
     }
 }
