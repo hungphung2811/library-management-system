@@ -7,6 +7,7 @@ import lms.api.identity.dto.AccessDtos.CreateRoleRequest;
 import lms.api.identity.dto.AccessDtos.GrantPermissionRequest;
 import lms.api.identity.dto.AccessDtos.PermissionView;
 import lms.api.identity.dto.AccessDtos.RoleView;
+import lms.api.identity.dto.AccessDtos.UpdateRoleRequest;
 import lms.api.identity.dto.AccessDtos.UserAccessView;
 import java.util.List;
 import java.util.UUID;
@@ -46,6 +47,16 @@ public class HttpAccessClient implements AccessClient {
     @Override
     public RoleView getRole(UUID roleId) {
         return client.get().uri("/internal/roles/{id}", roleId).retrieve().body(RoleView.class);
+    }
+
+    @Override
+    public RoleView updateRole(UUID roleId, UpdateRoleRequest request) {
+        return client.put().uri("/internal/roles/{id}", roleId).body(request).retrieve().body(RoleView.class);
+    }
+
+    @Override
+    public void deleteRole(UUID roleId) {
+        client.delete().uri("/internal/roles/{id}", roleId).retrieve().toBodilessEntity();
     }
 
     @Override

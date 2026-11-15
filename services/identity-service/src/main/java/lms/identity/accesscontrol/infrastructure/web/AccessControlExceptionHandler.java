@@ -4,6 +4,7 @@ import lms.identity.accesscontrol.domain.AccessControlForbiddenException;
 import lms.identity.accesscontrol.domain.AccessControlNotFoundException;
 import lms.identity.accesscontrol.domain.DuplicateAccessControlException;
 import lms.identity.accesscontrol.domain.InvalidAccessControlException;
+import lms.identity.accesscontrol.domain.RoleConflictException;
 import lms.common.kernel.ErrorResponse;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -28,6 +29,11 @@ public class AccessControlExceptionHandler {
     @ExceptionHandler(DuplicateAccessControlException.class)
     ResponseEntity<ErrorResponse> handleDuplicate(DuplicateAccessControlException ex) {
         return build(HttpStatus.CONFLICT, "DUPLICATE", ex.getMessage());
+    }
+
+    @ExceptionHandler(RoleConflictException.class)
+    ResponseEntity<ErrorResponse> handleRoleConflict(RoleConflictException ex) {
+        return build(HttpStatus.CONFLICT, ex.code(), ex.getMessage());
     }
 
     @ExceptionHandler({InvalidAccessControlException.class, IllegalArgumentException.class})

@@ -7,6 +7,7 @@ import lms.api.identity.dto.AccessDtos.CreateRoleRequest;
 import lms.api.identity.dto.AccessDtos.GrantPermissionRequest;
 import lms.api.identity.dto.AccessDtos.PermissionView;
 import lms.api.identity.dto.AccessDtos.RoleView;
+import lms.api.identity.dto.AccessDtos.UpdateRoleRequest;
 import lms.api.identity.dto.AccessDtos.UserAccessView;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -60,6 +62,17 @@ public class AccessController {
     @GetMapping("/roles/{roleId}")
     public RoleView getRole(@PathVariable UUID roleId) {
         return access.getRole(roleId);
+    }
+
+    @PutMapping("/roles/{roleId}")
+    public RoleView updateRole(@PathVariable UUID roleId, @Valid @RequestBody UpdateRoleRequest request) {
+        return access.updateRole(roleId, request);
+    }
+
+    @DeleteMapping("/roles/{roleId}")
+    public ResponseEntity<Void> deleteRole(@PathVariable UUID roleId) {
+        access.deleteRole(roleId);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/roles/{roleId}/permissions")

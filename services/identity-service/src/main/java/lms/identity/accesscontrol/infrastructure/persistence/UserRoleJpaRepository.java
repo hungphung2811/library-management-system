@@ -7,4 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface UserRoleJpaRepository extends JpaRepository<UserRoleJpaEntity, UserRoleJpaEntity.Key> {
 
     List<UserRoleJpaEntity> findByUserId(UUID userId);
+
+    boolean existsByRoleId(UUID roleId);
 }

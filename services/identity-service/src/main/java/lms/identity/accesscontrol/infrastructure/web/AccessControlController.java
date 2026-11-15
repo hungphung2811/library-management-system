@@ -6,6 +6,7 @@ import lms.identity.accesscontrol.application.AccessDtos.CreateRoleRequest;
 import lms.identity.accesscontrol.application.AccessDtos.GrantPermissionRequest;
 import lms.identity.accesscontrol.application.AccessDtos.PermissionResponse;
 import lms.identity.accesscontrol.application.AccessDtos.RoleResponse;
+import lms.identity.accesscontrol.application.AccessDtos.UpdateRoleRequest;
 import lms.identity.accesscontrol.application.AccessDtos.UserAccessResponse;
 import lms.identity.accesscontrol.application.AccessCommands;
 import lms.identity.accesscontrol.application.GetUserAccessUseCase;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -78,6 +80,21 @@ public class AccessControlController {
     @GetMapping("/roles/{roleId}")
     public RoleResponse getRole(@PathVariable UUID roleId) {
         return roles.get(roleId);
+    }
+
+    /** Chỉ đổi tên/mô tả. Role isAdmin chỉ quản trị viên được sửa; cờ isAdmin không đổi được. */
+    @PutMapping("/roles/{roleId}")
+    public RoleResponse updateRole(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID roleId,
+                                   @Valid @RequestBody UpdateRoleRequest request) {
+        return roles.update(new AccessCommands.UpdateRole(roleId, request.name(), request.description(),
+                callerIsAdmin(jwt)));
+    }
+
+    /** Xóa cứng; 409 ROLE_IN_USE khi còn người dùng được gán, LAST_ADMIN_ROLE khi là role quản trị duy nhất. */
+    @DeleteMapping("/roles/{roleId}")
+    public ResponseEntity<Void> deleteRole(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID roleId) {
+        roles.delete(new AccessCommands.DeleteRole(roleId, callerIsAdmin(jwt)));
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/roles/{roleId}/permissions")

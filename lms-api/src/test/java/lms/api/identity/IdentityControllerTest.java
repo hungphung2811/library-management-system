@@ -241,6 +241,34 @@ class IdentityControllerTest {
     }
 
     @Test
+    void datLaiMatKhauTraNoContentVaChuyenNguyenLoi4xx() throws Exception {
+        UUID id = UUID.randomUUID();
+        String body = "{\"temporaryPassword\":\"Tam-12345\"}";
+        mvc.perform(post("/api/users/" + id + "/password-reset").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isUnauthorized());
+
+        mvc.perform(post("/api/users/" + id + "/password-reset").with(jwt()).contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isNoContent()).andExpect(content().string(""));
+        ArgumentCaptor<lms.api.identity.dto.UserDtos.ResetPasswordRequest> r =
+                ArgumentCaptor.forClass(lms.api.identity.dto.UserDtos.ResetPasswordRequest.class);
+        verify(users).resetPassword(eq(id), r.capture());
+        Assertions.assertEquals("Tam-12345", r.getValue().temporaryPassword());
+        Assertions.assertFalse(r.getValue().toString().contains("Tam-12345"));
+
+        mvc.perform(post("/api/users/" + id + "/password-reset").with(jwt()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"temporaryPassword\":\"ngan\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+
+        Mockito.doThrow(error(HttpStatus.FORBIDDEN,
+                        "{\"code\":\"USER_OPERATION_NOT_ALLOWED\",\"message\":\"Không được phép\",\"details\":[]}"))
+                .when(users).resetPassword(eq(id), any());
+        mvc.perform(post("/api/users/" + id + "/password-reset").with(jwt()).contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("USER_OPERATION_NOT_ALLOWED"));
+    }
+
+    @Test
     void huyQuyenGiuDauGachCheoTrongKhoa() throws Exception {
         UUID role = UUID.randomUUID();
         when(access.revokePermission(eq(role), eq("BorrowingController/borrow")))
@@ -248,6 +276,28 @@ class IdentityControllerTest {
         mvc.perform(delete("/api/roles/" + role + "/permissions/BorrowingController/borrow").with(jwt()))
                 .andExpect(status().isOk());
         verify(access).revokePermission(role, "BorrowingController/borrow");
+    }
+
+    @Test
+    void suaVaXoaRoleChuyenTiepVaGiuMaLoi409() throws Exception {
+        UUID role = UUID.randomUUID();
+        when(access.updateRole(eq(role), any())).thenReturn(new RoleView(role, "REVIEWER", "Duyệt", false, List.of()));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/roles/" + role)
+                        .with(jwt()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"REVIEWER\",\"description\":\"Duyệt\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.name").value("REVIEWER"));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/roles/" + role)
+                        .with(jwt()).contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"\"}"))
+                .andExpect(status().isBadRequest());
+
+        mvc.perform(delete("/api/roles/" + role).with(jwt())).andExpect(status().isNoContent());
+        verify(access).deleteRole(role);
+
+        Mockito.doThrow(error(HttpStatus.CONFLICT, "{\"code\":\"ROLE_IN_USE\",\"message\":\"Đang dùng\",\"details\":[]}"))
+                .when(access).deleteRole(role);
+        mvc.perform(delete("/api/roles/" + role).with(jwt()))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("ROLE_IN_USE"));
+        mvc.perform(delete("/api/roles/" + role)).andExpect(status().isUnauthorized());
     }
 
     @Test

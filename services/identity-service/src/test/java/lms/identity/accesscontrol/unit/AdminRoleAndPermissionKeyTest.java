@@ -48,7 +48,7 @@ class AdminRoleAndPermissionKeyTest {
     private final PublishAccessEventPort events = mock(PublishAccessEventPort.class);
     private final Clock clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC);
 
-    private final RoleManagementUseCase roleUseCase = new RoleManagementUseCase(roles, permissions, saveRole);
+    private final RoleManagementUseCase roleUseCase = new RoleManagementUseCase(roles, permissions, saveRole, assignments);
     private final UserRoleUseCase userRoleUseCase =
             new UserRoleUseCase(roles, assignments, saveAssignment, events, clock);
 

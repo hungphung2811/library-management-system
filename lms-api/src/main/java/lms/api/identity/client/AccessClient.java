@@ -6,6 +6,7 @@ import lms.api.identity.dto.AccessDtos.CreateRoleRequest;
 import lms.api.identity.dto.AccessDtos.GrantPermissionRequest;
 import lms.api.identity.dto.AccessDtos.PermissionView;
 import lms.api.identity.dto.AccessDtos.RoleView;
+import lms.api.identity.dto.AccessDtos.UpdateRoleRequest;
 import lms.api.identity.dto.AccessDtos.UserAccessView;
 import java.util.List;
 import java.util.UUID;
@@ -22,6 +23,10 @@ public interface AccessClient {
     List<RoleView> listRoles();
 
     RoleView getRole(UUID roleId);
+
+    RoleView updateRole(UUID roleId, UpdateRoleRequest request);
+
+    void deleteRole(UUID roleId);
 
     RoleView grantPermission(UUID roleId, GrantPermissionRequest request);
 

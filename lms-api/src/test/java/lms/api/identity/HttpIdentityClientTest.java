@@ -56,6 +56,7 @@ class HttpIdentityClientTest {
         RestClient rc = builder.build();
         Jwt jwt = Jwt.withTokenValue("tok").header("alg", "none").subject("u1").build();
         SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
+        UUID uid = UUID.fromString("00000000-0000-0000-0000-0000000000aa");
 
         server.expect(requestTo("http://identity/internal/auth/login")).andExpect(method(HttpMethod.POST))
                 .andExpect(jsonPath("$.username").value("alice"))
@@ -68,7 +69,17 @@ class HttpIdentityClientTest {
                 .andExpect(method(HttpMethod.DELETE))
                 .andRespond(withSuccess("{\"id\":\"" + ROLE + "\",\"name\":\"r\","
                         + "\"description\":\"d\",\"isAdmin\":true,\"permissions\":[]}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo("http://identity/internal/roles/" + ROLE)).andExpect(method(HttpMethod.PUT))
+                .andExpect(jsonPath("$.name").value("REVIEWER"))
+                .andRespond(withSuccess("{\"id\":\"" + ROLE + "\",\"name\":\"REVIEWER\","
+                        + "\"description\":\"d\",\"isAdmin\":false,\"permissions\":[]}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo("http://identity/internal/roles/" + ROLE)).andExpect(method(HttpMethod.DELETE))
+                .andExpect(header("Authorization", "Bearer tok")).andRespond(withNoContent());
         server.expect(requestTo("http://identity/internal/auth/password")).andExpect(method(HttpMethod.POST))
+                .andRespond(withNoContent());
+        server.expect(requestTo("http://identity/internal/users/" + uid + "/password-reset"))
+                .andExpect(method(HttpMethod.POST)).andExpect(header("Authorization", "Bearer tok"))
+                .andExpect(jsonPath("$.temporaryPassword").value("Tam-12345"))
                 .andRespond(withNoContent());
 
         var token = new HttpAuthClient(rc).login("alice", "pw", null);
@@ -77,7 +88,11 @@ class HttpIdentityClientTest {
         assertEquals(5, new HttpUserClient(rc).search(new SearchUsersQuery("a b", null, null, null, 5)).size());
         var role = new HttpAccessClient(rc).revokePermission(ROLE, "BorrowingController/borrow");
         assertTrue(role.isAdmin());
+        assertEquals("REVIEWER", new HttpAccessClient(rc)
+                .updateRole(ROLE, new lms.api.identity.dto.AccessDtos.UpdateRoleRequest("REVIEWER", "d")).name());
+        new HttpAccessClient(rc).deleteRole(ROLE);
         new HttpAuthClient(rc).changePassword(new ChangePasswordRequest("a", "12345678"));
+        new HttpUserClient(rc).resetPassword(uid, new lms.api.identity.dto.UserDtos.ResetPasswordRequest("Tam-12345"));
         server.verify();
     }
 

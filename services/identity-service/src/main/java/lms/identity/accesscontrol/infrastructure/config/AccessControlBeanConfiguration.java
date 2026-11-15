@@ -68,7 +68,7 @@ public class AccessControlBeanConfiguration {
 
     @Bean
     RoleManagementUseCase roleManagementUseCase(AccessControlPersistenceAdapter persistence) {
-        return new RoleManagementUseCase(persistence, persistence, persistence);
+        return new RoleManagementUseCase(persistence, persistence, persistence, persistence);
     }
 
     @Bean

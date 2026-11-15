@@ -46,6 +46,11 @@ public class Role {
         return new Role(id, name, description, admin, permissionCodes);
     }
 
+    /** Đổi tên/mô tả, giữ id, cờ admin và permission (không cho đổi cờ admin qua đường này). */
+    public Role rename(String newName, String newDescription) {
+        return new Role(id, newName, newDescription, admin, permissionCodes);
+    }
+
     /** Idempotent: cấp lại permission đã có không gây lỗi. */
     public void grant(String permissionCode) {
         permissionCodes.add(NamingRule.requirePermissionKey(permissionCode, "Mã permission"));

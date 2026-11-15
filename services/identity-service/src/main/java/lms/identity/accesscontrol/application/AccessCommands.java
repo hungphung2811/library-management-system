@@ -17,6 +17,13 @@ public final class AccessCommands {
         }
     }
 
+    /** Chỉ đổi tên/mô tả; role quản trị (isAdmin) chỉ quản trị viên được sửa. */
+    public record UpdateRole(UUID roleId, String name, String description, boolean requestedByAdmin) {
+    }
+
+    public record DeleteRole(UUID roleId, boolean requestedByAdmin) {
+    }
+
     public record CreatePermission(String code, String description) {
     }
 

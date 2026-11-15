@@ -15,6 +15,10 @@ public final class AccessDtos {
     public record CreateRoleRequest(@NotBlank String name, @NotBlank String description, Boolean isAdmin) {
     }
 
+    /** Chỉ đổi tên/mô tả; cờ isAdmin không đổi được. */
+    public record UpdateRoleRequest(@NotBlank String name, @NotBlank String description) {
+    }
+
     public record CreatePermissionRequest(@NotBlank String code, @NotBlank String description) {
     }
 

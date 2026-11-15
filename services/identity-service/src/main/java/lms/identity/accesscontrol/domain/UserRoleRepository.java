@@ -6,4 +6,7 @@ import java.util.UUID;
 
 public interface UserRoleRepository {
     Optional<UserRoleAssignment> findByUserId(UUID userId);
+
+    /** Còn người dùng (trong tenant hiện tại) đang được gán role này không. */
+    boolean existsByRoleId(UUID roleId);
 }

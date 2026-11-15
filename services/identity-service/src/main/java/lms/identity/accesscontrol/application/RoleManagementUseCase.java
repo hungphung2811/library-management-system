@@ -3,7 +3,11 @@ package lms.identity.accesscontrol.application;
 import lms.identity.accesscontrol.application.AccessDtos.RoleResponse;
 import lms.identity.accesscontrol.application.AccessMapper;
 import lms.identity.accesscontrol.application.AccessCommands.CreateRole;
+import lms.identity.accesscontrol.application.AccessCommands.DeleteRole;
 import lms.identity.accesscontrol.application.AccessCommands.GrantPermission;
+import lms.identity.accesscontrol.application.AccessCommands.UpdateRole;
+import lms.identity.accesscontrol.domain.RoleConflictException;
+import lms.identity.accesscontrol.domain.UserRoleRepository;
 import lms.identity.accesscontrol.application.SaveRolePort;
 import lms.identity.accesscontrol.domain.AccessControlForbiddenException;
 import lms.identity.accesscontrol.domain.AccessControlNotFoundException;
@@ -21,11 +25,14 @@ public class RoleManagementUseCase {
     private final RoleRepository roles;
     private final PermissionRepository permissions;
     private final SaveRolePort savePort;
+    private final UserRoleRepository assignments;
 
-    public RoleManagementUseCase(RoleRepository roles, PermissionRepository permissions, SaveRolePort savePort) {
+    public RoleManagementUseCase(RoleRepository roles, PermissionRepository permissions, SaveRolePort savePort,
+                                 UserRoleRepository assignments) {
         this.roles = roles;
         this.permissions = permissions;
         this.savePort = savePort;
+        this.assignments = assignments;
     }
 
     @Transactional
@@ -38,6 +45,40 @@ public class RoleManagementUseCase {
             throw new DuplicateAccessControlException("Role đã tồn tại: " + role.name());
         }
         return AccessMapper.toResponse(savePort.save(role));
+    }
+
+    @Transactional
+    public RoleResponse update(UpdateRole command) {
+        Role role = load(command.roleId());
+        requireAdminForAdminRole(role, command.requestedByAdmin(), "sửa");
+        Role updated = role.rename(command.name(), command.description());
+        if (!updated.name().equals(role.name()) && roles.existsByName(updated.name())) {
+            throw new DuplicateAccessControlException("Role đã tồn tại: " + updated.name());
+        }
+        return AccessMapper.toResponse(savePort.save(updated));
+    }
+
+    /**
+     * Xóa cứng role (role_permissions xóa theo). Chặn khi còn user được gán (ROLE_IN_USE) hoặc là role quản trị
+     * duy nhất của tenant (LAST_ADMIN_ROLE). Token đã phát hành vẫn mang permission cũ đến khi hết hạn/refresh.
+     */
+    @Transactional
+    public void delete(DeleteRole command) {
+        Role role = load(command.roleId());
+        requireAdminForAdminRole(role, command.requestedByAdmin(), "xóa");
+        if (role.isAdmin() && roles.findAll().stream().filter(Role::isAdmin).count() <= 1) {
+            throw new RoleConflictException("LAST_ADMIN_ROLE", "Không thể xóa role quản trị duy nhất: " + role.name());
+        }
+        if (assignments.existsByRoleId(role.id().value())) {
+            throw new RoleConflictException("ROLE_IN_USE", "Role đang được gán cho người dùng: " + role.name());
+        }
+        savePort.delete(role);
+    }
+
+    private static void requireAdminForAdminRole(Role role, boolean callerIsAdmin, String action) {
+        if (role.isAdmin() && !callerIsAdmin) {
+            throw new AccessControlForbiddenException("Chỉ quản trị viên mới " + action + " được role quản trị (isAdmin)");
+        }
     }
 
     @Transactional

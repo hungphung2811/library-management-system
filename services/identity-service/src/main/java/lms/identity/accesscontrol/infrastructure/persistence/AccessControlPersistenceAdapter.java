@@ -43,6 +43,16 @@ public class AccessControlPersistenceAdapter implements RoleRepository, Permissi
     }
 
     @Override
+    public void delete(Role role) {
+        roleJpa.deleteById(role.id().value());
+    }
+
+    @Override
+    public boolean existsByRoleId(UUID roleId) {
+        return userRoleJpa.existsByRoleId(roleId);
+    }
+
+    @Override
     public Optional<Role> findById(RoleId id) {
         return roleJpa.findById(id.value()).map(AccessControlPersistenceAdapter::toDomain);
     }

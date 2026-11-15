@@ -20,6 +20,9 @@ public final class AccessDtos {
         }
     }
 
+    public record UpdateRoleRequest(@NotBlank String name, @NotBlank String description) {
+    }
+
     public record CreatePermissionRequest(@NotBlank String code, @NotBlank String description) {
     }
 
