@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lms.identity.auth.application.AuthDtos.TokenResponse;
 import lms.identity.auth.application.RefreshTokenCodecPort;
@@ -29,7 +30,9 @@ import lms.identity.auth.application.TenantAccessPort;
 import lms.identity.auth.application.TokenIssuerPort;
 import lms.identity.auth.application.TokenService;
 import lms.identity.auth.application.UserAccessPort;
+import lms.identity.auth.application.UserDirectoryPort;
 import lms.identity.auth.application.PasswordHasherPort;
+import lms.identity.auth.domain.DuplicateUsernameException;
 import lms.identity.auth.domain.InvalidRefreshTokenException;
 import lms.identity.auth.domain.RefreshToken;
 import lms.identity.auth.domain.RefreshTokenRepository;
@@ -405,7 +408,8 @@ class TokenServiceTenantTest {
         PasswordHasherPort hasher = mock(PasswordHasherPort.class);
         when(hasher.hash("password1")).thenReturn("bcrypt");
         when(save.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        RegisterCredentialUseCase register = new RegisterCredentialUseCase(credentials, save, hasher, tenants);
+        RegisterCredentialUseCase register = new RegisterCredentialUseCase(credentials, save, hasher, tenants,
+                id -> Optional.empty());
 
         UUID created = UUID.randomUUID();
         register.execute(created, "bob", "password1", null, false, tenantA);
@@ -420,5 +424,48 @@ class TokenServiceTenantTest {
         UUID noTenant = UUID.randomUUID();
         register.execute(noTenant, "carol", "password1", null, false, null);
         verify(tenants, never()).addMember(any(), any(), any());
+    }
+
+    // ---- F-3: không cấp credential cho userId thuộc tenant khác ----
+
+    private RegisterCredentialUseCase registerWith(Set<UUID> usersRows) {
+        SaveCredentialPort save = mock(SaveCredentialPort.class);
+        PasswordHasherPort hasher = mock(PasswordHasherPort.class);
+        when(hasher.hash("password1")).thenReturn("bcrypt");
+        when(save.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        return new RegisterCredentialUseCase(credentials, save, hasher, tenants,
+                id -> usersRows.contains(id) ? Optional.of(new UserDirectoryPort.UserInfo(false)) : Optional.empty());
+    }
+
+    @Test
+    void tuChoiTaoCredentialChoUserIdChiCoMembershipOTenantKhac() {
+        UUID victim = UUID.randomUUID();
+        when(tenants.hasAnyMembership(victim)).thenReturn(true);
+        when(tenants.isMember(victim, tenantA)).thenReturn(false);
+
+        assertThatThrownBy(() -> registerWith(Set.of()).execute(victim, "mallory", "password1", null, false, tenantA))
+                .isInstanceOf(DuplicateUsernameException.class)
+                .hasMessageNotContaining("mallory");
+        verify(tenants, never()).addMember(any(), any(), any());
+    }
+
+    @Test
+    void tuChoiTaoCredentialChoUserIdCoHoSoUsersNhungKhongThuocTenantNguoiGoi() {
+        UUID victim = UUID.randomUUID();
+
+        assertThatThrownBy(() -> registerWith(Set.of(victim)).execute(victim, "mallory", "password1", null, false,
+                tenantA)).isInstanceOf(DuplicateUsernameException.class);
+        verify(tenants, never()).addMember(any(), any(), any());
+    }
+
+    @Test
+    void choPhepTaoCredentialChoUserIdDaLaThanhVienTenantNguoiGoi() {
+        UUID member = UUID.randomUUID();
+        when(tenants.hasAnyMembership(member)).thenReturn(true);
+        when(tenants.isMember(member, tenantA)).thenReturn(true);
+
+        registerWith(Set.of(member)).execute(member, "bob", "password1", null, false, tenantA);
+
+        verify(tenants).addMember(member, tenantA, null);
     }
 }

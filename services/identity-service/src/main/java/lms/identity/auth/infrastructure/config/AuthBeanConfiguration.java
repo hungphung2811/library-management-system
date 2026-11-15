@@ -136,8 +136,9 @@ public class AuthBeanConfiguration {
 
     @Bean
     RegisterCredentialUseCase registerCredentialUseCase(AuthPersistenceAdapter persistence, BcryptPasswordHasher hasher,
-                                                        InProcessTenantAccessAdapter tenantAccess) {
-        return new RegisterCredentialUseCase(persistence, persistence, hasher, tenantAccess);
+                                                        InProcessTenantAccessAdapter tenantAccess,
+                                                        UserDirectoryPort userDirectory) {
+        return new RegisterCredentialUseCase(persistence, persistence, hasher, tenantAccess, userDirectory);
     }
 
     @Bean

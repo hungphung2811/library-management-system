@@ -196,7 +196,8 @@ class AuthUseCasesTest {
 
     @Test
     void dangKyChuanHoaUsernameVaChanTrung() {
-        RegisterCredentialUseCase register = new RegisterCredentialUseCase(credentials, saveCredential, hasher, tenantAccess);
+        RegisterCredentialUseCase register = new RegisterCredentialUseCase(credentials, saveCredential, hasher, tenantAccess,
+                id -> Optional.empty());
         when(hasher.hash("password1")).thenReturn("bcrypt");
         when(saveCredential.save(any())).thenAnswer(inv -> inv.getArgument(0));
 

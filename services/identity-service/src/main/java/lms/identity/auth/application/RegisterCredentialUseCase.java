@@ -16,13 +16,16 @@ public class RegisterCredentialUseCase {
     private final SaveCredentialPort savePort;
     private final PasswordHasherPort hasher;
     private final TenantAccessPort tenantAccess;
+    private final UserDirectoryPort userDirectory;
 
     public RegisterCredentialUseCase(UserCredentialRepository repository, SaveCredentialPort savePort,
-                                     PasswordHasherPort hasher, TenantAccessPort tenantAccess) {
+                                     PasswordHasherPort hasher, TenantAccessPort tenantAccess,
+                                     UserDirectoryPort userDirectory) {
         this.repository = repository;
         this.savePort = savePort;
         this.hasher = hasher;
         this.tenantAccess = tenantAccess;
+        this.userDirectory = userDirectory;
     }
 
     public UUID execute(UUID userId, String username, String rawPassword, UUID departmentId) {
@@ -38,6 +41,10 @@ public class RegisterCredentialUseCase {
      * tenantId: tenant mà tài khoản mới là thành viên (tenant của người tạo, hoặc tenant mặc định cho tài khoản quản
      * trị khởi tạo). Không có membership thì tài khoản không đăng nhập được (trừ platform admin), nên null chỉ dùng
      * khi việc gắn tenant làm ở nơi khác.
+     *
+     * <p>Chống cấp credential chéo tenant: khi tenantId khác null, userId đã có hồ sơ users hoặc membership ở tenant
+     * khác nhưng không có membership ở tenantId thì từ chối bằng DuplicateUsernameException với thông điệp chung
+     * (không lộ việc userId tồn tại ở tenant khác). Gắn tài khoản có sẵn vào tenant là việc của người vận hành.
      */
     @Transactional
     public UUID execute(UUID userId, String username, String rawPassword, UUID departmentId,
@@ -49,6 +56,9 @@ public class RegisterCredentialUseCase {
         if (repository.existsByUsername(normalized) || repository.existsByUserId(userId)) {
             throw new DuplicateUsernameException(normalized);
         }
+        if (tenantId != null && belongsOutside(userId, tenantId)) {
+            throw DuplicateUsernameException.generic();
+        }
         UserCredential credential = UserCredential.register(userId, normalized, hasher.hash(rawPassword), departmentId,
                 mustChangePassword);
         UUID created = savePort.save(credential).userId();
@@ -57,6 +67,11 @@ public class RegisterCredentialUseCase {
             tenantAccess.addMember(created, tenantId, departmentId);
         }
         return created;
+    }
+
+    private boolean belongsOutside(UUID userId, UUID tenantId) {
+        if (tenantAccess.isMember(userId, tenantId)) return false;
+        return userDirectory.find(userId).isPresent() || tenantAccess.hasAnyMembership(userId);
     }
 
     /**
