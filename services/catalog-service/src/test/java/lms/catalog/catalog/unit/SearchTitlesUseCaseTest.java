@@ -9,6 +9,7 @@ import lms.catalog.catalog.domain.TitleRepository;
 import lms.catalog.inventory.application.CopyAvailabilityQuery;
 import lms.catalog.inventory.domain.BookCopy;
 import lms.catalog.inventory.domain.BookCopyRepository;
+import lms.catalog.inventory.domain.CopyDetails;
 import lms.catalog.inventory.domain.CopyStatus;
 import java.math.BigDecimal;
 import java.util.Collection;
@@ -37,6 +38,9 @@ class SearchTitlesUseCaseTest {
         BookCopyRepository copies = new BookCopyRepository() {
             public BookCopy save(BookCopy c) { return c; }
             public Optional<BookCopy> findById(UUID id) { return Optional.empty(); }
+            public Optional<BookCopy> findByIdForUpdate(UUID id) { return Optional.empty(); }
+            public Optional<CopyDetails> findDetailsById(UUID id) { return Optional.empty(); }
+            public Optional<CopyDetails> findDetailsByBarcode(String barcode) { return Optional.empty(); }
             public boolean existsByBarcode(String b) { return false; }
             public boolean titleExists(UUID id) { return true; }
             public List<BookCopy> findByTitleId(UUID id) { return List.of(); }
