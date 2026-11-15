@@ -98,8 +98,26 @@ Thêm migration mới vào `services/migration-service` (không sửa file cũ �
 
 Ngoài Postgres: bản ghi audit cũ trong Mongo được gán `tenantId` của tenant mặc định bằng một script một lần; khóa Redis cũ không có tiền tố tenant được bỏ (hết hạn theo TTL hoặc xóa); access và refresh token cũ không có `tenantId` bị từ chối, người dùng đăng nhập lại một lần khi triển khai. *(Lựa chọn của người viết.)*
 
-## 7. API nền tảng cho người vận hành
-`/api/platform/**` (chỉ platform admin): tạo/sửa/tạm ngưng tenant, tạo organization, tạo tài khoản quản trị đầu tiên của tenant (hoặc gắn tài khoản có sẵn), liệt kê tenant. Tạo tenant sinh bộ role mẫu và dữ liệu khởi tạo trong cùng một thao tác.
+## 7. Chức năng quản lý tenant cho super admin
+"Super admin" trong tài liệu này là tài khoản có cờ `platform_admin` (mục 5.1), tức người vận hành đứng trên mọi tenant. Chủ hệ thống yêu cầu có chức năng này. Phạm vi chức năng dưới đây là đề xuất của người viết, chờ duyệt.
+
+API nằm ở identity-service dưới `/api/platform/**`, yêu cầu claim `platformAdmin` (không dùng khóa `Controller/method` của tenant), qua `lms-api` và nginx như các API khác.
+
+| Chức năng | Mô tả |
+|---|---|
+| Tạo tenant | Nhập mã (`code`, unique), tên, trường (organization, tùy chọn). Trong **một thao tác**: tạo tenant, sao chép role mẫu từ `role_templates`, tạo dữ liệu khởi tạo (ví dụ quy tắc mượn mặc định), tạo tài khoản quản trị đầu tiên (tài khoản mới với mật khẩu tạm buộc đổi, hoặc gắn tài khoản có sẵn) và gán role quản trị của tenant |
+| Danh sách và tìm kiếm | Tìm theo mã, tên, trường, trạng thái; phân trang; mỗi dòng có số thành viên |
+| Xem chi tiết | Thông tin tenant, trường, trạng thái, số thành viên, danh sách quản trị viên của tenant |
+| Sửa | Đổi tên, đổi trường; đổi `code` chỉ khi chưa có dữ liệu gắn với nó (đề xuất: không cho đổi `code` sau khi tạo để tránh vỡ tham chiếu) |
+| Tạm ngưng / kích hoạt lại | `SUSPENDED` chặn cấp và làm mới token cho tenant (token đang sống hết hạn trong tối đa 15 phút); kích hoạt lại thì dùng được ngay. Dữ liệu giữ nguyên |
+| Quản lý trường (organization) | Tạo, sửa, liệt kê; gán hoặc đổi trường cho tenant |
+| Quản trị viên tenant | Thêm một quản trị viên cho tenant (gắn tài khoản có sẵn hoặc tạo mới), gỡ quản trị viên, đặt lại mật khẩu quản trị viên khi tài khoản chỉ thuộc tenant đó (cùng quy tắc ở mục 5.6) |
+| Gắn tài khoản có sẵn vào tenant | Đây là đường duy nhất để một tài khoản thuộc nhiều tenant (mục 5.6) |
+| Nhật ký thao tác nền tảng | Mọi thao tác trên ghi audit (ai, làm gì, tenant nào, khi nào) |
+
+**Giới hạn:** super admin quản lý tenant, không xem dữ liệu nghiệp vụ trong tenant (sách, mượn trả, độc giả). Muốn làm việc bên trong một tenant thì phải là thành viên của tenant đó. Không có thao tác xóa cứng tenant (đã nằm ngoài phạm vi ở mục 3); chỉ tạm ngưng. Chưa có giao diện quản trị (dự án hiện chưa có CMS); chức năng này chỉ gồm API, FE dùng sau.
+
+**Kiểm thử:** chỉ có `platformAdmin` mới gọi được; quản trị viên tenant và người dùng thường nhận 403; tạo tenant tạo đủ role, dữ liệu khởi tạo và quản trị viên; tạo trùng `code` bị từ chối; tạm ngưng chặn đăng nhập và làm mới token, kích hoạt lại thì dùng được; mọi thao tác có audit.
 
 ## 8. Kiểm thử cần có
 - Integration test (Testcontainers) với hai tenant: đọc, ghi, tìm kiếm không thấy dữ liệu tenant kia, kể cả qua SQL native; không có tenant thì không thấy gì.
