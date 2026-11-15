@@ -1,6 +1,9 @@
 package lms.circulation.borrowing.domain;
 
-/** Tình trạng bản sao khi đóng lượt mượn (cột borrowing_items.item_condition, V4). */
+/**
+ * Tình trạng bản sao khi đóng lượt mượn (UC07 nguyên vẹn/hỏng, UC08 mất). Lưu ở cột borrowing_items.item_condition
+ * (CHECK của migration V4: GOOD, DAMAGED, LOST).
+ */
 public enum ItemCondition {
     /** Trả nguyên vẹn. */
     GOOD,

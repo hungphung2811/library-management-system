@@ -27,4 +27,7 @@ public interface ReservationRepository {
     List<Reservation> findHoldExpired(LocalDate today);
 
     boolean existsReadyForCopy(UUID copyId);
+
+    /** Đặt trước READY đang giữ bản sao này (cho UC06: ai được nhận bản sao RESERVED). */
+    Optional<Reservation> findReadyByCopyId(UUID copyId);
 }

@@ -1,6 +1,23 @@
 package lms.circulation.borrowing.infrastructure.config;
 
 import lms.circulation.borrowing.application.BorrowBookUseCase;
+import lms.circulation.borrowing.application.CopyInventoryPort;
+import lms.circulation.borrowing.application.CopyReservationPort;
+import lms.circulation.borrowing.application.FineLedgerPort;
+import lms.circulation.borrowing.application.ListBorrowingsUseCase;
+import lms.circulation.borrowing.application.ReaderDirectoryPort;
+import lms.circulation.borrowing.application.ReportLostUseCase;
+import lms.circulation.borrowing.domain.BorrowRuleRepository;
+import lms.circulation.borrowing.infrastructure.client.CatalogCopyRestClientAdapter;
+import lms.circulation.borrowing.infrastructure.client.IdentityReaderRestClientAdapter;
+import lms.circulation.borrowing.infrastructure.integration.FineLedgerAdapter;
+import lms.circulation.borrowing.infrastructure.integration.ReservationHoldAdapter;
+import lms.circulation.fine.application.AssessFineUseCase;
+import lms.circulation.fine.application.GetReaderFinesUseCase;
+import lms.circulation.reservation.application.FulfillReservationUseCase;
+import java.time.Duration;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.web.client.RestClient;
 import lms.circulation.borrowing.application.GetBorrowingUseCase;
 import lms.circulation.borrowing.application.ProvisionDefaultBorrowRulesUseCase;
 import lms.circulation.borrowing.infrastructure.persistence.BorrowRuleJdbcAdapter;
@@ -38,16 +55,57 @@ public class BorrowingBeanConfiguration {
         return new KafkaBorrowingEventPublisher(new KafkaEventPublisher(kafkaTemplate, objectMapper, topic));
     }
 
-    @Bean
-    BorrowBookUseCase borrowBookUseCase(BorrowingDomainService domainService, BorrowingPersistenceAdapter persistence,
-                                        KafkaBorrowingEventPublisher publisher, Clock clock) {
-        return new BorrowBookUseCase(domainService, persistence, persistence, publisher, clock);
+    private static RestClient restClient(String baseUrl) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(Duration.ofSeconds(2));
+        factory.setReadTimeout(Duration.ofSeconds(5));
+        return RestClient.builder().baseUrl(baseUrl).requestFactory(factory).build();
     }
 
     @Bean
-    ReturnBookUseCase returnBookUseCase(BorrowingPersistenceAdapter persistence,
-                                        KafkaBorrowingEventPublisher publisher, Clock clock) {
-        return new ReturnBookUseCase(persistence, persistence, publisher, clock);
+    ReaderDirectoryPort readerDirectoryPort(@Value("${app.clients.identity.base-url}") String baseUrl) {
+        return new IdentityReaderRestClientAdapter(restClient(baseUrl));
+    }
+
+    @Bean
+    CopyInventoryPort copyInventoryPort(@Value("${app.clients.catalog.base-url}") String baseUrl) {
+        return new CatalogCopyRestClientAdapter(restClient(baseUrl));
+    }
+
+    @Bean
+    CopyReservationPort copyReservationPort(FulfillReservationUseCase fulfillReservation) {
+        return new ReservationHoldAdapter(fulfillReservation);
+    }
+
+    @Bean
+    FineLedgerPort fineLedgerPort(GetReaderFinesUseCase query, AssessFineUseCase assess) {
+        return new FineLedgerAdapter(query, assess);
+    }
+
+    @Bean
+    BorrowBookUseCase borrowBookUseCase(BorrowingDomainService domainService, BorrowingPersistenceAdapter persistence,
+                                        BorrowRuleRepository rules, ReaderDirectoryPort readers,
+                                        CopyInventoryPort inventory, CopyReservationPort reservations,
+                                        FineLedgerPort fines, KafkaBorrowingEventPublisher publisher, Clock clock) {
+        return new BorrowBookUseCase(domainService, persistence, persistence, rules, readers, inventory, reservations,
+                fines, publisher, clock);
+    }
+
+    @Bean
+    ReturnBookUseCase returnBookUseCase(BorrowingPersistenceAdapter persistence, CopyInventoryPort inventory,
+                                        FineLedgerPort fines, KafkaBorrowingEventPublisher publisher, Clock clock) {
+        return new ReturnBookUseCase(persistence, persistence, inventory, fines, publisher, clock);
+    }
+
+    @Bean
+    ReportLostUseCase reportLostUseCase(BorrowingPersistenceAdapter persistence, CopyInventoryPort inventory,
+                                        FineLedgerPort fines, KafkaBorrowingEventPublisher publisher, Clock clock) {
+        return new ReportLostUseCase(persistence, persistence, inventory, fines, publisher, clock);
+    }
+
+    @Bean
+    ListBorrowingsUseCase listBorrowingsUseCase(BorrowingPersistenceAdapter persistence) {
+        return new ListBorrowingsUseCase(persistence);
     }
 
     @Bean

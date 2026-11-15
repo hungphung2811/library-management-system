@@ -42,7 +42,7 @@ Không có hằng số permission và không dùng `hasAuthority`. `PermissionIn
 - Endpoint không cần quyền: `@AuthenticatedOnly` (chỉ đăng nhập) hoặc `@PublicEndpoint`. Không dùng `@RequirePermission("KEY")` (còn trong code nhưng chủ đích không dùng); mọi khóa là `Controller/method`.
 - Đổi tên controller/method đổi khóa, role đã gán mất quyền; quyền mới của role chỉ có hiệu lực khi đăng nhập hoặc refresh token kế tiếp.
 - Quản trị viên là dữ liệu: role có cờ `is_admin` → JWT có claim `admin=true` và bỏ qua kiểm khóa. Không hardcode tên role. Chỉ admin được tạo/gán/thu hồi role `isAdmin`. Token của tài khoản `mustChangePassword` không mang `admin`/`permissions`.
-- `SecurityConfiguration` của mỗi service chỉ xác thực (`/internal/**` authenticated, còn lại denyAll; `/api/**` chỉ có ở lms-api và identity cho tới khi identity chuyển). Profile dev tắt kiểm khóa bằng `lms.security.permission.enabled=false`; test WebMvc phải bật lại (`@TestPropertySource`) và `@MockitoBean PermissionKeyRegistrar`.
+- `SecurityConfiguration` của mỗi service chỉ xác thực (`/internal/**` authenticated, còn lại denyAll; `/api/**` chỉ có ở lms-api; identity đã chuyển sang `/internal/**`, chỉ công khai các đường dẫn đăng nhập/làm mới/đăng xuất/đăng nhập ngoài, JWKS và `POST /internal/permissions/registrations`). Profile dev tắt kiểm khóa bằng `lms.security.permission.enabled=false`; test WebMvc phải bật lại (`@TestPropertySource`) và `@MockitoBean PermissionKeyRegistrar`.
 - Migration identity có đánh số liên tục (V9 đổi mã seed cũ sang khóa endpoint); thêm migration mới phải kiểm tra số kế tiếp vì nhiều người cùng sửa (file nằm ở `migration-service`, thư mục `identity`).
 
 ### Multi-tenant (ADR-0006)
@@ -65,4 +65,4 @@ Kết nối khai báo ở `database.connections.*` (PostgreSQL, Oracle, MongoDB,
 - Cấu hình YAML: nhiều người cùng sửa `application.yml`; khi thêm khối cấp cao (ví dụ `lms:`) đặt ở cuối file và chắc chắn chỉ có một khối cùng tên (chèn vào giữa `app:` từng làm lồng nhầm cấu hình khác).
 - Working tree thường có thay đổi chưa commit của phiên/người khác: sửa có mục tiêu bằng Edit, đọc lại file trước khi sửa, không ghi đè cả file và không revert.
 - Song song hóa: khi công việc chia được thành các phần độc lập (ví dụ sửa/test nhiều service hoặc module không phụ thuộc nhau, rà nhiều controller), chạy sub agent song song để giảm thời gian chờ. Giao mỗi agent một phạm vi file riêng để không ghi đè nhau; việc phụ thuộc nhau (shared-libraries trước, service sau) thì chạy tuần tự.
-- Commit: message tiếng Việt có dấu, không thêm `Co-Authored-By` hay dòng attribution nào.
+- Commit: message tiếng Việt có dấu, không thêm `Co-Authored-By` hay dòng attribution nào. Dòng đầu có prefix Conventional Commits, chỉ dùng 7 loại `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `build`; scope tuỳ chọn theo service/module (`fix(identity):`, `feat(lms-api):`), thay đổi phá vỡ API thêm `!` (`feat(api)!:`). Quy ước đầy đủ ở `~/.claude/CLAUDE.md`.

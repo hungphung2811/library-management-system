@@ -12,6 +12,8 @@ import lms.circulation.borrowing.application.BorrowingResponse;
 import lms.circulation.borrowing.application.BorrowBookUseCase;
 import lms.circulation.borrowing.application.GetBorrowingUseCase;
 import lms.circulation.borrowing.application.RenewBorrowingUseCase;
+import lms.circulation.borrowing.application.ListBorrowingsUseCase;
+import lms.circulation.borrowing.application.ReportLostUseCase;
 import lms.circulation.borrowing.application.ReturnBookUseCase;
 import lms.circulation.borrowing.infrastructure.web.BorrowingController;
 import lms.circulation.config.SecurityConfiguration;
@@ -44,6 +46,8 @@ class BorrowingSecurityTest {
     @MockitoBean ReturnBookUseCase returnBook;
     @MockitoBean RenewBorrowingUseCase renewBorrowing;
     @MockitoBean GetBorrowingUseCase getBorrowing;
+    @MockitoBean ReportLostUseCase reportLost;
+    @MockitoBean ListBorrowingsUseCase listBorrowings;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean PermissionKeyRegistrar permissionKeyRegistrar;
 
@@ -93,5 +97,45 @@ class BorrowingSecurityTest {
 
         mvc.perform(get("/internal/borrowings/" + UUID.randomUUID()).with(jwt()))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void baoMatCanQuyenRiengCuaEndpoint() throws Exception {
+        when(reportLost.execute(any())).thenReturn(response());
+        String body = "{\"barcode\":\"BC-1\"}";
+
+        mvc.perform(post("/internal/borrowings/losses").contentType(MediaType.APPLICATION_JSON).content(body)
+                        .with(jwt().jwt(j -> j.claim("permissions", List.of("BorrowingController/borrow")))
+                                .authorities(new SimpleGrantedAuthority("BorrowingController/borrow"))))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/internal/borrowings/losses").contentType(MediaType.APPLICATION_JSON).content(body)
+                        .with(jwt().jwt(j -> j.claim("permissions", List.of("BorrowingController/reportLost")))
+                                .authorities(new SimpleGrantedAuthority("BorrowingController/reportLost"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void traTheoMaBanSaoCanQuyenReturnCopy() throws Exception {
+        when(returnBook.execute(any())).thenReturn(response());
+        String body = "{\"barcode\":\"BC-1\",\"condition\":\"DAMAGED\"}";
+
+        mvc.perform(post("/internal/borrowings/returns").contentType(MediaType.APPLICATION_JSON).content(body)
+                        .with(jwt().jwt(j -> j.claim("permissions", List.of("BorrowingController/returnCopy")))
+                                .authorities(new SimpleGrantedAuthority("BorrowingController/returnCopy"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void docGiaXemLuotMuonCuaMinhChiCanDangNhap() throws Exception {
+        when(listBorrowings.execute(any())).thenReturn(List.of(response()));
+
+        mvc.perform(get("/internal/borrowings/mine").with(jwt().jwt(j -> j.subject(UUID.randomUUID().toString()))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void thuThuXemTheoDocGiaCanQuyen() throws Exception {
+        mvc.perform(get("/internal/borrowings").param("readerId", UUID.randomUUID().toString()).with(jwt()))
+                .andExpect(status().isForbidden());
     }
 }

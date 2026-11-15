@@ -76,7 +76,7 @@ class BorrowingPersistenceAdapterIT {
         assertThat(adapter.countActiveItemsByUserId(userId)).isEqualTo(2);
 
         BorrowingRecord loaded = adapter.findById(record.id()).orElseThrow();
-        loaded.returnCopy(copy1, LocalDate.of(2026, 1, 5));
+        loaded.returnCopy(copy1, lms.circulation.borrowing.domain.ItemCondition.GOOD, LocalDate.of(2026, 1, 5));
         adapter.save(loaded);
 
         assertThat(adapter.countActiveItemsByUserId(userId)).isEqualTo(1);

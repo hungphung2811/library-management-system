@@ -43,6 +43,10 @@ class BorrowingJpaEntity {
     @Column(name = "renew_count", nullable = false)
     private int renewCount;
 
+    /** Số ngày mượn theo loại độc giả lúc lập phiếu (migration V4), dùng cho gia hạn. */
+    @Column(name = "loan_days", nullable = false)
+    private int loanDays;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "borrowing_items", joinColumns = @JoinColumn(name = "borrowing_id"))
     private List<BorrowingItemEmbeddable> items = new ArrayList<>();
@@ -50,7 +54,7 @@ class BorrowingJpaEntity {
     protected BorrowingJpaEntity() {
     }
 
-    BorrowingJpaEntity(UUID id, UUID userId, LocalDate borrowDate, LocalDate dueDate, int renewCount,
+    BorrowingJpaEntity(UUID id, UUID userId, LocalDate borrowDate, LocalDate dueDate, int renewCount, int loanDays,
                        List<BorrowingItemEmbeddable> items) {
         // Điền sẵn tenant của phiên: merge (save entity mới dựng) không ghi đè tenant_id thành null, insert khớp
         // tenant phiên; không có tenant thì ném TenantRequiredException (fail-closed). Cột updatable=false.
@@ -60,6 +64,7 @@ class BorrowingJpaEntity {
         this.borrowDate = borrowDate;
         this.dueDate = dueDate;
         this.renewCount = renewCount;
+        this.loanDays = loanDays;
         this.items = new ArrayList<>(items);
     }
 
@@ -68,5 +73,6 @@ class BorrowingJpaEntity {
     LocalDate getBorrowDate() { return borrowDate; }
     LocalDate getDueDate() { return dueDate; }
     int getRenewCount() { return renewCount; }
+    int getLoanDays() { return loanDays; }
     List<BorrowingItemEmbeddable> getItems() { return items; }
 }
