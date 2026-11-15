@@ -65,7 +65,8 @@ Lý do chọn A: khớp "số lượng nhỏ trước". `@TenantId` kết hợp 
 - `POST /api/auth/switch-tenant {tenantId}`: kiểm tra thành viên, lưu `last_tenant_id`, cấp access token và refresh token mới của tenant đó.
 - Token thêm claim `tenantId`; `permissions` và `admin` chỉ của tenant đó. Refresh token gắn `tenant_id`; refresh giữ nguyên tenant.
 - Tài khoản không còn tenant nào và không phải platform admin: không đăng nhập được (lỗi riêng, rõ nghĩa).
-- Token của platform admin không có `tenantId` và chỉ dùng được cho endpoint nền tảng (`/api/platform/**`); muốn làm việc trong một tenant thì phải là thành viên của tenant đó.
+- Token có thể mang claim `platformAdmin=true` (tài khoản có cờ `platform_admin`) và/hoặc `tenantId`. Endpoint nền tảng (`/api/platform/**`, đặt ở identity-service, `lms-api` và nginx định tuyến tới) yêu cầu `platformAdmin`; endpoint thuộc tenant yêu cầu `tenantId`. Platform admin không phải thành viên tenant nào thì token chỉ có `platformAdmin`; nếu họ cũng là thành viên thì token có cả hai. Cờ `platform_admin` chỉ đặt bằng cấu hình bootstrap, tài khoản `admin` dev hiện có **không** tự thành platform admin (người vận hành có tài khoản riêng). *(Lựa chọn của người viết.)*
+- "Có quyền ở tenant" nghĩa là có membership ACTIVE ở tenant ACTIVE; role chỉ quyết định permission trong tenant. Độc giả không có role vẫn là thành viên. Khi migrate, mọi người dùng hiện có được tạo membership vào tenant mặc định. *(Lựa chọn của người viết.)*
 - Tenant SUSPENDED: không cấp và không làm mới token; access token đang sống hết hạn trong tối đa 15 phút (chấp nhận).
 
 ### 5.3 Cách ly dữ liệu (cả 4 service)
@@ -84,8 +85,18 @@ Lý do chọn A: khớp "số lượng nhỏ trước". `@TenantId` kết hợp 
 ### 5.5 Đường lên về sau
 Mọi truy cập dữ liệu đi qua `TenantContext`, nên sau này có thể thêm lớp định tuyến kết nối theo tenant để tách một tenant lớn sang database riêng mà không đổi code nghiệp vụ. Phần này không làm bây giờ.
 
+### 5.6 Quản lý người dùng trong tenant
+Chủ hệ thống chốt: quản trị viên của từng tenant **tự quản lý** người dùng của tenant mình. Các quy tắc cụ thể (phần quy tắc chi tiết là lựa chọn của người viết):
+- Quản trị viên tenant tự tạo người dùng cho tenant mình, gán role, phòng ban, bật/tắt membership, và liệt kê/tìm kiếm người dùng. Mọi thao tác chỉ thấy và chỉ tác động tới người có membership trong tenant của họ (`/api/users` lọc theo `tenant_memberships`).
+- Tạo người dùng mà username hoặc email đã tồn tại ở bất kỳ nơi nào: báo "đã tồn tại" chung chung, không tiết lộ tài khoản đó thuộc tenant nào hay có tồn tại ở tenant khác. Muốn thêm một tài khoản có sẵn vào tenant thì người vận hành gắn vào; luồng "mời, người dùng tự đồng ý" để làm sau.
+- Sửa thông tin tài khoản (họ tên, email) và đặt lại mật khẩu: quản trị viên tenant chỉ làm được với tài khoản mà **chỉ là thành viên của đúng tenant đó** và không phải platform admin. Khi tài khoản trở thành thành viên của từ hai tenant trở lên, quyền này chuyển về chính người dùng (và người vận hành). Lý do: nếu không, quản trị viên của tenant A có thể đặt lại mật khẩu để chiếm tài khoản đang dùng ở tenant B. Đặt lại mật khẩu dùng cơ chế mật khẩu tạm có sẵn (buộc đổi ở lần đăng nhập đầu).
+- Quản trị viên tenant không tạo, gán hoặc thu hồi được role nằm ngoài tenant của mình, và vẫn chịu quy tắc hiện có: chỉ quản trị viên mới gán role `isAdmin` (ở phạm vi tenant).
+- Test cách ly cho bảng `users`: quản trị viên A không liệt kê, đọc, sửa hay đặt lại mật khẩu người dùng chỉ thuộc tenant B; không sửa được tài khoản thuộc nhiều tenant.
+
 ## 6. Nâng cấp dữ liệu hiện có
-Thêm migration mới vào `services/migration-service` (không sửa file cũ để không đổi checksum): tạo một tenant mặc định, thêm `tenant_id` dạng cho phép null, gán toàn bộ dữ liệu hiện có vào tenant mặc định, đặt NOT NULL, đổi các ràng buộc unique, bật RLS. Người dùng hiện có được tạo membership vào tenant mặc định, role hiện có thành role của tenant đó, `SUPER_ADMIN` seed hiện tại thành quản trị tenant; tài khoản `admin` dev vẫn đăng nhập được. Tạo tenant mới thì sao chép bộ role mẫu hiện có (5 role seed) cho tenant đó.
+Thêm migration mới vào `services/migration-service` (không sửa file cũ để không đổi checksum): tạo một tenant mặc định, thêm `tenant_id` dạng cho phép null, gán toàn bộ dữ liệu hiện có vào tenant mặc định, đặt NOT NULL, đổi các ràng buộc unique, bật RLS. Người dùng hiện có được tạo membership vào tenant mặc định, role hiện có thành role của tenant đó, `SUPER_ADMIN` seed hiện tại thành quản trị tenant; tài khoản `admin` dev vẫn đăng nhập được. Tạo tenant mới thì sao chép bộ role mẫu cho tenant đó. Bộ mẫu là **dữ liệu** trong bảng riêng `role_templates` (và quyền của từng mẫu theo khóa permission), khởi tạo từ 5 role seed hiện có; không sao chép từ tenant mặc định (có thể đã bị sửa) và không tự đồng bộ khi danh mục permission đổi. *(Lựa chọn của người viết.)*
+
+Ngoài Postgres: bản ghi audit cũ trong Mongo được gán `tenantId` của tenant mặc định bằng một script một lần; khóa Redis cũ không có tiền tố tenant được bỏ (hết hạn theo TTL hoặc xóa); access và refresh token cũ không có `tenantId` bị từ chối, người dùng đăng nhập lại một lần khi triển khai. *(Lựa chọn của người viết.)*
 
 ## 7. API nền tảng cho người vận hành
 `/api/platform/**` (chỉ platform admin): tạo/sửa/tạm ngưng tenant, tạo organization, tạo tài khoản quản trị đầu tiên của tenant (hoặc gắn tài khoản có sẵn), liệt kê tenant. Tạo tenant sinh bộ role mẫu và dữ liệu khởi tạo trong cùng một thao tác.
