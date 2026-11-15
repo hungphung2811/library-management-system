@@ -13,5 +13,6 @@ class TenantArchitectureRulesTest {
     static final ArchRule entityTheoTenantPhaiCoTenantId = TenantArchitectureRules.tenantScopedEntitiesMustUseTenantId();
 
     @ArchTest
-    static final ArchRule khongCoNativeQueryChuaRa = TenantArchitectureRules.noUnreviewedNativeQueries("SpringDataAuditLogRepository");
+    static final ArchRule khongCoNativeQueryChuaRa = TenantArchitectureRules.noUnreviewedNativeQueries(
+            "SpringDataAuditLogRepository", "SpringDataNotificationRepository");
 }
