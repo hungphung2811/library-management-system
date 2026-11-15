@@ -5,6 +5,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import lms.circulation.borrowing.application.BorrowingResponse;
@@ -46,6 +47,7 @@ class BorrowingSecurityTest {
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean PermissionKeyRegistrar permissionKeyRegistrar;
 
+    private static final UUID TENANT = UUID.randomUUID();
     private static final String BODY = "{\"userId\":\"" + UUID.randomUUID() + "\",\"bookCopyIds\":[\"" + UUID.randomUUID() + "\"]}";
 
     private BorrowingResponse response() {
@@ -62,7 +64,7 @@ class BorrowingSecurityTest {
     @Test
     void thieuPermissionBorrowBookBi403() throws Exception {
         mvc.perform(post("/internal/borrowings").contentType(MediaType.APPLICATION_JSON).content(BODY)
-                        .with(jwt().jwt(j -> j.claim("permissions", List.of("BorrowingController/returnBook")))
+                        .with(jwt().jwt(j -> j.claim("tenantId", TENANT.toString()).claim("permissions", List.of("BorrowingController/returnBook")))
                                 .authorities(new SimpleGrantedAuthority("BorrowingController/returnBook"))))
                 .andExpect(status().isForbidden());
     }
@@ -72,9 +74,17 @@ class BorrowingSecurityTest {
         when(borrowBook.execute(any())).thenReturn(response());
 
         mvc.perform(post("/internal/borrowings").contentType(MediaType.APPLICATION_JSON).content(BODY)
-                        .with(jwt().jwt(j -> j.claim("permissions", List.of("BorrowingController/borrow")))
+                        .with(jwt().jwt(j -> j.claim("tenantId", TENANT.toString()).claim("permissions", List.of("BorrowingController/borrow")))
                                 .authorities(new SimpleGrantedAuthority("BorrowingController/borrow"))))
                 .andExpect(status().isCreated());
+    }
+
+    @Test
+    void tokenKhongCoTenantBi403TenantRequiredKeCaAdmin() throws Exception {
+        mvc.perform(post("/internal/borrowings").contentType(MediaType.APPLICATION_JSON).content(BODY)
+                        .with(jwt().jwt(j -> j.claim("admin", true))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("TENANT_REQUIRED"));
     }
 
     @Test

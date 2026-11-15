@@ -52,6 +52,7 @@ class ReservationSecurityTest {
     @MockitoBean JwtDecoder jwtDecoder;
 
     static final UUID READER = UUID.randomUUID();
+    static final UUID TENANT = UUID.randomUUID();
     static final UUID TITLE = UUID.randomUUID();
     static final String BODY = "{\"titleId\":\"" + TITLE + "\"}";
 
@@ -68,7 +69,7 @@ class ReservationSecurityTest {
 
     @Test
     void thieuPermissionReserveBookBi403() throws Exception {
-        var token = jwt().jwt(j -> j.subject(READER.toString())).authorities(new SimpleGrantedAuthority("BOOK_VIEW"));
+        var token = jwt().jwt(j -> j.subject(READER.toString()).claim("tenantId", TENANT.toString())).authorities(new SimpleGrantedAuthority("BOOK_VIEW"));
         mvc.perform(post("/internal/reservations").with(token).contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isForbidden());
         mvc.perform(get("/internal/reservations").with(token)).andExpect(status().isForbidden());
@@ -78,7 +79,7 @@ class ReservationSecurityTest {
     @Test
     void duPermissionDatTruocBangDanhTinhTrongToken() throws Exception {
         when(reserve.execute(eq(READER), eq(TITLE))).thenReturn(response());
-        var token = jwt().jwt(j -> j.subject(READER.toString())).authorities(new SimpleGrantedAuthority("ReservationController/reserve"));
+        var token = jwt().jwt(j -> j.subject(READER.toString()).claim("tenantId", TENANT.toString())).authorities(new SimpleGrantedAuthority("ReservationController/reserve"));
 
         mvc.perform(post("/internal/reservations").with(token).contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isCreated())
@@ -91,15 +92,27 @@ class ReservationSecurityTest {
         UUID id = UUID.randomUUID();
         when(cancel.execute(eq(READER), eq(id))).thenReturn(response());
         when(listMine.execute(any())).thenReturn(List.of(response()));
-        var token = jwt().jwt(j -> j.subject(READER.toString())).authorities(new SimpleGrantedAuthority("ReservationController/cancel"), new SimpleGrantedAuthority("ReservationController/mine"));
+        var token = jwt().jwt(j -> j.subject(READER.toString()).claim("tenantId", TENANT.toString())).authorities(new SimpleGrantedAuthority("ReservationController/cancel"), new SimpleGrantedAuthority("ReservationController/mine"));
 
         mvc.perform(delete("/internal/reservations/" + id).with(token)).andExpect(status().isOk());
         mvc.perform(get("/internal/reservations").with(token)).andExpect(status().isOk()).andExpect(jsonPath("$[0].queuePosition").value(1));
     }
 
     @Test
+    void tokenKhongCoTenantBi403TenantRequired() throws Exception {
+        var token = jwt().jwt(j -> j.subject(READER.toString()).claim("admin", true));
+
+        mvc.perform(post("/internal/reservations").with(token).contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("TENANT_REQUIRED"));
+        mvc.perform(get("/internal/reservations").with(token))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("TENANT_REQUIRED"));
+    }
+
+    @Test
     void validationBodyThieuTitleIdBi400() throws Exception {
-        var token = jwt().jwt(j -> j.subject(READER.toString())).authorities(new SimpleGrantedAuthority("ReservationController/reserve"));
+        var token = jwt().jwt(j -> j.subject(READER.toString()).claim("tenantId", TENANT.toString())).authorities(new SimpleGrantedAuthority("ReservationController/reserve"));
         mvc.perform(post("/internal/reservations").with(token).contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest());
     }
@@ -107,8 +120,8 @@ class ReservationSecurityTest {
     @Test
     void chayThuCongUC14CanPermissionApproveBorrowing() throws Exception {
         when(expire.execute()).thenReturn(2);
-        var reader = jwt().jwt(j -> j.subject(READER.toString())).authorities(new SimpleGrantedAuthority("ReservationController/reserve"));
-        var librarian = jwt().jwt(j -> j.subject(UUID.randomUUID().toString()))
+        var reader = jwt().jwt(j -> j.subject(READER.toString()).claim("tenantId", TENANT.toString())).authorities(new SimpleGrantedAuthority("ReservationController/reserve"));
+        var librarian = jwt().jwt(j -> j.subject(UUID.randomUUID().toString()).claim("tenantId", TENANT.toString()))
                 .authorities(new SimpleGrantedAuthority("ReservationController/expireNow"));
 
         mvc.perform(post("/internal/reservations/expirations")).andExpect(status().isUnauthorized());

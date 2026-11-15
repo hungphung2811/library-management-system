@@ -46,6 +46,8 @@ app:
       fine-events: fine.events
       reservation-events: reservation.events
       inventory-events: inventory.events
+      # Vòng đời tenant do identity-service phát (TenantCreated, TenantStatusChanged), hợp đồng Task 6
+      identity-events: identity-events
   reservation:
     # UC14: chạy đầu mỗi ngày (cron 6 trường)
     expire-cron: "0 5 0 * * *"
@@ -63,3 +65,9 @@ lms:
       service-name: ${spring.application.name}
       identity-base-url: ${IDENTITY_SERVICE_URL:http://localhost:8081}
       internal-api-key: ${INTERNAL_API_KEY:}
+      # Endpoint thường bắt buộc token có claim tenantId (403 TENANT_REQUIRED); @AuthenticatedOnly/@PublicEndpoint
+      # không bị ảnh hưởng.
+      require-tenant: true
+  # tenant-common: TenantContext theo claim tenantId, Hibernate @TenantId và RLS (app.tenant_id)
+  tenant:
+    enabled: true

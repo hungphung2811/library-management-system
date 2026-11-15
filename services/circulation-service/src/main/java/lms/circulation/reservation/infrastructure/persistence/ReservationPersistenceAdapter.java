@@ -37,7 +37,7 @@ class ReservationPersistenceAdapter implements ReservationRepository {
 
     @Override
     public Optional<Reservation> findById(UUID id) {
-        return jpa.findById(id).map(ReservationPersistenceAdapter::toDomain);
+        return jpa.findInTenantById(id).map(ReservationPersistenceAdapter::toDomain);
     }
 
     @Override

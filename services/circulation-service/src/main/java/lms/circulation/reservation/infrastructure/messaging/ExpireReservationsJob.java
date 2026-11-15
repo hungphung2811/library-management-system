@@ -24,7 +24,8 @@ public class ExpireReservationsJob {
     private final ExpireOverdueReservationsUseCase expire;
     private final ObjectProvider<ActiveTenantsPort> activeTenants;
 
-    // Adapter của ActiveTenantsPort (bảng known_tenants) do Task 8 cung cấp; chưa có thì job chỉ log WARN và bỏ qua.
+    // Adapter duy nhất của ActiveTenantsPort là KnownTenantsJdbcAdapter (bảng known_tenants, context tenant); vẫn lấy
+    // qua ObjectProvider để context thiếu adapter (test lát cắt) chỉ log WARN và bỏ qua.
     public ExpireReservationsJob(ExpireOverdueReservationsUseCase expire, ObjectProvider<ActiveTenantsPort> activeTenants) {
         this.expire = expire;
         this.activeTenants = activeTenants;

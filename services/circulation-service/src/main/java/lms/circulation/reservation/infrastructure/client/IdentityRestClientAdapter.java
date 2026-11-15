@@ -8,7 +8,10 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
-/** Gọi GET /internal/users/me/reader-profile của identity-service bằng token của người dùng. */
+/**
+ * Gọi GET /internal/users/me/reader-profile của identity-service bằng token của người dùng. Tenant đi theo token
+ * (claim tenantId): hồ sơ độc giả trả về là hồ sơ trong tenant của token (Review Focus 6).
+ */
 public class IdentityRestClientAdapter implements ReaderEligibilityPort {
 
     private final RestClient client;

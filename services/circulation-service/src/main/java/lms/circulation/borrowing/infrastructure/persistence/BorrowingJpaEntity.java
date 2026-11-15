@@ -12,13 +12,23 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.hibernate.annotations.TenantId;
 
+/**
+ * Lượt mượn thuộc một tenant: tenant_id do Hibernate điền/lọc theo TenantContext (@TenantId), RLS lọc thêm ở DB.
+ * Bảng phụ borrowing_items không có trường tenant ở JPA: cột tenant_id lấy mặc định từ biến phiên app.tenant_id
+ * (migration V6) và khóa ngoại kép bảo đảm trùng tenant của lượt mượn.
+ */
 @Entity
 @Table(name = "borrowings")
 class BorrowingJpaEntity {
 
     @Id
     private UUID id;
+
+    @TenantId
+    @Column(name = "tenant_id", nullable = false, updatable = false)
+    private UUID tenantId;
 
     @Column(name = "user_id", nullable = false)
     private UUID userId;

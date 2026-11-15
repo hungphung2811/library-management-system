@@ -10,13 +10,22 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
+import org.hibernate.annotations.TenantId;
 
+/**
+ * Đặt trước thuộc một tenant: tenant_id do Hibernate điền/lọc theo TenantContext (@TenantId), RLS lọc thêm ở DB.
+ * Hàng đợi và các chỉ mục unique một phần (uq_reservations_active, uq_reservations_ready_copy) tính riêng từng tenant.
+ */
 @Entity
 @Table(name = "reservations")
 class ReservationJpaEntity {
 
     @Id
     private UUID id;
+
+    @TenantId
+    @Column(name = "tenant_id", nullable = false, updatable = false)
+    private UUID tenantId;
 
     @Column(name = "reader_id", nullable = false)
     private UUID readerId;
