@@ -264,7 +264,7 @@ class CirculationTenantIsolationIT {
         return json.readTree(body);
     }
 
-    /** catalog (/internal/books/{id}) và identity (/internal/users/me/reader-profile) giả, phân theo token. */
+    /** catalog (/internal/books/{id}, /internal/book-copies/**) và identity (/internal/users/{id}/reader-profile) giả, phân theo token. */
     private static HttpServer startFakeServices() {
         CATALOG.put(TOKEN_A, new ConcurrentHashMap<>());
         CATALOG.put(TOKEN_B, new ConcurrentHashMap<>());
@@ -282,11 +282,32 @@ class CirculationTenantIsolationIT {
                     respond(exchange, 200, "{\"id\":\"" + id + "\",\"name\":\"Sách\",\"availableCopies\":" + available + "}");
                 }
             });
-            server.createContext("/internal/users/me/reader-profile", exchange -> {
+            // Luồng mượn tra bản sao (GET /{id}) rồi đổi trạng thái (PUT /{id}/status) ở catalog: giả bản sao luôn
+            // AVAILABLE, chấp nhận mọi đổi trạng thái; chỉ chấp nhận token của hai tenant thử nghiệm.
+            server.createContext("/internal/book-copies/", exchange -> {
                 String auth = exchange.getRequestHeaders().getFirst("Authorization");
                 boolean known = auth != null && Set.of("Bearer " + TOKEN_A, "Bearer " + TOKEN_B).contains(auth);
-                respond(exchange, known ? 200 : 401,
-                        known ? "{\"userId\":\"" + READER + "\",\"cardValid\":true}" : "{}");
+                if (!known) {
+                    respond(exchange, 401, "{}");
+                    return;
+                }
+                String path = exchange.getRequestURI().getPath().substring("/internal/book-copies/".length());
+                if ("PUT".equals(exchange.getRequestMethod())) {
+                    respond(exchange, 200, "{}");
+                } else {
+                    UUID id = UUID.fromString(path);
+                    respond(exchange, 200, "{\"id\":\"" + id + "\",\"titleId\":\"" + UUID.randomUUID()
+                            + "\",\"titleName\":\"Sách\",\"barcode\":\"BC-" + id + "\",\"status\":\"AVAILABLE\","
+                            + "\"coverPrice\":100000}");
+                }
+            });
+            // Thủ thư tra hồ sơ độc giả theo userId: GET /internal/users/{id}/reader-profile (cần readerType để
+            // tra quy định mượn của tenant).
+            server.createContext("/internal/users/", exchange -> {
+                String auth = exchange.getRequestHeaders().getFirst("Authorization");
+                boolean known = auth != null && Set.of("Bearer " + TOKEN_A, "Bearer " + TOKEN_B).contains(auth);
+                respond(exchange, known ? 200 : 401, known ? "{\"userId\":\"" + READER
+                        + "\",\"readerType\":\"STUDENT\",\"cardValid\":true}" : "{}");
             });
             server.start();
             return server;
