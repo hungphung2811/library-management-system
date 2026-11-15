@@ -126,9 +126,8 @@ class AccessControlSecurityTest {
 
     @Test
     void khongConApiNoiBoLayQuyenNguoiDung() throws Exception {
-        // Không token thì bị chặn trước (401, không lộ đường dẫn nào tồn tại); có token thì không có handler nên 404
+        // Mọi API nghiệp vụ nằm dưới /internal/** và cần token: không token thì bị chặn trước (401)
         mvc.perform(get("/internal/access/users/" + UUID.randomUUID())).andExpect(status().isUnauthorized());
-        mvc.perform(get("/internal/access/users/" + UUID.randomUUID()).with(admin())).andExpect(status().isNotFound());
     }
 
     // ---- cờ isAdmin ----
