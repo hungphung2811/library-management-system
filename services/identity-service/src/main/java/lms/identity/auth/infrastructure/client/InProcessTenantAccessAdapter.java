@@ -54,7 +54,7 @@ public class InProcessTenantAccessAdapter implements TenantAccessPort {
     }
 
     @Override
-    public void addMember(UUID userId, UUID tenantId) {
-        addMembership.execute(userId, tenantId);
+    public void addMember(UUID userId, UUID tenantId, UUID departmentId) {
+        addMembership.execute(userId, tenantId, departmentId);
     }
 }

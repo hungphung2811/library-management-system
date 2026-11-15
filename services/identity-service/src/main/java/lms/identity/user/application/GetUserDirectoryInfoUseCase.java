@@ -14,6 +14,6 @@ public class GetUserDirectoryInfoUseCase {
     }
 
     public Optional<UserDirectoryInfo> execute(UUID userId) {
-        return repository.findById(userId).map(u -> new UserDirectoryInfo(u.isDisabled(), u.departmentId()));
+        return repository.findById(userId).map(u -> new UserDirectoryInfo(u.isDisabled()));
     }
 }

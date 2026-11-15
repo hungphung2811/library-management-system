@@ -1,6 +1,9 @@
 package lms.identity.auth.infrastructure.config;
 
 import lms.identity.auth.application.ChangePasswordUseCase;
+import lms.identity.auth.application.GetCredentialInfoUseCase;
+import lms.identity.auth.application.ResetCredentialPasswordUseCase;
+import lms.identity.auth.infrastructure.client.InProcessAccountCredentialAdapter;
 import lms.identity.auth.application.LoginUseCase;
 import lms.identity.auth.application.LogoutUseCase;
 import lms.identity.auth.application.RefreshTokenUseCase;
@@ -142,5 +145,24 @@ public class AuthBeanConfiguration {
     @Bean
     RevokeUserSessionsUseCase revokeUserSessionsUseCase(AuthPersistenceAdapter persistence) {
         return new RevokeUserSessionsUseCase(persistence);
+    }
+
+    @Bean
+    GetCredentialInfoUseCase getCredentialInfoUseCase(AuthPersistenceAdapter persistence) {
+        return new GetCredentialInfoUseCase(persistence);
+    }
+
+    @Bean
+    ResetCredentialPasswordUseCase resetCredentialPasswordUseCase(AuthPersistenceAdapter persistence,
+                                                                  BcryptPasswordHasher hasher) {
+        return new ResetCredentialPasswordUseCase(persistence, persistence, persistence, hasher);
+    }
+
+    /** Cổng credential cho context user (tạo tài khoản, đặt lại mật khẩu, kiểm tra platform admin). */
+    @Bean
+    InProcessAccountCredentialAdapter accountCredentialAdapter(RegisterCredentialUseCase register,
+                                                               GetCredentialInfoUseCase info,
+                                                               ResetCredentialPasswordUseCase resetPassword) {
+        return new InProcessAccountCredentialAdapter(register, info, resetPassword);
     }
 }

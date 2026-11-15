@@ -17,6 +17,7 @@ import lms.identity.accesscontrol.application.GetUserAccessUseCase;
 import lms.identity.accesscontrol.application.UserRoleUseCase;
 import lms.identity.accesscontrol.domain.RoleAssignedEvent;
 import lms.identity.accesscontrol.domain.RoleRevokedEvent;
+import lms.identity.accesscontrol.domain.AccessControlForbiddenException;
 import lms.identity.accesscontrol.domain.AccessControlNotFoundException;
 import lms.identity.accesscontrol.domain.InvalidAccessControlException;
 import lms.identity.accesscontrol.domain.UserRoleAssignment;
@@ -131,5 +132,35 @@ class UserRoleUseCaseTest {
 
         assertThat(response.roles()).isEmpty();
         assertThat(response.permissions()).isEmpty();
+    }
+
+    // ---- phạm vi tenant (spec 5.6): kho role chỉ trả role của tenant hiện tại (@TenantId + RLS) ----
+
+    @Test
+    void khongGanHayThuHoiDuocRoleNgoaiTenantMinh() {
+        Role roleOfOtherTenant = roleWith("B_ONLY");
+        // kho role của tenant hiện tại không thấy role của tenant khác
+        when(roles.findById(roleOfOtherTenant.id())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> useCase.assign(new UserRole(userId, roleOfOtherTenant.id().value(), true)))
+                .isInstanceOf(AccessControlNotFoundException.class);
+        assertThatThrownBy(() -> useCase.revoke(new UserRole(userId, roleOfOtherTenant.id().value(), true)))
+                .isInstanceOf(AccessControlNotFoundException.class);
+        verify(savePort, never()).save(any());
+        verify(eventPort, never()).publish(any());
+    }
+
+    @Test
+    void chiQuanTriVienMoiGanDuocRoleQuanTriCuaTenant() {
+        Role tenantAdmin = Role.create("TENANT_ADMIN", "Quản trị tenant", true);
+        when(roles.findById(tenantAdmin.id())).thenReturn(Optional.of(tenantAdmin));
+        when(assignments.findByUserId(userId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> useCase.assign(new UserRole(userId, tenantAdmin.id().value(), false)))
+                .isInstanceOf(AccessControlForbiddenException.class);
+        verify(savePort, never()).save(any());
+
+        useCase.assign(new UserRole(userId, tenantAdmin.id().value(), true));
+        verify(savePort).save(any(UserRoleAssignment.class));
     }
 }

@@ -53,7 +53,8 @@ public class RegisterCredentialUseCase {
                 mustChangePassword);
         UUID created = savePort.save(credential).userId();
         if (tenantId != null) {
-            tenantAccess.addMember(created, tenantId);
+            // Phòng ban là dữ liệu của tenant: ghi vào membership (token đọc phòng ban từ đây)
+            tenantAccess.addMember(created, tenantId, departmentId);
         }
         return created;
     }

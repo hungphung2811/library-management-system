@@ -132,4 +132,28 @@ class DepartmentUseCasesTest {
         assertTrue(list.list(DepartmentStatus.ACTIVE).stream().noneMatch(x -> x.status() == DepartmentStatus.INACTIVE));
         assertFalse(store.isEmpty());
     }
+
+    /**
+     * Mỗi tenant chỉ thấy kho phòng ban của mình (lớp lưu trữ lọc bằng @TenantId + RLS): giả lập bằng hai kho riêng.
+     * Mã phòng ban chỉ unique trong tenant; phòng ban của tenant khác không dùng làm phòng ban cha được.
+     */
+    @Test
+    void maPhongBanUniqueTheoTenantVaKhongDungPhongBanTenantKhacLamCha() {
+        List<Department> otherStore = new ArrayList<>();
+        DepartmentRepository otherTenant = new DepartmentRepository() {
+            public Department save(Department d) { otherStore.removeIf(x -> x.id().equals(d.id())); otherStore.add(d); return d; }
+            public Optional<Department> findById(UUID id) { return otherStore.stream().filter(d -> d.id().equals(id)).findFirst(); }
+            public List<Department> findAll() { return List.copyOf(otherStore); }
+            public boolean existsByCode(String code) { return otherStore.stream().anyMatch(d -> d.code().equals(code)); }
+        };
+        CreateDepartmentUseCase createInOther = new CreateDepartmentUseCase(otherTenant);
+
+        DepartmentResponse mine = make("IT", null);
+        DepartmentResponse theirs = createInOther.execute(new CreateDepartmentRequest("IT", "Phòng IT B", null));
+        assertEquals(mine.code(), theirs.code());
+        assertThrows(DuplicateDepartmentException.class, () -> make("IT", null));
+        assertThrows(DepartmentNotFoundException.class,
+                () -> createInOther.execute(new CreateDepartmentRequest("CON", "Con", mine.id())));
+        assertEquals(1, new ListDepartmentsUseCase(otherTenant).list(null).size());
+    }
 }

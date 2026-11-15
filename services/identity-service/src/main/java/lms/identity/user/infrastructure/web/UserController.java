@@ -5,6 +5,8 @@ import lms.identity.user.application.ChangeUserStatusUseCase;
 import lms.identity.user.application.CreateUserRequest;
 import lms.identity.user.application.CreateUserUseCase;
 import lms.identity.user.application.GetUserUseCase;
+import lms.identity.user.application.ResetUserPasswordRequest;
+import lms.identity.user.application.ResetUserPasswordUseCase;
 import lms.identity.user.application.SearchUsersUseCase;
 import lms.identity.user.application.UpdateUserRequest;
 import lms.identity.user.application.UpdateUserUseCase;
@@ -31,6 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Quản lý người dùng (hồ sơ định danh). Không gắn annotation quyền (trừ /me): mỗi method dùng khóa tự sinh
  * {@code UserController/tênPhươngThức}. Hồ sơ độc giả nằm ở {@link ReaderProfileController} dưới /internal/users/{id}/reader-profile.
+ * Mọi thao tác chỉ thấy/tác động người có membership ở tenant trong token (người ngoài tenant: 404).
  */
 @RestController
 @RequestMapping("/internal/users")
@@ -41,14 +44,16 @@ public class UserController {
     private final ChangeUserStatusUseCase changeStatus;
     private final GetUserUseCase get;
     private final SearchUsersUseCase search;
+    private final ResetUserPasswordUseCase resetPassword;
 
     public UserController(CreateUserUseCase create, UpdateUserUseCase update, ChangeUserStatusUseCase changeStatus,
-                          GetUserUseCase get, SearchUsersUseCase search) {
+                          GetUserUseCase get, SearchUsersUseCase search, ResetUserPasswordUseCase resetPassword) {
         this.create = create;
         this.update = update;
         this.changeStatus = changeStatus;
         this.get = get;
         this.search = search;
+        this.resetPassword = resetPassword;
     }
 
     @PostMapping
@@ -70,7 +75,7 @@ public class UserController {
     @AuthenticatedOnly
     @GetMapping("/me")
     public UserResponse me(@AuthenticationPrincipal Jwt jwt) {
-        return get.execute(CurrentUser.from(jwt).userId());
+        return get.me(CurrentUser.from(jwt).userId());
     }
 
     @GetMapping("/{id}")
@@ -79,8 +84,17 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
-    public UserResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateUserRequest request) {
-        return update.execute(id, request);
+    public UserResponse update(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                               @Valid @RequestBody UpdateUserRequest request) {
+        return update.execute(CurrentUser.from(jwt).userId(), id, request);
+    }
+
+    /** Đặt mật khẩu tạm (buộc đổi ở lần đăng nhập sau); chỉ với tài khoản chỉ thuộc tenant hiện tại (spec 5.6). */
+    @PostMapping("/{id}/password-reset")
+    public ResponseEntity<Void> resetPassword(@PathVariable UUID id,
+                                              @Valid @RequestBody ResetUserPasswordRequest request) {
+        resetPassword.execute(id, request.temporaryPassword());
+        return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/{id}/status")

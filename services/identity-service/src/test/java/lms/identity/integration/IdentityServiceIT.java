@@ -591,4 +591,50 @@ class IdentityServiceIT {
         assertThat(((List<Map<String, Object>>) call(HttpMethod.GET, "/internal/roles", admin, null, List.class).getBody())
                 .stream().filter(r -> "MEMBER".equals(r.get("name")))).hasSize(1);
     }
+
+    // ---- Task 5 (m1): phòng ban ghi vào membership, token mang departmentId ----
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void taoVaDoiPhongBanNguoiDungGhiVaoMembershipVaTokenCoDepartmentId() {
+        String admin = accessToken("admin", "Admin@12345");
+        ResponseEntity<Map> d1 = call(HttpMethod.POST, "/internal/departments", admin,
+                Map.of("code", "M1-A", "name", "Phòng M1 A"), Map.class);
+        ResponseEntity<Map> d2 = call(HttpMethod.POST, "/internal/departments", admin,
+                Map.of("code", "M1-B", "name", "Phòng M1 B"), Map.class);
+        assertThat(d1.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        String dept1 = (String) d1.getBody().get("id");
+        String dept2 = (String) d2.getBody().get("id");
+
+        Map<String, Object> body = new java.util.HashMap<>(Map.of("username", "m1-user", "fullName", "M1 User",
+                "email", "m1@x.vn", "departmentId", dept1, "password", "M1User@1234"));
+        ResponseEntity<Map> created = call(HttpMethod.POST, "/internal/users", admin, body, Map.class);
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        UUID userId = UUID.fromString((String) created.getBody().get("id"));
+        assertThat(created.getBody().get("departmentId")).isEqualTo(dept1);
+        assertThat(jdbc.queryForObject("SELECT department_id FROM tenant_memberships WHERE user_id = ? AND tenant_id = ?",
+                UUID.class, userId, DEFAULT_TENANT).toString()).isEqualTo(dept1);
+        assertThat(jwtDecoder.decode(accessToken("m1-user", "M1User@1234")).getClaimAsString("departmentId"))
+                .isEqualTo(dept1);
+
+        // đổi phòng ban qua PUT: membership và token lần đăng nhập sau đổi theo
+        assertThat(call(HttpMethod.PUT, "/internal/users/" + userId, admin,
+                Map.of("fullName", "M1 User", "email", "m1@x.vn", "departmentId", dept2), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+        assertThat(jwtDecoder.decode(accessToken("m1-user", "M1User@1234")).getClaimAsString("departmentId"))
+                .isEqualTo(dept2);
+
+        // luồng cũ: credential trước (kèm departmentId) rồi mới tạo hồ sơ với cùng id
+        UUID legacyFlow = UUID.randomUUID();
+        assertThat(call(HttpMethod.POST, "/internal/auth/credentials", admin, Map.of("userId", legacyFlow,
+                "username", "m1-legacy", "password", "M1Legacy@123", "departmentId", dept1), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.CREATED);
+        assertThat(jwtDecoder.decode(accessToken("m1-legacy", "M1Legacy@123")).getClaimAsString("departmentId"))
+                .isEqualTo(dept1);
+        assertThat(call(HttpMethod.POST, "/internal/users", admin, Map.of("id", legacyFlow, "username", "m1-legacy",
+                "fullName", "M1 Legacy", "email", "m1legacy@x.vn", "departmentId", dept2), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.CREATED);
+        assertThat(jwtDecoder.decode(accessToken("m1-legacy", "M1Legacy@123")).getClaimAsString("departmentId"))
+                .isEqualTo(dept2);
+    }
 }

@@ -16,6 +16,6 @@ public class InProcessUserDirectoryAdapter implements UserDirectoryPort {
 
     @Override
     public Optional<UserInfo> find(UUID userId) {
-        return getInfo.execute(userId).map(i -> new UserInfo(i.disabled(), i.departmentId()));
+        return getInfo.execute(userId).map(i -> new UserInfo(i.disabled()));
     }
 }

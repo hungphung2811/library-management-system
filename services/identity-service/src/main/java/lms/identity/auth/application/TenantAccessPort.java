@@ -23,6 +23,9 @@ public interface TenantAccessPort {
     /** Các tenant truy cập được. */
     List<TenantSummary> available(UUID userId);
 
-    /** Thêm người dùng vào tenant (idempotent). */
-    void addMember(UUID userId, UUID tenantId);
+    /**
+     * Thêm người dùng vào tenant (idempotent). departmentId (tùy chọn) ghi vào membership của tenant đó; null không xóa
+     * phòng ban đang có.
+     */
+    void addMember(UUID userId, UUID tenantId, UUID departmentId);
 }

@@ -63,6 +63,13 @@ class IdentityArchitectureTest {
             .should().dependOnClassesThat().resideInAnyPackage(
                     "lms.identity.department.domain..", "lms.identity.department.infrastructure..");
 
+    /** user chỉ được dùng API (tầng application) của tenant (ghi membership, phòng ban trong tenant). */
+    @ArchTest
+    static final ArchRule userChiDungTangApplicationCuaTenant = noClasses()
+            .that().resideInAPackage("lms.identity.user..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "lms.identity.tenant.domain..", "lms.identity.tenant.infrastructure..");
+
     /** user là context độc lập: không biết auth hay accesscontrol. */
     @ArchTest
     static final ArchRule userKhongBietCacContextKhac = noClasses()

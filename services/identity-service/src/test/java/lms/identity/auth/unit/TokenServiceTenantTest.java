@@ -409,10 +409,16 @@ class TokenServiceTenantTest {
 
         UUID created = UUID.randomUUID();
         register.execute(created, "bob", "password1", null, false, tenantA);
-        verify(tenants).addMember(created, tenantA);
+        verify(tenants).addMember(created, tenantA, null);
+
+        // m1: phòng ban của tài khoản mới ghi vào membership của tenant (token đọc phòng ban từ đây)
+        UUID withDept = UUID.randomUUID();
+        UUID dept = UUID.randomUUID();
+        register.execute(withDept, "dave", "password1", dept, false, tenantA);
+        verify(tenants).addMember(withDept, tenantA, dept);
 
         UUID noTenant = UUID.randomUUID();
         register.execute(noTenant, "carol", "password1", null, false, null);
-        verify(tenants, never()).addMember(noTenant, null);
+        verify(tenants, never()).addMember(any(), any(), any());
     }
 }

@@ -250,4 +250,14 @@ class TenantMigrationIT {
             }
         }
     }
+
+    // ---- V14: bỏ users.department_id, phòng ban chỉ còn ở membership ----
+
+    @Test
+    void v14BoCotPhongBanCuaUsersVaGiuPhongBanTrongMembership() throws SQLException {
+        assertThat(column("SELECT column_name FROM information_schema.columns WHERE table_name = 'users' "
+                + "AND column_name = 'department_id'")).isEmpty();
+        assertThat(column("SELECT COALESCE(department_id::text, '-') FROM tenant_memberships WHERE user_id = '" + U_BOTH
+                + "' AND tenant_id = '" + DEFAULT_TENANT + "'")).containsExactly(DEPT);
+    }
 }

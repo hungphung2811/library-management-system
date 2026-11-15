@@ -116,6 +116,20 @@ public class UserCredential {
         this.lockedUntil = null;
     }
 
+    /**
+     * Quản trị viên đặt lại mật khẩu: đặt mật khẩu tạm (đã băm), buộc đổi ở lần đăng nhập sau và gỡ khóa do đăng nhập
+     * sai (cùng cơ chế mật khẩu tạm của tài khoản cấp sẵn).
+     */
+    public void resetToTemporaryPassword(String temporaryPasswordHash) {
+        if (temporaryPasswordHash == null || temporaryPasswordHash.isBlank()) {
+            throw new IllegalArgumentException("passwordHash không được trống");
+        }
+        this.passwordHash = temporaryPasswordHash;
+        this.mustChangePassword = true;
+        this.failedAttempts = 0;
+        this.lockedUntil = null;
+    }
+
     public void deactivate() {
         active = false;
     }

@@ -1,6 +1,7 @@
 package lms.identity.accesscontrol.integration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import lms.identity.accesscontrol.domain.UserRoleAssignment;
 import lms.identity.accesscontrol.domain.Permission;
@@ -146,6 +147,22 @@ class AccessControlPersistenceAdapterIT {
                 "SELECT tenant_id FROM user_roles WHERE user_id = '" + user + "'").getSingleResult();
         assertThat(tenantOfAssignment.toString()).isEqualTo(DEFAULT_TENANT.toString());
     }
+    /** Quản trị viên không gán được role ngoài tenant mình, kể cả khi biết id: khóa ngoại kép (role_id, tenant_id). */
+    @Test
+    void ganRoleCuaTenantKhacBiChanOTangDuLieu() throws Exception {
+        UUID other = tenantKhac("acl-assign");
+        UUID otherRole = UUID.randomUUID();
+        asSuperuser("INSERT INTO roles (id, tenant_id, name, description) VALUES ('" + otherRole + "', '" + other
+                + "', 'B_ROLE', 'Role của tenant khác')");
+        UserRoleAssignment assignment = UserRoleAssignment.empty(UUID.randomUUID());
+        assignment.assign(new lms.identity.accesscontrol.domain.RoleId(otherRole), "B_ROLE", Instant.now());
+
+        assertThatThrownBy(() -> {
+            adapter.save(assignment);
+            entityManager.flush();
+        }).isInstanceOf(RuntimeException.class);
+    }
+
     @Test
     void migrationSeedCoSuperAdminVoiToanBoPermission() {
         List<Role> roles = adapter.findAll();

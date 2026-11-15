@@ -43,7 +43,7 @@ class TenantAccessStub implements TenantAccessPort {
     }
 
     @Override
-    public void addMember(UUID userId, UUID tenantId) {
+    public void addMember(UUID userId, UUID tenantId, UUID departmentId) {
         addedMembers.add(tenantId);
     }
 }

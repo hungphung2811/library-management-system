@@ -58,7 +58,8 @@ public class ReaderProfileController {
     public ResponseEntity<ReaderProfileResponse> issue(@PathVariable UUID userId,
                                                        @Valid @RequestBody IssueReaderCardRequest request) {
         ReaderProfileResponse response = issueCard.execute(new IssueReaderCardCommand(userId, request.cardNo(),
-                request.fullName(), request.email(), request.readerType(), request.cardExpiryDate()));
+                request.fullName(), request.email(), request.readerType(), request.cardExpiryDate(),
+                request.username(), request.temporaryPassword()));
         return ResponseEntity.created(URI.create("/internal/users/" + userId + "/reader-profile")).body(response);
     }
 

@@ -26,9 +26,6 @@ class UserJpaEntity {
     @Column(nullable = false)
     private String email;
 
-    @Column(name = "department_id")
-    private UUID departmentId;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private UserStatus status;
@@ -42,13 +39,12 @@ class UserJpaEntity {
     protected UserJpaEntity() {
     }
 
-    UserJpaEntity(UUID id, String username, String fullName, String email, UUID departmentId, UserStatus status,
+    UserJpaEntity(UUID id, String username, String fullName, String email, UserStatus status,
                   Instant createdAt, Instant updatedAt) {
         this.id = id;
         this.username = username;
         this.fullName = fullName;
         this.email = email;
-        this.departmentId = departmentId;
         this.status = status;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
@@ -58,7 +54,6 @@ class UserJpaEntity {
     String getUsername() { return username; }
     String getFullName() { return fullName; }
     String getEmail() { return email; }
-    UUID getDepartmentId() { return departmentId; }
     UserStatus getStatus() { return status; }
     Instant getCreatedAt() { return createdAt; }
 }

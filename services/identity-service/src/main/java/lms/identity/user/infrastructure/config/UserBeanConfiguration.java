@@ -1,16 +1,22 @@
 package lms.identity.user.infrastructure.config;
 
 import lms.identity.department.application.GetDepartmentUseCase;
+import lms.identity.tenant.application.AddMembershipUseCase;
+import lms.identity.tenant.application.ChangeMembershipDepartmentUseCase;
+import lms.identity.user.application.AccountCredentialPort;
 import lms.identity.user.application.ChangeReaderStatusUseCase;
 import lms.identity.user.application.ChangeUserStatusUseCase;
 import lms.identity.user.application.CreateUserUseCase;
 import lms.identity.user.application.DepartmentLookupPort;
 import lms.identity.user.application.GetUserDirectoryInfoUseCase;
 import lms.identity.user.application.GetUserUseCase;
+import lms.identity.user.application.ResetUserPasswordUseCase;
 import lms.identity.user.application.SearchUsersUseCase;
+import lms.identity.user.application.TenantMembershipPort;
 import lms.identity.user.application.UpdateUserUseCase;
 import lms.identity.user.domain.UserRepository;
 import lms.identity.user.infrastructure.client.InProcessDepartmentLookupAdapter;
+import lms.identity.user.infrastructure.client.InProcessTenantMembershipAdapter;
 import lms.identity.user.application.FindReaderUserIdsByEmailUseCase;
 import lms.identity.user.application.GetReaderProfileUseCase;
 import lms.identity.user.application.IssueReaderCardUseCase;
@@ -20,13 +26,18 @@ import java.time.Clock;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/** Composition root của context user. */
+/**
+ * Composition root của context user. AccountCredentialPort do context auth cung cấp (AuthBeanConfiguration), vì user
+ * không được biết auth.
+ */
 @Configuration
 public class UserBeanConfiguration {
 
     @Bean
-    IssueReaderCardUseCase issueReaderCardUseCase(ReaderProfileRepository repository, Clock clock) {
-        return new IssueReaderCardUseCase(repository, clock);
+    IssueReaderCardUseCase issueReaderCardUseCase(ReaderProfileRepository repository, Clock clock,
+                                                  UserRepository users, AccountCredentialPort credentials,
+                                                  CreateUserUseCase createUser) {
+        return new IssueReaderCardUseCase(repository, clock, users, credentials, createUser);
     }
 
     @Bean
@@ -55,18 +66,31 @@ public class UserBeanConfiguration {
     }
 
     @Bean
-    CreateUserUseCase createUserUseCase(UserRepository repository, DepartmentLookupPort departments) {
-        return new CreateUserUseCase(repository, departments);
+    TenantMembershipPort tenantMembershipPort(AddMembershipUseCase addMembership,
+                                              ChangeMembershipDepartmentUseCase changeDepartment) {
+        return new InProcessTenantMembershipAdapter(addMembership, changeDepartment);
     }
 
     @Bean
-    UpdateUserUseCase updateUserUseCase(UserRepository repository, DepartmentLookupPort departments) {
-        return new UpdateUserUseCase(repository, departments);
+    CreateUserUseCase createUserUseCase(UserRepository repository, DepartmentLookupPort departments,
+                                        AccountCredentialPort credentials, TenantMembershipPort memberships) {
+        return new CreateUserUseCase(repository, departments, credentials, memberships);
     }
 
     @Bean
-    ChangeUserStatusUseCase changeUserStatusUseCase(UserRepository repository) {
-        return new ChangeUserStatusUseCase(repository);
+    UpdateUserUseCase updateUserUseCase(UserRepository repository, DepartmentLookupPort departments,
+                                        AccountCredentialPort credentials, TenantMembershipPort memberships) {
+        return new UpdateUserUseCase(repository, departments, credentials, memberships);
+    }
+
+    @Bean
+    ResetUserPasswordUseCase resetUserPasswordUseCase(UserRepository repository, AccountCredentialPort credentials) {
+        return new ResetUserPasswordUseCase(repository, credentials);
+    }
+
+    @Bean
+    ChangeUserStatusUseCase changeUserStatusUseCase(UserRepository repository, AccountCredentialPort credentials) {
+        return new ChangeUserStatusUseCase(repository, credentials);
     }
 
     @Bean

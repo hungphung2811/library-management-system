@@ -5,6 +5,7 @@ import lms.identity.user.domain.DuplicateReaderException;
 import lms.identity.user.domain.DuplicateUserException;
 import lms.identity.user.domain.InvalidUserException;
 import lms.identity.user.domain.UserNotFoundException;
+import lms.identity.user.domain.UserOperationNotAllowedException;
 import lms.identity.user.domain.InvalidReaderException;
 import lms.identity.user.domain.ReaderProfileNotFoundException;
 import java.util.List;
@@ -35,6 +36,11 @@ public class UserExceptionHandler {
     @ExceptionHandler(UserNotFoundException.class)
     ResponseEntity<ErrorResponse> handleUserNotFound(UserNotFoundException ex) {
         return build(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", ex.getMessage());
+    }
+
+    @ExceptionHandler(UserOperationNotAllowedException.class)
+    ResponseEntity<ErrorResponse> handleNotAllowed(UserOperationNotAllowedException ex) {
+        return build(HttpStatus.FORBIDDEN, "USER_OPERATION_NOT_ALLOWED", ex.getMessage());
     }
 
     @ExceptionHandler(DuplicateUserException.class)

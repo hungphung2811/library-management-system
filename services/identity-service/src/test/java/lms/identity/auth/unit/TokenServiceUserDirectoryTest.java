@@ -54,7 +54,7 @@ class TokenServiceUserDirectoryTest {
 
     @Test
     void nguoiDungBiVoHieuHoaKhongNhanDuocToken() {
-        info = Optional.of(new UserDirectoryPort.UserInfo(true, null));
+        info = Optional.of(new UserDirectoryPort.UserInfo(true));
         assertThrows(AccountDisabledException.class, () -> service().issueFor(credential));
         assertThrows(AccountDisabledException.class, () -> service().issueForExternal(credential));
         assertEquals(0, issued.size());
@@ -64,7 +64,7 @@ class TokenServiceUserDirectoryTest {
     void phongBanTrongTokenLayTuMembershipCuaTenantDaChon() {
         UUID membershipDept = UUID.randomUUID();
         tenants.department = membershipDept;
-        info = Optional.of(new UserDirectoryPort.UserInfo(false, UUID.randomUUID())); // phòng ban toàn cục khác
+        info = Optional.of(new UserDirectoryPort.UserInfo(false)); // phòng ban toàn cục khác
 
         service().issueFor(credential);
 
@@ -74,7 +74,7 @@ class TokenServiceUserDirectoryTest {
     @Test
     void membershipChuaGanPhongBanThiTokenKhongCoPhongBanDuUserHayCredentialCo() {
         tenants.department = null;
-        info = Optional.of(new UserDirectoryPort.UserInfo(false, UUID.randomUUID()));
+        info = Optional.of(new UserDirectoryPort.UserInfo(false));
         service().issueFor(credential);
         assertNull(issued.get(0).departmentId());
 
