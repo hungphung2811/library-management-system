@@ -27,7 +27,7 @@ public class AuditEventConsumer {
     }
 
     @KafkaListener(topics = {"${app.kafka.topics.auth-events}", "${app.kafka.topics.access-events}",
-            "${app.kafka.topics.borrowing-events}"}, groupId = "${spring.kafka.consumer.group-id:support-service}")
+            "${app.kafka.topics.borrowing-events}", "${app.kafka.topics.identity-events}"}, groupId = "${spring.kafka.consumer.group-id:support-service}")
     public void onEvent(String message, @Header(KafkaHeaders.RECEIVED_TOPIC) String topic) {
         parser.parse(topic, message).ifPresent(command ->
                 TenantAwareEventHandler.handle(command.tenantId(), command.eventType(), command.eventId(), () -> {

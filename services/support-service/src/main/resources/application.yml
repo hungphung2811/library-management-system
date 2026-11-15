@@ -73,6 +73,8 @@ app:
       access-events: access-control.events
       borrowing-events: borrowing.events
       reservation-events: reservation.events
+      # Vòng đời tenant + PlatformOperationPerformed (tenantId = tenant bị tác động) vào audit_logs
+      identity-events: identity-events
 
 # Middleware phân quyền theo endpoint (security-common): khóa Controller/method được đăng ký về identity-service
 lms:
