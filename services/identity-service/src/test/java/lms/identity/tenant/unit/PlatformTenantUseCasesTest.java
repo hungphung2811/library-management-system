@@ -486,6 +486,11 @@ class PlatformTenantUseCasesTest {
         }
 
         @Override
+        public boolean existsForUser(UUID userId) {
+            return all.values().stream().anyMatch(m -> m.userId().equals(userId));
+        }
+
+        @Override
         public void saveLastTenant(UUID userId, UUID tenantId) {
         }
 

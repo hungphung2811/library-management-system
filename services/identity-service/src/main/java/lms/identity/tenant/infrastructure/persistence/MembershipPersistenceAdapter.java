@@ -45,6 +45,11 @@ class MembershipPersistenceAdapter implements MembershipRepository {
     }
 
     @Override
+    public boolean existsForUser(UUID userId) {
+        return jpa.existsByUserId(userId);
+    }
+
+    @Override
     public void saveLastTenant(UUID userId, UUID tenantId) {
         jdbc.update("UPDATE credentials SET last_tenant_id = ? WHERE user_id = ?", tenantId, userId);
     }

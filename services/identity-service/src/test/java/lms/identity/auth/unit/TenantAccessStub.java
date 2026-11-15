@@ -2,6 +2,7 @@ package lms.identity.auth.unit;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lms.identity.auth.application.TenantAccessPort;
 import lms.identity.tenant.application.TenantChoice;
@@ -45,5 +46,23 @@ class TenantAccessStub implements TenantAccessPort {
     @Override
     public void addMember(UUID userId, UUID tenantId, UUID departmentId) {
         addedMembers.add(tenantId);
+    }
+
+    /** Tenant dùng gần nhất trả về cho mọi người dùng; null = chưa có. */
+    UUID lastTenant;
+
+    @Override
+    public Optional<UUID> lastTenant(UUID userId) {
+        return Optional.ofNullable(lastTenant);
+    }
+
+    @Override
+    public boolean isMember(UUID userId, UUID tenantId) {
+        return false;
+    }
+
+    @Override
+    public boolean hasAnyMembership(UUID userId) {
+        return false;
     }
 }

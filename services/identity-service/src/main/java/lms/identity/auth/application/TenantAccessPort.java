@@ -1,6 +1,7 @@
 package lms.identity.auth.application;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lms.identity.tenant.application.TenantChoice;
 import lms.identity.tenant.application.TenantSummary;
@@ -28,4 +29,13 @@ public interface TenantAccessPort {
      * phòng ban đang có.
      */
     void addMember(UUID userId, UUID tenantId, UUID departmentId);
+
+    /** Tenant dùng gần nhất (credentials.last_tenant_id); rỗng nếu chưa có. Không ném lỗi truy cập. */
+    Optional<UUID> lastTenant(UUID userId);
+
+    /** Có membership (mọi trạng thái) ở tenantId. */
+    boolean isMember(UUID userId, UUID tenantId);
+
+    /** Có membership (mọi trạng thái) ở bất kỳ tenant nào. */
+    boolean hasAnyMembership(UUID userId);
 }

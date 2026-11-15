@@ -12,6 +12,8 @@ interface SpringDataMembershipRepository extends JpaRepository<MembershipJpaEnti
 
     List<MembershipJpaEntity> findByUserIdAndStatus(UUID userId, MembershipStatus status);
 
+    boolean existsByUserId(UUID userId);
+
     /** Mỗi dòng: [tenantId, số membership có trạng thái status]. */
     @Query("SELECT m.tenantId, COUNT(m) FROM MembershipJpaEntity m WHERE m.tenantId IN :tenantIds AND m.status = :status "
             + "GROUP BY m.tenantId")

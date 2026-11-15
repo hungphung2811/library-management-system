@@ -1,10 +1,12 @@
 package lms.identity.auth.infrastructure.client;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lms.identity.auth.application.TenantAccessPort;
 import lms.identity.tenant.application.AddMembershipUseCase;
 import lms.identity.tenant.application.ListMyTenantsUseCase;
+import lms.identity.tenant.application.MembershipLookupUseCase;
 import lms.identity.tenant.application.ResolveLoginTenantUseCase;
 import lms.identity.tenant.application.SwitchTenantUseCase;
 import lms.identity.tenant.application.TenantChoice;
@@ -22,15 +24,17 @@ public class InProcessTenantAccessAdapter implements TenantAccessPort {
     private final VerifyTenantAccessUseCase verify;
     private final ListMyTenantsUseCase listMine;
     private final AddMembershipUseCase addMembership;
+    private final MembershipLookupUseCase lookup;
 
     public InProcessTenantAccessAdapter(ResolveLoginTenantUseCase resolve, SwitchTenantUseCase switchTenant,
                                         VerifyTenantAccessUseCase verify, ListMyTenantsUseCase listMine,
-                                        AddMembershipUseCase addMembership) {
+                                        AddMembershipUseCase addMembership, MembershipLookupUseCase lookup) {
         this.resolve = resolve;
         this.switchTenant = switchTenant;
         this.verify = verify;
         this.listMine = listMine;
         this.addMembership = addMembership;
+        this.lookup = lookup;
     }
 
     @Override
@@ -56,5 +60,20 @@ public class InProcessTenantAccessAdapter implements TenantAccessPort {
     @Override
     public void addMember(UUID userId, UUID tenantId, UUID departmentId) {
         addMembership.execute(userId, tenantId, departmentId);
+    }
+
+    @Override
+    public Optional<UUID> lastTenant(UUID userId) {
+        return lookup.lastTenant(userId);
+    }
+
+    @Override
+    public boolean isMember(UUID userId, UUID tenantId) {
+        return lookup.isMember(userId, tenantId);
+    }
+
+    @Override
+    public boolean hasAnyMembership(UUID userId) {
+        return lookup.hasAnyMembership(userId);
     }
 }

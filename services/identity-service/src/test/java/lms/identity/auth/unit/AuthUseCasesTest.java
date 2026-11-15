@@ -55,7 +55,8 @@ class AuthUseCasesTest {
 
     private final TokenService tokenService =
             new TokenService(access, issuer, codec, saveRefresh, clock, Duration.ofDays(7), tenantAccess);
-    private final LoginUseCase login = new LoginUseCase(credentials, saveCredential, hasher, tokenService, events, clock);
+    private final LoginUseCase login = new LoginUseCase(credentials, saveCredential, hasher, tokenService, events, clock,
+            tenantAccess);
     private final RefreshTokenUseCase refresh =
             new RefreshTokenUseCase(refreshRepo, saveRefresh, credentials, codec, tokenService, tenantAccess, clock);
 
@@ -97,6 +98,53 @@ class AuthUseCasesTest {
         assertThat(credential.failedAttempts()).isEqualTo(1);
         verify(saveCredential).save(credential);
         verify(issuer, never()).issue(any());
+    }
+
+    /** Ghi lại tenant của luồng tại thời điểm phát từng sự kiện. */
+    private List<Optional<UUID>> captureTenantOnPublish() {
+        List<Optional<UUID>> seen = new java.util.ArrayList<>();
+        org.mockito.Mockito.doAnswer(inv -> seen.add(lms.tenant.TenantContext.current()))
+                .when(events).publish(any());
+        return seen;
+    }
+
+    @Test
+    void dangNhapDungPhatSuKienDuoiTenantCuaPhien() {
+        stubIssue();
+        List<Optional<UUID>> seen = captureTenantOnPublish();
+        when(credentials.findByUsername("alice")).thenReturn(Optional.of(credential));
+        when(hasher.matches("pw", "hash")).thenReturn(true);
+
+        login.execute("alice", "pw");
+
+        assertThat(seen).containsExactly(Optional.of(TenantAccessStub.TENANT));
+        assertThat(lms.tenant.TenantContext.current()).isEmpty();
+    }
+
+    @Test
+    void saiMatKhauPhatSuKienDuoiTenantDungGanNhat() {
+        List<Optional<UUID>> seen = captureTenantOnPublish();
+        UUID last = UUID.randomUUID();
+        tenantAccess.lastTenant = last;
+        when(credentials.findByUsername("alice")).thenReturn(Optional.of(credential));
+        when(hasher.matches("sai", "hash")).thenReturn(false);
+
+        assertThatThrownBy(() -> login.execute("alice", "sai")).isInstanceOf(InvalidCredentialsException.class);
+
+        assertThat(seen).containsExactly(Optional.of(last));
+        assertThat(lms.tenant.TenantContext.current()).isEmpty();
+    }
+
+    @Test
+    void saiMatKhauKhongBietTenantThiKhongPhatSuKienNhungVanDemLanSai() {
+        when(credentials.findByUsername("alice")).thenReturn(Optional.of(credential));
+        when(hasher.matches("sai", "hash")).thenReturn(false);
+
+        assertThatThrownBy(() -> login.execute("alice", "sai")).isInstanceOf(InvalidCredentialsException.class);
+
+        assertThat(credential.failedAttempts()).isEqualTo(1);
+        verify(saveCredential).save(credential);
+        verify(events, never()).publish(any());
     }
 
     @Test

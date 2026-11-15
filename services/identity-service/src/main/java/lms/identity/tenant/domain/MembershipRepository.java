@@ -13,6 +13,9 @@ public interface MembershipRepository {
 
     Optional<Membership> find(UUID userId, UUID tenantId);
 
+    /** Người dùng có membership ở bất kỳ tenant nào (mọi trạng thái). */
+    boolean existsForUser(UUID userId);
+
     /**
      * Ghi tenant dùng gần nhất (credentials.last_tenant_id). Tài khoản đăng nhập được luôn có dòng credentials;
      * với userId không có dòng credentials (không thể xác thực, không nhận được token) thì đây là no-op có chủ đích.

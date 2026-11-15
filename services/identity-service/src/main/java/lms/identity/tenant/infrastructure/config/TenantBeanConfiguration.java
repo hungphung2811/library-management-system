@@ -2,6 +2,7 @@ package lms.identity.tenant.infrastructure.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lms.identity.tenant.application.AddMembershipUseCase;
+import lms.identity.tenant.application.MembershipLookupUseCase;
 import lms.identity.tenant.application.AddTenantAdminUseCase;
 import lms.identity.tenant.application.AttachUserToTenantUseCase;
 import lms.identity.tenant.application.ChangeMembershipDepartmentUseCase;
@@ -69,6 +70,11 @@ public class TenantBeanConfiguration {
     @Bean
     AddMembershipUseCase addMembershipUseCase(TenantRepository tenants, MembershipRepository memberships) {
         return new AddMembershipUseCase(tenants, memberships);
+    }
+
+    @Bean
+    MembershipLookupUseCase membershipLookupUseCase(MembershipRepository memberships) {
+        return new MembershipLookupUseCase(memberships);
     }
 
     @Bean

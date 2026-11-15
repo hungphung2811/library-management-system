@@ -272,6 +272,9 @@ class LoginTenantResolutionTest {
         public Optional<Membership> find(UUID userId, UUID tenantId) {
             return Optional.ofNullable(rows.get(userId + "/" + tenantId));
         }
+        public boolean existsForUser(UUID userId) {
+            return rows.values().stream().anyMatch(m -> m.userId().equals(userId));
+        }
         public void saveLastTenant(UUID userId, UUID tenantId) { last.put(userId, tenantId); }
         public Optional<UUID> findLastTenant(UUID userId) { return Optional.ofNullable(last.get(userId)); }
     }

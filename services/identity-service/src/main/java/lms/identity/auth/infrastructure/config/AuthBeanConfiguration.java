@@ -16,6 +16,7 @@ import lms.identity.auth.infrastructure.client.InProcessUserDirectoryAdapter;
 import lms.identity.auth.infrastructure.client.InProcessTenantAccessAdapter;
 import lms.identity.tenant.application.AddMembershipUseCase;
 import lms.identity.tenant.application.ListMyTenantsUseCase;
+import lms.identity.tenant.application.MembershipLookupUseCase;
 import lms.identity.tenant.application.ResolveLoginTenantUseCase;
 import lms.identity.tenant.application.SwitchTenantUseCase;
 import lms.identity.tenant.application.VerifyTenantAccessUseCase;
@@ -92,8 +93,9 @@ public class AuthBeanConfiguration {
     @Bean
     InProcessTenantAccessAdapter tenantAccessAdapter(ResolveLoginTenantUseCase resolve, SwitchTenantUseCase switchTenant,
                                                      VerifyTenantAccessUseCase verify, ListMyTenantsUseCase listMine,
-                                                     AddMembershipUseCase addMembership) {
-        return new InProcessTenantAccessAdapter(resolve, switchTenant, verify, listMine, addMembership);
+                                                     AddMembershipUseCase addMembership,
+                                                     MembershipLookupUseCase lookup) {
+        return new InProcessTenantAccessAdapter(resolve, switchTenant, verify, listMine, addMembership, lookup);
     }
 
     @Bean
@@ -106,8 +108,9 @@ public class AuthBeanConfiguration {
 
     @Bean
     LoginUseCase loginUseCase(AuthPersistenceAdapter persistence, BcryptPasswordHasher hasher, TokenService tokenService,
-                              KafkaAuthEventPublisher publisher, Clock clock) {
-        return new LoginUseCase(persistence, persistence, hasher, tokenService, publisher, clock);
+                              KafkaAuthEventPublisher publisher, Clock clock,
+                              InProcessTenantAccessAdapter tenantAccess) {
+        return new LoginUseCase(persistence, persistence, hasher, tokenService, publisher, clock, tenantAccess);
     }
 
     @Bean
