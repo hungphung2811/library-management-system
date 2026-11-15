@@ -39,4 +39,10 @@ class LmsApiArchitectureTest {
             .that().resideInAnyPackage("lms.api.support.client..", "lms.api.support.dto..", "lms.api.support.web..")
             .should().dependOnClassesThat().resideInAnyPackage("lms.api.identity..", "lms.api.catalog..",
                     "lms.api.circulation..");
+
+    @ArchTest
+    static final ArchRule systemKhongBietContextKhac = noClasses()
+            .that().resideInAPackage("lms.api.system..")
+            .should().dependOnClassesThat().resideInAnyPackage("lms.api.identity..", "lms.api.catalog..",
+                    "lms.api.circulation..", "lms.api.support.client..", "lms.api.support.dto..", "lms.api.support.web..");
 }

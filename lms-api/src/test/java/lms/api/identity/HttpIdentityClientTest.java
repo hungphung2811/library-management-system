@@ -114,7 +114,7 @@ class HttpIdentityClientTest {
         idp.start();
         try {
             String base = "http://127.0.0.1:" + idp.getAddress().getPort();
-            ServicesProperties props = new ServicesProperties(base, base, base, base, Duration.ofSeconds(2),
+            ServicesProperties props = new ServicesProperties(base, base, base, base, base, Duration.ofSeconds(2),
                     Duration.ofSeconds(5));
             HttpAuthClient client = new HttpAuthClient(IdentityClientConfiguration.noRedirectClient(base, props));
 
