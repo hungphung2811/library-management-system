@@ -9,7 +9,7 @@ quy định mượn), nên nguồn nghiệp vụ chính là tài liệu yêu c�
 |---|---|---|
 | UC02 Tìm kiếm sách | `catalog-service` / `catalog` (`GET /api/books?keyword=&available=`) | Kèm số bản sao sẵn có lấy từ `inventory` |
 | UC11 (một phần) Thêm đầu sách, nhập bản sao | `catalog` (`POST /api/books`), `inventory` (`POST /api/book-copies`) | Chưa có sửa/thanh lý |
-| UC10 (một phần) Cấp thẻ, gia hạn thẻ, khóa/mở khóa | `identity-service` / `user` (`/api/users/{id}/reader-profile`) | Hồ sơ độc giả: loại SV/GV, hạn thẻ, trạng thái |
+| UC10 (một phần) Cấp thẻ, gia hạn thẻ, khóa/mở khóa | `identity-service` / `user` (FE: `/api/users/{id}/reader-profile` qua `lms-api`; service: `/internal/users/{id}/reader-profile`) | Hồ sơ độc giả: loại SV/GV, hạn thẻ, trạng thái |
 | QĐ2 (điều kiện thẻ) | `ReaderProfile.isCardValid`, cờ `cardValid` ở `GET /api/users/me/reader-profile` | Chưa gồm "không giữ sách quá hạn / không nợ phạt" (cần `borrowing` + `fine`) |
 | UC03 Đặt trước, QĐ5, QĐ7 | `circulation-service` / `reservation` (`POST /api/reservations`) | FIFO theo `(reserved_at, id)`; unique index chặn trùng khi đồng thời |
 | UC04 Hủy đặt trước | `DELETE /api/reservations/{id}` | Đặt trước của người khác coi như không tồn tại |
@@ -54,6 +54,8 @@ OIDC Authorization Code + PKCE (S256) tự cài trong `identity-service` (không
 | `POST /api/auth/external/exchange {code}` | Đổi mã dùng một lần (60 giây, chỉ lưu băm) lấy cặp token. Token không bao giờ nằm trên URL |
 | `GET /api/auth/me/external/{provider}/link?returnUrl=` | Cần Bearer; trả `{authorizationUrl}` (trình duyệt không gắn được header khi điều hướng) |
 | `GET /api/auth/me/external`, `DELETE /api/auth/me/external/{provider}` | Danh sách và gỡ liên kết |
+
+Ghi chú kiến trúc: các đường dẫn `/api/auth/**` ở trên là đường dẫn FE thấy, do `lms-api` cung cấp (nginx -> lms-api -> `identity-service` ở `/internal/auth/**`). `lms-api` chuyển nguyên status 302, `Location` và `Set-Cookie` (cookie `lms_ext` giữ `Path=/api/auth`) và gửi cookie `lms_ext` của trình duyệt sang service ở bước callback, không tự follow redirect. `redirect_uri` đăng ký ở IdP vẫn là `<public-base-url>/external/<tên>/callback` với `public-base-url` = URL công khai qua nginx `/api/auth`.
 
 Quy tắc (giữ nguyên thiết kế cũ): khóa liên kết là `(provider, subject)`, không dùng email làm khóa; lần đầu chỉ tự liên kết khi email đã xác minh,
 tên miền thuộc `allowed-email-domains` (rỗng = không giới hạn) và có **đúng một** hồ sơ độc giả cùng email; không tự tạo tài khoản; tài khoản khóa/vô hiệu hóa bị
