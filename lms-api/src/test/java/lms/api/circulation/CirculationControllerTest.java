@@ -1,6 +1,8 @@
 package lms.api.circulation;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -12,9 +14,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import lms.api.circulation.client.CirculationClient;
 import lms.api.circulation.dto.BorrowingView;
+import lms.api.circulation.dto.CollectFinesResult;
 import lms.api.circulation.dto.ExpirationResult;
+import lms.api.circulation.dto.FineView;
+import lms.api.circulation.dto.ReaderFinesView;
+import lms.api.circulation.dto.ReportLostRequest;
 import lms.api.circulation.dto.ReservationView;
+import lms.api.circulation.dto.ReturnCopyRequest;
 import lms.api.circulation.web.BorrowingController;
+import lms.api.circulation.web.FineController;
+import java.math.BigDecimal;
 import lms.api.circulation.web.ReservationController;
 import lms.api.config.SecurityConfiguration;
 import lms.api.web.ApiExceptionHandler;
@@ -37,7 +46,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.ResourceAccessException;
 
 /** Hợp đồng FE của circulation: xác thực, ánh xạ DTO, chuyển nguyên lỗi 4xx, mất kết nối thành 503. */
-@WebMvcTest({BorrowingController.class, ReservationController.class})
+@WebMvcTest({BorrowingController.class, ReservationController.class, FineController.class})
 @Import({SecurityConfiguration.class, ApiExceptionHandler.class})
 class CirculationControllerTest {
 
@@ -123,6 +132,83 @@ class CirculationControllerTest {
         mvc.perform(post("/api/borrowings/" + ID + "/renewals").with(jwt()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("DOWNSTREAM_REJECTED"));
+    }
+
+    private static BorrowingView returned() {
+        return new BorrowingView(ID, USER, "RETURNED", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 15), 0,
+                List.of(new BorrowingView.Item(COPY, LocalDate.of(2026, 1, 20), "DAMAGED")),
+                List.of(new FineView(ID, USER, ID, COPY, "DAMAGED", new BigDecimal("50000"), "UNPAID",
+                        Instant.parse("2026-01-20T00:00:00Z"), null)));
+    }
+
+    @Test
+    void traTheoBarcodeVaBaoMatChuyenTiep() throws Exception {
+        when(circulation.returnCopy(any())).thenReturn(returned());
+        when(circulation.reportLost(any())).thenReturn(returned());
+        mvc.perform(post("/api/borrowings/returns").with(jwt()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"barcode\":\"B-001\",\"condition\":\"DAMAGED\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].condition").value("DAMAGED"))
+                .andExpect(jsonPath("$.fines[0].amount").value(50000));
+        verify(circulation).returnCopy(new ReturnCopyRequest(null, "B-001", "DAMAGED"));
+        mvc.perform(post("/api/borrowings/losses").with(jwt()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"bookCopyId\":\"" + COPY + "\"}"))
+                .andExpect(status().isOk());
+        verify(circulation).reportLost(new ReportLostRequest(COPY, null));
+    }
+
+    @Test
+    void traVoiConditionLaBi400() throws Exception {
+        mvc.perform(post("/api/borrowings/returns").with(jwt()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"barcode\":\"B-001\",\"condition\":\"LOST\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void phieuMuonCuaToiKhongBiNhamVoiId() throws Exception {
+        when(circulation.myBorrowings()).thenReturn(List.of(returned()));
+        when(circulation.borrowingsOfReader(USER)).thenReturn(List.of(returned()));
+        mvc.perform(get("/api/borrowings/mine").with(jwt()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].status").value("RETURNED"));
+        mvc.perform(get("/api/borrowings").param("readerId", USER.toString()).with(jwt()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].userId").value(USER.toString()));
+        verify(circulation, never()).getBorrowing(any());
+        mvc.perform(get("/api/borrowings").with(jwt())).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void phiPhatXemVaThu() throws Exception {
+        FineView fine = returned().fines().get(0);
+        ReaderFinesView fines = new ReaderFinesView(USER, new BigDecimal("50000"), List.of(fine));
+        when(circulation.myFines()).thenReturn(fines);
+        when(circulation.finesOfReader(USER)).thenReturn(fines);
+        when(circulation.collectFines(USER)).thenReturn(new CollectFinesResult(USER, 1, new BigDecimal("50000"),
+                List.of(fine)));
+        mvc.perform(get("/api/fines/mine").with(jwt()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalUnpaid").value(50000));
+        mvc.perform(get("/api/fines").param("readerId", USER.toString()).with(jwt()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.fines[0].reason").value("DAMAGED"));
+        mvc.perform(post("/api/fines/payments").with(jwt()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"readerId\":\"" + USER + "\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.collectedCount").value(1));
+        mvc.perform(post("/api/fines/payments").with(jwt()).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/fines")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/fines/mine")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void loi403VaLoi422CuaPhiPhatDuocChuyenNguyen() throws Exception {
+        when(circulation.collectFines(USER)).thenThrow(loi(HttpStatus.FORBIDDEN, ""));
+        mvc.perform(post("/api/fines/payments").with(jwt()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"readerId\":\"" + USER + "\"}"))
+                .andExpect(status().isForbidden());
+        when(circulation.reportLost(any())).thenThrow(loi(HttpStatus.UNPROCESSABLE_ENTITY,
+                "{\"code\":\"INVALID_BORROWING\",\"message\":\"x\",\"details\":[]}"));
+        mvc.perform(post("/api/borrowings/losses").with(jwt()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("INVALID_BORROWING"));
     }
 
     @Test

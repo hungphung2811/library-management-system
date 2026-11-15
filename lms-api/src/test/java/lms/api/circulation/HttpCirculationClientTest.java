@@ -80,6 +80,40 @@ class HttpCirculationClientTest {
                 .andExpect(method(HttpMethod.POST))
                 .andRespond(withSuccess("{\"expired\":4}", MediaType.APPLICATION_JSON));
 
+        String fine = "{\"id\":\"" + id + "\",\"readerId\":\"" + user + "\",\"borrowingId\":\"" + id
+                + "\",\"bookCopyId\":\"" + copy + "\",\"reason\":\"LOST\",\"amount\":120000,\"status\":\"UNPAID\","
+                + "\"createdAt\":\"2026-01-20T00:00:00Z\",\"paidAt\":null}";
+        String returned = "{\"id\":\"" + id + "\",\"userId\":\"" + user + "\",\"status\":\"RETURNED\","
+                + "\"borrowDate\":\"2026-01-01\",\"dueDate\":\"2026-01-15\",\"renewCount\":0,"
+                + "\"items\":[{\"bookCopyId\":\"" + copy + "\",\"returnDate\":\"2026-01-20\",\"condition\":\"LOST\"}],"
+                + "\"fines\":[" + fine + "]}";
+        String fines = "{\"readerId\":\"" + user + "\",\"totalUnpaid\":120000,\"fines\":[" + fine + "]}";
+        server.expect(requestTo("http://circulation/internal/borrowings/returns"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.barcode").value("B-1"))
+                .andRespond(withSuccess(returned, MediaType.APPLICATION_JSON));
+        server.expect(requestTo("http://circulation/internal/borrowings/losses"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.bookCopyId").value(copy.toString()))
+                .andRespond(withSuccess(returned, MediaType.APPLICATION_JSON));
+        server.expect(requestTo("http://circulation/internal/borrowings/mine"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("[" + returned + "]", MediaType.APPLICATION_JSON));
+        server.expect(requestTo("http://circulation/internal/borrowings?readerId=" + user))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("[" + returned + "]", MediaType.APPLICATION_JSON));
+        server.expect(requestTo("http://circulation/internal/fines/mine"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess(fines, MediaType.APPLICATION_JSON));
+        server.expect(requestTo("http://circulation/internal/fines?readerId=" + user))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess(fines, MediaType.APPLICATION_JSON));
+        server.expect(requestTo("http://circulation/internal/fines/payments"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.readerId").value(user.toString()))
+                .andRespond(withSuccess("{\"readerId\":\"" + user + "\",\"collectedCount\":1,"
+                        + "\"totalCollected\":120000,\"fines\":[" + fine + "]}", MediaType.APPLICATION_JSON));
+
         var created = client.borrow(new BorrowBookRequest(user, List.of(copy)));
         assertEquals(copy, created.items().get(0).bookCopyId());
         assertEquals("BORROWING", client.returnBook(id, copy).status());
@@ -89,6 +123,15 @@ class HttpCirculationClientTest {
         assertEquals(1, client.myReservations().get(0).queuePosition());
         assertEquals(title, client.cancelReservation(id).titleId());
         assertEquals(4, client.expireReservations().expired());
+        var lost = client.returnCopy(new lms.api.circulation.dto.ReturnCopyRequest(null, "B-1", null));
+        assertEquals("LOST", lost.items().get(0).condition());
+        assertEquals("LOST", lost.fines().get(0).reason());
+        assertEquals(1, client.reportLost(new lms.api.circulation.dto.ReportLostRequest(copy, null)).fines().size());
+        assertEquals(1, client.myBorrowings().size());
+        assertEquals(1, client.borrowingsOfReader(user).size());
+        assertEquals(0, new java.math.BigDecimal("120000").compareTo(client.myFines().totalUnpaid()));
+        assertEquals(1, client.finesOfReader(user).fines().size());
+        assertEquals(1, client.collectFines(user).collectedCount());
         server.verify();
     }
 }
