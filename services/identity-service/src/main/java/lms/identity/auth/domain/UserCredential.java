@@ -29,10 +29,12 @@ public class UserCredential {
     private int failedAttempts;
     private Instant lockedUntil;
     private boolean mustChangePassword;
+    private final boolean platformAdmin;
     private final List<DomainEvent> events = new ArrayList<>();
 
     private UserCredential(UUID userId, String username, String passwordHash, UUID departmentId,
-                           boolean active, int failedAttempts, Instant lockedUntil, boolean mustChangePassword) {
+                           boolean active, int failedAttempts, Instant lockedUntil, boolean mustChangePassword,
+                           boolean platformAdmin) {
         if (userId == null) throw new IllegalArgumentException("userId không được null");
         if (username == null || username.isBlank()) throw new IllegalArgumentException("username không được trống");
         if (passwordHash == null || passwordHash.isBlank()) throw new IllegalArgumentException("passwordHash không được trống");
@@ -44,6 +46,7 @@ public class UserCredential {
         this.failedAttempts = failedAttempts;
         this.lockedUntil = lockedUntil;
         this.mustChangePassword = mustChangePassword;
+        this.platformAdmin = platformAdmin;
     }
 
     public static UserCredential register(UUID userId, String username, String passwordHash, UUID departmentId) {
@@ -53,7 +56,7 @@ public class UserCredential {
     /** mustChangePassword: tài khoản cấp sẵn mật khẩu tạm, người dùng phải đổi trước khi dùng các chức năng khác. */
     public static UserCredential register(UUID userId, String username, String passwordHash, UUID departmentId,
                                           boolean mustChangePassword) {
-        return new UserCredential(userId, username, passwordHash, departmentId, true, 0, null, mustChangePassword);
+        return new UserCredential(userId, username, passwordHash, departmentId, true, 0, null, mustChangePassword, false);
     }
 
     public static UserCredential restore(UUID userId, String username, String passwordHash, UUID departmentId,
@@ -64,8 +67,16 @@ public class UserCredential {
     public static UserCredential restore(UUID userId, String username, String passwordHash, UUID departmentId,
                                          boolean active, int failedAttempts, Instant lockedUntil,
                                          boolean mustChangePassword) {
+        return restore(userId, username, passwordHash, departmentId, active, failedAttempts, lockedUntil,
+                mustChangePassword, false);
+    }
+
+    /** platformAdmin: quản trị nền tảng (cờ credentials.platform_admin, chỉ đặt bằng cấu hình, không qua API). */
+    public static UserCredential restore(UUID userId, String username, String passwordHash, UUID departmentId,
+                                         boolean active, int failedAttempts, Instant lockedUntil,
+                                         boolean mustChangePassword, boolean platformAdmin) {
         return new UserCredential(userId, username, passwordHash, departmentId, active, failedAttempts, lockedUntil,
-                mustChangePassword);
+                mustChangePassword, platformAdmin);
     }
 
     public boolean isLocked(Instant now) {
@@ -123,4 +134,5 @@ public class UserCredential {
     public int failedAttempts() { return failedAttempts; }
     public Instant lockedUntil() { return lockedUntil; }
     public boolean mustChangePassword() { return mustChangePassword; }
+    public boolean platformAdmin() { return platformAdmin; }
 }

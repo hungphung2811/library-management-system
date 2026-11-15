@@ -33,8 +33,17 @@ public class LoginUseCase {
     /**
      * noRollbackFor: đăng nhập sai vẫn phải lưu số lần thất bại (để khóa tài khoản) dù ném exception.
      */
-    @Transactional(noRollbackFor = InvalidCredentialsException.class)
     public TokenResponse execute(String username, String rawPassword) {
+        return execute(username, rawPassword, null);
+    }
+
+    /**
+     * tenantCodeOrNull: mã tenant muốn vào (tùy chọn). Không truy cập được tenant (hoặc không còn tenant nào) thì ném
+     * NoTenantAccessException của context tenant sau khi đã xác thực mật khẩu; giao dịch rollback nên không ghi nhận
+     * lần đăng nhập thành công.
+     */
+    @Transactional(noRollbackFor = InvalidCredentialsException.class)
+    public TokenResponse execute(String username, String rawPassword, String tenantCodeOrNull) {
         Instant now = clock.instant();
         String normalized = username == null ? "" : username.trim().toLowerCase();
         UserCredential credential = repository.findByUsername(normalized).orElseThrow(InvalidCredentialsException::new);
@@ -50,7 +59,7 @@ public class LoginUseCase {
 
         credential.recordSuccess(now);
         savePort.save(credential);
-        TokenResponse response = tokenService.issueFor(credential);
+        TokenResponse response = tokenService.issueFor(credential, tenantCodeOrNull);
         credential.pullEvents().forEach(eventPort::publish);
         return response;
     }

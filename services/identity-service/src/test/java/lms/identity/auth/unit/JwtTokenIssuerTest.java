@@ -53,6 +53,34 @@ class JwtTokenIssuerTest {
     }
 
     @Test
+    void ghiClaimTenantIdVaPlatformAdminChiKhiCo() throws Exception {
+        KeyPair pair = PemKeys.generate();
+        RSAKey rsaKey = new RSAKey.Builder((RSAPublicKey) pair.getPublic()).privateKey((RSAPrivateKey) pair.getPrivate())
+                .keyIDFromThumbprint().build();
+        JwtTokenIssuer issuer = new JwtTokenIssuer(new NimbusJwtEncoder(new ImmutableJWKSet<>(new JWKSet(rsaKey))),
+                rsaKey.getKeyID(), "library-auth-service", Duration.ofMinutes(15), Clock.systemUTC());
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withPublicKey(rsaKey.toRSAPublicKey()).build();
+        UUID userId = UUID.randomUUID();
+        UUID tenantId = UUID.randomUUID();
+
+        Jwt tenantToken = decoder.decode(issuer.issue(new TokenIssuerPort.Claims(userId, "alice", null, List.of(),
+                List.of("k"), false, false, tenantId, false)).value());
+        assertThat(tenantToken.getClaimAsString(JwtClaims.TENANT_ID)).isEqualTo(tenantId.toString());
+        assertThat(tenantToken.hasClaim(JwtClaims.PLATFORM_ADMIN)).isFalse();
+
+        Jwt platformToken = decoder.decode(issuer.issue(new TokenIssuerPort.Claims(userId, "root", null, List.of(),
+                List.of(), false, false, null, true)).value());
+        assertThat(platformToken.hasClaim(JwtClaims.TENANT_ID)).isFalse();
+        assertThat(platformToken.getClaimAsBoolean(JwtClaims.PLATFORM_ADMIN)).isTrue();
+
+        // token phải đổi mật khẩu không bao giờ mang platformAdmin
+        Jwt forced = decoder.decode(issuer.issue(new TokenIssuerPort.Claims(userId, "root", null, List.of(),
+                List.of(), true, false, tenantId, true)).value());
+        assertThat(forced.hasClaim(JwtClaims.PLATFORM_ADMIN)).isFalse();
+        assertThat(forced.getClaimAsString(JwtClaims.TENANT_ID)).isEqualTo(tenantId.toString());
+    }
+
+    @Test
     void khoaPemDocGhiKhuHoi() {
         KeyPair pair = PemKeys.generate();
 

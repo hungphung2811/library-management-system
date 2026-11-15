@@ -21,8 +21,7 @@ class TenantArchitectureTest {
     @ArchTest
     static final ArchRule applicationKhongPhuThuocInfrastructure = noClasses()
             .that().resideInAPackage("..application..")
-            .should().dependOnClassesThat().resideInAPackage("..infrastructure..")
-            .allowEmptyShould(true); // tầng application của tenant chưa có use case ở bước này
+            .should().dependOnClassesThat().resideInAPackage("..infrastructure..");
 
     @ArchTest
     static final ArchRule khongCoVongLapGiuaCacPackageCap1 =

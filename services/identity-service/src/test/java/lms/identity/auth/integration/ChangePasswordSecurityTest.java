@@ -43,6 +43,7 @@ class ChangePasswordSecurityTest {
     @MockitoBean LogoutUseCase logout;
     @MockitoBean RegisterCredentialUseCase register;
     @MockitoBean ChangePasswordUseCase changePassword;
+    @MockitoBean lms.identity.auth.application.SwitchTenantSessionUseCase switchTenant;
     @MockitoBean JwtDecoder jwtDecoder;
 
     static final UUID USER = UUID.randomUUID();

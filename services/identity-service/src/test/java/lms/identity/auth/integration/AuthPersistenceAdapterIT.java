@@ -65,6 +65,27 @@ class AuthPersistenceAdapterIT {
     }
 
     @Test
+    void refreshTokenLuuTenantIdVaCoPhienNenTangCredentialLuuCoPlatformAdmin() {
+        UUID user = UUID.randomUUID();
+        UUID tenant = UUID.randomUUID();
+        adapter.save(RefreshToken.issueForTenant(user, tenant, "t-1", now, Duration.ofDays(7)));
+        adapter.save(RefreshToken.issueForPlatform(user, "p-1", now, Duration.ofDays(7)));
+        adapter.save(RefreshToken.issue(user, "legacy-1", now, Duration.ofDays(7)));
+
+        assertThat(adapter.findByTokenHash("t-1").orElseThrow())
+                .extracting(RefreshToken::tenantId, RefreshToken::platformSession).containsExactly(tenant, false);
+        assertThat(adapter.findByTokenHash("p-1").orElseThrow())
+                .extracting(RefreshToken::tenantId, RefreshToken::platformSession).containsExactly(null, true);
+        assertThat(adapter.findByTokenHash("legacy-1").orElseThrow())
+                .extracting(RefreshToken::tenantId, RefreshToken::platformSession).containsExactly(null, false);
+
+        UUID root = UUID.randomUUID();
+        adapter.save(UserCredential.restore(root, "root-op", "bcrypt-hash", null, true, 0, null, false, true));
+        assertThat(adapter.findByUserId(root).orElseThrow().platformAdmin()).isTrue();
+        assertThat(adapter.findByUsername("alice-x")).isEmpty();
+    }
+
+    @Test
     void thuHoiTatCaRefreshTokenCuaNguoiDungChiAnhHuongNguoiDoMa() {
         UUID alice = UUID.randomUUID();
         UUID bob = UUID.randomUUID();

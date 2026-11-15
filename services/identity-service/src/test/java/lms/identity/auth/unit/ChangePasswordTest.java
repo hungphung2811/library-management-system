@@ -104,7 +104,8 @@ class ChangePasswordTest {
             public String hash(String raw) { return "hash-" + raw; }
         };
         Clock clock = Clock.fixed(Instant.parse("2026-10-01T00:00:00Z"), ZoneOffset.UTC);
-        TokenService tokens = new TokenService(access, issuer, codec, refreshSave, clock, Duration.ofDays(7));
+        TokenService tokens = new TokenService(access, issuer, codec, refreshSave, clock, Duration.ofDays(7),
+                new TenantAccessStub());
 
         TokenResponse forced = tokens.issueFor(stored); // stored: mustChangePassword = true
         assertTrue(forced.mustChangePassword());

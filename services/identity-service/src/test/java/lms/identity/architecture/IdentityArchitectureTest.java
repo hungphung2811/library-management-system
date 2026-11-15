@@ -31,6 +31,24 @@ class IdentityArchitectureTest {
             .should().dependOnClassesThat().resideInAnyPackage(
                     "lms.identity.user.domain..", "lms.identity.user.infrastructure..");
 
+    /**
+     * auth chỉ được dùng API (tầng application) của tenant. Ngoại lệ có chủ đích: NoTenantAccessException (domain của
+     * tenant) chỉ đi xuyên qua auth chứ không bị auth tham chiếu, nên luật này vẫn áp nguyên cho mọi lớp của auth.
+     */
+    @ArchTest
+    static final ArchRule authChiDungTangApplicationCuaTenant = noClasses()
+            .that().resideInAPackage("lms.identity.auth..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "lms.identity.tenant.domain..", "lms.identity.tenant.infrastructure..");
+
+    /** tenant là context nền: không biết auth, accesscontrol, user hay department. */
+    @ArchTest
+    static final ArchRule tenantKhongBietCacContextKhac = noClasses()
+            .that().resideInAPackage("lms.identity.tenant..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "lms.identity.auth..", "lms.identity.accesscontrol..", "lms.identity.user..",
+                    "lms.identity.department..");
+
     /** department là context độc lập: không biết auth, accesscontrol hay user. */
     @ArchTest
     static final ArchRule departmentKhongBietCacContextKhac = noClasses()

@@ -178,7 +178,7 @@ class ExternalSignInUseCaseTest {
             public void revokeAllByUserId(UUID u) { }
         };
         ExchangeExternalTicketUseCase exchange = new ExchangeExternalTicketUseCase(ticketPort, credentials,
-                new TokenService(access, issuer, codec, refresh, CLOCK, Duration.ofDays(7)), CLOCK);
+                new TokenService(access, issuer, codec, refresh, CLOCK, Duration.ofDays(7), new TenantAccessStub()), CLOCK);
 
         String code = signIn.execute(id("sub-1", "alice@school.test", true));
         var response = exchange.execute(code);

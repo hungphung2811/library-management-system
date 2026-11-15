@@ -6,9 +6,16 @@ import lms.identity.auth.application.LogoutUseCase;
 import lms.identity.auth.application.RefreshTokenUseCase;
 import lms.identity.auth.application.RegisterCredentialUseCase;
 import lms.identity.auth.application.RevokeUserSessionsUseCase;
+import lms.identity.auth.application.SwitchTenantSessionUseCase;
 import lms.identity.auth.application.TokenService;
 import lms.identity.auth.application.UserDirectoryPort;
 import lms.identity.auth.infrastructure.client.InProcessUserDirectoryAdapter;
+import lms.identity.auth.infrastructure.client.InProcessTenantAccessAdapter;
+import lms.identity.tenant.application.AddMembershipUseCase;
+import lms.identity.tenant.application.ListMyTenantsUseCase;
+import lms.identity.tenant.application.ResolveLoginTenantUseCase;
+import lms.identity.tenant.application.SwitchTenantUseCase;
+import lms.identity.tenant.application.VerifyTenantAccessUseCase;
 import lms.identity.user.application.GetUserDirectoryInfoUseCase;
 import lms.identity.accesscontrol.application.GetUserAccessUseCase;
 import lms.identity.auth.infrastructure.client.InProcessUserAccessAdapter;
@@ -80,10 +87,18 @@ public class AuthBeanConfiguration {
     }
 
     @Bean
+    InProcessTenantAccessAdapter tenantAccessAdapter(ResolveLoginTenantUseCase resolve, SwitchTenantUseCase switchTenant,
+                                                     VerifyTenantAccessUseCase verify, ListMyTenantsUseCase listMine,
+                                                     AddMembershipUseCase addMembership) {
+        return new InProcessTenantAccessAdapter(resolve, switchTenant, verify, listMine, addMembership);
+    }
+
+    @Bean
     TokenService tokenService(InProcessUserAccessAdapter accessClient, JwtTokenIssuer issuer, SecureRefreshTokenCodec codec,
                               AuthPersistenceAdapter persistence, Clock clock, UserDirectoryPort userDirectory,
+                              InProcessTenantAccessAdapter tenantAccess,
                               @Value("${auth.refresh-token-ttl}") Duration refreshTtl) {
-        return new TokenService(accessClient, issuer, codec, persistence, clock, refreshTtl, userDirectory);
+        return new TokenService(accessClient, issuer, codec, persistence, clock, refreshTtl, userDirectory, tenantAccess);
     }
 
     @Bean
@@ -94,8 +109,16 @@ public class AuthBeanConfiguration {
 
     @Bean
     RefreshTokenUseCase refreshTokenUseCase(AuthPersistenceAdapter persistence, SecureRefreshTokenCodec codec,
-                                            TokenService tokenService, Clock clock) {
-        return new RefreshTokenUseCase(persistence, persistence, persistence, codec, tokenService, clock);
+                                            TokenService tokenService, InProcessTenantAccessAdapter tenantAccess,
+                                            Clock clock) {
+        return new RefreshTokenUseCase(persistence, persistence, persistence, codec, tokenService, tenantAccess, clock);
+    }
+
+    @Bean
+    SwitchTenantSessionUseCase switchTenantSessionUseCase(AuthPersistenceAdapter persistence,
+                                                          InProcessTenantAccessAdapter tenantAccess,
+                                                          TokenService tokenService, Clock clock) {
+        return new SwitchTenantSessionUseCase(persistence, tenantAccess, tokenService, clock);
     }
 
     @Bean
@@ -104,8 +127,9 @@ public class AuthBeanConfiguration {
     }
 
     @Bean
-    RegisterCredentialUseCase registerCredentialUseCase(AuthPersistenceAdapter persistence, BcryptPasswordHasher hasher) {
-        return new RegisterCredentialUseCase(persistence, persistence, hasher);
+    RegisterCredentialUseCase registerCredentialUseCase(AuthPersistenceAdapter persistence, BcryptPasswordHasher hasher,
+                                                        InProcessTenantAccessAdapter tenantAccess) {
+        return new RegisterCredentialUseCase(persistence, persistence, hasher, tenantAccess);
     }
 
     @Bean

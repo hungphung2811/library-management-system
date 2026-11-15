@@ -43,7 +43,7 @@ class TokenServiceUserDirectoryTest {
             public void revokeAllByUserId(UUID u) { }
         };
         return new TokenService(access, issuer, codec, refresh, Clock.fixed(Instant.parse("2026-10-01T00:00:00Z"), ZoneOffset.UTC),
-                Duration.ofDays(7), id -> info);
+                Duration.ofDays(7), id -> info, new TenantAccessStub());
     }
 
     @Test

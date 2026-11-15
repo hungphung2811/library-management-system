@@ -320,4 +320,171 @@ class IdentityServiceIT {
         // số lần sai phải được lưu dù ném exception (noRollbackFor); lần thứ sáu dù đúng mật khẩu vẫn bị khóa
         login("locky", "Correct@123", HttpStatus.LOCKED);
     }
+
+    // ---- đăng nhập, đổi tenant, refresh theo tenant (Task 4a) ----
+
+    static final UUID DEFAULT_TENANT = UUID.fromString("00000000-0000-0000-0000-0000000000d1");
+
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+    private UUID newTenant(String code, String status) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("INSERT INTO tenants (id, code, name, status) VALUES (?, ?, ?, ?)", id, code, "Thư viện " + code, status);
+        return id;
+    }
+
+    private void joinTenant(UUID userId, UUID tenantId) {
+        // tham gia sau tenant mặc định để thứ tự "tham gia sớm nhất" rõ ràng
+        jdbc.update("INSERT INTO tenant_memberships (user_id, tenant_id, status, joined_at) VALUES (?, ?, 'ACTIVE', "
+                + "now() + interval '1 hour')", userId, tenantId);
+    }
+
+    @SuppressWarnings("unchecked")
+    private ResponseEntity<Map> loginTo(String username, String password, String tenantCode) {
+        Map<String, Object> body = new java.util.HashMap<>(Map.of("username", username, "password", password));
+        if (tenantCode != null) body.put("tenantCode", tenantCode);
+        return rest.postForEntity("/internal/auth/login", body, Map.class);
+    }
+
+    private ResponseEntity<Map> switchTo(String token, UUID tenantId) {
+        return call(HttpMethod.POST, "/internal/auth/switch-tenant", token, Map.of("tenantId", tenantId), Map.class);
+    }
+
+    private ResponseEntity<Map> refreshWith(String refreshToken) {
+        return rest.postForEntity("/internal/auth/refresh", Map.of("refreshToken", refreshToken), Map.class);
+    }
+
+    private String tenantClaim(Object accessToken) {
+        return jwtDecoder.decode((String) accessToken).getClaimAsString("tenantId");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void dangNhapNhanTokenCuaTenantMacDinhKemDanhSachTenant() {
+        Map<String, Object> body = login("admin", "Admin@12345", HttpStatus.OK);
+
+        assertThat(tenantClaim(body.get("accessToken"))).isEqualTo(DEFAULT_TENANT.toString());
+        assertThat((Object) jwtDecoder.decode((String) body.get("accessToken")).getClaim("platformAdmin")).isNull();
+        assertThat(body.get("tenantId")).isEqualTo(DEFAULT_TENANT.toString());
+        assertThat((List<Map<String, Object>>) body.get("availableTenants"))
+                .anySatisfy(t -> assertThat(t.get("code")).isEqualTo("default"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void doiTenantLuuLastTenantVaLanDangNhapSauVaoDungTenant() {
+        String admin = accessToken("admin", "Admin@12345");
+        UUID userId = createUser(admin, "tenant-switcher", "Switch@12345");
+        UUID second = newTenant("it-second", "ACTIVE");
+        joinTenant(userId, second);
+
+        Map<String, Object> first = login("tenant-switcher", "Switch@12345", HttpStatus.OK);
+        assertThat(tenantClaim(first.get("accessToken"))).isEqualTo(DEFAULT_TENANT.toString());
+        assertThat((List<Map<String, Object>>) first.get("availableTenants")).hasSize(2);
+
+        ResponseEntity<Map> switched = switchTo((String) first.get("accessToken"), second);
+        assertThat(switched.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(tenantClaim(switched.getBody().get("accessToken"))).isEqualTo(second.toString());
+        assertThat(jdbc.queryForObject("SELECT last_tenant_id FROM credentials WHERE user_id = ?", UUID.class, userId))
+                .isEqualTo(second);
+        // refresh token mới gắn tenant vừa chọn
+        ResponseEntity<Map> refreshed = refreshWith((String) switched.getBody().get("refreshToken"));
+        assertThat(refreshed.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(tenantClaim(refreshed.getBody().get("accessToken"))).isEqualTo(second.toString());
+
+        assertThat(tenantClaim(login("tenant-switcher", "Switch@12345", HttpStatus.OK).get("accessToken")))
+                .isEqualTo(second.toString());
+        // mã tenant tường minh thắng last_tenant_id
+        assertThat(tenantClaim(loginTo("tenant-switcher", "Switch@12345", "default").getBody().get("accessToken")))
+                .isEqualTo(DEFAULT_TENANT.toString());
+
+        List<Map<String, Object>> mine = call(HttpMethod.GET, "/internal/me/tenants",
+                (String) switched.getBody().get("accessToken"), null, List.class).getBody();
+        assertThat(mine).extracting(t -> t.get("code")).containsExactly("default", "it-second");
+    }
+
+    @Test
+    void doiHoacDangNhapVaoTenantKhongCoMembershipBi403CungThongDiep() {
+        String admin = accessToken("admin", "Admin@12345");
+        createUser(admin, "tenant-outsider", "Outside@12345");
+        UUID foreign = newTenant("it-foreign", "ACTIVE");
+        String token = accessToken("tenant-outsider", "Outside@12345");
+
+        ResponseEntity<Map> denied = switchTo(token, foreign);
+        assertThat(denied.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(denied.getBody().get("code")).isEqualTo("NO_TENANT_ACCESS");
+
+        ResponseEntity<Map> byCode = loginTo("tenant-outsider", "Outside@12345", "it-foreign");
+        ResponseEntity<Map> unknown = loginTo("tenant-outsider", "Outside@12345", "khong-ton-tai");
+        assertThat(byCode.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(unknown.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        for (ResponseEntity<Map> r : List.of(byCode, unknown)) {
+            assertThat(r.getBody().get("code")).isEqualTo("NO_TENANT_ACCESS");
+            assertThat(r.getBody().get("message")).isEqualTo(denied.getBody().get("message"));
+        }
+    }
+
+    @Test
+    void refreshBiTuChoiKhiTenantBiTamNgungHoacMembershipBiTat() {
+        String admin = accessToken("admin", "Admin@12345");
+        UUID userId = createUser(admin, "tenant-refresher", "Refresh@12345");
+        UUID suspendLater = newTenant("it-suspend", "ACTIVE");
+        joinTenant(userId, suspendLater);
+        String token = accessToken("tenant-refresher", "Refresh@12345");
+
+        String inSuspended = (String) switchTo(token, suspendLater).getBody().get("refreshToken");
+        jdbc.update("UPDATE tenants SET status = 'SUSPENDED' WHERE id = ?", suspendLater);
+        ResponseEntity<Map> refused = refreshWith(inSuspended);
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(refused.getBody().get("code")).isEqualTo("NO_TENANT_ACCESS");
+        // tenant tạm ngưng không còn được chọn: đăng nhập rơi về tenant mặc định
+        assertThat(tenantClaim(accessToken("tenant-refresher", "Refresh@12345"))).isEqualTo(DEFAULT_TENANT.toString());
+
+        String inDefault = (String) login("tenant-refresher", "Refresh@12345", HttpStatus.OK).get("refreshToken");
+        jdbc.update("UPDATE tenant_memberships SET status = 'DISABLED' WHERE user_id = ? AND tenant_id = ?",
+                userId, DEFAULT_TENANT);
+        ResponseEntity<Map> disabled = refreshWith(inDefault);
+        assertThat(disabled.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(disabled.getBody().get("code")).isEqualTo("NO_TENANT_ACCESS");
+        // không còn tenant nào: đăng nhập cũng bị từ chối
+        assertThat(loginTo("tenant-refresher", "Refresh@12345", null).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void refreshTokenCuKhongGanTenantBiTuChoi() {
+        String admin = accessToken("admin", "Admin@12345");
+        UUID userId = createUser(admin, "tenant-legacy", "Legacy@12345");
+        String refresh = (String) login("tenant-legacy", "Legacy@12345", HttpStatus.OK).get("refreshToken");
+        jdbc.update("UPDATE refresh_tokens SET tenant_id = NULL WHERE user_id = ?", userId); // như token phát hành trước V12
+
+        assertThat(refreshWith(refresh).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void platformAdminKhongCoMembershipNhanTokenPlatformAdminKhongTenantId() {
+        String admin = accessToken("admin", "Admin@12345");
+        UUID userId = createUser(admin, "platform-op", "Platform@12345");
+        jdbc.update("UPDATE credentials SET platform_admin = TRUE WHERE user_id = ?", userId);
+        jdbc.update("DELETE FROM tenant_memberships WHERE user_id = ?", userId);
+
+        Map<String, Object> body = login("platform-op", "Platform@12345", HttpStatus.OK);
+        Jwt jwt = jwtDecoder.decode((String) body.get("accessToken"));
+        assertThat(jwt.getClaimAsBoolean("platformAdmin")).isTrue();
+        assertThat(jwt.hasClaim("tenantId")).isFalse();
+        assertThat(body.get("tenantId")).isNull();
+        assertThat((List<Object>) body.get("availableTenants")).isEmpty();
+
+        // endpoint chỉ cần đăng nhập vẫn dùng được với token không có tenantId
+        assertThat(call(HttpMethod.GET, "/internal/me/tenants", (String) body.get("accessToken"), null, List.class)
+                .getBody()).isEmpty();
+        // phiên nền tảng làm mới được khi credential còn cờ; mất cờ thì bị từ chối
+        ResponseEntity<Map> refreshed = refreshWith((String) body.get("refreshToken"));
+        assertThat(refreshed.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(jwtDecoder.decode((String) refreshed.getBody().get("accessToken")).getClaimAsBoolean("platformAdmin"))
+                .isTrue();
+        jdbc.update("UPDATE credentials SET platform_admin = FALSE WHERE user_id = ?", userId);
+        assertThat(refreshWith((String) refreshed.getBody().get("refreshToken")).getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
 }

@@ -51,12 +51,13 @@ class AuthUseCasesTest {
     private final RefreshTokenCodecPort codec = mock(RefreshTokenCodecPort.class);
     private final Instant now = Instant.parse("2026-01-01T00:00:00Z");
     private final Clock clock = Clock.fixed(now, ZoneOffset.UTC);
+    private final TenantAccessStub tenantAccess = new TenantAccessStub();
 
     private final TokenService tokenService =
-            new TokenService(access, issuer, codec, saveRefresh, clock, Duration.ofDays(7));
+            new TokenService(access, issuer, codec, saveRefresh, clock, Duration.ofDays(7), tenantAccess);
     private final LoginUseCase login = new LoginUseCase(credentials, saveCredential, hasher, tokenService, events, clock);
     private final RefreshTokenUseCase refresh =
-            new RefreshTokenUseCase(refreshRepo, saveRefresh, credentials, codec, tokenService, clock);
+            new RefreshTokenUseCase(refreshRepo, saveRefresh, credentials, codec, tokenService, tenantAccess, clock);
 
     private final UUID userId = UUID.randomUUID();
     private UserCredential credential = UserCredential.register(userId, "alice", "hash", null);
@@ -118,7 +119,7 @@ class AuthUseCasesTest {
     void refreshXoayVongThuHoiTokenCuVaPhatHanhTokenMoi() {
         stubIssue();
         when(codec.hash("old-raw")).thenReturn("old-hash");
-        RefreshToken old = RefreshToken.issue(userId, "old-hash", now.minusSeconds(60), Duration.ofDays(7));
+        RefreshToken old = RefreshToken.issueForTenant(userId, TenantAccessStub.TENANT, "old-hash", now.minusSeconds(60), Duration.ofDays(7));
         when(refreshRepo.findByTokenHash("old-hash")).thenReturn(Optional.of(old));
         when(credentials.findByUserId(userId)).thenReturn(Optional.of(credential));
 
@@ -143,7 +144,7 @@ class AuthUseCasesTest {
 
     @Test
     void dangKyChuanHoaUsernameVaChanTrung() {
-        RegisterCredentialUseCase register = new RegisterCredentialUseCase(credentials, saveCredential, hasher);
+        RegisterCredentialUseCase register = new RegisterCredentialUseCase(credentials, saveCredential, hasher, tenantAccess);
         when(hasher.hash("password1")).thenReturn("bcrypt");
         when(saveCredential.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
