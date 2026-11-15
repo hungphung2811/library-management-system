@@ -8,7 +8,9 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.util.UUID;
+import org.hibernate.annotations.TenantId;
 
+/** Bản sao thuộc một tenant (@TenantId + RLS); mã vạch unique theo tenant (ràng buộc ở migration). */
 @Entity
 @Table(name = "book_copies")
 class BookCopyJpaEntity {
@@ -16,10 +18,14 @@ class BookCopyJpaEntity {
     @Id
     private UUID id;
 
+    @TenantId
+    @Column(name = "tenant_id", nullable = false, updatable = false)
+    private UUID tenantId;
+
     @Column(name = "title_id", nullable = false)
     private UUID titleId;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String barcode;
 
     @Enumerated(EnumType.STRING)
