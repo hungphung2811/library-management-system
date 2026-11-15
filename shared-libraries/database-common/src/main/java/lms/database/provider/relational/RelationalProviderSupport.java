@@ -9,6 +9,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import javax.sql.DataSource;
 import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
@@ -44,7 +45,8 @@ public abstract class RelationalProviderSupport implements DatabaseProvider<Rela
 
     @Override
     public RelationalConnection create(String name, ConnectionSpec spec) {
-        HikariDataSource dataSource = new HikariDataSource(hikariConfig(name, spec));
+        HikariDataSource pool = new HikariDataSource(hikariConfig(name, spec));
+        DataSource dataSource = decorate(pool);
         LocalContainerEntityManagerFactoryBean emfBean = null;
         try {
             List<String> packages = spec.getEntityPackages();
@@ -55,16 +57,24 @@ public abstract class RelationalProviderSupport implements DatabaseProvider<Rela
                     ? new JpaTransactionManager(emfBean.getObject())
                     : new DataSourceTransactionManager(dataSource);
             int validationSeconds = (int) Math.max(1, spec.getTimeout().getValidation().toSeconds());
-            return new DefaultRelationalConnection(name, type, dataSource, emfBean, transactionManager,
+            return new DefaultRelationalConnection(name, type, pool, dataSource, emfBean, transactionManager,
                     testQuery, validationSeconds);
         } catch (RuntimeException e) {
             // Không để rò pool nếu bước sau của việc khởi tạo thất bại.
             if (emfBean != null) {
                 emfBean.destroy();
             }
-            dataSource.close();
+            pool.close();
             throw e;
         }
+    }
+
+    /**
+     * Hook cho service bọc DataSource (ví dụ đặt biến phiên cho RLS theo tenant). DataSource trả về dùng cho
+     * EntityManagerFactory, TransactionManager và bean DataSource; pool Hikari gốc vẫn do connection đóng.
+     */
+    protected DataSource decorate(HikariDataSource pool) {
+        return pool;
     }
 
     private HikariConfig hikariConfig(String name, ConnectionSpec spec) {
@@ -93,7 +103,7 @@ public abstract class RelationalProviderSupport implements DatabaseProvider<Rela
     }
 
     private LocalContainerEntityManagerFactoryBean entityManagerFactory(String name, ConnectionSpec spec,
-                                                                        HikariDataSource dataSource,
+                                                                        DataSource dataSource,
                                                                         List<String> packages) {
         Map<String, Object> properties = new LinkedHashMap<>();
         // Giữ quy ước đặt tên cột giống auto-configuration của Spring Boot (camelCase -> snake_case).

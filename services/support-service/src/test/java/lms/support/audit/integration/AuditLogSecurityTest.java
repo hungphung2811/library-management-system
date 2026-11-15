@@ -31,6 +31,8 @@ import org.springframework.test.web.servlet.MockMvc;
 @TestPropertySource(properties = {"app.security.enabled=true", "lms.security.permission.enabled=true"})
 class AuditLogSecurityTest {
 
+    private static final String TENANT = "00000000-0000-0000-0000-0000000000a1";
+
     @Autowired MockMvc mvc;
 
     @MockitoBean PermissionKeyRegistrar permissionKeyRegistrar;
@@ -44,8 +46,16 @@ class AuditLogSecurityTest {
     }
 
     @Test
+    void tokenKhongCoTenantBi403TenantRequiredKeCaKhiDuQuyen() throws Exception {
+        mvc.perform(get("/internal/audit-logs")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("AuditLogController/search"))))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("TENANT_REQUIRED"));
+    }
+
+    @Test
     void thieuKhoaQuyenBi403() throws Exception {
-        mvc.perform(get("/internal/audit-logs").with(jwt().authorities(new SimpleGrantedAuthority("BOOK_VIEW"))))
+        mvc.perform(get("/internal/audit-logs").with(jwt().jwt(j -> j.claim("tenantId", TENANT))
+                        .authorities(new SimpleGrantedAuthority("BOOK_VIEW"))))
                 .andExpect(status().isForbidden());
     }
 
@@ -54,14 +64,15 @@ class AuditLogSecurityTest {
         when(query.execute(any())).thenReturn(new PageResponse<>(List.of(), 0, 0, 20));
 
         mvc.perform(get("/internal/audit-logs").param("aggregateId", "x")
-                        .with(jwt().authorities(new SimpleGrantedAuthority("AuditLogController/search"))))
+                        .with(jwt().jwt(j -> j.claim("tenantId", TENANT))
+                                .authorities(new SimpleGrantedAuthority("AuditLogController/search"))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(0));
     }
 
     @Test
     void thamSoPhanTrangSaiBi400() throws Exception {
         mvc.perform(get("/internal/audit-logs").param("size", "1000")
-                        .with(jwt().authorities(new SimpleGrantedAuthority("AuditLogController/search"))))
+                        .with(jwt().jwt(j -> j.claim("tenantId", TENANT)).authorities(new SimpleGrantedAuthority("AuditLogController/search"))))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_AUDIT_QUERY"));
     }
 
@@ -75,7 +86,7 @@ class AuditLogSecurityTest {
     void adminDuocBoQuaKiemTraKhoaQuyen() throws Exception {
         when(query.execute(any())).thenReturn(new PageResponse<>(List.of(), 0, 0, 20));
 
-        mvc.perform(get("/internal/audit-logs").with(jwt().jwt(j -> j.claim("admin", true))))
+        mvc.perform(get("/internal/audit-logs").with(jwt().jwt(j -> j.claim("admin", true).claim("tenantId", TENANT))))
                 .andExpect(status().isOk());
     }
 }
