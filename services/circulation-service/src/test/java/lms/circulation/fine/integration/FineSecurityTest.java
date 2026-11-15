@@ -74,7 +74,7 @@ class FineSecurityTest {
         mvc.perform(post("/internal/fines/payments").contentType(MediaType.APPLICATION_JSON).content(body).with(jwt()))
                 .andExpect(status().isForbidden());
         mvc.perform(post("/internal/fines/payments").contentType(MediaType.APPLICATION_JSON).content(body)
-                        .with(jwt().jwt(j -> j.claim("permissions", List.of("FineController/collect")))
+                        .with(jwt().jwt(j -> j.claim("tenantId", UUID.randomUUID().toString()).claim("permissions", List.of("FineController/collect")))
                                 .authorities(new SimpleGrantedAuthority("FineController/collect"))))
                 .andExpect(status().isOk());
     }

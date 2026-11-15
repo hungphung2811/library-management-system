@@ -14,6 +14,9 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import lms.tenant.TenantContext;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class FulfillReservationUseCaseTest {
@@ -22,6 +25,16 @@ class FulfillReservationUseCaseTest {
     private final ReservationUseCasesTest.FakeRepo repo = new ReservationUseCasesTest.FakeRepo();
     private final List<DomainEvent> events = new ArrayList<>();
     private final FulfillReservationUseCase useCase = new FulfillReservationUseCase(repo, events::add, clock);
+
+    @BeforeEach
+    void datTenant() {
+        TenantContext.set(UUID.randomUUID());
+    }
+
+    @AfterEach
+    void roiTenant() {
+        TenantContext.clear();
+    }
 
     private Reservation readyFor(UUID reader, UUID copy) {
         Reservation r = Reservation.create(reader, UUID.randomUUID(), Instant.now(clock));

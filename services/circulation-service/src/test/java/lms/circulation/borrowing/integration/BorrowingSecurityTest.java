@@ -109,7 +109,7 @@ class BorrowingSecurityTest {
                                 .authorities(new SimpleGrantedAuthority("BorrowingController/borrow"))))
                 .andExpect(status().isForbidden());
         mvc.perform(post("/internal/borrowings/losses").contentType(MediaType.APPLICATION_JSON).content(body)
-                        .with(jwt().jwt(j -> j.claim("permissions", List.of("BorrowingController/reportLost")))
+                        .with(jwt().jwt(j -> j.claim("tenantId", TENANT.toString()).claim("permissions", List.of("BorrowingController/reportLost")))
                                 .authorities(new SimpleGrantedAuthority("BorrowingController/reportLost"))))
                 .andExpect(status().isOk());
     }
@@ -120,7 +120,7 @@ class BorrowingSecurityTest {
         String body = "{\"barcode\":\"BC-1\",\"condition\":\"DAMAGED\"}";
 
         mvc.perform(post("/internal/borrowings/returns").contentType(MediaType.APPLICATION_JSON).content(body)
-                        .with(jwt().jwt(j -> j.claim("permissions", List.of("BorrowingController/returnCopy")))
+                        .with(jwt().jwt(j -> j.claim("tenantId", TENANT.toString()).claim("permissions", List.of("BorrowingController/returnCopy")))
                                 .authorities(new SimpleGrantedAuthority("BorrowingController/returnCopy"))))
                 .andExpect(status().isOk());
     }
