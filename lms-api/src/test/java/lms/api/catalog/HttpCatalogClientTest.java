@@ -61,6 +61,28 @@ class HttpCatalogClientTest {
     }
 
     @Test
+    void suaDauSachGoiPutNoiBoVoiBodyDayDu() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://catalog")
+                .requestInterceptor(new TokenRelayInterceptor());
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        HttpCatalogClient client = new HttpCatalogClient(builder.build());
+
+        UUID title = UUID.randomUUID();
+        server.expect(requestTo("http://catalog/internal/books/" + title))
+                .andExpect(method(HttpMethod.PUT))
+                .andExpect(jsonPath("$.name").value("Clean Code 2"))
+                .andExpect(jsonPath("$.coverPrice").value(300000))
+                .andRespond(withSuccess("{\"id\":\"" + title + "\",\"name\":\"Clean Code 2\",\"author\":\"Martin\","
+                        + "\"isbn\":\"978\",\"coverPrice\":300000,\"availableCopies\":2}", MediaType.APPLICATION_JSON));
+
+        var view = client.updateTitle(title, new lms.api.catalog.dto.UpdateTitleRequest(
+                "Clean Code 2", "Martin", "978", new java.math.BigDecimal("300000")));
+        assertEquals("Clean Code 2", view.name());
+        assertEquals(2, view.availableCopies());
+        server.verify();
+    }
+
+    @Test
     void traBanSaoTheoIdMaVachVaDoiTrangThaiGoiDungDuongDanNoiBo() {
         RestClient.Builder builder = RestClient.builder().baseUrl("http://catalog")
                 .requestInterceptor(new TokenRelayInterceptor());

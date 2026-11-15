@@ -32,6 +32,7 @@ class SearchTitlesUseCaseTest {
             public Title save(Title t) { return t; }
             public Optional<Title> findById(UUID id) { return Optional.empty(); }
             public boolean existsByIsbn(String isbn) { return false; }
+            public boolean existsByIsbnAndIdNot(String isbn, UUID id) { return false; }
             public List<Title> search(String keyword) { return List.of(withCopy, noCopy); }
             public List<Title> findByIds(Collection<UUID> ids) { return List.of(); }
         };

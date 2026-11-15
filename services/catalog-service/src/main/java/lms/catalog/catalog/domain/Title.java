@@ -32,6 +32,11 @@ public class Title {
         return new Title(id, name, author, isbn, coverPrice);
     }
 
+    /** Bản đã sửa (cùng id): thay name/author/isbn/coverPrice, kiểm quy tắc như khi tạo. Không đổi bản hiện tại. */
+    public Title update(String name, String author, String isbn, BigDecimal coverPrice) {
+        return new Title(id, name, author, isbn, coverPrice);
+    }
+
     public UUID id() { return id; }
     public String name() { return name; }
     public String author() { return author; }

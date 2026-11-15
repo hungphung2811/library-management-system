@@ -13,6 +13,9 @@ public interface TitleRepository {
 
     boolean existsByIsbn(String isbn);
 
+    /** ISBN đã thuộc về đầu sách khác (loại trừ chính đầu sách có id này). */
+    boolean existsByIsbnAndIdNot(String isbn, UUID id);
+
     /** Tìm theo tên hoặc tác giả, không phân biệt hoa thường; keyword rỗng/null thì lấy tất cả. */
     List<Title> search(String keyword);
 

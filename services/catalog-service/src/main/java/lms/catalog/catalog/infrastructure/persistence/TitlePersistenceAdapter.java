@@ -34,6 +34,11 @@ class TitlePersistenceAdapter implements TitleRepository {
     }
 
     @Override
+    public boolean existsByIsbnAndIdNot(String isbn, UUID id) {
+        return jpa.existsByIsbnAndIdNot(isbn, id);
+    }
+
+    @Override
     public List<Title> search(String keyword) {
         boolean all = keyword == null || keyword.isBlank();
         List<TitleJpaEntity> rows = all ? jpa.findAllByOrderByName() : jpa.search(keyword.trim());

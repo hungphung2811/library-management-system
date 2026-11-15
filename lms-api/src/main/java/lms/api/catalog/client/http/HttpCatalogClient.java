@@ -8,6 +8,7 @@ import lms.api.catalog.dto.CopyStatus;
 import lms.api.catalog.dto.CopyView;
 import lms.api.catalog.dto.CreateTitleRequest;
 import lms.api.catalog.dto.TitleView;
+import lms.api.catalog.dto.UpdateTitleRequest;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -65,6 +66,11 @@ public class HttpCatalogClient implements CatalogClient {
     @Override
     public TitleView createTitle(CreateTitleRequest request) {
         return view(client.post().uri("/internal/books").body(request).retrieve().body(InternalTitle.class));
+    }
+
+    @Override
+    public TitleView updateTitle(UUID id, UpdateTitleRequest request) {
+        return view(client.put().uri("/internal/books/{id}", id).body(request).retrieve().body(InternalTitle.class));
     }
 
     @Override

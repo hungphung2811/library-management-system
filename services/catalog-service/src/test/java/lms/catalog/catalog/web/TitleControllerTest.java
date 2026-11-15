@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -20,6 +21,8 @@ import lms.catalog.catalog.application.CreateTitleUseCase;
 import lms.catalog.catalog.application.GetTitleUseCase;
 import lms.catalog.catalog.application.SearchTitlesUseCase;
 import lms.catalog.catalog.application.TitleResponse;
+import lms.catalog.catalog.application.UpdateTitleCommand;
+import lms.catalog.catalog.application.UpdateTitleUseCase;
 import lms.catalog.catalog.domain.DuplicateIsbnException;
 import lms.catalog.catalog.domain.InvalidTitleException;
 import lms.catalog.catalog.domain.TitleNotFoundException;
@@ -54,6 +57,7 @@ class TitleControllerTest {
     @MockitoBean CreateTitleUseCase createTitle;
     @MockitoBean GetTitleUseCase getTitle;
     @MockitoBean SearchTitlesUseCase searchTitles;
+    @MockitoBean UpdateTitleUseCase updateTitle;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean PermissionKeyRegistrar permissionKeyRegistrar;
 
@@ -174,6 +178,60 @@ class TitleControllerTest {
         mvc.perform(post("/internal/books").contentType(MediaType.APPLICATION_JSON).content(VALID).with(admin()))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("INVALID_TITLE"));
+    }
+
+    // --- update ---
+
+    @Test
+    void suaDauSachVoiKhoaUpdateTra200() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(updateTitle.execute(any())).thenReturn(title(id));
+        mvc.perform(put("/internal/books/" + id).contentType(MediaType.APPLICATION_JSON).content(VALID)
+                        .with(withKey("TitleController/update")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id.toString()));
+        verify(updateTitle).execute(new UpdateTitleCommand(id, "Clean Code", "Robert Martin", "9780132350884",
+                new BigDecimal("250000")));
+    }
+
+    @Test
+    void suaDauSachKhongCoKhoaHoacKhoaKhacBi403KhongTokenBi401() throws Exception {
+        UUID id = UUID.randomUUID();
+        mvc.perform(put("/internal/books/" + id).contentType(MediaType.APPLICATION_JSON).content(VALID)
+                        .with(noPermission()))
+                .andExpect(status().isForbidden());
+        mvc.perform(put("/internal/books/" + id).contentType(MediaType.APPLICATION_JSON).content(VALID)
+                        .with(withKey("TitleController/create")))
+                .andExpect(status().isForbidden());
+        mvc.perform(put("/internal/books/" + id).contentType(MediaType.APPLICATION_JSON).content(VALID))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(updateTitle);
+    }
+
+    @Test
+    void suaDauSachSaiDuLieuTra400VaIdSaiTra400() throws Exception {
+        UUID id = UUID.randomUUID();
+        mvc.perform(put("/internal/books/" + id).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\" \",\"author\":\"B\",\"coverPrice\":-1}").with(admin()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        mvc.perform(put("/internal/books/khong-phai-uuid").contentType(MediaType.APPLICATION_JSON).content(VALID)
+                        .with(admin()))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(updateTitle);
+    }
+
+    @Test
+    void suaDauSachKhongThayTra404TrungIsbnTra409() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(updateTitle.execute(any())).thenThrow(new TitleNotFoundException(id));
+        mvc.perform(put("/internal/books/" + id).contentType(MediaType.APPLICATION_JSON).content(VALID).with(admin()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("TITLE_NOT_FOUND"));
+        org.mockito.Mockito.doThrow(new DuplicateIsbnException("9780132350884")).when(updateTitle).execute(any());
+        mvc.perform(put("/internal/books/" + id).contentType(MediaType.APPLICATION_JSON).content(VALID).with(admin()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DUPLICATE_ISBN"));
     }
 
     // --- search ---

@@ -7,6 +7,7 @@ import lms.api.catalog.dto.CopyDetailsView;
 import lms.api.catalog.dto.CopyView;
 import lms.api.catalog.dto.CreateTitleRequest;
 import lms.api.catalog.dto.TitleView;
+import lms.api.catalog.dto.UpdateTitleRequest;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
@@ -47,6 +48,12 @@ public class CatalogController {
     public ResponseEntity<TitleView> create(@Valid @RequestBody CreateTitleRequest request) {
         TitleView created = catalog.createTitle(request);
         return ResponseEntity.created(URI.create("/api/books/" + created.id())).body(created);
+    }
+
+    /** Sửa đầu sách (tên, tác giả, ISBN, giá bìa); 404 không thấy, 409 trùng ISBN, 400/422 dữ liệu sai. */
+    @PutMapping("/books/{id}")
+    public TitleView update(@PathVariable UUID id, @Valid @RequestBody UpdateTitleRequest request) {
+        return catalog.updateTitle(id, request);
     }
 
     @GetMapping("/book-copies")

@@ -6,6 +6,7 @@ import lms.api.catalog.dto.CopyStatus;
 import lms.api.catalog.dto.CopyView;
 import lms.api.catalog.dto.CreateTitleRequest;
 import lms.api.catalog.dto.TitleView;
+import lms.api.catalog.dto.UpdateTitleRequest;
 import java.util.List;
 import java.util.UUID;
 
@@ -17,6 +18,8 @@ public interface CatalogClient {
     TitleView getTitle(UUID id);
 
     TitleView createTitle(CreateTitleRequest request);
+
+    TitleView updateTitle(UUID id, UpdateTitleRequest request);
 
     List<CopyView> listCopies(UUID titleId);
 

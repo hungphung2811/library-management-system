@@ -3,6 +3,7 @@ package lms.catalog.catalog.infrastructure.config;
 import lms.catalog.catalog.application.CreateTitleUseCase;
 import lms.catalog.catalog.application.GetTitleUseCase;
 import lms.catalog.catalog.application.SearchTitlesUseCase;
+import lms.catalog.catalog.application.UpdateTitleUseCase;
 import lms.catalog.catalog.domain.TitleRepository;
 import lms.catalog.inventory.application.CopyAvailabilityQuery;
 import org.springframework.context.annotation.Bean;
@@ -15,6 +16,11 @@ public class CatalogBeanConfiguration {
     @Bean
     CreateTitleUseCase createTitleUseCase(TitleRepository repository) {
         return new CreateTitleUseCase(repository);
+    }
+
+    @Bean
+    UpdateTitleUseCase updateTitleUseCase(TitleRepository repository, CopyAvailabilityQuery availability) {
+        return new UpdateTitleUseCase(repository, availability);
     }
 
     @Bean

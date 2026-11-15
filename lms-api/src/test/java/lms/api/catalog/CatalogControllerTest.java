@@ -77,6 +77,40 @@ class CatalogControllerTest {
     }
 
     @Test
+    void suaDauSachChuyenTiepVaTraDauSachMoi() throws Exception {
+        when(catalog.updateTitle(eq(TITLE), any())).thenReturn(
+                new TitleView(TITLE, "Clean Code 2", "Martin", "978", new BigDecimal("300000"), 1));
+        mvc.perform(put("/api/books/" + TITLE).with(jwt()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Clean Code 2\",\"author\":\"Martin\",\"isbn\":\"978\",\"coverPrice\":300000}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Clean Code 2"))
+                .andExpect(jsonPath("$.availableCopies").value(1));
+    }
+
+    @Test
+    void suaDauSachSaiDuLieuBi400VaKhongTokenBi401() throws Exception {
+        mvc.perform(put("/api/books/" + TITLE).with(jwt()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"\",\"author\":\"B\",\"coverPrice\":-1}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        mvc.perform(put("/api/books/" + TITLE).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"A\",\"author\":\"B\",\"coverPrice\":1}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void suaDauSachTrungIsbnChuyenNguyen409() throws Exception {
+        when(catalog.updateTitle(eq(TITLE), any())).thenThrow(HttpClientErrorException.create(HttpStatus.CONFLICT,
+                "Conflict", HttpHeaders.EMPTY,
+                "{\"code\":\"DUPLICATE_ISBN\",\"message\":\"x\",\"details\":[]}".getBytes(StandardCharsets.UTF_8),
+                StandardCharsets.UTF_8));
+        mvc.perform(put("/api/books/" + TITLE).with(jwt()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"A\",\"author\":\"B\",\"isbn\":\"1\",\"coverPrice\":1}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DUPLICATE_ISBN"));
+    }
+
+    @Test
     void duLieuSaiBi400TruocKhiGoiService() throws Exception {
         mvc.perform(post("/api/books").with(jwt()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"\",\"author\":\"B\",\"coverPrice\":-1}"))
