@@ -13,7 +13,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
-import javax.sql.DataSource;
 import lms.database.api.ConnectionState;
 import lms.database.api.MongoConnection;
 import lms.database.api.RelationalConnection;
@@ -29,18 +28,25 @@ import lms.support.audit.application.RecordAuditEventCommand;
 import lms.support.audit.application.RecordAuditEventUseCase;
 import lms.support.audit.domain.AuditLogCriteria;
 import lms.support.audit.infrastructure.messaging.AuditEventConsumer;
+import lms.tenant.TenantContext;
 import org.bson.Document;
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.DependsOn;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.orm.jpa.JpaTransactionManager;
@@ -66,6 +72,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
         "app.security.enabled=false"
 })
 @Testcontainers
+@Import(TestTenantFilterConfiguration.class)
 class SupportServiceIT {
 
     @Container
@@ -76,9 +83,8 @@ class SupportServiceIT {
 
     @DynamicPropertySource
     static void databases(DynamicPropertyRegistry registry) {
-        registry.add("database.connections.AUDIT_DB.url", postgres::getJdbcUrl);
-        registry.add("database.connections.AUDIT_DB.username", postgres::getUsername);
-        registry.add("database.connections.AUDIT_DB.password", postgres::getPassword);
+        // AUDIT_DB kết nối bằng vai trò audit_app (chịu RLS); Flyway của test chạy bằng superuser (chủ bảng)
+        AppRoleDatabase.register(postgres, registry);
         registry.add("database.connections.LOG_DB.uri", () -> mongo.getReplicaSetUrl("audit_logs"));
     }
 
@@ -119,10 +125,22 @@ class SupportServiceIT {
         @DependsOn("databaseLifecycleManager")
         Flyway auditFlyway(DatabaseConnectionRegistry registry) {
             return Flyway.configure()
-                    .dataSource(registry.require("AUDIT_DB", RelationalConnection.class).dataSource())
+                    .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
                     .locations("classpath:db/migration/audit")
                     .load();
         }
+    }
+
+    static final UUID TENANT_A = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+
+    @BeforeEach
+    void tenantContext() {
+        TenantContext.set(TENANT_A);
+    }
+
+    @AfterEach
+    void clearTenantContext() {
+        TenantContext.clear();
     }
 
     @Autowired TestRestTemplate rest;
@@ -133,16 +151,21 @@ class SupportServiceIT {
     @Autowired IngestAuditEventUseCase ingest;
     @Autowired AuditEventConsumer consumer;
     @Autowired TransactionProbe probe;
-    @Autowired @Qualifier("auditDbDataSource") DataSource auditDataSource;
+
+    /** Đọc thẳng DB bằng superuser (bỏ qua RLS) để kiểm tra dữ liệu thật sự nằm trong bảng. */
+    private JdbcTemplate superuserJdbc() {
+        return new JdbcTemplate(new DriverManagerDataSource(postgres.getJdbcUrl(), postgres.getUsername(),
+                postgres.getPassword()));
+    }
 
     private int countRows(UUID eventId) {
-        return new JdbcTemplate(auditDataSource)
+        return superuserJdbc()
                 .queryForObject("SELECT COUNT(*) FROM audit_logs WHERE event_id = ?", Integer.class, eventId);
     }
 
     private Document rawDocument(UUID eventId) {
         return registry.require("LOG_DB", MongoConnection.class).mongoTemplate()
-                .getCollection("raw_events").find(new Document("_id", eventId.toString())).first();
+                .getCollection("raw_events").find(new Document("eventId", eventId.toString())).first();
     }
 
     private RecordAuditEventCommand event(UUID eventId, String type, String aggregateId) {
@@ -153,11 +176,19 @@ class SupportServiceIT {
     void khoiDongMoCaHaiConnectionVaSchemaAuditDbDuocBeanTestMigrate() {
         assertThat(registry.state("AUDIT_DB")).isEqualTo(ConnectionState.UP);
         assertThat(registry.state("LOG_DB")).isEqualTo(ConnectionState.UP);
-        // 1 bản ghi thành công do bean auditFlyway của test chạy (script từ jar migration-service)
-        assertThat(new JdbcTemplate(auditDataSource)
-                .queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE success", Integer.class)).isEqualTo(1);
+        // V1 + V2 thành công do bean auditFlyway của test chạy (script từ jar migration-service)
+        assertThat(superuserJdbc()
+                .queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE success AND version IS NOT NULL",
+                        Integer.class)).isEqualTo(2);
         assertThat(context.getBean("auditDbTransactionManager")).isInstanceOf(JpaTransactionManager.class)
                 .isSameAs(registry.require("AUDIT_DB", RelationalConnection.class).transactionManager());
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> get(String url) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Test-Tenant", TENANT_A.toString());
+        return rest.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), Map.class).getBody();
     }
 
     @Test
@@ -171,19 +202,21 @@ class SupportServiceIT {
 
         assertThat(query.execute(new AuditLogCriteria(aggregate, null, 0, 20)).total()).isEqualTo(3);
 
-        Map<String, Object> filtered = rest.getForObject(
-                "/internal/audit-logs?aggregateId=" + aggregate + "&eventType=BookBorrowedEvent", Map.class);
+        Map<String, Object> filtered = get(
+                "/internal/audit-logs?aggregateId=" + aggregate + "&eventType=BookBorrowedEvent");
         assertThat(filtered.get("total")).isEqualTo(2);
         assertThat((List<Map<String, Object>>) filtered.get("items")).extracting(i -> i.get("eventType"))
                 .containsOnly("BookBorrowedEvent");
 
-        Map<String, Object> secondPage = rest.getForObject(
-                "/internal/audit-logs?aggregateId=" + aggregate + "&page=1&size=2", Map.class);
+        Map<String, Object> secondPage = get(
+                "/internal/audit-logs?aggregateId=" + aggregate + "&page=1&size=2");
         assertThat(secondPage.get("total")).isEqualTo(3);
         assertThat((List<?>) secondPage.get("items")).hasSize(1);
 
-        assertThat(rest.getForEntity("/internal/audit-logs?size=1000", Map.class).getStatusCode())
-                .isEqualTo(HttpStatus.BAD_REQUEST);
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Test-Tenant", TENANT_A.toString());
+        assertThat(rest.exchange("/internal/audit-logs?size=1000", HttpMethod.GET, new HttpEntity<>(headers), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test
@@ -204,7 +237,8 @@ class SupportServiceIT {
         List<Future<?>> futures = new ArrayList<>();
         for (int i = 0; i < 8; i++) {
             futures.add(pool.submit((Callable<Void>) () -> {
-                if (record.execute(event(eventId, "BookBorrowedEvent", "agg-race"))) created.incrementAndGet();
+                if (TenantContext.callAs(TENANT_A,
+                        () -> record.execute(event(eventId, "BookBorrowedEvent", "agg-race")))) created.incrementAndGet();
                 return null;
             }));
         }

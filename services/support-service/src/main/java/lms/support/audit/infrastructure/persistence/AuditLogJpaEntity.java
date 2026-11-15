@@ -6,13 +6,19 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
+import org.hibernate.annotations.TenantId;
 
+/** Audit log thuộc một tenant: tenant_id do Hibernate lọc theo TenantContext (@TenantId), RLS lọc thêm ở DB. */
 @Entity
 @Table(name = "audit_logs")
 class AuditLogJpaEntity {
 
     @Id
     private UUID id;
+
+    @TenantId
+    @Column(name = "tenant_id", nullable = false, updatable = false)
+    private UUID tenantId;
 
     @Column(name = "event_id", nullable = false, unique = true)
     private UUID eventId;

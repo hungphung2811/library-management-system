@@ -18,19 +18,21 @@ class DefaultRelationalConnection implements RelationalConnection {
 
     private final String name;
     private final DatabaseType type;
-    private final HikariDataSource dataSource;
+    private final HikariDataSource pool;
+    private final DataSource dataSource;
     private final LocalContainerEntityManagerFactoryBean emfBean;
     private final PlatformTransactionManager transactionManager;
     private final String testQuery;
     private final int validationSeconds;
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
-    DefaultRelationalConnection(String name, DatabaseType type, HikariDataSource dataSource,
+    DefaultRelationalConnection(String name, DatabaseType type, HikariDataSource pool, DataSource dataSource,
                                 LocalContainerEntityManagerFactoryBean emfBean,
                                 PlatformTransactionManager transactionManager, String testQuery,
                                 int validationSeconds) {
         this.name = name;
         this.type = type;
+        this.pool = pool;
         this.dataSource = dataSource;
         this.emfBean = emfBean;
         this.transactionManager = transactionManager;
@@ -91,7 +93,7 @@ class DefaultRelationalConnection implements RelationalConnection {
                     emfBean.destroy();
                 }
             } finally {
-                dataSource.close();
+                pool.close();
             }
         }
     }

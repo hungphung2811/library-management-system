@@ -31,6 +31,10 @@ import lms.support.audit.domain.AuditLogCriteria;
 import lms.support.audit.domain.AuditLogPage;
 import lms.support.audit.domain.AuditLogRepository;
 import lms.support.audit.domain.InvalidAuditEventException;
+import lms.support.audit.infrastructure.messaging.AuditEventConsumer;
+import lms.support.audit.infrastructure.messaging.AuditEventParser;
+import lms.tenant.TenantContext;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -131,5 +135,54 @@ class AuditUseCasesTest {
         assertThat(response.total()).isEqualTo(11);
         assertThat(response.page()).isEqualTo(1);
         assertThat(response.items()).singleElement().extracting(AuditLogResponse::eventType).isEqualTo("BookReturnedEvent");
+    }
+
+    // ===== Theo tenant (T9) =====
+
+    private static final UUID TENANT = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+
+    private final IngestAuditEventUseCase ingestMock = mock(IngestAuditEventUseCase.class);
+    private final AuditEventConsumer consumer = new AuditEventConsumer(
+            new AuditEventParser(new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules()), ingestMock);
+
+    @AfterEach
+    void clearTenant() {
+        TenantContext.clear();
+    }
+
+    private static String envelope(UUID eventId, String tenantField) {
+        return "{\"eventId\":\"" + eventId + "\",\"eventType\":\"BookBorrowedEvent\",\"aggregateId\":\"agg-1\","
+                + "\"occurredAt\":\"2026-01-01T00:00:00Z\",\"version\":1,\"payload\":{}" + tenantField + "}";
+    }
+
+    @Test
+    void consumerBoQuaEventThieuTenantIdKhongGoiIngestVaKhongNemLoi() {
+        org.assertj.core.api.Assertions.assertThatCode(
+                () -> consumer.onEvent(envelope(UUID.randomUUID(), ""), "borrowing.events")).doesNotThrowAnyException();
+
+        verify(ingestMock, never()).execute(any());
+    }
+
+    @Test
+    void consumerDatTenantContextTheoEventKhiGoiIngestRoiKhoiPhuc() {
+        java.util.concurrent.atomic.AtomicReference<UUID> seen = new java.util.concurrent.atomic.AtomicReference<>();
+        when(ingestMock.execute(any())).thenAnswer(invocation -> {
+            seen.set(TenantContext.current().orElse(null));
+            return true;
+        });
+
+        consumer.onEvent(envelope(UUID.randomUUID(), ",\"tenantId\":\"" + TENANT + "\""), "borrowing.events");
+
+        assertThat(seen.get()).isEqualTo(TENANT);
+        assertThat(TenantContext.current()).isEmpty();
+    }
+
+    @Test
+    void consumerBoQuaTenantIdKhongPhaiUuidKhongNemLoi() {
+        org.assertj.core.api.Assertions.assertThatCode(() -> consumer.onEvent(
+                envelope(UUID.randomUUID(), ",\"tenantId\":\"khong-phai-uuid\""), "borrowing.events"))
+                .doesNotThrowAnyException();
+
+        verify(ingestMock, never()).execute(any());
     }
 }

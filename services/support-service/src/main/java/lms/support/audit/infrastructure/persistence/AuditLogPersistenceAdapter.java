@@ -4,6 +4,7 @@ import jakarta.persistence.criteria.Predicate;
 import java.util.ArrayList;
 import java.util.List;
 import lms.support.audit.application.SaveAuditLogPort;
+import lms.tenant.TenantContext;
 import lms.support.audit.domain.AuditLog;
 import lms.support.audit.domain.AuditLogCriteria;
 import lms.support.audit.domain.AuditLogPage;
@@ -24,10 +25,11 @@ public class AuditLogPersistenceAdapter implements AuditLogRepository, SaveAudit
 
     @Override
     public boolean saveIfAbsent(AuditLog log) {
-        return jpa.insertIfAbsent(log.id(), log.eventId(), log.eventType(), log.aggregateId(), log.occurredAt(),
+        return jpa.insertIfAbsent(log.id(), TenantContext.require(), log.eventId(), log.eventType(), log.aggregateId(), log.occurredAt(),
                 log.recordedAt(), log.payload()) == 1;
     }
 
+    /** Tìm kiếm: Hibernate (@TenantId) tự lọc theo TenantContext, RLS lọc thêm ở DB; không có tenant thì không có dòng nào. */
     @Override
     public AuditLogPage search(AuditLogCriteria criteria) {
         Specification<AuditLogJpaEntity> spec = (root, query, cb) -> {

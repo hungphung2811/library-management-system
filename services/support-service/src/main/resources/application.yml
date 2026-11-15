@@ -38,6 +38,8 @@ database:
       jpa-properties:
         # Không tự sinh/validate schema ở đây: schema do migration-service quản lý.
         hibernate.hbm2ddl.auto: none
+        # @TenantId của AuditLogJpaEntity lọc theo TenantContext (không có tenant: UUID nil, không khớp dòng nào)
+        hibernate.tenant_identifier_resolver: lms.tenant.TenantIdentifierResolver
     LOG_DB:
       type: MONGODB
       critical: false
@@ -76,3 +78,8 @@ lms:
       service-name: ${spring.application.name}
       identity-base-url: ${IDENTITY_SERVICE_URL:http://localhost:8081}
       internal-api-key: ${INTERNAL_API_KEY:}
+      # Endpoint bắt buộc token có claim tenantId (403 TENANT_REQUIRED)
+      require-tenant: true
+  # tenant-common: TenantContext theo claim tenantId, Hibernate @TenantId và RLS (app.tenant_id)
+  tenant:
+    enabled: true
