@@ -77,6 +77,13 @@ public class UserBeanConfiguration {
         return new CreateUserUseCase(repository, departments, credentials, memberships);
     }
 
+    /** Tài khoản cho thao tác nền tảng của context tenant (tạo quản trị viên tenant, gắn tài khoản có sẵn). */
+    @Bean
+    lms.identity.tenant.application.TenantAccountPort tenantAccountPort(CreateUserUseCase createUser,
+                                                                        AccountCredentialPort credentials) {
+        return new lms.identity.user.infrastructure.client.PlatformTenantAccountAdapter(createUser, credentials);
+    }
+
     @Bean
     UpdateUserUseCase updateUserUseCase(UserRepository repository, DepartmentLookupPort departments,
                                         AccountCredentialPort credentials, TenantMembershipPort memberships) {

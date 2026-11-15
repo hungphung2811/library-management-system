@@ -44,6 +44,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
         "spring.kafka.admin.properties.request.timeout.ms=500",
         "spring.kafka.admin.properties.default.api.timeout.ms=500",
         "auth.bootstrap-admin.password=Admin@12345",
+        "auth.bootstrap.platform-admin-username=platform-root",
+        "auth.bootstrap.platform-admin-password=PlatformRoot@123",
         "app.internal-api-key=test-internal-key"
 })
 @Testcontainers
@@ -636,5 +638,130 @@ class IdentityServiceIT {
                 .isEqualTo(HttpStatus.CREATED);
         assertThat(jwtDecoder.decode(accessToken("m1-legacy", "M1Legacy@123")).getClaimAsString("departmentId"))
                 .isEqualTo(dept2);
+    }
+
+    // ---- Task 6: quản lý tenant cho super admin (Review Focus 3) ----
+
+    /** Tài khoản người vận hành do bootstrap tạo (auth.bootstrap.platform-admin-*), không thuộc tenant nào. */
+    private String platformToken() {
+        return accessToken("platform-root", "PlatformRoot@123");
+    }
+
+    private static Map<String, Object> createTenantBody(String code, String adminUsername) {
+        return Map.of("code", code, "name", "Thư viện " + code, "newAdmin", Map.of("username", adminUsername,
+                "fullName", "Quản trị " + code, "email", adminUsername + "@x.vn", "temporaryPassword", "TempAdmin@123"));
+    }
+
+    @Test
+    void bootstrapTaoPlatformAdminTokenChiCoPlatformAdmin() {
+        Jwt jwt = jwtDecoder.decode(platformToken());
+        assertThat(jwt.getClaimAsBoolean("platformAdmin")).isTrue();
+        assertThat(jwt.hasClaim("tenantId")).isFalse();
+        assertThat(jdbc.queryForObject("SELECT platform_admin FROM credentials WHERE username = 'platform-root'",
+                Boolean.class)).isTrue();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void superAdminTaoTenantCoDuRoleMauVaQuanTriVienDauTien() {
+        String operator = platformToken();
+        ResponseEntity<Map> created = call(HttpMethod.POST, "/api/platform/tenants", operator,
+                createTenantBody("it-plat-roles", "it-plat-roles-admin"), Map.class);
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        UUID tenantId = UUID.fromString((String) created.getBody().get("id"));
+        assertThat(created.getBody().get("status")).isEqualTo("ACTIVE");
+        assertThat(((Number) created.getBody().get("memberCount")).longValue()).isEqualTo(1L);
+
+        // role của tenant mới = bộ role_templates (đọc dưới RLS bằng identity_app trong ngữ cảnh tenant mới)
+        Integer templates = jdbc.queryForObject("SELECT count(*) FROM role_templates", Integer.class);
+        assertThat(templates).isEqualTo(5);
+        assertThat(lms.tenant.TenantContext.callAs(tenantId,
+                () -> jdbc.queryForObject("SELECT count(*) FROM roles", Integer.class))).isEqualTo(templates);
+        assertThat(lms.tenant.TenantContext.callAs(tenantId, () -> jdbc.queryForObject(
+                "SELECT count(*) FROM role_permissions", Integer.class))).isEqualTo(jdbc.queryForObject(
+                "SELECT count(*) FROM role_template_permissions", Integer.class));
+        // quản trị viên đầu tiên: membership ACTIVE + đúng một role quản trị của tenant mới, mật khẩu tạm buộc đổi
+        UUID adminId = jdbc.queryForObject("SELECT user_id FROM credentials WHERE username = 'it-plat-roles-admin'",
+                UUID.class);
+        assertThat(jdbc.queryForObject("SELECT must_change_password FROM credentials WHERE user_id = ?", Boolean.class,
+                adminId)).isTrue();
+        assertThat(jdbc.queryForObject("SELECT status FROM tenant_memberships WHERE user_id = ? AND tenant_id = ?",
+                String.class, adminId, tenantId)).isEqualTo("ACTIVE");
+        assertThat(lms.tenant.TenantContext.callAs(tenantId, () -> jdbc.queryForObject(
+                "SELECT count(*) FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE r.is_admin AND ur.user_id = ?",
+                Integer.class, adminId))).isEqualTo(1);
+        // chi tiết liệt kê quản trị viên
+        ResponseEntity<Map> detail = call(HttpMethod.GET, "/api/platform/tenants/" + tenantId, operator, null, Map.class);
+        assertThat((List<String>) detail.getBody().get("adminUserIds")).containsExactly(adminId.toString());
+
+        // tạo trùng code bị từ chối, không tạo tài khoản quản trị thứ hai
+        ResponseEntity<Map> duplicate = call(HttpMethod.POST, "/api/platform/tenants", operator,
+                createTenantBody("it-plat-roles", "it-plat-roles-admin2"), Map.class);
+        assertThat(duplicate.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM credentials WHERE username = 'it-plat-roles-admin2'",
+                Integer.class)).isZero();
+
+        // tìm kiếm có số thành viên
+        ResponseEntity<Map> page = call(HttpMethod.GET, "/api/platform/tenants?keyword=plat-roles", operator, null,
+                Map.class);
+        assertThat((List<Map<String, Object>>) page.getBody().get("items"))
+                .extracting(t -> t.get("code")).containsExactly("it-plat-roles");
+    }
+
+    @Test
+    void tamNgungTenantChanDangNhapVaRefreshKichHoatLaiThiVaoLaiDuoc() {
+        String operator = platformToken();
+        ResponseEntity<Map> created = call(HttpMethod.POST, "/api/platform/tenants", operator,
+                createTenantBody("it-plat-suspend", "it-plat-suspend-admin"), Map.class);
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        String tenantId = (String) created.getBody().get("id");
+
+        ResponseEntity<Map> before = loginTo("it-plat-suspend-admin", "TempAdmin@123", "it-plat-suspend");
+        assertThat(before.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(tenantClaim(before.getBody().get("accessToken"))).isEqualTo(tenantId);
+        String refresh = (String) before.getBody().get("refreshToken");
+
+        ResponseEntity<Map> suspended = call(HttpMethod.POST, "/api/platform/tenants/" + tenantId + "/suspend",
+                operator, null, Map.class);
+        assertThat(suspended.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(suspended.getBody().get("status")).isEqualTo("SUSPENDED");
+
+        ResponseEntity<Map> deniedLogin = loginTo("it-plat-suspend-admin", "TempAdmin@123", "it-plat-suspend");
+        assertThat(deniedLogin.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(deniedLogin.getBody().get("code")).isEqualTo("NO_TENANT_ACCESS");
+        ResponseEntity<Map> deniedRefresh = refreshWith(refresh);
+        assertThat(deniedRefresh.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(deniedRefresh.getBody().get("code")).isEqualTo("NO_TENANT_ACCESS");
+
+        assertThat(call(HttpMethod.POST, "/api/platform/tenants/" + tenantId + "/activate", operator, null, Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.OK);
+        ResponseEntity<Map> again = loginTo("it-plat-suspend-admin", "TempAdmin@123", "it-plat-suspend");
+        assertThat(again.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(tenantClaim(again.getBody().get("accessToken"))).isEqualTo(tenantId);
+    }
+
+    @Test
+    void superAdminKhongDocDuocDuLieuNghiepVuVaQuanTriVienTenantKhongGoiDuocApiNenTang() {
+        String operator = platformToken();
+        // token chỉ có platformAdmin: endpoint thuộc tenant bị từ chối TENANT_REQUIRED
+        ResponseEntity<Map> users = call(HttpMethod.GET, "/internal/users", operator, null, Map.class);
+        assertThat(users.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(users.getBody().get("code")).isEqualTo("TENANT_REQUIRED");
+        ResponseEntity<Map> roles = call(HttpMethod.GET, "/internal/roles", operator, null, Map.class);
+        assertThat(roles.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(roles.getBody().get("code")).isEqualTo("TENANT_REQUIRED");
+
+        // quản trị viên tenant (admin=true, có tenantId) và người dùng thường không gọi được /api/platform/**
+        String tenantAdmin = accessToken("admin", "Admin@12345");
+        assertThat(call(HttpMethod.GET, "/api/platform/tenants", tenantAdmin, null, Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(call(HttpMethod.POST, "/api/platform/tenants", tenantAdmin,
+                createTenantBody("it-plat-denied", "it-plat-denied-admin"), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+        createUser(tenantAdmin, "it-plat-plain", "PlainUser@123");
+        assertThat(call(HttpMethod.GET, "/api/platform/organizations", accessToken("it-plat-plain", "PlainUser@123"),
+                null, Map.class).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM tenants WHERE code = 'it-plat-denied'", Integer.class))
+                .isZero();
     }
 }

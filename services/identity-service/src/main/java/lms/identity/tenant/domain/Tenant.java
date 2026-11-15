@@ -12,7 +12,7 @@ public class Tenant {
     private final UUID id;
     private final String code;
     private String name;
-    private final UUID organizationId;
+    private UUID organizationId;
     private TenantStatus status;
     private final Instant createdAt;
 
@@ -21,8 +21,7 @@ public class Tenant {
         if (code == null || !CODE.matcher(code).matches()) {
             throw new InvalidTenantException("Mã tenant chỉ gồm chữ thường, số và '-', từ 2 đến 50 ký tự");
         }
-        if (name == null || name.isBlank()) throw new InvalidTenantException("Tên tenant không được để trống");
-        if (name.trim().length() > 255) throw new InvalidTenantException("Tên tenant tối đa 255 ký tự");
+        requireName(name);
         if (status == null) throw new InvalidTenantException("Trạng thái không được null");
         this.id = id;
         this.code = code;
@@ -39,6 +38,22 @@ public class Tenant {
     public static Tenant restore(UUID id, String code, String name, UUID organizationId, TenantStatus status,
                                  Instant createdAt) {
         return new Tenant(id, code, name, organizationId, status, createdAt);
+    }
+
+    /** Đổi tên; mã ({@code code}) bất biến sau khi tạo để không vỡ tham chiếu. */
+    public void rename(String newName) {
+        requireName(newName);
+        this.name = newName.trim();
+    }
+
+    /** Gán hoặc đổi trường (null = không thuộc trường nào). */
+    public void moveToOrganization(UUID newOrganizationId) {
+        this.organizationId = newOrganizationId;
+    }
+
+    private static void requireName(String name) {
+        if (name == null || name.isBlank()) throw new InvalidTenantException("Tên tenant không được để trống");
+        if (name.trim().length() > 255) throw new InvalidTenantException("Tên tenant tối đa 255 ký tự");
     }
 
     public void suspend() {

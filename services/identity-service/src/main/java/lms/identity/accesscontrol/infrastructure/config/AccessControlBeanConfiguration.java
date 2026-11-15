@@ -77,6 +77,15 @@ public class AccessControlBeanConfiguration {
         return new UserRoleUseCase(persistence, persistence, persistence, publisher, clock);
     }
 
+    /** Role của tenant mới từ role_templates, gán/gỡ quản trị viên tenant cho thao tác nền tảng (context tenant). */
+    @Bean
+    lms.identity.tenant.application.TenantRoleProvisioningPort tenantRoleProvisioningPort(
+            AccessControlPersistenceAdapter persistence, UserRoleUseCase userRoleUseCase,
+            org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
+        return new lms.identity.accesscontrol.infrastructure.platform.TenantRoleProvisioningAdapter(persistence,
+                persistence, persistence, userRoleUseCase, jdbcTemplate);
+    }
+
     @Bean
     GetUserAccessUseCase getUserAccessUseCase(AccessControlPersistenceAdapter persistence,
                                               EffectivePermissionsService permissionsService) {
