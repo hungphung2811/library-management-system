@@ -31,6 +31,7 @@ Hiện tại hệ thống chỉ phục vụ một thư viện: không có khái 
 - Tính tiền, hạn mức, gói dịch vụ; tên miền hoặc subdomain riêng cho từng tenant; giao diện và cấu hình riêng theo tenant.
 - Trường tự đăng ký; xuất hoặc xóa toàn bộ dữ liệu của một tenant; báo cáo hoặc tìm kiếm xuyên tenant.
 - Đăng nhập ngoài (OIDC) riêng cho từng tenant: tạm giữ là toàn hệ thống như hiện nay.
+- Đặt chỗ ngồi trong thư viện (khu vực, khung giờ, sức chứa, check-in): chủ hệ thống xác nhận không cần.
 
 **Điều không được xảy ra (kể cả khi tính năng "chạy đúng")**
 - Một request của tenant A đọc hoặc ghi được dòng của tenant B, kể cả qua SQL native hoặc quên điều kiện lọc.
@@ -92,6 +93,14 @@ Chủ hệ thống chốt: quản trị viên của từng tenant **tự quản 
 - Sửa thông tin tài khoản (họ tên, email) và đặt lại mật khẩu: quản trị viên tenant chỉ làm được với tài khoản mà **chỉ là thành viên của đúng tenant đó** và không phải platform admin. Khi tài khoản trở thành thành viên của từ hai tenant trở lên, quyền này chuyển về chính người dùng (và người vận hành). Lý do: nếu không, quản trị viên của tenant A có thể đặt lại mật khẩu để chiếm tài khoản đang dùng ở tenant B. Đặt lại mật khẩu dùng cơ chế mật khẩu tạm có sẵn (buộc đổi ở lần đăng nhập đầu).
 - Quản trị viên tenant không tạo, gán hoặc thu hồi được role nằm ngoài tenant của mình, và vẫn chịu quy tắc hiện có: chỉ quản trị viên mới gán role `isAdmin` (ở phạm vi tenant).
 - Test cách ly cho bảng `users`: quản trị viên A không liệt kê, đọc, sửa hay đặt lại mật khẩu người dùng chỉ thuộc tenant B; không sửa được tài khoản thuộc nhiều tenant.
+
+### 5.7 Độc giả (người dùng cuối)
+Chủ hệ thống chốt: nhu cầu "xếp chỗ online" của độc giả chỉ là **đặt trước sách**, không có đặt chỗ ngồi. Các luồng dưới đây là đề xuất của người viết, chờ duyệt.
+- **Tại quầy:** thủ thư (đăng nhập vào tenant của mình) quét thẻ, hệ thống tra `card_no` trong tenant đó, kiểm tra thẻ còn hạn và độc giả không bị khóa, rồi mượn sách thuộc cùng tenant. Độc giả không cần đăng nhập. `card_no` unique theo tenant nên thẻ của tenant khác không tra ra gì. Một người học ở hai thư viện có hai thẻ riêng.
+- **Tài khoản online:** tạo cùng lúc thủ thư cấp thẻ (mật khẩu tạm, buộc đổi ở lần đăng nhập đầu); không có tự đăng ký. Độc giả chỉ thấy danh mục sách của tenant đang chọn, việc mượn và phạt của mình, và đặt trước.
+- **Vào đúng thư viện:** mỗi tenant có đường dẫn hoặc mã QR chứa mã tenant (`code`, ví dụ `/t/<code>`). API đăng nhập nhận thêm `tenantCode` tùy chọn: có thì chọn tenant đó (phải có membership ACTIVE, không thì lỗi chung chung), không có thì theo quy tắc ở mục 5.2 (tenant dùng gần nhất). Độc giả thuộc nhiều tenant dùng `switch-tenant` để đổi.
+- **Đặt trước sách (đã có ở circulation-service, UC04):** đặt trước khi sách đang được mượn; khi có người trả, độc giả đầu hàng chuyển sang trạng thái sẵn sàng nhận và được giữ trong N ngày; quá hạn không đến nhận thì chuyển người kế tiếp. Hàng đợi, thời hạn giữ và quy tắc mượn đều theo tenant (`borrow_rules` theo tenant).
+- **Thông báo:** cần thêm thông báo khi sách sẵn sàng nhận (email hoặc trong ứng dụng), trong ngữ cảnh `notification` (hiện chỉ là khung). Kênh thông báo cụ thể để người xây dựng đề xuất, mỗi thông báo mang `tenantId` và chỉ gửi trong tenant.
 
 ## 6. Nâng cấp dữ liệu hiện có
 Thêm migration mới vào `services/migration-service` (không sửa file cũ để không đổi checksum): tạo một tenant mặc định, thêm `tenant_id` dạng cho phép null, gán toàn bộ dữ liệu hiện có vào tenant mặc định, đặt NOT NULL, đổi các ràng buộc unique, bật RLS. Người dùng hiện có được tạo membership vào tenant mặc định, role hiện có thành role của tenant đó, `SUPER_ADMIN` seed hiện tại thành quản trị tenant; tài khoản `admin` dev vẫn đăng nhập được. Tạo tenant mới thì sao chép bộ role mẫu cho tenant đó. Bộ mẫu là **dữ liệu** trong bảng riêng `role_templates` (và quyền của từng mẫu theo khóa permission), khởi tạo từ 5 role seed hiện có; không sao chép từ tenant mặc định (có thể đã bị sửa) và không tự đồng bộ khi danh mục permission đổi. *(Lựa chọn của người viết.)*
