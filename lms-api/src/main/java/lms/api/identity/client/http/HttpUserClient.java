@@ -6,6 +6,7 @@ import lms.api.identity.dto.UserDtos.CreateUserRequest;
 import lms.api.identity.dto.UserDtos.IssueReaderCardRequest;
 import lms.api.identity.dto.UserDtos.ReaderProfileView;
 import lms.api.identity.dto.UserDtos.RenewReaderCardRequest;
+import lms.api.identity.dto.UserDtos.ResetPasswordRequest;
 import lms.api.identity.dto.UserDtos.SearchUsersQuery;
 import lms.api.identity.dto.UserDtos.UpdateUserRequest;
 import lms.api.identity.dto.UserDtos.UserPageView;
@@ -65,6 +66,11 @@ public class HttpUserClient implements UserClient {
     @Override
     public UserView changeStatus(UUID id, ChangeStatusRequest request) {
         return client.put().uri("/internal/users/{id}/status", id).body(request).retrieve().body(UserView.class);
+    }
+
+    @Override
+    public void resetPassword(UUID id, ResetPasswordRequest request) {
+        client.post().uri("/internal/users/{id}/password-reset", id).body(request).retrieve().toBodilessEntity();
     }
 
     @Override

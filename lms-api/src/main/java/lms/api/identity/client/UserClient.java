@@ -5,6 +5,7 @@ import lms.api.identity.dto.UserDtos.CreateUserRequest;
 import lms.api.identity.dto.UserDtos.IssueReaderCardRequest;
 import lms.api.identity.dto.UserDtos.ReaderProfileView;
 import lms.api.identity.dto.UserDtos.RenewReaderCardRequest;
+import lms.api.identity.dto.UserDtos.ResetPasswordRequest;
 import lms.api.identity.dto.UserDtos.SearchUsersQuery;
 import lms.api.identity.dto.UserDtos.UpdateUserRequest;
 import lms.api.identity.dto.UserDtos.UserPageView;
@@ -25,6 +26,8 @@ public interface UserClient {
     UserView update(UUID id, UpdateUserRequest request);
 
     UserView changeStatus(UUID id, ChangeStatusRequest request);
+
+    void resetPassword(UUID id, ResetPasswordRequest request);
 
     ReaderProfileView myReaderProfile();
 

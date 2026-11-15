@@ -29,6 +29,14 @@ public final class UserDtos {
     public record ChangeStatusRequest(@NotBlank String status) {
     }
 
+    /** Mật khẩu tạm do quản trị đặt (8-128 ký tự). Không log; toString bị che để tránh lộ qua log/exception. */
+    public record ResetPasswordRequest(@NotBlank @Size(min = 8, max = 128) String temporaryPassword) {
+        @Override
+        public String toString() {
+            return "ResetPasswordRequest[temporaryPassword=***]";
+        }
+    }
+
     public record SearchUsersQuery(String keyword, UUID departmentId, String status, Integer page, Integer size) {
     }
 

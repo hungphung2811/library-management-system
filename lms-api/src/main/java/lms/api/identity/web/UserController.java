@@ -6,6 +6,7 @@ import lms.api.identity.dto.UserDtos.CreateUserRequest;
 import lms.api.identity.dto.UserDtos.IssueReaderCardRequest;
 import lms.api.identity.dto.UserDtos.ReaderProfileView;
 import lms.api.identity.dto.UserDtos.RenewReaderCardRequest;
+import lms.api.identity.dto.UserDtos.ResetPasswordRequest;
 import lms.api.identity.dto.UserDtos.SearchUsersQuery;
 import lms.api.identity.dto.UserDtos.UpdateUserRequest;
 import lms.api.identity.dto.UserDtos.UserPageView;
@@ -67,6 +68,14 @@ public class UserController {
     @PutMapping("/{id}/status")
     public UserView changeStatus(@PathVariable UUID id, @Valid @RequestBody ChangeStatusRequest request) {
         return users.changeStatus(id, request);
+    }
+
+    /** Quản trị đặt mật khẩu tạm; thân yêu cầu chứa mật khẩu nên không được log. */
+    @PostMapping("/{id}/password-reset")
+    public ResponseEntity<Void> resetPassword(@PathVariable UUID id,
+                                              @Valid @RequestBody ResetPasswordRequest request) {
+        users.resetPassword(id, request);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{userId}/reader-profile")
