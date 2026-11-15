@@ -6,6 +6,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,6 +18,7 @@ import lms.circulation.reservation.application.ExpireOverdueReservationsUseCase;
 import lms.circulation.reservation.infrastructure.messaging.ExpireReservationsJob;
 import lms.tenant.TenantContext;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 
 class ExpireReservationsJobTenantTest {
 
@@ -23,7 +26,20 @@ class ExpireReservationsJobTenantTest {
 
     private ExpireReservationsJob job(List<UUID> tenants) {
         ActiveTenantsPort port = () -> tenants;
-        return new ExpireReservationsJob(expire, port);
+        ObjectProvider<ActiveTenantsPort> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(port);
+        return new ExpireReservationsJob(expire, provider);
+    }
+
+    @Test
+    void chuaCoPortThiBoQuaVaKhongGoiUseCase() {
+        ObjectProvider<ActiveTenantsPort> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(null);
+
+        new ExpireReservationsJob(expire, provider).run();
+
+        verify(provider).getIfAvailable();
+        verifyNoInteractions(expire);
     }
 
     @Test

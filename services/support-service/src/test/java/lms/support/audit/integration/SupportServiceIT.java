@@ -238,7 +238,8 @@ class SupportServiceIT {
     void consumerXuLyEnvelopeThatVaBoQuaMessageHong() {
         UUID eventId = UUID.randomUUID();
         String message = "{\"eventId\":\"" + eventId + "\",\"eventType\":\"RoleRevokedEvent\",\"aggregateId\":\"user-9\","
-                + "\"occurredAt\":\"2026-01-01T00:00:00Z\",\"version\":1,\"payload\":{\"userId\":\"user-9\"}}";
+                + "\"occurredAt\":\"2026-01-01T00:00:00Z\",\"version\":1,\"payload\":{\"userId\":\"user-9\"},"
+                + "\"tenantId\":\"00000000-0000-0000-0000-0000000000a1\"}";
 
         consumer.onEvent(message, "access-control.events");
         consumer.onEvent("hỏng hoàn toàn", "access-control.events");

@@ -7,7 +7,7 @@ import lms.circulation.reservation.application.ExpireOverdueReservationsUseCase;
 import lms.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -17,23 +17,27 @@ import org.springframework.stereotype.Component;
  * không chạy gì (không bao giờ chạy ngoài phạm vi tenant).
  */
 @Component
-// Adapter của ActiveTenantsPort (bảng known_tenants) do Task 8 cung cấp; chưa có thì job không được tạo.
-@ConditionalOnBean(ActiveTenantsPort.class)
 public class ExpireReservationsJob {
 
     private static final Logger log = LoggerFactory.getLogger(ExpireReservationsJob.class);
 
     private final ExpireOverdueReservationsUseCase expire;
-    private final ActiveTenantsPort activeTenants;
+    private final ObjectProvider<ActiveTenantsPort> activeTenants;
 
-    public ExpireReservationsJob(ExpireOverdueReservationsUseCase expire, ActiveTenantsPort activeTenants) {
+    // Adapter của ActiveTenantsPort (bảng known_tenants) do Task 8 cung cấp; chưa có thì job chỉ log WARN và bỏ qua.
+    public ExpireReservationsJob(ExpireOverdueReservationsUseCase expire, ObjectProvider<ActiveTenantsPort> activeTenants) {
         this.expire = expire;
         this.activeTenants = activeTenants;
     }
 
     @Scheduled(cron = "${app.reservation.expire-cron:0 5 0 * * *}")
     public void run() {
-        List<UUID> tenantIds = activeTenants.activeTenantIds();
+        ActiveTenantsPort port = activeTenants.getIfAvailable();
+        if (port == null) {
+            log.warn("UC14: ActiveTenantsPort chưa được cấu hình, bỏ qua lượt hết hạn đặt trước");
+            return;
+        }
+        List<UUID> tenantIds = port.activeTenantIds();
         if (tenantIds.isEmpty()) {
             log.info("UC14: không có tenant ACTIVE, bỏ qua");
             return;
