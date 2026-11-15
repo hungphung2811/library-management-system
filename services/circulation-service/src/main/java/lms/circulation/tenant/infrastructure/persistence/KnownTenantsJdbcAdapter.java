@@ -28,6 +28,12 @@ public class KnownTenantsJdbcAdapter implements KnownTenantsPort, ActiveTenantsP
     }
 
     @Override
+    public void insertIfAbsent(UUID tenantId, KnownTenantStatus status) {
+        jdbc.update("INSERT INTO known_tenants (tenant_id, status, updated_at) VALUES (?, ?, now()) "
+                + "ON CONFLICT (tenant_id) DO NOTHING", tenantId, status.name());
+    }
+
+    @Override
     public List<UUID> activeTenantIds() {
         return jdbc.queryForList("SELECT tenant_id FROM known_tenants WHERE status = ? ORDER BY tenant_id", UUID.class,
                 KnownTenantStatus.ACTIVE.name());

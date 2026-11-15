@@ -7,8 +7,8 @@ import lms.tenant.TenantContext;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Tenant mới được tạo ở identity (event TenantCreated): ghi vào danh bạ known_tenants (ACTIVE, để việc nền UC14 chạy
- * cho tenant này) và tạo quy tắc mượn mặc định cho tenant đó. Idempotent nên event giao lại an toàn.
+ * Tenant mới được tạo ở identity (event TenantCreated): ghi vào danh bạ known_tenants (ACTIVE nếu chưa có, không
+ * đổi trạng thái dòng đã có; để việc nền UC14 chạy cho tenant này) và tạo quy tắc mượn mặc định cho tenant đó. Idempotent nên event giao lại an toàn.
  *
  * <p>Người gọi phải đặt TenantContext = tenantId TRƯỚC khi gọi (consumer dùng TenantAwareEventHandler), vì biến RLS
  * app.tenant_id chốt lúc transaction mượn kết nối. Tenant trong ngữ cảnh khác tenantId thì từ chối.
@@ -31,7 +31,8 @@ public class RegisterTenantUseCase {
         if (!current.equals(tenantId)) {
             throw new IllegalStateException("Tenant trong ngữ cảnh khác tenant được đăng ký");
         }
-        knownTenants.upsert(tenantId, KnownTenantStatus.ACTIVE);
+        // insert-if-absent: TenantCreated giao lại (hoặc tới sau TenantStatusChanged) không bật ACTIVE lại tenant SUSPENDED
+        knownTenants.insertIfAbsent(tenantId, KnownTenantStatus.ACTIVE);
         return provisionBorrowRules.execute();
     }
 }

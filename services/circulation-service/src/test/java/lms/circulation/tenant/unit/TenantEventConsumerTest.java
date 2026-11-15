@@ -135,7 +135,8 @@ class TenantEventConsumerTest {
         assertThat(TenantContext.callAs(tenant, rules::findAll)).containsExactlyInAnyOrder(
                 new BorrowRule(ReaderType.STUDENT, 5, 14), new BorrowRule(ReaderType.LECTURER, 10, 30));
         assertThat(TenantContext.callAs(UUID.randomUUID(), rules::findAll)).isEmpty();
-        verify(known, org.mockito.Mockito.times(2)).upsert(tenant, KnownTenantStatus.ACTIVE);
+        verify(known, org.mockito.Mockito.times(2)).insertIfAbsent(tenant, KnownTenantStatus.ACTIVE);
+        verify(known, org.mockito.Mockito.never()).upsert(any(), any());
     }
 
     @Test
