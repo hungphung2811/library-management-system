@@ -2,7 +2,9 @@ package lms.api.support.client.http;
 
 import lms.api.support.client.SupportClient;
 import lms.api.support.dto.AuditLogView;
+import lms.api.support.dto.MarkAllReadView;
 import lms.api.support.dto.NotificationView;
+import lms.api.support.dto.UnreadCountView;
 import lms.api.support.dto.PageView;
 import java.time.Instant;
 import java.util.List;
@@ -32,6 +34,25 @@ public class HttpSupportClient implements SupportClient {
         List<NotificationView> result = client.get().uri("/internal/notifications/me").retrieve()
                 .body(new ParameterizedTypeReference<List<NotificationView>>() { });
         return result == null ? List.of() : result;
+    }
+
+    @Override
+    public UnreadCountView myUnreadNotificationCount() {
+        UnreadCountView result = client.get().uri("/internal/notifications/me/unread-count").retrieve()
+                .body(UnreadCountView.class);
+        return result == null ? new UnreadCountView(0) : result;
+    }
+
+    @Override
+    public NotificationView markNotificationRead(UUID id) {
+        return client.post().uri("/internal/notifications/{id}/read", id).retrieve().body(NotificationView.class);
+    }
+
+    @Override
+    public MarkAllReadView markAllNotificationsRead() {
+        MarkAllReadView result = client.post().uri("/internal/notifications/read-all").retrieve()
+                .body(MarkAllReadView.class);
+        return result == null ? new MarkAllReadView(0) : result;
     }
 
     @Override

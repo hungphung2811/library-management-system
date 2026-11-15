@@ -13,6 +13,19 @@ public interface SpringDataNotificationRepository extends JpaRepository<Notifica
     /** Hibernate (@TenantId) tự lọc theo TenantContext, RLS lọc thêm ở DB. */
     List<NotificationJpaEntity> findByUserIdOrderByCreatedAtDescIdAsc(UUID userId);
 
+    java.util.Optional<NotificationJpaEntity> findByIdAndUserId(UUID id, UUID userId);
+
+    long countByUserIdAndReadAtIsNull(UUID userId);
+
+    /** HQL: Hibernate thêm điều kiện @TenantId cho cả câu UPDATE; RLS lọc thêm ở DB. */
+    @Modifying
+    @Query("UPDATE NotificationJpaEntity n SET n.readAt = :at WHERE n.id = :id AND n.userId = :userId AND n.readAt IS NULL")
+    int markRead(@Param("id") UUID id, @Param("userId") UUID userId, @Param("at") Instant at);
+
+    @Modifying
+    @Query("UPDATE NotificationJpaEntity n SET n.readAt = :at WHERE n.userId = :userId AND n.readAt IS NULL")
+    int markAllRead(@Param("userId") UUID userId, @Param("at") Instant at);
+
     /**
      * INSERT ... ON CONFLICT DO NOTHING: idempotent theo (tenant_id, event_id), an toàn khi hai consumer trùng event.
      * tenant_id điền tay (native SQL không qua @TenantId); RLS WITH CHECK từ chối nếu khác tenant của phiên.

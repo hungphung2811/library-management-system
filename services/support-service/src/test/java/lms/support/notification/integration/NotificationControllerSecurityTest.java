@@ -15,7 +15,11 @@ import java.util.UUID;
 import lms.security.permission.PermissionAutoConfiguration;
 import lms.security.permission.PermissionKeyRegistrar;
 import lms.support.config.SecurityConfiguration;
+import lms.support.notification.application.CountUnreadNotificationsUseCase;
 import lms.support.notification.application.ListMyNotificationsUseCase;
+import lms.support.notification.application.MarkAllNotificationsReadUseCase;
+import lms.support.notification.application.MarkNotificationReadUseCase;
+import lms.support.notification.domain.NotificationNotFoundException;
 import lms.support.notification.application.NotificationResponse;
 import lms.support.notification.infrastructure.web.NotificationController;
 import org.junit.jupiter.api.Test;
@@ -41,6 +45,9 @@ class NotificationControllerSecurityTest {
 
     @MockitoBean PermissionKeyRegistrar permissionKeyRegistrar;
     @MockitoBean ListMyNotificationsUseCase listMine;
+    @MockitoBean MarkNotificationReadUseCase markRead;
+    @MockitoBean MarkAllNotificationsReadUseCase markAllRead;
+    @MockitoBean CountUnreadNotificationsUseCase countUnread;
     @MockitoBean JwtDecoder jwtDecoder;
 
     @Test
@@ -114,6 +121,62 @@ class NotificationControllerSecurityTest {
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(
                         org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("khong-phai-uuid"))));
         verifyNoInteractions(listMine);
+    }
+
+    @Test
+    void danhDauDaDocLayUserTuTokenVaTraThongBao() throws Exception {
+        UUID id = UUID.fromString("22222222-2222-2222-2222-222222222222");
+        Instant at = Instant.parse("2026-01-02T03:04:05Z");
+        when(markRead.execute(id, USER)).thenReturn(new NotificationResponse(id, "T", "m", at, at));
+
+        mvc.perform(post("/internal/notifications/" + id + "/read")
+                        .with(jwt().jwt(j -> j.subject(USER.toString()).claim("tenantId", TENANT))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id.toString()))
+                .andExpect(jsonPath("$.readAt").exists());
+        verify(markRead).execute(id, USER);
+    }
+
+    @Test
+    void danhDauThongBaoKhongCoCuaMinhLa404() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(markRead.execute(id, USER)).thenThrow(new NotificationNotFoundException());
+
+        mvc.perform(post("/internal/notifications/" + id + "/read")
+                        .with(jwt().jwt(j -> j.subject(USER.toString()).claim("tenantId", TENANT))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOTIFICATION_NOT_FOUND"));
+    }
+
+    @Test
+    void idKhongPhaiUuidLa400() throws Exception {
+        mvc.perform(post("/internal/notifications/abc/read")
+                        .with(jwt().jwt(j -> j.subject(USER.toString()).claim("tenantId", TENANT))))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(markRead);
+    }
+
+    @Test
+    void docTatCaVaDemChuaDoc() throws Exception {
+        when(markAllRead.execute(USER)).thenReturn(3);
+        when(countUnread.execute(USER)).thenReturn(5L);
+
+        mvc.perform(post("/internal/notifications/read-all")
+                        .with(jwt().jwt(j -> j.subject(USER.toString()).claim("tenantId", TENANT))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.updated").value(3));
+        mvc.perform(get("/internal/notifications/me/unread-count")
+                        .with(jwt().jwt(j -> j.subject(USER.toString()).claim("tenantId", TENANT))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.unread").value(5));
+    }
+
+    @Test
+    void cacEndpointMoiCanDangNhap() throws Exception {
+        mvc.perform(post("/internal/notifications/read-all")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/internal/notifications/" + UUID.randomUUID() + "/read")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/internal/notifications/me/unread-count")).andExpect(status().isUnauthorized());
+        verifyNoInteractions(markRead, markAllRead, countUnread);
     }
 
     @Test

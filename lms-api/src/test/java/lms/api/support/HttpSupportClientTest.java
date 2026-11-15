@@ -50,4 +50,34 @@ class HttpSupportClientTest {
         assertEquals("E", page.items().get(0).eventType());
         server.verify();
     }
+
+    @Test
+    void thongBaoDocDemVaDanhDauGoiDungDuongDan() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://support")
+                .requestInterceptor(new TokenRelayInterceptor());
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        HttpSupportClient client = new HttpSupportClient(builder.build());
+        Jwt jwt = Jwt.withTokenValue("tok").header("alg", "none").subject("u1").build();
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
+        UUID id = UUID.randomUUID();
+
+        server.expect(requestTo("http://support/internal/notifications/me/unread-count"))
+                .andExpect(method(HttpMethod.GET)).andExpect(header("Authorization", "Bearer tok"))
+                .andRespond(withSuccess("{\"unread\":6}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo("http://support/internal/notifications/" + id + "/read"))
+                .andExpect(method(HttpMethod.POST)).andExpect(header("Authorization", "Bearer tok"))
+                .andRespond(withSuccess("{\"id\":\"" + id + "\",\"type\":\"T\",\"message\":\"m\","
+                        + "\"createdAt\":\"2026-01-01T00:00:00Z\",\"readAt\":\"2026-01-01T00:01:00Z\"}",
+                        MediaType.APPLICATION_JSON));
+        server.expect(requestTo("http://support/internal/notifications/read-all"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("{\"updated\":2}", MediaType.APPLICATION_JSON));
+
+        assertEquals(6, client.myUnreadNotificationCount().unread());
+        var read = client.markNotificationRead(id);
+        assertEquals(id, read.id());
+        assertEquals(java.time.Instant.parse("2026-01-01T00:01:00Z"), read.readAt());
+        assertEquals(2, client.markAllNotificationsRead().updated());
+        server.verify();
+    }
 }

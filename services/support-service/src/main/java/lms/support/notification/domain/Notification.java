@@ -22,4 +22,13 @@ public record Notification(UUID id, UUID eventId, UUID userId, String type, Stri
     public static Notification create(UUID eventId, UUID userId, String type, String message, Instant now) {
         return new Notification(UUID.randomUUID(), eventId, userId, type, message, now, null);
     }
+
+    public boolean isRead() {
+        return readAt != null;
+    }
+
+    /** Idempotent: đã đọc thì giữ nguyên thời điểm đọc đầu tiên. */
+    public Notification markRead(Instant now) {
+        return isRead() ? this : new Notification(id, eventId, userId, type, message, createdAt, now);
+    }
 }
