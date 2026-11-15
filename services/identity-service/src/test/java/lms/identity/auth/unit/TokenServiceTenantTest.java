@@ -51,11 +51,12 @@ class TokenServiceTenantTest {
 
     private final List<TokenIssuerPort.Claims> issued = new ArrayList<>();
     private final List<RefreshToken> savedRefresh = new ArrayList<>();
+    private final List<UUID> revokedAllFor = new ArrayList<>();
     private final TenantAccessPort tenants = mock(TenantAccessPort.class);
     private final RefreshTokenRepository refreshRepo = mock(RefreshTokenRepository.class);
     private final SaveRefreshTokenPort refreshSave = new SaveRefreshTokenPort() {
         public RefreshToken save(RefreshToken t) { savedRefresh.add(t); return t; }
-        public void revokeAllByUserId(UUID u) { }
+        public void revokeAllByUserId(UUID u) { revokedAllFor.add(u); }
     };
     private final UserCredentialRepository credentials = mock(UserCredentialRepository.class);
     private final RefreshTokenCodecPort codec = new RefreshTokenCodecPort() {
@@ -237,6 +238,7 @@ class TokenServiceTenantTest {
 
         assertThatThrownBy(() -> refresh().execute("raw-cur")).isInstanceOf(InvalidRefreshTokenException.class);
         assertThat(issued).isEmpty();
+        assertThat(revokedAllFor).containsExactly(userId); // reuse-detection thu hồi mọi phiên của đúng người dùng
         assertThatThrownBy(() -> switchTenant().execute(userId, tenantB, "raw-cur"))
                 .isInstanceOf(InvalidRefreshTokenException.class);
     }

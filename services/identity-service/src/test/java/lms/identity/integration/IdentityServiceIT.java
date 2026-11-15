@@ -388,12 +388,14 @@ class IdentityServiceIT {
         assertThat(tenantClaim(switched.getBody().get("accessToken"))).isEqualTo(second.toString());
         assertThat(jdbc.queryForObject("SELECT last_tenant_id FROM credentials WHERE user_id = ?", UUID.class, userId))
                 .isEqualTo(second);
-        // refresh token cũ (của tenant trước) bị thu hồi khi đổi tenant
-        assertThat(refreshWith((String) first.get("refreshToken")).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-        // refresh token mới gắn tenant vừa chọn
+        // refresh token mới gắn tenant vừa chọn (kiểm tra trước, vì replay token cũ sẽ thu hồi mọi phiên)
         ResponseEntity<Map> refreshed = refreshWith((String) switched.getBody().get("refreshToken"));
         assertThat(refreshed.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(tenantClaim(refreshed.getBody().get("accessToken"))).isEqualTo(second.toString());
+        // refresh token cũ (của tenant trước) bị thu hồi khi đổi tenant; dùng lại nó kích hoạt reuse-detection
+        assertThat(refreshWith((String) first.get("refreshToken")).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(refreshWith((String) refreshed.getBody().get("refreshToken")).getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
 
         assertThat(tenantClaim(login("tenant-switcher", "Switch@12345", HttpStatus.OK).get("accessToken")))
                 .isEqualTo(second.toString());
