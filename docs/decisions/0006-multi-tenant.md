@@ -36,6 +36,8 @@ Hệ thống phục vụ nhiều thư viện (tenant) trên cùng hạ tầng. C
 - **`borrow_rules` chưa nối `BorrowBookUseCase`**: bảng quy tắc mượn theo tenant tồn tại nhưng `BorrowingRecord` vẫn dùng hằng `LOAN_DAYS`/`MAX_ITEMS`; cần task riêng (cần `reader_type` từ identity).
 - **Mongo dữ liệu cũ**: bản ghi `raw_events` trước khi đổi có `_id = eventId`, không `tenantId` nên vô hình với truy vấn mới và có thể nhân bản khi redeliver; chạy `backfill-tenant-id.js` một lần.
 - **switch-tenant bắt buộc có `refreshToken`** (để thu hồi phiên cũ); thiếu thì từ chối.
+- **Audit thao tác tổ chức (organization) không vào kho audit**: tạo/đổi tên tổ chức không thuộc tenant nào, mà audit của support chỉ ghi sự kiện có `tenantId`, nên `ManageOrganizationUseCase` chỉ ghi log INFO có cấu trúc (`platform-audit operation=... actorId=... organizationId=...`), không phát Kafka. Chưa có kho audit cấp nền tảng; cần thì thêm sau (không làm trong đợt này).
+- **Audit đăng nhập thất bại không biết tenant**: `LoginFailed`/`AccountLocked` phát dưới `credentials.last_tenant_id`; tài khoản chưa có tenant gần nhất thì chỉ log WARN, không có trong audit của tenant nào.
 - Khác: `audit_logs.event_id` còn UNIQUE toàn cục (event trùng id giữa tenant có thể bị bỏ qua ở Postgres, Mongo vẫn giữ); `known_tenants` của circulation chỉ seed tenant mặc định; refresh đồng thời cùng token có thể cùng thành công (có từ trước).
 
 ## Kiểm chứng còn nợ

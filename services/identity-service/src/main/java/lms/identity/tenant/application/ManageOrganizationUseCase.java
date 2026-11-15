@@ -5,22 +5,26 @@ import java.util.UUID;
 import lms.identity.tenant.domain.Organization;
 import lms.identity.tenant.domain.OrganizationNotFoundException;
 import lms.identity.tenant.domain.OrganizationRepository;
-import lms.identity.tenant.domain.PlatformOperationEvent;
-import lms.tenant.TenantContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Quản lý trường (organization): tạo, đổi tên, xem, liệt kê. Không xóa (tenant tham chiếu tới). Gán/đổi trường cho
- * tenant đi qua {@link UpdateTenantUseCase}. Audit phát với envelope không có tenantId (thao tác không thuộc tenant).
+ * tenant đi qua {@link UpdateTenantUseCase}.
+ *
+ * <p>Audit: thao tác tổ chức không thuộc tenant nào, mà audit của support chỉ ghi sự kiện có tenantId, nên không phát
+ * sự kiện Kafka (sẽ bị bỏ qua) mà ghi log INFO có cấu trúc (người thao tác, loại thao tác, organizationId). Giới hạn đã
+ * biết, ghi ở ADR-0006: chưa có kho audit cấp nền tảng.
  */
 public class ManageOrganizationUseCase {
 
-    private final OrganizationRepository organizations;
-    private final PublishPlatformEventPort events;
+    private static final Logger log = LoggerFactory.getLogger(ManageOrganizationUseCase.class);
 
-    public ManageOrganizationUseCase(OrganizationRepository organizations, PublishPlatformEventPort events) {
+    private final OrganizationRepository organizations;
+
+    public ManageOrganizationUseCase(OrganizationRepository organizations) {
         this.organizations = organizations;
-        this.events = events;
     }
 
     /** organizationId null hợp lệ (tenant không thuộc trường nào). */
@@ -60,8 +64,7 @@ public class ManageOrganizationUseCase {
     }
 
     private void audit(String operation, UUID actorId, Organization organization) {
-        // token của người vận hành có thể mang tenantId của tenant họ là thành viên: không gắn audit vào tenant đó
-        TenantContext.runAs(null, () -> events.publish(PlatformOperationEvent.of(operation, actorId, null,
-                organization.id(), "name=" + organization.name())));
+        log.info("platform-audit operation={} actorId={} organizationId={} name=\"{}\"", operation, actorId,
+                organization.id(), organization.name());
     }
 }

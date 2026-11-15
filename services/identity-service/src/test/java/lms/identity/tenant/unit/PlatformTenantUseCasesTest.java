@@ -77,7 +77,7 @@ class PlatformTenantUseCasesTest {
     private final SetTenantStatusUseCase status = new SetTenantStatusUseCase(tenants, tenants, events, tx);
     private final SearchTenantsUseCase search = new SearchTenantsUseCase(tenants);
     private final GetTenantUseCase get = new GetTenantUseCase(tenants, tenants, roles, tx);
-    private final ManageOrganizationUseCase orgs = new ManageOrganizationUseCase(organizations, events);
+    private final ManageOrganizationUseCase orgs = new ManageOrganizationUseCase(organizations);
     private final AddTenantAdminUseCase addAdmin = new AddTenantAdminUseCase(tenants, memberships, roles, accounts,
             events, tx);
     private final RemoveTenantAdminUseCase removeAdmin = new RemoveTenantAdminUseCase(tenants, roles, events, tx);
@@ -244,28 +244,27 @@ class PlatformTenantUseCasesTest {
     @Test
     void moiThaoTacThayDoiPhatDungMotSuKienAudit() {
         TenantResponse created = createLib("lib-audit");                                   // 1
-        OrganizationResponse org = orgs.create(new OrganizationRequest("Trường A"), operator); // 2
-        orgs.rename(org.id(), new OrganizationRequest("Trường A2"), operator);             // 3
-        update.execute(created.id(), new UpdateTenantRequest("Đổi tên", org.id()), operator); // 4
-        status.suspend(created.id(), operator);                                            // 5
-        status.activate(created.id(), operator);                                           // 6
+        // thao tác tổ chức không thuộc tenant: chỉ ghi log INFO, không phát sự kiện (support bỏ qua envelope không tenant)
+        OrganizationResponse org = orgs.create(new OrganizationRequest("Trường A"), operator);
+        orgs.rename(org.id(), new OrganizationRequest("Trường A2"), operator);
+        update.execute(created.id(), new UpdateTenantRequest("Đổi tên", org.id()), operator); // 2
+        status.suspend(created.id(), operator);                                            // 3
+        status.activate(created.id(), operator);                                           // 4
         UUID second = addAdmin.execute(created.id(), new TenantAdminRequest(newAdmin("second-admin"), null),
-                operator);                                                                  // 7
-        removeAdmin.execute(created.id(), second, operator);                               // 8
-        attach.execute(created.id(), new AttachUserRequest(accounts.existing("ke-toan")), operator); // 9
+                operator);                                                                  // 5
+        removeAdmin.execute(created.id(), second, operator);                               // 6
+        attach.execute(created.id(), new AttachUserRequest(accounts.existing("ke-toan")), operator); // 7
 
-        assertThat(auditCount()).isEqualTo(9);
+        assertThat(auditCount()).isEqualTo(7);
         assertThat(events.published).filteredOn(e -> e.event() instanceof PlatformOperationEvent)
                 .extracting(e -> ((PlatformOperationEvent) e.event()).operation())
-                .containsExactly("TENANT_CREATED", "ORGANIZATION_CREATED", "ORGANIZATION_UPDATED", "TENANT_UPDATED",
+                .containsExactly("TENANT_CREATED", "TENANT_UPDATED",
                         "TENANT_SUSPENDED", "TENANT_ACTIVATED", "TENANT_ADMIN_ADDED", "TENANT_ADMIN_REMOVED",
                         "MEMBER_ATTACHED");
         assertThat(events.published).filteredOn(e -> e.event() instanceof PlatformOperationEvent)
                 .allSatisfy(e -> assertThat(((PlatformOperationEvent) e.event()).actorId()).isEqualTo(operator));
-        // audit của tổ chức không gắn tenant nào
-        assertThat(events.published).filteredOn(e -> e.event() instanceof PlatformOperationEvent p
-                        && p.operation().startsWith("ORGANIZATION"))
-                .allSatisfy(e -> assertThat(e.envelopeTenant()).isNull());
+        assertThat(events.published).noneMatch(e -> e.event() instanceof PlatformOperationEvent p
+                && p.operation().startsWith("ORGANIZATION"));
     }
 
     @Test

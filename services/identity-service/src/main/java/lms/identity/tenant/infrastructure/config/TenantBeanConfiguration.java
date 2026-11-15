@@ -136,9 +136,8 @@ public class TenantBeanConfiguration {
     }
 
     @Bean
-    ManageOrganizationUseCase manageOrganizationUseCase(OrganizationRepository organizations,
-                                                        PublishPlatformEventPort events) {
-        return new ManageOrganizationUseCase(organizations, events);
+    ManageOrganizationUseCase manageOrganizationUseCase(OrganizationRepository organizations) {
+        return new ManageOrganizationUseCase(organizations);
     }
 
     @Bean
