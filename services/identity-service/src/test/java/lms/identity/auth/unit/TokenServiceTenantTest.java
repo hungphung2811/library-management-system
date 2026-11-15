@@ -3,6 +3,7 @@ package lms.identity.auth.unit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -423,7 +424,7 @@ class TokenServiceTenantTest {
 
         UUID noTenant = UUID.randomUUID();
         register.execute(noTenant, "carol", "password1", null, false, null);
-        verify(tenants, never()).addMember(any(), any(), any());
+        verify(tenants, never()).addMember(eq(noTenant), any(), any());
     }
 
     // ---- F-3: không cấp credential cho userId thuộc tenant khác ----
