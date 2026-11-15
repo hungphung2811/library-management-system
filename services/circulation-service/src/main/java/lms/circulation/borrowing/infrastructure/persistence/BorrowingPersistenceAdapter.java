@@ -23,7 +23,7 @@ public class BorrowingPersistenceAdapter implements SaveBorrowingPort, Borrowing
 
     @Override
     public Optional<BorrowingRecord> findById(BorrowingId id) {
-        return jpa.findById(id.value()).map(BorrowingPersistenceMapper::toDomain);
+        return jpa.findInTenantById(id.value()).map(BorrowingPersistenceMapper::toDomain);
     }
 
     @Override

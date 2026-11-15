@@ -2,6 +2,8 @@ package lms.circulation.borrowing.infrastructure.config;
 
 import lms.circulation.borrowing.application.BorrowBookUseCase;
 import lms.circulation.borrowing.application.GetBorrowingUseCase;
+import lms.circulation.borrowing.application.ProvisionDefaultBorrowRulesUseCase;
+import lms.circulation.borrowing.infrastructure.persistence.BorrowRuleJdbcAdapter;
 import lms.circulation.borrowing.application.RenewBorrowingUseCase;
 import lms.circulation.borrowing.application.ReturnBookUseCase;
 import lms.circulation.borrowing.domain.BorrowingDomainService;
@@ -56,5 +58,10 @@ public class BorrowingBeanConfiguration {
     @Bean
     GetBorrowingUseCase getBorrowingUseCase(BorrowingPersistenceAdapter persistence) {
         return new GetBorrowingUseCase(persistence);
+    }
+
+    @Bean
+    ProvisionDefaultBorrowRulesUseCase provisionDefaultBorrowRulesUseCase(BorrowRuleJdbcAdapter rules) {
+        return new ProvisionDefaultBorrowRulesUseCase(rules);
     }
 }

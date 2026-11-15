@@ -9,7 +9,11 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
-/** Gọi GET /internal/books/{id} của catalog-service bằng token của người dùng (cần permission BOOK_VIEW). */
+/**
+ * Gọi GET /internal/books/{id} của catalog-service bằng token của người dùng (cần permission BOOK_VIEW). Tenant đi theo
+ * token (claim tenantId): catalog chỉ trả dữ liệu tenant của token, đầu sách thuộc tenant khác thành 404 (Review Focus 6).
+ * Không tự thêm header tenant nào khác token.
+ */
 public class CatalogRestClientAdapter implements TitleCatalogPort {
 
     private final RestClient client;

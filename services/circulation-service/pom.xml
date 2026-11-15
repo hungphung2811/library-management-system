@@ -28,6 +28,10 @@
         </dependency>
         <dependency>
             <groupId>com.company</groupId>
+            <artifactId>tenant-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.company</groupId>
             <artifactId>observability-common</artifactId>
         </dependency>
         <dependency>

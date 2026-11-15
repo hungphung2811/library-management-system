@@ -29,49 +29,74 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.stream.Stream;
+import lms.tenant.TenantContext;
+import lms.tenant.TenantRequiredException;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class ReservationUseCasesTest {
 
-    /** Repository trong bộ nhớ, vị trí hàng đợi tính theo (reservedAt, id) giống cài đặt thật. */
+    /**
+     * Repository trong bộ nhớ, vị trí hàng đợi tính theo (reservedAt, id) giống cài đặt thật. Mô phỏng cách ly tenant
+     * như @TenantId + RLS: mỗi đặt trước gắn tenant lúc lưu, mọi truy vấn chỉ thấy tenant hiện tại, không có tenant
+     * thì không thấy gì (fail-closed) và không ghi được.
+     */
     static class FakeRepo implements ReservationRepository {
         final List<Reservation> items = new ArrayList<>();
+        final Map<UUID, UUID> tenantOf = new HashMap<>();
+
+        private Stream<Reservation> visible() {
+            Optional<UUID> tenant = TenantContext.current();
+            return items.stream().filter(r -> tenant.isPresent() && tenant.get().equals(tenantOf.get(r.id())));
+        }
 
         public Reservation save(Reservation r) {
+            UUID tenant = TenantContext.require();
+            UUID owner = tenantOf.get(r.id());
+            if (owner != null && !owner.equals(tenant)) throw new IllegalStateException("RLS: dòng của tenant khác");
             items.removeIf(x -> x.id().equals(r.id()));
             items.add(r);
+            tenantOf.put(r.id(), tenant);
             return r;
         }
-        public Optional<Reservation> findById(UUID id) { return items.stream().filter(r -> r.id().equals(id)).findFirst(); }
+        public Optional<Reservation> findById(UUID id) { return visible().filter(r -> r.id().equals(id)).findFirst(); }
         public boolean existsActive(UUID reader, UUID title) {
-            return items.stream().anyMatch(r -> r.readerId().equals(reader) && r.titleId().equals(title) && r.isActive());
+            return visible().anyMatch(r -> r.readerId().equals(reader) && r.titleId().equals(title) && r.isActive());
         }
         public List<Reservation> findByReader(UUID reader) {
-            return items.stream().filter(r -> r.readerId().equals(reader))
+            return visible().filter(r -> r.readerId().equals(reader))
                     .sorted(Comparator.comparing(Reservation::reservedAt).reversed()).toList();
         }
         public Optional<Reservation> findNextWaitingForUpdate(UUID titleId) {
-            return items.stream().filter(r -> r.titleId().equals(titleId) && r.status() == ReservationStatus.WAITING)
+            return visible().filter(r -> r.titleId().equals(titleId) && r.status() == ReservationStatus.WAITING)
                     .min(Comparator.comparing(Reservation::reservedAt));
         }
         public List<Reservation> findHoldExpired(java.time.LocalDate today) {
-            return items.stream().filter(r -> r.isHoldExpired(today)).toList();
+            return visible().filter(r -> r.isHoldExpired(today)).toList();
         }
         public boolean existsReadyForCopy(UUID copyId) {
-            return items.stream().anyMatch(r -> r.status() == ReservationStatus.READY && copyId.equals(r.copyId()));
+            return visible().anyMatch(r -> r.status() == ReservationStatus.READY && copyId.equals(r.copyId()));
         }
         public long queuePosition(Reservation r) {
             if (r.status() != ReservationStatus.WAITING) return 0;
-            return items.stream().filter(x -> x.titleId().equals(r.titleId()) && x.status() == ReservationStatus.WAITING
+            return visible().filter(x -> x.titleId().equals(r.titleId()) && x.status() == ReservationStatus.WAITING
                     && x.reservedAt().compareTo(r.reservedAt()) <= 0).count();
         }
     }
+
+    static final UUID TENANT_A = UUID.randomUUID();
+    static final UUID TENANT_B = UUID.randomUUID();
 
     final UUID reader = UUID.randomUUID();
     final UUID title = UUID.randomUUID();
     final FakeRepo repo = new FakeRepo();
     final List<DomainEvent> published = new ArrayList<>();
+    /** Tenant trong ngữ cảnh lúc phát từng event (để kiểm event đi theo tenant của thao tác). */
+    final List<Optional<UUID>> publishedTenants = new ArrayList<>();
     ReaderEligibilityPort.ReaderEligibility eligibility = new ReaderEligibilityPort.ReaderEligibility(true, true);
     long availableCopies = 0;
     boolean titleExists = true;
@@ -82,8 +107,20 @@ class ReservationUseCasesTest {
     HoldCopyForNextReservationUseCase holdCopy;
     ExpireOverdueReservationsUseCase expire;
 
+    @AfterEach
+    void roiTenant() {
+        TenantContext.clear();
+    }
+
+    private void publish(DomainEvent event) {
+        published.add(event);
+        publishedTenants.add(TenantContext.current());
+    }
+
     @BeforeEach
     void setUp() {
+        // Mặc định mọi test chạy trong tenant A (như request có token tenant A)
+        TenantContext.set(TENANT_A);
         Clock clock = new Clock() {
             public java.time.ZoneId getZone() { return ZoneOffset.UTC; }
             public Clock withZone(java.time.ZoneId zone) { return this; }
@@ -92,10 +129,10 @@ class ReservationUseCasesTest {
         ReaderEligibilityPort eligibilityPort = id -> eligibility;
         TitleCatalogPort catalogPort = id -> titleExists
                 ? Optional.of(new TitleCatalogPort.TitleInfo(id, "Clean Code", availableCopies)) : Optional.empty();
-        reserve = new ReserveTitleUseCase(eligibilityPort, catalogPort, repo, published::add, clock);
-        holdCopy = new HoldCopyForNextReservationUseCase(repo, published::add, clock);
-        cancel = new CancelReservationUseCase(repo, holdCopy, published::add, clock);
-        expire = new ExpireOverdueReservationsUseCase(repo, holdCopy, published::add, clock);
+        reserve = new ReserveTitleUseCase(eligibilityPort, catalogPort, repo, this::publish, clock);
+        holdCopy = new HoldCopyForNextReservationUseCase(repo, this::publish, clock);
+        cancel = new CancelReservationUseCase(repo, holdCopy, this::publish, clock);
+        expire = new ExpireOverdueReservationsUseCase(repo, holdCopy, this::publish, clock);
     }
 
     @Test
@@ -242,5 +279,87 @@ class ReservationUseCasesTest {
         cancel.execute(reader, first.id());
 
         assertTrue(published.stream().anyMatch(e -> e instanceof lms.circulation.reservation.domain.CopyReleasedEvent));
+    }
+
+    // ---- Cách ly tenant ----
+
+    @Test
+    void hangDoiVaDatTruocConHieuLucTinhRiengTungTenant() {
+        ReservationResponse a = reserve.execute(reader, title);
+
+        TenantContext.set(TENANT_B);
+        // cùng độc giả, cùng đầu sách ở tenant khác: không bị coi là đặt trùng và đứng đầu hàng đợi của B
+        ReservationResponse b = reserve.execute(reader, title);
+        now = now.plusSeconds(5);
+        ReservationResponse b2 = reserve.execute(UUID.randomUUID(), title);
+
+        assertEquals(1, a.queuePosition());
+        assertEquals(1, b.queuePosition());
+        assertEquals(2, b2.queuePosition());
+        assertThrows(AlreadyReservedException.class, () -> reserve.execute(reader, title));
+
+        TenantContext.set(TENANT_A);
+        ListMyReservationsUseCase list = new ListMyReservationsUseCase(repo);
+        assertEquals(List.of(a.id()), list.execute(reader).stream().map(ReservationResponse::id).toList());
+        assertEquals(1, list.execute(reader).get(0).queuePosition());
+    }
+
+    @Test
+    void huyDatTruocCuaTenantKhacBiTuChoiNhuKhongTonTai() {
+        TenantContext.set(TENANT_B);
+        ReservationResponse ofB = reserve.execute(reader, title);
+
+        TenantContext.set(TENANT_A);
+        assertThrows(ReservationNotFoundException.class, () -> cancel.execute(reader, ofB.id()));
+
+        TenantContext.set(TENANT_B);
+        assertEquals(ReservationStatus.WAITING, repo.findById(ofB.id()).orElseThrow().status());
+    }
+
+    @Test
+    void banSaoSanSangChiGiuChoNguoiChoCungTenant() {
+        TenantContext.set(TENANT_B);
+        reserve.execute(reader, title);
+
+        TenantContext.set(TENANT_A);
+        assertEquals(false, holdCopy.holdIfAnyoneWaiting(title, UUID.randomUUID()));
+
+        TenantContext.set(TENANT_B);
+        assertTrue(holdCopy.holdIfAnyoneWaiting(title, UUID.randomUUID()));
+    }
+
+    @Test
+    void hetHanGiuChiXuLyDatTruocCuaTenantHienTai() {
+        TenantContext.set(TENANT_B);
+        ReservationResponse ofB = reserve.execute(reader, title);
+        holdCopy.holdIfAnyoneWaiting(title, UUID.randomUUID());
+
+        now = Instant.parse("2026-10-10T00:10:00Z");
+        TenantContext.set(TENANT_A);
+        assertEquals(0, expire.execute());
+
+        TenantContext.set(TENANT_B);
+        assertEquals(ReservationStatus.READY, repo.findById(ofB.id()).orElseThrow().status());
+        assertEquals(1, expire.execute());
+        assertEquals(ReservationStatus.EXPIRED, repo.findById(ofB.id()).orElseThrow().status());
+    }
+
+    @Test
+    void eventPhatTrongTenantCuaThaoTac() {
+        reserve.execute(reader, title);
+        TenantContext.set(TENANT_B);
+        reserve.execute(reader, title);
+
+        assertEquals(List.of(Optional.of(TENANT_A), Optional.of(TENANT_B)), publishedTenants);
+    }
+
+    @Test
+    void khongCoTenantThiKhongThayVaKhongGhiDuoc() {
+        reserve.execute(reader, title);
+        TenantContext.clear();
+
+        assertTrue(new ListMyReservationsUseCase(repo).execute(reader).isEmpty());
+        assertEquals(0, expire.execute());
+        assertThrows(TenantRequiredException.class, () -> reserve.execute(UUID.randomUUID(), title));
     }
 }

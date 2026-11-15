@@ -13,7 +13,15 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+/**
+ * Mọi truy vấn là JPQL/derived nên Hibernate tự thêm điều kiện tenant (@TenantId); RLS ở DB lọc thêm. Không có SQL
+ * native. Đọc theo id dùng {@link #findInTenantById} thay cho findById (find theo khóa chính không đi qua bộ lọc
+ * tenant của Hibernate, chỉ còn RLS chặn).
+ */
 interface SpringDataReservationRepository extends JpaRepository<ReservationJpaEntity, UUID> {
+
+    @Query("select r from ReservationJpaEntity r where r.id = :id")
+    Optional<ReservationJpaEntity> findInTenantById(@Param("id") UUID id);
 
     boolean existsByReaderIdAndTitleIdAndStatusIn(UUID readerId, UUID titleId, Collection<ReservationStatus> statuses);
 

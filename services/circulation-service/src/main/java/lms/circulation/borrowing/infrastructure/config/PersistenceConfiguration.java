@@ -1,6 +1,8 @@
 package lms.circulation.borrowing.infrastructure.config;
 
+import lms.circulation.borrowing.infrastructure.persistence.BorrowRuleJdbcAdapter;
 import lms.circulation.borrowing.infrastructure.persistence.BorrowingPersistenceAdapter;
+import org.springframework.jdbc.core.JdbcTemplate;
 import lms.circulation.borrowing.infrastructure.persistence.SpringDataBorrowingRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,5 +14,10 @@ public class PersistenceConfiguration {
     @Bean
     BorrowingPersistenceAdapter borrowingPersistenceAdapter(SpringDataBorrowingRepository jpa) {
         return new BorrowingPersistenceAdapter(jpa);
+    }
+
+    @Bean
+    BorrowRuleJdbcAdapter borrowRuleJdbcAdapter(JdbcTemplate jdbc) {
+        return new BorrowRuleJdbcAdapter(jdbc);
     }
 }
