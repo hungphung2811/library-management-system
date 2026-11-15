@@ -56,7 +56,7 @@ Lý do chọn A: khớp "số lượng nhỏ trước". `@TenantId` kết hợp 
 ### 5.1 Mô hình tenant và người dùng (identity-service, thêm bounded context `tenant`)
 - `organizations` (trường, chỉ để nhóm) và `tenants(id, code, name, organization_id nullable, status ACTIVE/SUSPENDED, created_at)`.
 - `tenant_memberships(user_id, tenant_id, department_id nullable, status)`: người dùng thuộc tenant nào. **Phòng ban chuyển từ `users` sang bảng này** vì phòng ban là dữ liệu của tenant còn tài khoản là toàn cục.
-- `users.last_tenant_id`: tenant được chọn gần nhất.
+- `credentials.last_tenant_id`: tenant được chọn gần nhất.
 - `roles.tenant_id` (role thuộc tenant), `user_roles` giữ nguyên nhưng role đã gắn tenant. Cờ `is_admin` của role nghĩa là quản trị viên **của tenant đó**. Danh mục khóa permission `Controller/method` **dùng chung toàn hệ thống** (mô tả endpoint, không phải dữ liệu tenant).
 - Quản trị cấp trên mọi tenant: cờ `platform_admin` trên tài khoản, tạo bằng bootstrap/cấu hình, không tạo qua API tenant.
 - Dữ liệu toàn cục (không có `tenant_id`): `credentials`, `users` (username, họ tên, email), `external_logins`, `permissions`.

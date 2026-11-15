@@ -70,14 +70,40 @@ class TenantPersistenceAdapterIT {
     }
 
     @Test
-    void lastTenantDocGhiQuaCotUsers() {
+    void lastTenantDocGhiQuaCotCredentials() {
         UUID user = UUID.randomUUID();
         UUID tenant = UUID.fromString("00000000-0000-0000-0000-0000000000d1");
-        jdbc.update("INSERT INTO users (id, username, full_name, email, status) VALUES (?, ?, 'N', ?, 'ACTIVE')",
-                user, "u" + user, user + "@x.vn");
+        jdbc.update("INSERT INTO credentials (user_id, username, password_hash, active) VALUES (?, ?, 'h', true)",
+                user, "u" + user);
 
         assertThat(memberships.findLastTenant(user)).isEmpty();
         memberships.saveLastTenant(user, tenant);
         assertThat(memberships.findLastTenant(user)).contains(tenant);
+
+        UUID other = tenants.save(Tenant.create("lib-c", "Thư viện C", null)).id();
+        memberships.saveLastTenant(user, other);
+        assertThat(memberships.findLastTenant(user)).contains(other);
+    }
+
+    @Test
+    void lastTenantVoiTaiKhoanChiCoCredentialKhongCoDongUsers() {
+        UUID user = UUID.randomUUID();
+        UUID tenant = UUID.fromString("00000000-0000-0000-0000-0000000000d1");
+        jdbc.update("INSERT INTO credentials (user_id, username, password_hash, active) VALUES (?, ?, 'h', true)",
+                user, "c" + user);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM users WHERE id = ?", Integer.class, user)).isZero();
+
+        memberships.saveLastTenant(user, tenant);
+
+        assertThat(memberships.findLastTenant(user)).contains(tenant);
+    }
+
+    @Test
+    void lastTenantVoiUserIdKhongTonTaiLaNoOp() {
+        UUID unknown = UUID.randomUUID();
+
+        memberships.saveLastTenant(unknown, UUID.fromString("00000000-0000-0000-0000-0000000000d1"));
+
+        assertThat(memberships.findLastTenant(unknown)).isEmpty();
     }
 }

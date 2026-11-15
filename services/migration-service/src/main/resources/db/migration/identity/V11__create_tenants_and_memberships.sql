@@ -40,7 +40,7 @@ CREATE TABLE role_template_permissions (
 );
 
 ALTER TABLE credentials ADD COLUMN platform_admin BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE users ADD COLUMN last_tenant_id UUID;
+ALTER TABLE credentials ADD COLUMN last_tenant_id UUID;
 
 -- Tenant mặc định cho dữ liệu hiện có
 INSERT INTO tenants (id, code, name, organization_id, status)

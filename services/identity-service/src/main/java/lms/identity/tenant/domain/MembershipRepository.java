@@ -13,7 +13,7 @@ public interface MembershipRepository {
 
     Optional<Membership> find(UUID userId, UUID tenantId);
 
-    /** Ghi tenant dùng gần nhất của người dùng (users.last_tenant_id). Không có dòng users thì không làm gì. */
+    /** Ghi tenant dùng gần nhất của người dùng (credentials.last_tenant_id). Với userId không tồn tại (không có credential) thì không làm gì. */
     void saveLastTenant(UUID userId, UUID tenantId);
 
     Optional<UUID> findLastTenant(UUID userId);

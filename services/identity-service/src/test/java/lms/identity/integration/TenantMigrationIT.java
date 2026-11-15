@@ -123,7 +123,7 @@ class TenantMigrationIT {
 
     @Test
     void lastTenantIdMacDinhNull() throws SQLException {
-        assertThat(column("SELECT count(*)::text FROM users WHERE last_tenant_id IS NOT NULL")).containsExactly("0");
+        assertThat(column("SELECT count(*)::text FROM credentials WHERE last_tenant_id IS NOT NULL")).containsExactly("0");
     }
 
     @Test

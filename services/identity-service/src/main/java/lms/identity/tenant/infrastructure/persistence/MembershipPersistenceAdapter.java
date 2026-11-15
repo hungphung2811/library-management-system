@@ -10,7 +10,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 /**
- * Membership qua JPA; users.last_tenant_id đọc/ghi bằng SQL hẹp để không đụng UserJpaEntity của context user.
+ * Membership qua JPA; credentials.last_tenant_id (mọi tài khoản đều có dòng credentials) đọc/ghi bằng SQL hẹp để không đụng
+ * entity của context auth.
  */
 @Repository
 class MembershipPersistenceAdapter implements MembershipRepository {
@@ -43,12 +44,12 @@ class MembershipPersistenceAdapter implements MembershipRepository {
 
     @Override
     public void saveLastTenant(UUID userId, UUID tenantId) {
-        jdbc.update("UPDATE users SET last_tenant_id = ? WHERE id = ?", tenantId, userId);
+        jdbc.update("UPDATE credentials SET last_tenant_id = ? WHERE user_id = ?", tenantId, userId);
     }
 
     @Override
     public Optional<UUID> findLastTenant(UUID userId) {
-        List<UUID> rows = jdbc.query("SELECT last_tenant_id FROM users WHERE id = ? AND last_tenant_id IS NOT NULL",
+        List<UUID> rows = jdbc.query("SELECT last_tenant_id FROM credentials WHERE user_id = ? AND last_tenant_id IS NOT NULL",
                 (rs, i) -> rs.getObject(1, UUID.class), userId);
         return rows.stream().findFirst();
     }
