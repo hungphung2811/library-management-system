@@ -51,8 +51,9 @@ class MigrationApiIT {
             try (Connection c = DriverManager.getConnection(postgres.getJdbcUrl(), postgres.getUsername(),
                     postgres.getPassword()); Statement s = c.createStatement()) {
                 s.execute("CREATE DATABASE " + db + "_db");
-                // Vai trò chạy ứng dụng như init-databases.sql: script R__grant_... cấp quyền cho nó
-                s.execute("CREATE USER " + db + "_app WITH PASSWORD '" + db + "_app' NOSUPERUSER NOBYPASSRLS");
+                // Vai trò chạy ứng dụng như init-databases.sql: callback afterMigrate.sql cấp quyền cho nó.
+                // audit_app cố ý tạo muộn (test vaiTroTaoMuon...) để mô phỏng volume cũ.
+                if (!LATE_ROLE_DB.equals(db)) taoVaiTroApp(s, db);
             }
             String url = "jdbc:postgresql://" + postgres.getHost() + ":" + postgres.getFirstMappedPort() + "/" + db
                     + "_db";
@@ -68,11 +69,26 @@ class MigrationApiIT {
     @Autowired
     MockMvc mvc;
 
-    /** Số script versioned (V*) và repeatable (R__*) của target, đếm từ classpath. */
+    private static final String LATE_ROLE_DB = "audit";
+
+    private static void taoVaiTroApp(Statement s, String db) throws Exception {
+        s.execute("CREATE USER " + db + "_app WITH PASSWORD '" + db + "_app' NOSUPERUSER NOBYPASSRLS");
+    }
+
     private static int demScript(String target) throws Exception {
-        var resolver = new org.springframework.core.io.support.PathMatchingResourcePatternResolver();
-        return resolver.getResources("classpath:db/migration/" + target + "/V*.sql").length
-                + resolver.getResources("classpath:db/migration/" + target + "/R__*.sql").length;
+        return new org.springframework.core.io.support.PathMatchingResourcePatternResolver()
+                .getResources("classpath:db/migration/" + target + "/V*.sql").length;
+    }
+
+    /** Vai trò có đủ SELECT/INSERT/UPDATE/DELETE trên bảng hay không (hỏi bằng superuser). */
+    private static boolean coDml(String db, String role, String table) throws Exception {
+        try (Connection c = connect(db, postgres.getUsername(), postgres.getPassword());
+                Statement s = c.createStatement();
+                var rs = s.executeQuery("SELECT has_table_privilege('" + role + "', '" + table
+                        + "', 'SELECT,INSERT,UPDATE,DELETE')")) {
+            rs.next();
+            return rs.getBoolean(1);
+        }
     }
 
     private static Connection connect(String db, String user, String password) throws Exception {
@@ -116,15 +132,16 @@ class MigrationApiIT {
     @Test
     @Order(2)
     void scriptMoiBaoPendingRoiChayXongBaoApplied() throws Exception {
-        Files.writeString(extraScripts.resolve("V2__them_cot_gia_lap.sql"),
+        // V999 để không trùng số với migration catalog thật về sau
+        Files.writeString(extraScripts.resolve("V999__them_cot_gia_lap.sql"),
                 "ALTER TABLE titles ADD COLUMN IF NOT EXISTS ghi_chu_migration VARCHAR(50);");
-
-        // Số đã áp dụng gồm cả script repeatable (R__grant_...); tìm script mới theo version thay vì vị trí
         int catalog = demScript("catalog");
+
         mvc.perform(get("/api/migrations/catalog"))
                 .andExpect(jsonPath("$.applied").value(catalog))
                 .andExpect(jsonPath("$.pending").value(1))
-                .andExpect(jsonPath("$.scripts[?(@.version=='2')].state").value("PENDING"));
+                .andExpect(jsonPath("$.scripts[" + catalog + "].version").value("999"))
+                .andExpect(jsonPath("$.scripts[" + catalog + "].state").value("PENDING"));
 
         mvc.perform(post("/api/migrations/catalog/run"))
                 .andExpect(status().isOk())
@@ -133,11 +150,33 @@ class MigrationApiIT {
         mvc.perform(get("/api/migrations/catalog"))
                 .andExpect(jsonPath("$.applied").value(catalog + 1))
                 .andExpect(jsonPath("$.pending").value(0))
-                .andExpect(jsonPath("$.scripts[?(@.version=='2')].state").value("APPLIED"));
+                .andExpect(jsonPath("$.scripts[" + catalog + "].state").value("APPLIED"));
     }
 
     @Test
     @Order(3)
+    void vaiTroTaoMuonSauKhiDaMigrateThiChayLaiMigrationLaDuocCapQuyen() throws Exception {
+        // Lúc khởi động audit_app chưa có: migrate vẫn thành công (callback chỉ cảnh báo), chưa cấp gì
+        try (Connection c = connect(LATE_ROLE_DB, postgres.getUsername(), postgres.getPassword());
+                Statement s = c.createStatement()) {
+            taoVaiTroApp(s, LATE_ROLE_DB);
+        }
+        assertThat(coDml(LATE_ROLE_DB, "audit_app", "audit_logs")).isFalse();
+
+        // Không có script mới (executed = 0) nhưng afterMigrate vẫn chạy và cấp quyền
+        mvc.perform(post("/api/migrations/run"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.executed").value(0));
+
+        assertThat(coDml(LATE_ROLE_DB, "audit_app", "audit_logs")).isTrue();
+        // Callback không phải migration: lịch sử vẫn chỉ gồm các script versioned
+        mvc.perform(get("/api/migrations/audit"))
+                .andExpect(jsonPath("$.applied").value(demScript("audit")))
+                .andExpect(jsonPath("$.scripts.length()").value(demScript("audit")));
+    }
+
+    @Test
+    @Order(4)
     void vaiTroAppDuocCapQuyenDuLieuNhungKhongPhaiChuBang() throws Exception {
         String[][] bangMau = {{"identity", "users"}, {"catalog", "titles"}, {"circulation", "borrowings"},
                 {"audit", "audit_logs"}};
@@ -149,12 +188,19 @@ class MigrationApiIT {
                         + "', 'SELECT,INSERT,UPDATE,DELETE'), pg_get_userbyid(c.relowner) <> '" + role
                         + "', (SELECT bool_and(has_table_privilege('" + role + "', format('%I', relname),"
                         + " 'SELECT,INSERT,UPDATE,DELETE')) FROM pg_class WHERE relnamespace = 'public'::regnamespace"
-                        + " AND relkind = 'r' AND relname <> 'flyway_schema_history')"
+                        + " AND relkind = 'r' AND relname <> 'flyway_schema_history'),"
+                        + " has_table_privilege('" + role + "', 'flyway_schema_history', 'INSERT'),"
+                        + " has_table_privilege('" + role + "', 'flyway_schema_history', 'UPDATE'),"
+                        + " has_table_privilege('" + role + "', 'flyway_schema_history', 'DELETE')"
                         + " FROM pg_class c WHERE c.relname = '" + t[1] + "'");
                 rs.next();
                 assertThat(rs.getBoolean(1)).as(role + " DML trên " + t[1]).isTrue();
                 assertThat(rs.getBoolean(2)).as(role + " không là chủ").isTrue();
-                assertThat(rs.getBoolean(3)).as(role + " DML mọi bảng").isTrue();
+                assertThat(rs.getBoolean(3)).as(role + " DML mọi bảng nghiệp vụ").isTrue();
+                // Sổ cái migration: vai trò app không được ghi/sửa/xóa
+                assertThat(rs.getBoolean(4)).as(role + " INSERT flyway_schema_history").isFalse();
+                assertThat(rs.getBoolean(5)).as(role + " UPDATE flyway_schema_history").isFalse();
+                assertThat(rs.getBoolean(6)).as(role + " DELETE flyway_schema_history").isFalse();
                 // Bảng do migration sau (cùng vai trò chạy migration) tạo được cấp qua ALTER DEFAULT PRIVILEGES
                 s.execute("CREATE TABLE bang_cua_migration_sau (id bigserial PRIMARY KEY)");
             }
@@ -171,7 +217,7 @@ class MigrationApiIT {
     }
 
     @Test
-    @Order(4)
+    @Order(5)
     void targetLaBi404() throws Exception {
         mvc.perform(get("/api/migrations/khong-co")).andExpect(status().isNotFound());
         mvc.perform(post("/api/migrations/khong-co/run")).andExpect(status().isNotFound());

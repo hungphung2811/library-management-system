@@ -4,7 +4,8 @@
 # migration-service (chạy Flyway cho mọi DB) phải healthy trước khi identity/catalog/circulation/support khởi động.
 # Postgres: migration-service dùng vai trò chủ DB (identity, catalog, ...); các service chạy bằng vai trò *_app
 # (không phải chủ bảng, chịu Row-Level Security), tạo trong infrastructure/postgres/init-databases.sql.
-# Volume pgdata cũ chưa có *_app: `docker compose down -v` hoặc chạy tay phần CREATE USER ..._app của script đó.
+# Volume pgdata cũ chưa có *_app: `docker compose down -v`, hoặc chạy tay phần CREATE USER ..._app của script đó rồi
+# khởi động lại migration-service (callback afterMigrate.sql cấp quyền sau mỗi lần migrate, không cần GRANT tay).
 # Chỉ nginx (8080) publish port ra host cho FE; lms-api và các service khác chỉ gọi được trong mạng compose.
 services:
   postgres:

@@ -2,9 +2,11 @@
 -- Hai vai trò cho mỗi DB:
 --   <svc>      : chủ DB và chủ bảng, chỉ migration-service dùng (chạy Flyway).
 --   <svc>_app  : service dùng lúc chạy. NOSUPERUSER NOBYPASSRLS, không sở hữu bảng nên chịu Row-Level Security.
---                Quyền SELECT/INSERT/UPDATE/DELETE do script R__grant_privileges_cho_vai_tro_app.sql của migration cấp.
--- Script này chỉ chạy khi volume postgres còn trống. Volume cũ: `docker compose down -v` hoặc chạy tay các lệnh
--- CREATE USER ..._app bên dưới rồi chạy lại migration-service.
+--                Quyền SELECT/INSERT/UPDATE/DELETE do callback afterMigrate.sql của migration-service cấp sau mỗi
+--                lần migrate (kể cả khi không có script mới).
+-- Script này chỉ chạy khi volume postgres còn trống. Volume cũ: `docker compose down -v`, hoặc chạy tay các lệnh
+-- CREATE USER ..._app bên dưới rồi khởi động lại/chạy lại migration-service (afterMigrate tự cấp quyền, không cần
+-- GRANT tay).
 CREATE USER identity WITH PASSWORD 'identity';
 CREATE DATABASE identity_db OWNER identity;
 CREATE USER identity_app WITH PASSWORD 'identity_app' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;

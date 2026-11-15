@@ -153,13 +153,9 @@ class SupportServiceIT {
     void khoiDongMoCaHaiConnectionVaSchemaAuditDbDuocBeanTestMigrate() {
         assertThat(registry.state("AUDIT_DB")).isEqualTo(ConnectionState.UP);
         assertThat(registry.state("LOG_DB")).isEqualTo(ConnectionState.UP);
-        // Bean auditFlyway của test chạy script từ jar migration-service: 1 script versioned + script repeatable
-        // cấp quyền cho audit_app (R__grant_..., không làm gì khi vai trò chưa có)
-        JdbcTemplate jdbc = new JdbcTemplate(auditDataSource);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE success AND version IS NOT NULL",
-                Integer.class)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE success AND version IS NULL"
-                + " AND script = 'R__grant_privileges_cho_vai_tro_app.sql'", Integer.class)).isEqualTo(1);
+        // 1 bản ghi thành công do bean auditFlyway của test chạy (script từ jar migration-service)
+        assertThat(new JdbcTemplate(auditDataSource)
+                .queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE success", Integer.class)).isEqualTo(1);
         assertThat(context.getBean("auditDbTransactionManager")).isInstanceOf(JpaTransactionManager.class)
                 .isSameAs(registry.require("AUDIT_DB", RelationalConnection.class).transactionManager());
     }
