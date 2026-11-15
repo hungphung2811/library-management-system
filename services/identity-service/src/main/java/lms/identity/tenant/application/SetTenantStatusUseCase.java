@@ -40,12 +40,17 @@ public class SetTenantStatusUseCase {
     }
 
     private TenantResponse change(UUID tenantId, TenantStatus status, UUID actorId) {
-        Tenant tenant = tenants.findById(tenantId)
+        tenants.findById(tenantId)
                 .orElseThrow(() -> new TenantNotFoundException("Không tìm thấy tenant " + tenantId));
-        if (status == TenantStatus.SUSPENDED) tenant.suspend();
-        else tenant.activate();
         return TenantContext.callAs(tenantId, () -> {
-            tx.inTransaction(() -> tenants.save(tenant));
+            // đọc có khóa + sửa + ghi trong cùng transaction: không ghi đè name/organization do thao tác đồng thời
+            Tenant tenant = tx.inTransaction(() -> {
+                Tenant locked = tenants.findByIdForUpdate(tenantId)
+                        .orElseThrow(() -> new TenantNotFoundException("Không tìm thấy tenant " + tenantId));
+                if (status == TenantStatus.SUSPENDED) locked.suspend();
+                else locked.activate();
+                return tenants.save(locked);
+            });
             events.publish(new TenantStatusChangedEvent(tenantId, status));
             events.publish(PlatformOperationEvent.of(status == TenantStatus.SUSPENDED ? "TENANT_SUSPENDED"
                     : "TENANT_ACTIVATED", actorId, tenantId, tenantId, "status=" + status));

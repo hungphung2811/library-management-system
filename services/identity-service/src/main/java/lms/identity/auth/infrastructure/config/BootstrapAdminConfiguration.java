@@ -50,7 +50,11 @@ public class BootstrapAdminConfiguration {
                                              @Value("${auth.bootstrap.platform-admin-password:}") String password) {
         return args -> {
             if (username.isBlank() || password.isBlank()) return;
-            if (repository.existsByUsername(username.trim().toLowerCase())) return;
+            if (repository.existsByUsername(username.trim().toLowerCase())) {
+                log.warn("Bỏ qua tạo quản trị nền tảng: tên đăng nhập '{}' đã tồn tại (không đổi mật khẩu/quyền của tài khoản đó)",
+                        username.trim().toLowerCase());
+                return;
+            }
             register.registerPlatformAdmin(username, password);
             log.info("Đã tạo tài khoản quản trị nền tảng '{}'", username.trim().toLowerCase());
         };

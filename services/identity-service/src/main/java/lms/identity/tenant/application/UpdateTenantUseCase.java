@@ -29,13 +29,18 @@ public class UpdateTenantUseCase {
     }
 
     public TenantResponse execute(UUID tenantId, UpdateTenantRequest request, UUID actorId) {
-        Tenant tenant = tenants.findById(tenantId)
+        tenants.findById(tenantId)
                 .orElseThrow(() -> new TenantNotFoundException("Không tìm thấy tenant " + tenantId));
         ManageOrganizationUseCase.requireExists(organizations, request.organizationId());
-        tenant.rename(request.name());
-        tenant.moveToOrganization(request.organizationId());
         return TenantContext.callAs(tenantId, () -> {
-            tx.inTransaction(() -> tenants.save(tenant));
+            // đọc có khóa + sửa + ghi trong cùng transaction: không ghi đè status do thao tác đồng thời
+            Tenant tenant = tx.inTransaction(() -> {
+                Tenant locked = tenants.findByIdForUpdate(tenantId)
+                        .orElseThrow(() -> new TenantNotFoundException("Không tìm thấy tenant " + tenantId));
+                locked.rename(request.name());
+                locked.moveToOrganization(request.organizationId());
+                return tenants.save(locked);
+            });
             events.publish(PlatformOperationEvent.of("TENANT_UPDATED", actorId, tenantId, tenantId,
                     "name=" + tenant.name() + ", organizationId=" + tenant.organizationId()));
             return TenantResponse.from(tenant, queries.countActiveMembers(List.of(tenantId)).getOrDefault(tenantId, 0L));

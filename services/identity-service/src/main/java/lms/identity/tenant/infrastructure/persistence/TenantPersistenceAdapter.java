@@ -51,6 +51,11 @@ class TenantPersistenceAdapter implements TenantRepository, TenantQueryRepositor
     }
 
     @Override
+    public Optional<Tenant> findByIdForUpdate(UUID id) {
+        return jpa.findByIdForUpdate(id).map(TenantPersistenceAdapter::toDomain);
+    }
+
+    @Override
     public Optional<Tenant> findByCode(String code) {
         return jpa.findByCode(code).map(TenantPersistenceAdapter::toDomain);
     }
