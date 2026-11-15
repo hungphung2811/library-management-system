@@ -3,6 +3,7 @@ package lms.circulation.borrowing.integration;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import lms.circulation.borrowing.domain.BorrowingRecord;
+import lms.circulation.borrowing.domain.ItemCondition;
 import lms.circulation.borrowing.infrastructure.persistence.BorrowingPersistenceAdapter;
 import lms.circulation.borrowing.infrastructure.config.PersistenceConfiguration;
 import java.time.LocalDate;
@@ -47,5 +48,11 @@ class BorrowingPersistenceAdapterIT {
         adapter.save(loaded);
 
         assertThat(adapter.countActiveItemsByUserId(userId)).isEqualTo(1);
+        // item_condition được ghi cùng return_date (ck_borrowing_items_closed của V4)
+        BorrowingRecord reloaded = adapter.findById(record.id()).orElseThrow();
+        assertThat(reloaded.items()).filteredOn(i -> i.bookCopyId().equals(copy1)).singleElement()
+                .satisfies(i -> assertThat(i.condition()).isEqualTo(ItemCondition.GOOD));
+        assertThat(reloaded.items()).filteredOn(i -> i.bookCopyId().equals(copy2)).singleElement()
+                .satisfies(i -> assertThat(i.condition()).isNull());
     }
 }

@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import lms.circulation.borrowing.domain.BookBorrowedEvent;
 import lms.circulation.borrowing.domain.BookReturnedEvent;
+import lms.circulation.borrowing.domain.BorrowingItem;
+import lms.circulation.borrowing.domain.ItemCondition;
 import lms.circulation.borrowing.domain.InvalidBorrowingException;
 import lms.circulation.borrowing.domain.BorrowingRecord;
 import lms.circulation.borrowing.domain.BorrowingStatus;
@@ -55,6 +57,26 @@ class BorrowingRecordTest {
         record.returnCopy(copy2, today.plusDays(3));
         assertThat(record.status()).isEqualTo(BorrowingStatus.RETURNED);
         assertThat(record.pullEvents()).hasSize(2).allMatch(e -> e instanceof BookReturnedEvent);
+    }
+
+    @Test
+    void traBanSaoGhiTinhTrangNguyenVenConDangMuonThiChuaCoTinhTrang() {
+        BorrowingRecord record = BorrowingRecord.borrow(userId, List.of(copy1, copy2), today);
+
+        record.returnCopy(copy1, today.plusDays(1));
+
+        var items = record.items();
+        assertThat(items).filteredOn(i -> i.bookCopyId().equals(copy1))
+                .singleElement().satisfies(i -> assertThat(i.condition()).isEqualTo(ItemCondition.GOOD));
+        assertThat(items).filteredOn(i -> i.bookCopyId().equals(copy2))
+                .singleElement().satisfies(i -> assertThat(i.condition()).isNull());
+    }
+
+    @Test
+    void ngayTraVaTinhTrangPhaiCungCoHoacCungKhong() {
+        assertThatThrownBy(() -> new BorrowingItem(copy1, today, null)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new BorrowingItem(copy1, null, ItemCondition.LOST))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
