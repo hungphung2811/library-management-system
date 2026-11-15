@@ -28,7 +28,7 @@ public class IdentityGatewayController {
     @RequestMapping("/api/platform/**")
     public ResponseEntity<byte[]> platform(HttpServletRequest request) throws IOException {
         String rest = request.getRequestURI().substring(PLATFORM_PREFIX.length());
-        return identity.forward(HttpMethod.valueOf(request.getMethod()), "/internal/platform" + rest,
+        return identity.forward(HttpMethod.valueOf(request.getMethod()), "/api/platform" + rest,
                 request.getQueryString(), request.getInputStream().readAllBytes(), request.getContentType());
     }
 

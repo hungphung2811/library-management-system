@@ -10,7 +10,7 @@ import org.springframework.http.ResponseEntity;
 public interface IdentityGatewayClient {
 
     /**
-     * @param internalPath đường dẫn nội bộ, ví dụ /internal/platform/tenants
+     * @param internalPath đường dẫn đích trên identity, ví dụ /api/platform/tenants hoặc /internal/me/tenants
      * @param rawQuery     query string thô (đã mã hóa) hoặc null
      */
     ResponseEntity<byte[]> forward(HttpMethod method, String internalPath, String rawQuery, byte[] body,

@@ -75,7 +75,7 @@ class LmsApiRoutingTest {
 
     @Test
     void platformTenantsChuyenToiIdentityGiuNguyenAuthorization() throws Exception {
-        identity.expect(requestTo("http://identity/internal/platform/tenants?page=1&q=th%C6%B0%20vi%E1%BB%87n"))
+        identity.expect(requestTo("http://identity/api/platform/tenants?page=1&q=th%C6%B0%20vi%E1%BB%87n"))
                 .andExpect(method(org.springframework.http.HttpMethod.GET))
                 .andExpect(header("Authorization", "Bearer token-platform"))
                 .andRespond(withSuccess("[{\"code\":\"abc\"}]", MediaType.APPLICATION_JSON));
@@ -89,7 +89,7 @@ class LmsApiRoutingTest {
 
     @Test
     void platformPostChuyenBodyVaTrangThaiCua4xx() throws Exception {
-        identity.expect(requestTo("http://identity/internal/platform/tenants"))
+        identity.expect(requestTo("http://identity/api/platform/tenants"))
                 .andExpect(method(org.springframework.http.HttpMethod.POST))
                 .andExpect(header("Authorization", "Bearer token-tenant"))
                 .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.content().json("{\"code\":\"abc\"}"))
