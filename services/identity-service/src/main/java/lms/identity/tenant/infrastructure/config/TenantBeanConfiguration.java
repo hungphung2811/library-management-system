@@ -1,6 +1,7 @@
 package lms.identity.tenant.infrastructure.config;
 
 import lms.identity.tenant.application.AddMembershipUseCase;
+import lms.identity.tenant.application.ListActiveTenantIdsUseCase;
 import lms.identity.tenant.application.ListMyTenantsUseCase;
 import lms.identity.tenant.application.ResolveLoginTenantUseCase;
 import lms.identity.tenant.application.SwitchTenantUseCase;
@@ -32,6 +33,11 @@ public class TenantBeanConfiguration {
     @Bean
     ListMyTenantsUseCase listMyTenantsUseCase(TenantRepository tenants, MembershipRepository memberships) {
         return new ListMyTenantsUseCase(tenants, memberships);
+    }
+
+    @Bean
+    ListActiveTenantIdsUseCase listActiveTenantIdsUseCase(TenantRepository tenants) {
+        return new ListActiveTenantIdsUseCase(tenants);
     }
 
     @Bean

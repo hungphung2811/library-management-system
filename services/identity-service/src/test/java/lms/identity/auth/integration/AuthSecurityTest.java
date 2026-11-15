@@ -40,6 +40,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @WebMvcTest(AuthController.class)
 @Import({SecurityConfiguration.class, PermissionAutoConfiguration.class})
+@org.springframework.test.context.TestPropertySource(properties = "lms.security.permission.require-tenant=true")
 class AuthSecurityTest {
 
     @Autowired MockMvc mvc;
@@ -57,8 +58,11 @@ class AuthSecurityTest {
     private final String registerBody = "{\"userId\":\"" + UUID.randomUUID()
             + "\",\"username\":\"bob\",\"password\":\"secret123\"}";
 
+    private static final String TOKEN_TENANT = UUID.randomUUID().toString();
+
+    /** Token của một tenant (claim tenantId) có đúng các khóa quyền được liệt kê. */
     private RequestPostProcessor with(String... permissions) {
-        return jwt().jwt(j -> j.claim("permissions", List.of(permissions)))
+        return jwt().jwt(j -> j.claim("permissions", List.of(permissions)).claim("tenantId", TOKEN_TENANT))
                 .authorities(Arrays.stream(permissions).map(SimpleGrantedAuthority::new).toArray(GrantedAuthority[]::new));
     }
 
@@ -101,6 +105,33 @@ class AuthSecurityTest {
         mvc.perform(post("/internal/auth/credentials").with(with("AuthController/register"))
                         .contentType(MediaType.APPLICATION_JSON).content(registerBody))
                 .andExpect(status().isCreated());
+    }
+
+    @Test
+    void tokenCuKhongCoTenantIdBiTuChoiOEndpointThuongDuCoPermissionHayAdmin() throws Exception {
+        mvc.perform(post("/internal/auth/credentials")
+                        .with(jwt().jwt(j -> j.claim("permissions", List.of("AuthController/register")))
+                                .authorities(new SimpleGrantedAuthority("AuthController/register")))
+                        .contentType(MediaType.APPLICATION_JSON).content(registerBody))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("TENANT_REQUIRED"));
+        mvc.perform(post("/internal/auth/credentials").with(jwt().jwt(j -> j.claim("admin", true)))
+                        .contentType(MediaType.APPLICATION_JSON).content(registerBody))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("TENANT_REQUIRED"));
+        org.mockito.Mockito.verifyNoInteractions(register);
+    }
+
+    @Test
+    void endpointCongKhaiVaChiCanDangNhapKhongDoiTenantId() throws Exception {
+        when(login.execute("alice", "secret123", null)).thenReturn(TokenResponse.bearer("a", "r", 900));
+
+        mvc.perform(post("/internal/auth/login").contentType(MediaType.APPLICATION_JSON).content(LOGIN_BODY))
+                .andExpect(status().isOk());
+        mvc.perform(post("/internal/auth/password").with(jwt().jwt(j -> j.subject(UUID.randomUUID().toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"secret123\",\"newPassword\":\"NewSecret@123\"}"))
+                .andExpect(status().isNoContent());
     }
 
     @Test

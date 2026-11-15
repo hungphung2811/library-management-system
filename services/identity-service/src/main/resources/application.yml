@@ -53,6 +53,8 @@ auth:
     password: ${AUTH_BOOTSTRAP_ADMIN_PASSWORD:}
     # Mặc định bắt buộc đổi mật khẩu ở lần đăng nhập đầu; profile dev tắt để dùng admin / Admin@12345 ngay
     must-change-password: true
+    # Tenant của tài khoản quản trị khởi tạo: tenant mặc định do migration V11 tạo (id chỉ nằm ở cấu hình/migration)
+    tenant-id: ${AUTH_BOOTSTRAP_ADMIN_TENANT_ID:00000000-0000-0000-0000-0000000000d1}
   # Đăng nhập ngoài (OIDC). Nhà cung cấp chỉ bật khi có client-id; redirect URI đăng ký ở IdP:
   #   <public-base-url>/external/<tên>/callback (dev: http://localhost:8080/api/auth/external/google/callback)
   external:
@@ -83,3 +85,9 @@ lms:
   security:
     permission:
       service-name: ${spring.application.name}
+      # Endpoint thường bắt buộc token có claim tenantId (403 TENANT_REQUIRED); @AuthenticatedOnly/@PublicEndpoint
+      # (đăng nhập, làm mới, đổi tenant, /me/tenants, đổi mật khẩu) không bị ảnh hưởng.
+      require-tenant: true
+  # tenant-common: TenantContext theo claim tenantId, Hibernate @TenantId và RLS (app.tenant_id)
+  tenant:
+    enabled: true

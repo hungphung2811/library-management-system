@@ -15,8 +15,11 @@ class TenantAccessStub implements TenantAccessPort {
 
     final List<UUID> addedMembers = new ArrayList<>();
 
+    /** Phòng ban của người dùng trong tenant (membership); null = chưa gán. */
+    UUID department;
+
     TenantChoice choice() {
-        return new TenantChoice(TENANT, List.of(SUMMARY));
+        return new TenantChoice(TENANT, List.of(SUMMARY), department);
     }
 
     @Override

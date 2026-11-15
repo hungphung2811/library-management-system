@@ -12,7 +12,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpEntity;
@@ -22,6 +21,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -31,6 +32,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 /**
  * Khởi động nguyên identity-service (auth + accesscontrol) trên PostgreSQL thật và chạy luồng RBAC từ đầu đến cuối.
  * Kafka không chạy: broker giả không với tới được, listener tắt, producer chờ rất ngắn (chỉ log lỗi publish).
+ * Ứng dụng kết nối bằng vai trò identity_app (chịu RLS), Flyway chạy bằng superuser (xem {@link AppRoleDatabase}).
  * Cần Docker. Chạy: mvn test -Dtest=IdentityServiceIT -Dsurefire.failIfNoSpecifiedTests=false
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
@@ -49,8 +51,12 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class IdentityServiceIT {
 
     @Container
-    @ServiceConnection
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16");
+
+    @DynamicPropertySource
+    static void database(DynamicPropertyRegistry registry) {
+        AppRoleDatabase.register(postgres, registry);
+    }
 
     @Autowired TestRestTemplate rest;
     @Autowired JwtDecoder jwtDecoder;
@@ -495,5 +501,94 @@ class IdentityServiceIT {
         jdbc.update("UPDATE credentials SET platform_admin = FALSE WHERE user_id = ?", userId);
         assertThat(refreshWith((String) refreshed.getBody().get("refreshToken")).getStatusCode())
                 .isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    // ---- cách ly dữ liệu identity theo tenant (Task 4b) ----
+
+    @Autowired lms.identity.auth.application.TokenIssuerPort tokenIssuer;
+
+    static final UUID BOOTSTRAP_ADMIN = UUID.fromString("00000000-0000-0000-0000-000000000001");
+
+    /** Seed bằng superuser (bỏ qua RLS) để ghi dữ liệu của tenant khác tenant đang đăng nhập. */
+    private void asSuperuser(String sql, Object... args) {
+        try (java.sql.Connection c = AppRoleDatabase.superuser(postgres);
+                java.sql.PreparedStatement ps = c.prepareStatement(sql)) {
+            for (int i = 0; i < args.length; i++) ps.setObject(i + 1, args[i]);
+            ps.executeUpdate();
+        } catch (java.sql.SQLException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    @Test
+    void tokenCuKhongCoTenantIdBiTuChoiOEndpointThuongNhungVanDungEndpointChiCanDangNhap() {
+        // như token phát hành trước multi-tenant: có admin và permission nhưng không có claim tenantId
+        String legacy = tokenIssuer.issue(new lms.identity.auth.application.TokenIssuerPort.Claims(BOOTSTRAP_ADMIN,
+                "admin", null, List.of("SUPER_ADMIN"), List.of("AccessControlController/listRoles"), false, true,
+                null, false)).value();
+
+        ResponseEntity<Map> denied = call(HttpMethod.GET, "/internal/roles", legacy, null, Map.class);
+        assertThat(denied.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(denied.getBody().get("code")).isEqualTo("TENANT_REQUIRED");
+        ResponseEntity<Map> register = call(HttpMethod.POST, "/internal/auth/credentials", legacy,
+                Map.of("userId", UUID.randomUUID(), "username", "legacy-made", "password", "Legacy@12345"), Map.class);
+        assertThat(register.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(register.getBody().get("code")).isEqualTo("TENANT_REQUIRED");
+
+        assertThat(call(HttpMethod.GET, "/internal/me/tenants", legacy, null, List.class).getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void ungDungChayDuoiRlsKhongCoTenantThiKhongThayRoleNao() {
+        // jdbc dùng vai trò identity_app, không có tenant trong ngữ cảnh: fail-closed
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM roles", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM user_roles", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM role_permissions", Integer.class)).isZero();
+        assertThat(lms.tenant.TenantContext.callAs(DEFAULT_TENANT,
+                () -> jdbc.queryForObject("SELECT count(*) FROM roles", Integer.class))).isGreaterThanOrEqualTo(5);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void quyenVaAdminTrongTokenChiTuRoleCuaTenantDaChon() {
+        String admin = accessToken("admin", "Admin@12345");
+        UUID userId = createUser(admin, "two-tenant-user", "TwoTenant@123");
+        assign(admin, userId, roleId(admin, "MEMBER"), HttpStatus.NO_CONTENT);
+        UUID tenantB = newTenant("it-iso-b", "ACTIVE");
+        joinTenant(userId, tenantB);
+        UUID bAdminRole = UUID.randomUUID();
+        asSuperuser("INSERT INTO roles (id, tenant_id, name, description, is_admin) "
+                + "VALUES (?, ?, 'B_ADMIN', 'Quản trị B', TRUE)", bAdminRole, tenantB);
+        asSuperuser("INSERT INTO user_roles (user_id, role_id, tenant_id) VALUES (?, ?, ?)", userId, bAdminRole, tenantB);
+
+        // tenant mặc định: chỉ role MEMBER của tenant đó, không admin
+        Map<String, Object> inDefault = login("two-tenant-user", "TwoTenant@123", HttpStatus.OK);
+        Jwt defaultJwt = jwtDecoder.decode((String) inDefault.get("accessToken"));
+        assertThat(defaultJwt.getClaimAsString("tenantId")).isEqualTo(DEFAULT_TENANT.toString());
+        assertThat(defaultJwt.getClaimAsStringList("roles")).containsExactly("MEMBER");
+        assertThat(defaultJwt.getClaimAsStringList("permissions")).contains("BorrowingController/borrow");
+        assertThat((Object) defaultJwt.getClaim("admin")).isNull();
+
+        // đổi sang B: chỉ role của B; admin vì B_ADMIN là is_admin ở B
+        ResponseEntity<Map> switched = switchTo((String) inDefault.get("accessToken"), tenantB,
+                (String) inDefault.get("refreshToken"));
+        assertThat(switched.getStatusCode()).isEqualTo(HttpStatus.OK);
+        String bToken = (String) switched.getBody().get("accessToken");
+        Jwt bJwt = jwtDecoder.decode(bToken);
+        assertThat(bJwt.getClaimAsString("tenantId")).isEqualTo(tenantB.toString());
+        assertThat(bJwt.getClaimAsStringList("roles")).containsExactly("B_ADMIN");
+        assertThat(bJwt.getClaimAsStringList("permissions")).isEmpty();
+        assertThat(bJwt.getClaimAsBoolean("admin")).isTrue();
+
+        // quản trị viên của B chỉ thấy role của B, và tạo được role trùng tên với role của tenant mặc định
+        List<Map<String, Object>> rolesInB = call(HttpMethod.GET, "/internal/roles", bToken, null, List.class).getBody();
+        assertThat(rolesInB).extracting(r -> r.get("name")).containsExactly("B_ADMIN");
+        createRole(bToken, "MEMBER", false, HttpStatus.CREATED);
+        // role của tenant mặc định không gán được từ B (không thấy role đó)
+        assign(bToken, userId, roleId(admin, "LIBRARIAN"), HttpStatus.NOT_FOUND);
+        // tenant mặc định vẫn chỉ có một MEMBER
+        assertThat(((List<Map<String, Object>>) call(HttpMethod.GET, "/internal/roles", admin, null, List.class).getBody())
+                .stream().filter(r -> "MEMBER".equals(r.get("name")))).hasSize(1);
     }
 }

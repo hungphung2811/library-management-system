@@ -33,6 +33,11 @@ final class AccessibleTenants {
                 .toList();
     }
 
+    /** Phòng ban của người dùng trong tenant (tenant_memberships.department_id), null nếu chưa gán. */
+    static UUID departmentIn(UUID userId, UUID tenantId, MembershipRepository memberships) {
+        return memberships.find(userId, tenantId).map(Membership::departmentId).orElse(null);
+    }
+
     static List<TenantSummary> summaries(List<Tenant> accessible) {
         return accessible.stream().map(TenantSummary::of).toList();
     }

@@ -13,7 +13,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lms.identity.auth.application.AuthDtos.TokenResponse;
@@ -36,6 +38,7 @@ import lms.identity.auth.domain.UserCredentialRepository;
 import lms.identity.tenant.application.TenantChoice;
 import lms.identity.tenant.application.TenantSummary;
 import lms.identity.tenant.domain.NoTenantAccessException;
+import lms.tenant.TenantContext;
 import org.junit.jupiter.api.Test;
 
 /** Token theo tenant: claim tenantId/platformAdmin, refresh giữ tenant, đổi tenant. */
@@ -82,7 +85,7 @@ class TokenServiceTenantTest {
         TokenIssuerPort.Claims claims = issued.get(0);
         assertThat(claims.tenantId()).isEqualTo(tenantA);
         assertThat(claims.platformAdmin()).isFalse();
-        // 4a: permissions/admin tính như trước (role còn toàn cục)
+        // port giả của test này không phân biệt tenant; phân biệt theo tenant xem các test "theo tenant" bên dưới
         assertThat(claims.permissions()).containsExactly("BorrowingController/borrow");
         assertThat(claims.admin()).isTrue();
         assertThat(response.tenantId()).isEqualTo(tenantA);
@@ -138,6 +141,95 @@ class TokenServiceTenantTest {
 
         assertThat(issued.get(0).tenantId()).isEqualTo(tenantB);
         assertThat(issued.get(0).mustChangePassword()).isFalse();
+    }
+
+    // ---- quyền theo tenant đã chọn (role là dữ liệu thuộc tenant) ----
+
+    /** Quyền của người dùng theo từng tenant; port đọc tenant từ TenantContext như adapter thật (role có @TenantId + RLS). */
+    private final Map<UUID, UserAccessPort.UserAccess> accessByTenant = new HashMap<>();
+    private final List<java.util.Optional<UUID>> tenantSeenByAccessPort = new ArrayList<>();
+
+    private final TokenService perTenantService = new TokenService(
+            id -> {
+                java.util.Optional<UUID> current = TenantContext.current();
+                tenantSeenByAccessPort.add(current);
+                return current.map(accessByTenant::get)
+                        .orElse(new UserAccessPort.UserAccess(id, List.of(), List.of(), false));
+            },
+            c -> { issued.add(c); return new TokenIssuerPort.IssuedToken("jwt", 900); },
+            codec, refreshSave, clock, Duration.ofDays(7), id -> Optional.empty(), tenants);
+
+    private void accessIn(UUID tenant, List<String> roles, List<String> permissions, boolean admin) {
+        accessByTenant.put(tenant, new UserAccessPort.UserAccess(userId, roles, permissions, admin));
+    }
+
+    @Test
+    void permissionsChiLayTuRoleCuaTenantDaChon() {
+        accessIn(tenantA, List.of("LIBRARIAN"), List.of("BorrowingController/borrow"), false);
+        accessIn(tenantB, List.of("AUDITOR"), List.of("AuditLogController/search"), false);
+        when(tenants.selectForLogin(userId, "lib-b", false)).thenReturn(new TenantChoice(tenantB, List.of(summaryA, summaryB)));
+
+        perTenantService.issueFor(credential(false, false), "lib-b");
+
+        TokenIssuerPort.Claims claims = issued.get(0);
+        assertThat(claims.tenantId()).isEqualTo(tenantB);
+        assertThat(claims.roles()).containsExactly("AUDITOR");
+        assertThat(claims.permissions()).containsExactly("AuditLogController/search");
+        assertThat(tenantSeenByAccessPort).containsExactly(Optional.of(tenantB));
+    }
+
+    @Test
+    void adminChiKhiCoRoleIsAdminOTenantDo() {
+        accessIn(tenantA, List.of("SUPER_ADMIN"), List.of(), true);
+        accessIn(tenantB, List.of("MEMBER"), List.of("TitleController/search"), false);
+        when(tenants.selectForLogin(userId, null, false)).thenReturn(new TenantChoice(tenantA, List.of(summaryA, summaryB)));
+        when(tenants.switchTo(userId, tenantB)).thenReturn(new TenantChoice(tenantB, List.of(summaryA, summaryB)));
+
+        perTenantService.issueFor(credential(false, false));
+        perTenantService.issueForTenant(credential(false, false), tenants.switchTo(userId, tenantB));
+
+        assertThat(issued.get(0).admin()).isTrue();
+        assertThat(issued.get(1).admin()).isFalse();
+        assertThat(issued.get(1).roles()).containsExactly("MEMBER");
+        assertThat(issued.get(1).permissions()).containsExactly("TitleController/search");
+    }
+
+    @Test
+    void docQuyenTrongTenantDaChonRoiKhoiPhucTenantCuaRequest() {
+        UUID requestTenant = UUID.randomUUID();
+        accessIn(tenantB, List.of("MEMBER"), List.of("TitleController/search"), false);
+
+        TenantContext.runAs(requestTenant, () ->
+                perTenantService.issueForTenant(credential(false, false), new TenantChoice(tenantB, List.of(summaryB))));
+
+        assertThat(tenantSeenByAccessPort).containsExactly(Optional.of(tenantB));
+        assertThat(issued.get(0).permissions()).containsExactly("TitleController/search");
+        assertThat(TenantContext.current()).isEmpty();
+    }
+
+    @Test
+    void phienNenTangKhongCoRoleTenantNaoVaKhongDocQuyen() {
+        when(tenants.selectForLogin(userId, null, true)).thenReturn(new TenantChoice(null, List.of()));
+
+        perTenantService.issueFor(credential(false, true));
+
+        TokenIssuerPort.Claims claims = issued.get(0);
+        assertThat(claims.platformAdmin()).isTrue();
+        assertThat(claims.roles()).isEmpty();
+        assertThat(claims.permissions()).isEmpty();
+        assertThat(claims.admin()).isFalse();
+        assertThat(tenantSeenByAccessPort).isEmpty();
+    }
+
+    @Test
+    void phongBanTrongTokenLaPhongBanCuaMembershipOTenantDaChon() {
+        UUID deptInB = UUID.randomUUID();
+        when(tenants.selectForLogin(userId, null, false))
+                .thenReturn(new TenantChoice(tenantB, List.of(summaryA, summaryB), deptInB));
+
+        perTenantService.issueFor(credential(false, false));
+
+        assertThat(issued.get(0).departmentId()).isEqualTo(deptInB);
     }
 
     // ---- refresh ----

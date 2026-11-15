@@ -11,11 +11,17 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
+import lms.tenant.TenantContext;
 
 /**
  * Phát hành cặp access token + refresh token theo tenant; dùng chung cho đăng nhập, đăng nhập ngoài, đổi tenant và
  * làm mới phiên. Token mang tenantId của tenant đã chọn và platformAdmin khi tài khoản có cờ; refresh token gắn cùng
  * tenant đó (hoặc là phiên nền tảng khi platform admin không có tenant).
+ *
+ * <p>roles/permissions/admin chỉ lấy từ role của tenant đã chọn: việc đọc chạy trong
+ * {@code TenantContext.callAs(<tenant đã chọn>, ...)} (role là dữ liệu thuộc tenant), bất kể tenant của request hiện tại
+ * (đăng nhập không có tenant, đổi tenant đang ở tenant cũ). Phiên nền tảng (không tenant) không có role tenant nào.
+ * Phòng ban trong token là phòng ban của membership ở tenant đã chọn.
  */
 public class TokenService {
 
@@ -85,11 +91,12 @@ public class TokenService {
         if (tenantId == null && !credential.platformAdmin()) {
             throw new IllegalStateException("Chỉ platform admin mới có phiên không thuộc tenant nào");
         }
-        // Phòng ban hiện tại lấy từ hồ sơ người dùng (đổi phòng ban có hiệu lực ở lần cấp token kế tiếp)
-        UUID departmentId = directory.map(UserDirectoryPort.UserInfo::departmentId)
-                .orElse(credential.departmentId());
-        // 4a: role/permission còn toàn cục nên permissions và admin tính như trước, chưa lọc theo tenant
-        UserAccessPort.UserAccess access = userAccessPort.fetch(credential.userId());
+        // Phòng ban là dữ liệu của tenant: lấy từ membership ở tenant đã chọn (không dùng users.department_id toàn cục)
+        UUID departmentId = tenantId != null ? choice.departmentId() : null;
+        // Role/permission thuộc tenant: chỉ tính role của tenant đã chọn; phiên nền tảng không có role tenant nào
+        UserAccessPort.UserAccess access = tenantId != null
+                ? TenantContext.callAs(tenantId, () -> userAccessPort.fetch(credential.userId()))
+                : new UserAccessPort.UserAccess(credential.userId(), List.of(), List.of(), false);
         // Phải đổi mật khẩu trước: token không mang permission nào nên mọi endpoint kiểm quyền (ở mọi service) đều
         // từ chối, chỉ còn các endpoint chỉ cần đăng nhập, như đổi mật khẩu. Vẫn mang tenantId.
         TokenIssuerPort.IssuedToken accessToken = tokenIssuer.issue(new TokenIssuerPort.Claims(

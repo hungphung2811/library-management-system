@@ -10,7 +10,12 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
 import java.util.UUID;
+import org.hibernate.annotations.TenantId;
 
+/**
+ * Hồ sơ độc giả của một người dùng trong một tenant. Khóa chính ở DB là (tenant_id, user_id); ở JPA chỉ cần user_id vì
+ * mỗi phiên Hibernate gắn một tenant (@TenantId lọc và điền tenant_id, RLS lọc thêm). card_no unique theo tenant.
+ */
 @Entity
 @Table(name = "reader_profiles")
 class ReaderProfileJpaEntity {
@@ -19,7 +24,11 @@ class ReaderProfileJpaEntity {
     @Column(name = "user_id")
     private UUID userId;
 
-    @Column(name = "card_no", nullable = false, unique = true)
+    @TenantId
+    @Column(name = "tenant_id", nullable = false, updatable = false)
+    private UUID tenantId;
+
+    @Column(name = "card_no", nullable = false)
     private String cardNo;
 
     @Column(name = "full_name", nullable = false)

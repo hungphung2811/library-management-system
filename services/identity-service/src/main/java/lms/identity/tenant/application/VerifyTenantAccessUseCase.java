@@ -29,6 +29,7 @@ public class VerifyTenantAccessUseCase {
         if (tenantId == null || accessible.stream().noneMatch(t -> t.id().equals(tenantId))) {
             throw new NoTenantAccessException();
         }
-        return new TenantChoice(tenantId, AccessibleTenants.summaries(accessible));
+        return new TenantChoice(tenantId, AccessibleTenants.summaries(accessible),
+                AccessibleTenants.departmentIn(userId, tenantId, memberships));
     }
 }

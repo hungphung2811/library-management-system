@@ -58,6 +58,6 @@ public class ResolveLoginTenantUseCase {
         if (last.filter(tenantId::equals).isEmpty()) {
             memberships.saveLastTenant(userId, tenantId);
         }
-        return new TenantChoice(tenantId, available);
+        return new TenantChoice(tenantId, available, AccessibleTenants.departmentIn(userId, tenantId, memberships));
     }
 }

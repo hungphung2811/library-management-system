@@ -8,8 +8,12 @@ import jakarta.persistence.Table;
 import java.io.Serializable;
 import java.util.Objects;
 import java.util.UUID;
+import org.hibernate.annotations.TenantId;
 
-/** Một dòng của bảng user_roles (userId, roleId). Aggregate UserRoleAssignment được dựng lại trong adapter. */
+/**
+ * Một dòng của bảng user_roles (userId, roleId) trong tenant hiện tại (@TenantId; khóa ngoại kép với roles bảo đảm
+ * trùng tenant của role). Aggregate UserRoleAssignment được dựng lại trong adapter.
+ */
 @Entity
 @Table(name = "user_roles")
 @IdClass(UserRoleJpaEntity.Key.class)
@@ -22,6 +26,10 @@ class UserRoleJpaEntity {
     @Id
     @Column(name = "role_id")
     private UUID roleId;
+
+    @TenantId
+    @Column(name = "tenant_id", nullable = false, updatable = false)
+    private UUID tenantId;
 
     protected UserRoleJpaEntity() {
     }

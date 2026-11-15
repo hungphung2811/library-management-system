@@ -8,7 +8,9 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.util.UUID;
+import org.hibernate.annotations.TenantId;
 
+/** Phòng ban thuộc một tenant (@TenantId + RLS); mã unique theo tenant, phòng ban cha cùng tenant (ràng buộc ở migration). */
 @Entity
 @Table(name = "departments")
 class DepartmentJpaEntity {
@@ -16,7 +18,11 @@ class DepartmentJpaEntity {
     @Id
     private UUID id;
 
-    @Column(nullable = false, unique = true)
+    @TenantId
+    @Column(name = "tenant_id", nullable = false, updatable = false)
+    private UUID tenantId;
+
+    @Column(nullable = false)
     private String code;
 
     @Column(nullable = false)

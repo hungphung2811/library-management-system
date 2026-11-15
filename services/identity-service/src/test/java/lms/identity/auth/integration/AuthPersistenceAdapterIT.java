@@ -13,7 +13,9 @@ import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
+import lms.tenant.TenantAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -26,6 +28,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 /** Cần Docker. Chạy: mvn test -Dtest=AuthPersistenceAdapterIT. Kiểm chứng migration + ánh xạ JPA (ddl validate). */
 @DataJpaTest(properties = {"spring.flyway.enabled=true", "spring.flyway.locations=classpath:db/migration/identity"})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+// Phiên Hibernate cần bộ phân giải tenant vì identity có entity @TenantId (bảng của test này là bảng toàn cục)
+@ImportAutoConfiguration(TenantAutoConfiguration.class)
 @Testcontainers
 @Import(AuthPersistenceAdapterIT.Config.class)
 class AuthPersistenceAdapterIT {

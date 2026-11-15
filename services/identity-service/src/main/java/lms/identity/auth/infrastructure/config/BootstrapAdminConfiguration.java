@@ -20,16 +20,18 @@ public class BootstrapAdminConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(BootstrapAdminConfiguration.class);
 
-    /** Tenant mặc định do migration V11 tạo; tài khoản quản trị khởi tạo là thành viên của tenant này. */
-    static final String DEFAULT_TENANT = "00000000-0000-0000-0000-0000000000d1";
-
+    /**
+     * Tenant của tài khoản quản trị khởi tạo lấy từ cấu hình {@code auth.bootstrap-admin.tenant-id} (application.yml
+     * trỏ tới tenant mặc định của migration V11); không cứng id tenant trong code. Chỉ ghi credentials và
+     * tenant_memberships (bảng toàn cục), không đụng bảng có RLS nên chạy được khi chưa có tenant trong ngữ cảnh.
+     */
     @Bean
     ApplicationRunner bootstrapAdmin(RegisterCredentialUseCase register, UserCredentialRepository repository,
                                      @Value("${auth.bootstrap-admin.user-id}") UUID userId,
                                      @Value("${auth.bootstrap-admin.username}") String username,
                                      @Value("${auth.bootstrap-admin.password:}") String password,
                                      @Value("${auth.bootstrap-admin.must-change-password:true}") boolean mustChange,
-                                     @Value("${auth.bootstrap-admin.tenant-id:" + DEFAULT_TENANT + "}") UUID tenantId) {
+                                     @Value("${auth.bootstrap-admin.tenant-id}") UUID tenantId) {
         return args -> {
             if (password.isBlank() || repository.existsByUserId(userId)) return;
             register.execute(userId, username, password, null, mustChange, tenantId);

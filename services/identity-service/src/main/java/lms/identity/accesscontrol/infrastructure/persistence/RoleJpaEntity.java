@@ -11,7 +11,9 @@ import jakarta.persistence.Table;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import org.hibernate.annotations.TenantId;
 
+/** Role thuộc một tenant: tenant_id do Hibernate điền/lọc theo TenantContext (@TenantId), RLS lọc thêm ở DB. */
 @Entity
 @Table(name = "roles")
 class RoleJpaEntity {
@@ -19,7 +21,12 @@ class RoleJpaEntity {
     @Id
     private UUID id;
 
-    @Column(nullable = false, unique = true)
+    @TenantId
+    @Column(name = "tenant_id", nullable = false, updatable = false)
+    private UUID tenantId;
+
+    /** Unique theo tenant (tenant_id, name), ràng buộc nằm ở migration. */
+    @Column(nullable = false)
     private String name;
 
     @Column(nullable = false)

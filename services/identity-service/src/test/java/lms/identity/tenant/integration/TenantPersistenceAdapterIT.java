@@ -11,7 +11,9 @@ import lms.identity.tenant.domain.Tenant;
 import lms.identity.tenant.domain.TenantRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
+import lms.tenant.TenantAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.ComponentScan;
@@ -23,6 +25,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 /** Cần Docker. Kiểm chứng ánh xạ JPA và adapter của context tenant trên schema thật (V1-V11). */
 @DataJpaTest(properties = {"spring.flyway.enabled=true", "spring.flyway.locations=classpath:db/migration/identity"})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+// Phiên Hibernate cần bộ phân giải tenant vì identity có entity @TenantId (bảng của test này là bảng toàn cục)
+@ImportAutoConfiguration(TenantAutoConfiguration.class)
 @Testcontainers
 @ComponentScan("lms.identity.tenant.infrastructure.persistence")
 class TenantPersistenceAdapterIT {

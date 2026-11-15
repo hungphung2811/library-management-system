@@ -3,7 +3,10 @@ package lms.identity.auth.application;
 import java.util.List;
 import java.util.UUID;
 
-/** Lấy role và permission hiệu lực của người dùng từ access-control-service. */
+/**
+ * Lấy role và permission hiệu lực của người dùng từ context accesscontrol, trong tenant đang ở TenantContext (role là
+ * dữ liệu thuộc tenant; không có tenant thì không có role nào). Người gọi đặt tenant bằng TenantContext.callAs.
+ */
 public interface UserAccessPort {
 
     UserAccess fetch(UUID userId);

@@ -16,6 +16,7 @@ import lms.identity.auth.infrastructure.security.OidcClient;
 import lms.identity.auth.infrastructure.security.Pkce;
 import lms.identity.auth.infrastructure.security.ReturnUrlValidator;
 import lms.identity.auth.infrastructure.security.StateCookieCodec;
+import lms.identity.tenant.application.ListActiveTenantIdsUseCase;
 import lms.identity.user.application.FindReaderUserIdsByEmailUseCase;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
@@ -69,8 +70,9 @@ public class ExternalAuthBeanConfiguration {
     }
 
     @Bean
-    ReaderLookupPort readerLookupPort(FindReaderUserIdsByEmailUseCase findByEmail) {
-        return new InProcessReaderLookupAdapter(findByEmail);
+    ReaderLookupPort readerLookupPort(FindReaderUserIdsByEmailUseCase findByEmail,
+                                      ListActiveTenantIdsUseCase activeTenants) {
+        return new InProcessReaderLookupAdapter(findByEmail, activeTenants);
     }
 
     @Bean

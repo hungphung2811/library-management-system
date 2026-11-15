@@ -46,6 +46,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
  */
 @WebMvcTest(AccessControlController.class)
 @Import({SecurityConfiguration.class, AccessControlExceptionHandler.class, PermissionAutoConfiguration.class})
+@org.springframework.test.context.TestPropertySource(properties = "lms.security.permission.require-tenant=true")
 class AccessControlSecurityTest {
 
     @Autowired MockMvc mvc;
@@ -59,14 +60,27 @@ class AccessControlSecurityTest {
 
     private static final String ROLE_BODY = "{\"name\":\"AUDITOR\",\"description\":\"Kiểm toán\"}";
 
-    /** Token có đúng các khóa quyền (Controller/method) được liệt kê. */
+    private static final String TOKEN_TENANT = UUID.randomUUID().toString();
+
+    /** Token của một tenant (claim tenantId) có đúng các khóa quyền (Controller/method) được liệt kê. */
     private RequestPostProcessor with(String... keys) {
-        return jwt().jwt(j -> j.claim("permissions", List.of(keys)))
+        return jwt().jwt(j -> j.claim("permissions", List.of(keys)).claim("tenantId", TOKEN_TENANT))
                 .authorities(Arrays.stream(keys).map(SimpleGrantedAuthority::new).toArray(GrantedAuthority[]::new));
     }
 
     private RequestPostProcessor admin() {
-        return jwt().jwt(j -> j.claim("admin", true));
+        return jwt().jwt(j -> j.claim("admin", true).claim("tenantId", TOKEN_TENANT));
+    }
+
+    @Test
+    void tokenKhongCoTenantIdBi403TenantRequiredKeCaAdmin() throws Exception {
+        mvc.perform(get("/internal/roles").with(jwt().jwt(j -> j.claim("admin", true))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("TENANT_REQUIRED"));
+        mvc.perform(get("/internal/roles").with(jwt().jwt(j -> j.claim("platformAdmin", true))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("TENANT_REQUIRED"));
+        org.mockito.Mockito.verifyNoInteractions(roles);
     }
 
     @Test

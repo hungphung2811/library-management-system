@@ -1,6 +1,8 @@
 package lms.identity.auth.unit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import lms.identity.auth.application.RefreshTokenCodecPort;
@@ -22,7 +24,10 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/** Người dùng bị vô hiệu hóa không nhận được token; phòng ban trong token lấy từ hồ sơ người dùng. */
+/**
+ * Người dùng bị vô hiệu hóa không nhận được token; phòng ban trong token lấy từ membership ở tenant đã chọn (dữ liệu
+ * của tenant), không lấy users.department_id hay credentials.department_id (toàn cục).
+ */
 class TokenServiceUserDirectoryTest {
 
     final UUID userId = UUID.randomUUID();
@@ -30,6 +35,7 @@ class TokenServiceUserDirectoryTest {
     final UserCredential credential = UserCredential.register(userId, "alice", "h", credentialDept);
     final List<TokenIssuerPort.Claims> issued = new ArrayList<>();
     Optional<UserDirectoryPort.UserInfo> info = Optional.empty();
+    final TenantAccessStub tenants = new TenantAccessStub();
 
     TokenService service() {
         TokenIssuerPort issuer = c -> { issued.add(c); return new TokenIssuerPort.IssuedToken("jwt", 900); };
@@ -43,7 +49,7 @@ class TokenServiceUserDirectoryTest {
             public void revokeAllByUserId(UUID u) { }
         };
         return new TokenService(access, issuer, codec, refresh, Clock.fixed(Instant.parse("2026-10-01T00:00:00Z"), ZoneOffset.UTC),
-                Duration.ofDays(7), id -> info, new TenantAccessStub());
+                Duration.ofDays(7), id -> info, tenants);
     }
 
     @Test
@@ -55,20 +61,26 @@ class TokenServiceUserDirectoryTest {
     }
 
     @Test
-    void khongCoHoSoNguoiDungThiDungThongTinCredential() {
+    void phongBanTrongTokenLayTuMembershipCuaTenantDaChon() {
+        UUID membershipDept = UUID.randomUUID();
+        tenants.department = membershipDept;
+        info = Optional.of(new UserDirectoryPort.UserInfo(false, UUID.randomUUID())); // phòng ban toàn cục khác
+
         service().issueFor(credential);
-        assertEquals(credentialDept, issued.get(0).departmentId());
+
+        assertEquals(membershipDept, issued.get(0).departmentId());
     }
 
     @Test
-    void phongBanTrongTokenLayTuHoSoNguoiDungNeuCo() {
-        UUID dept = UUID.randomUUID();
-        info = Optional.of(new UserDirectoryPort.UserInfo(false, dept));
+    void membershipChuaGanPhongBanThiTokenKhongCoPhongBanDuUserHayCredentialCo() {
+        tenants.department = null;
+        info = Optional.of(new UserDirectoryPort.UserInfo(false, UUID.randomUUID()));
         service().issueFor(credential);
-        assertEquals(dept, issued.get(0).departmentId());
+        assertNull(issued.get(0).departmentId());
 
-        info = Optional.of(new UserDirectoryPort.UserInfo(false, null)); // user chưa gán phòng ban: giữ của credential
+        info = Optional.empty(); // không có hồ sơ user: cũng không rơi về credentials.department_id
         service().issueFor(credential);
-        assertEquals(credentialDept, issued.get(1).departmentId());
+        assertNull(issued.get(1).departmentId());
+        assertNotEquals(credentialDept, issued.get(1).departmentId());
     }
 }

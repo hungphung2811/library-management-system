@@ -93,6 +93,20 @@ class LoginTenantResolutionTest {
     }
 
     @Test
+    void luaChonTenantKemPhongBanCuaMembershipOTenantDo() {
+        Tenant a = tenant("lib-a", TenantStatus.ACTIVE);
+        Tenant b = tenant("lib-b", TenantStatus.ACTIVE);
+        UUID deptA = UUID.randomUUID();
+        UUID deptB = UUID.randomUUID();
+        memberships.save(Membership.restore(user, a.id(), deptA, MembershipStatus.ACTIVE, t0));
+        memberships.save(Membership.restore(user, b.id(), deptB, MembershipStatus.ACTIVE, t0.plusSeconds(86400)));
+
+        assertThat(resolve.execute(user, "lib-a").departmentId()).isEqualTo(deptA);
+        assertThat(switchTenant.execute(user, b.id()).departmentId()).isEqualTo(deptB);
+        assertThat(verify.execute(user, a.id()).departmentId()).isEqualTo(deptA);
+    }
+
+    @Test
     void khongCoMaThiDungLastTenantNeuConActive() {
         Tenant a = tenant("lib-a", TenantStatus.ACTIVE);
         Tenant b = tenant("lib-b", TenantStatus.ACTIVE);
