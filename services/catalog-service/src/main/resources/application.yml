@@ -56,3 +56,8 @@ lms:
       service-name: ${spring.application.name}
       identity-base-url: ${IDENTITY_SERVICE_URL:http://localhost:8081}
       internal-api-key: ${INTERNAL_API_KEY:}
+      # Endpoint thường bắt buộc token có claim tenantId (403 TENANT_REQUIRED)
+      require-tenant: true
+  # tenant-common: TenantContext theo claim tenantId, Hibernate @TenantId và RLS (app.tenant_id)
+  tenant:
+    enabled: true
