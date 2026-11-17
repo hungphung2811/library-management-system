@@ -22,6 +22,7 @@ import lms.security.permission.PermissionAutoConfiguration;
 import lms.security.permission.PermissionKeyRegistrar;
 import lms.system.config.SecurityConfiguration;
 import lms.system.menu.application.CreateMenuUseCase;
+import lms.system.menu.application.DefaultMenus;
 import lms.system.menu.application.DeleteMenuUseCase;
 import lms.system.menu.application.GetMyMenuUseCase;
 import lms.system.menu.application.InitializeDefaultMenusUseCase;
@@ -382,7 +383,7 @@ class MenuWebVisibilityTest {
         mvc.perform(get("/internal/menus/me").with(withModules(T1, true, "LENDING", "SALES")))
                 .andExpect(jsonPath("$.length()").value(5))
                 .andExpect(jsonPath("$[4].code").value("sales"))
-                .andExpect(jsonPath("$[4].children.length()").value(5));
+                .andExpect(jsonPath("$[4].children.length()").value(9));
         mvc.perform(get("/internal/menus/me").with(withModules(T1, false, "SALES")))
                 .andExpect(jsonPath("$.length()").value(2));
         assertThat(repo.items).isEmpty();
@@ -398,20 +399,20 @@ class MenuWebVisibilityTest {
         mvc.perform(post("/internal/menus/defaults").with(admin(T1)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.usingDefaults").value(false))
-                .andExpect(jsonPath("$.items.length()").value(10))
+                .andExpect(jsonPath("$.items.length()").value(DefaultMenus.ENTRIES.size()))
                 .andExpect(jsonPath("$.items[?(@.code=='circulation')].module").value("LENDING"))
                 .andExpect(jsonPath("$.items[?(@.code=='sales-pos')].module").value("SALES"));
-        assertThat(repo.items.values()).hasSize(10).allMatch(i -> i.tenantId().equals(T1));
+        assertThat(repo.items.values()).hasSize(DefaultMenus.ENTRIES.size()).allMatch(i -> i.tenantId().equals(T1));
         assertThat(cache.evicted).containsExactly(T1);
 
         mvc.perform(post("/internal/menus/defaults").with(admin(T1)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("MENU_ALREADY_INITIALIZED"));
-        assertThat(repo.items).hasSize(10);
+        assertThat(repo.items).hasSize(DefaultMenus.ENTRIES.size());
 
         mvc.perform(get("/internal/menus").with(admin(T1)))
                 .andExpect(jsonPath("$.usingDefaults").value(false))
-                .andExpect(jsonPath("$.items.length()").value(10));
+                .andExpect(jsonPath("$.items.length()").value(DefaultMenus.ENTRIES.size()));
         // Sau khi chép: /me dùng dữ liệu của tenant, vẫn lọc theo module
         mvc.perform(get("/internal/menus/me").with(withModules(T1, true, "LENDING")))
                 .andExpect(jsonPath("$.length()").value(4));

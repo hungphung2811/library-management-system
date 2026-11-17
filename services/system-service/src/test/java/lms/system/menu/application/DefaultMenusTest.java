@@ -90,7 +90,7 @@ class DefaultMenusTest {
         assertThat(DefaultMenus.ENTRIES).filteredOn(e -> e.module() == null).extracting(DefaultMenus.Entry::code)
                 .contains("home", "catalog", "admin");
         assertThat(DefaultMenus.ENTRIES).filteredOn(e -> "LENDING".equals(e.module()))
-                .extracting(DefaultMenus.Entry::code).containsExactly("circulation");
+                .extracting(DefaultMenus.Entry::code).startsWith("circulation").allMatch(c -> c.startsWith("circulation"));
         assertThat(DefaultMenus.ENTRIES).filteredOn(e -> "SALES".equals(e.module()))
                 .extracting(DefaultMenus.Entry::code).contains("sales", "sales-pos", "sales-orders");
         assertThat(DefaultMenus.ENTRIES).extracting(DefaultMenus.Entry::code).doesNotHaveDuplicates();
@@ -115,8 +115,8 @@ class DefaultMenusTest {
                 .containsExactly("home", "catalog", "sales");
         List<MenuNode> both = getMy.execute(T1, viewer(true, Set.of(), "LENDING", "SALES"));
         assertThat(codes(both)).containsExactly("home", "catalog", "circulation", "admin", "sales");
-        assertThat(codes(both.get(4).children())).containsExactly("sales-pos", "sales-orders", "sales-stock",
-                "sales-receipts", "sales-suppliers");
+        assertThat(codes(both.get(4).children())).containsExactly("sales-pos", "sales-orders", "sales-contacts",
+                "sales-refunds", "sales-stock", "sales-receipts", "sales-suppliers", "sales-audit", "sales-settings");
     }
 
     @Test

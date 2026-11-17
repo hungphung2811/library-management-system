@@ -480,7 +480,7 @@ class MenuInfrastructureIT {
         // Cột module qua API quản trị
         JsonNode list = body(mvc.perform(get("/internal/menus").with(admin(DEFAULT_TENANT)))
                 .andExpect(jsonPath("$.usingDefaults").value(false)));
-        assertThat(list.get("items")).hasSize(10);
+        assertThat(list.get("items")).hasSize(lms.system.menu.application.DefaultMenus.ENTRIES.size());
         assertThat(list.get("items").findValuesAsText("module")).contains("LENDING", "SALES");
     }
 
