@@ -11,9 +11,16 @@ import lms.api.identity.dto.UserDtos.SearchUsersQuery;
 import lms.api.identity.dto.UserDtos.UpdateUserRequest;
 import lms.api.identity.dto.UserDtos.UserPageView;
 import lms.api.identity.dto.UserDtos.UserView;
+import lms.api.identity.dto.UserDtos.ExportUsersQuery;
+import lms.api.identity.dto.UserDtos.ImportUsersRequest;
+import lms.api.identity.dto.UserDtos.ImportUsersResult;
+import lms.api.identity.dto.UserDtos.RevokedSessionsView;
+import lms.api.identity.dto.UserDtos.UserSessionView;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.client.RestClient;
 
 /** Gọi API nội bộ /internal/users/** của identity-service (người dùng và hồ sơ độc giả). */
@@ -100,5 +107,47 @@ public class HttpUserClient implements UserClient {
     public ReaderProfileView changeReaderStatus(UUID userId, ChangeStatusRequest request) {
         return client.put().uri("/internal/users/{id}/reader-profile/status", userId).body(request).retrieve()
                 .body(ReaderProfileView.class);
+    }
+
+    @Override
+    public UserView unlock(UUID id) {
+        return client.post().uri("/internal/users/{id}/unlock", id).retrieve().body(UserView.class);
+    }
+
+    @Override
+    public RevokedSessionsView revokeSessions(UUID id) {
+        return client.post().uri("/internal/users/{id}/sessions/revocation", id).retrieve()
+                .body(RevokedSessionsView.class);
+    }
+
+    @Override
+    public List<UserSessionView> listSessions(UUID id) {
+        return client.get().uri("/internal/users/{id}/sessions", id).retrieve()
+                .body(new ParameterizedTypeReference<List<UserSessionView>>() { });
+    }
+
+    @Override
+    public void revokeSession(UUID id, UUID sessionId) {
+        client.delete().uri("/internal/users/{id}/sessions/{sid}", id, sessionId).retrieve().toBodilessEntity();
+    }
+
+    @Override
+    public ImportUsersResult importUsers(ImportUsersRequest request) {
+        return client.post().uri("/internal/users/imports").body(request).retrieve().body(ImportUsersResult.class);
+    }
+
+    @Override
+    public byte[] exportUsers(ExportUsersQuery q) {
+        Map<String, Object> vars = new LinkedHashMap<>();
+        if (q.keyword() != null && !q.keyword().isBlank()) vars.put("keyword", q.keyword());
+        if (q.departmentId() != null) vars.put("departmentId", q.departmentId());
+        if (q.status() != null && !q.status().isBlank()) vars.put("status", q.status());
+        StringBuilder template = new StringBuilder("/internal/users/export");
+        String sep = "?";
+        for (String key : vars.keySet()) {
+            template.append(sep).append(key).append("={").append(key).append('}');
+            sep = "&";
+        }
+        return client.get().uri(template.toString(), vars).retrieve().body(byte[].class);
     }
 }

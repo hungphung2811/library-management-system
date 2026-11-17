@@ -5,9 +5,12 @@ import lms.api.identity.dto.AuthDtos.CredentialCreated;
 import lms.api.identity.dto.AuthDtos.ExternalLoginView;
 import lms.api.identity.dto.AuthDtos.ProviderView;
 import lms.api.identity.dto.AuthDtos.RegisterCredentialRequest;
+import lms.api.identity.dto.AuthDtos.SessionView;
 import lms.api.identity.dto.AuthDtos.SwitchTenantRequest;
 import lms.api.identity.dto.AuthDtos.TokenView;
+import lms.api.identity.dto.UserDtos.RevokedSessionsView;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 
 /**
@@ -28,6 +31,12 @@ public interface AuthClient {
 
     void changePassword(ChangePasswordRequest request);
 
+    /** Quên mật khẩu, yêu cầu (công khai, identity luôn 202). */
+    void requestPasswordReset(String username);
+
+    /** Quên mật khẩu, xác nhận (công khai): 400 INVALID_RESET_TOKEN khi token sai/hết hạn/đã dùng. */
+    void confirmPasswordReset(String token, String newPassword);
+
     CredentialCreated register(RegisterCredentialRequest request);
 
     List<ProviderView> externalProviders();
@@ -47,4 +56,13 @@ public interface AuthClient {
     List<ExternalLoginView> myExternalLogins();
 
     void unlinkExternal(String provider);
+
+    /** Phiên đăng nhập của chính người gọi (mọi tenant, mọi kênh). */
+    List<SessionView> mySessions();
+
+    /** 204; 404 SESSION_NOT_FOUND. */
+    void revokeMySession(UUID sessionId);
+
+    /** keepCurrent=true giữ phiên hiện tại; 409 SESSION_NOT_IDENTIFIED khi token không có claim sid. */
+    RevokedSessionsView revokeMySessions(boolean keepCurrent);
 }

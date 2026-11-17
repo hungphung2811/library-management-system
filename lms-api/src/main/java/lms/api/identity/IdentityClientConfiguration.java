@@ -11,12 +11,12 @@ import lms.api.identity.client.http.HttpAccessClient;
 import lms.api.identity.client.http.HttpAuthClient;
 import lms.api.identity.client.http.HttpDepartmentClient;
 import lms.api.identity.client.http.HttpUserClient;
+import lms.api.support.ClientInfoResolver;
 import lms.api.support.TokenRelayInterceptor;
-import java.io.IOException;
-import java.net.HttpURLConnection;
+import java.net.http.HttpClient;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 /**
@@ -26,27 +26,24 @@ import org.springframework.web.client.RestClient;
 @Configuration
 public class IdentityClientConfiguration {
 
-    /** HttpURLConnection mặc định follow redirect với GET; tắt hẳn. */
-    static final class NoRedirectRequestFactory extends SimpleClientHttpRequestFactory {
-        @Override
-        protected void prepareConnection(HttpURLConnection connection, String httpMethod) throws IOException {
-            super.prepareConnection(connection, httpMethod);
-            connection.setInstanceFollowRedirects(false);
-        }
-    }
-
-    /** Công khai trong package để test kiểm chứng cấu hình không follow redirect. */
+    /**
+     * Công khai trong package để test kiểm chứng. Dùng java.net.http (JdkClientHttpRequestFactory) thay vì
+     * HttpURLConnection: HttpURLConnection không đọc được thân của 401 trên POST (không kèm WWW-Authenticate) nên
+     * REFRESH_TOKEN_SUPERSEDED/UNAUTHORIZED của identity bị đổi thành DOWNSTREAM_REJECTED. HTTP/1.1 để khỏi gửi
+     * header nâng cấp h2c.
+     */
     public static RestClient noRedirectClient(String baseUrl, ServicesProperties properties) {
-        NoRedirectRequestFactory factory = new NoRedirectRequestFactory();
-        factory.setConnectTimeout(properties.connectTimeout());
+        HttpClient http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER)
+                .version(HttpClient.Version.HTTP_1_1).connectTimeout(properties.connectTimeout()).build();
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(http);
         factory.setReadTimeout(properties.readTimeout());
         return RestClient.builder().baseUrl(baseUrl).requestFactory(factory)
                 .requestInterceptor(new TokenRelayInterceptor()).build();
     }
 
     @Bean
-    AuthClient authClient(ServicesProperties properties) {
-        return new HttpAuthClient(noRedirectClient(properties.identityUrl(), properties));
+    AuthClient authClient(ServicesProperties properties, ClientInfoResolver clientInfo) {
+        return new HttpAuthClient(noRedirectClient(properties.identityUrl(), properties), clientInfo::current);
     }
 
     @Bean

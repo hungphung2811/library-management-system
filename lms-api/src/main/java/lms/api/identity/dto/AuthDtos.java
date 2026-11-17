@@ -41,6 +41,19 @@ public final class AuthDtos {
                                             UUID departmentId, Boolean mustChangePassword) {
     }
 
+    /** Quên mật khẩu, yêu cầu: luôn 202 dù tài khoản có hay không. */
+    public record PasswordResetRequest(@NotBlank @Size(max = 100) String username) {
+    }
+
+    /** Quên mật khẩu, xác nhận bằng token một lần. toString che token và mật khẩu. */
+    public record PasswordResetConfirmRequest(@NotBlank @Size(max = 200) String token,
+                                              @NotBlank @Size(min = 8, max = 72) String newPassword) {
+        @Override
+        public String toString() {
+            return "PasswordResetConfirmRequest[token=***, newPassword=***]";
+        }
+    }
+
     public record ExchangeRequest(@NotBlank String code) {
     }
 
@@ -77,6 +90,19 @@ public final class AuthDtos {
     }
 
     public record ProviderView(String name, String displayName) {
+    }
+
+    /**
+     * Một phiên đăng nhập của chính người dùng (ADR-0017). channel: STAFF hoặc STOREFRONT; tenantId null là phiên nền
+     * tảng; current: đúng phiên của token đang gọi.
+     */
+    public record SessionView(UUID sessionId, String channel, UUID tenantId, String tenantName, String deviceSummary,
+                              String ipAddress, Instant startedAt, Instant lastUsedAt, Instant expiresAt,
+                              boolean current) {
+    }
+
+    /** keepCurrent bắt buộc: thiếu thì 400 thay vì ngầm hiểu là false (thu hồi cả phiên hiện tại). */
+    public record RevokeSessionsRequest(@NotNull Boolean keepCurrent) {
     }
 
     public record ExternalLoginView(String provider, String email, Instant linkedAt, Instant lastUsedAt) {

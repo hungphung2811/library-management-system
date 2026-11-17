@@ -3,7 +3,11 @@ package lms.api.identity.web;
 import lms.api.identity.client.UserClient;
 import lms.api.identity.dto.UserDtos.ChangeStatusRequest;
 import lms.api.identity.dto.UserDtos.CreateUserRequest;
+import lms.api.identity.dto.UserDtos.ExportUsersQuery;
+import lms.api.identity.dto.UserDtos.ImportUsersRequest;
+import lms.api.identity.dto.UserDtos.ImportUsersResult;
 import lms.api.identity.dto.UserDtos.IssueReaderCardRequest;
+import lms.api.identity.dto.UserDtos.RevokedSessionsView;
 import lms.api.identity.dto.UserDtos.ReaderProfileView;
 import lms.api.identity.dto.UserDtos.RenewReaderCardRequest;
 import lms.api.identity.dto.UserDtos.ResetPasswordRequest;
@@ -11,9 +15,15 @@ import lms.api.identity.dto.UserDtos.SearchUsersQuery;
 import lms.api.identity.dto.UserDtos.UpdateUserRequest;
 import lms.api.identity.dto.UserDtos.UserPageView;
 import lms.api.identity.dto.UserDtos.UserView;
+import lms.api.identity.dto.UserDtos.UserSessionView;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.util.List;
 import java.util.UUID;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -76,6 +86,53 @@ public class UserController {
                                               @Valid @RequestBody ResetPasswordRequest request) {
         users.resetPassword(id, request);
         return ResponseEntity.noContent().build();
+    }
+
+    /** Mở khóa tài khoản bị khóa do đăng nhập sai nhiều lần; trả hồ sơ với locked=false. */
+    @PostMapping("/{id}/unlock")
+    public UserView unlock(@PathVariable UUID id) {
+        return users.unlock(id);
+    }
+
+    /**
+     * Thu hồi mọi refresh token của người dùng trong tenant hiện tại. Access token đã phát còn dùng được tối đa đến hết
+     * TTL (15 phút).
+     */
+    @PostMapping("/{id}/sessions/revocation")
+    public RevokedSessionsView revokeSessions(@PathVariable UUID id) {
+        return users.revokeSessions(id);
+    }
+
+    /**
+     * Quản trị xem phiên của người dùng trong tenant (có IP đầy đủ, no-store). Khóa quyền UserController/listSessions do
+     * identity kiểm; mỗi lần xem bị audit nên FE không tự làm mới định kỳ.
+     */
+    @GetMapping("/{id}/sessions")
+    public ResponseEntity<List<UserSessionView>> listSessions(@PathVariable UUID id) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(users.listSessions(id));
+    }
+
+    /** Thu hồi một phiên của người dùng (khóa UserController/revokeSession): 204. */
+    @DeleteMapping("/{id}/sessions/{sessionId}")
+    public ResponseEntity<Void> revokeSession(@PathVariable UUID id, @PathVariable UUID sessionId) {
+        users.revokeSession(id, sessionId);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Nhập hàng loạt (tối đa 500 dòng). Phản hồi có mật khẩu tạm nên no-store; lms-api không log thân. */
+    @PostMapping("/imports")
+    public ResponseEntity<ImportUsersResult> importUsers(@Valid @RequestBody ImportUsersRequest request) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(users.importUsers(request));
+    }
+
+    /** Xuất CSV (UTF-8 có BOM, tối đa 5000 dòng) theo cùng bộ lọc tìm kiếm người dùng. */
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> exportUsers(ExportUsersQuery query) {
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"users.csv\"")
+                .cacheControl(CacheControl.noStore())
+                .body(users.exportUsers(query));
     }
 
     @GetMapping("/{userId}/reader-profile")

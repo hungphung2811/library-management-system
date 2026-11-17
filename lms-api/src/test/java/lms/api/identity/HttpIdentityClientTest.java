@@ -159,4 +159,39 @@ class HttpIdentityClientTest {
             idp.stop(0);
         }
     }
+
+    /**
+     * 401 của identity trên POST (refresh) phải giữ nguyên thân JSON: HttpURLConnection ở chế độ output streaming không
+     * đọc được thân của 401 không kèm WWW-Authenticate nên thân rỗng và lms-api đổi thành DOWNSTREAM_REJECTED, làm FE
+     * không phân biệt được REFRESH_TOKEN_SUPERSEDED với refresh token sai.
+     */
+    @Test
+    void giuNguyenThanJsonCua401TrenPostRefresh() throws Exception {
+        String body = "{\"code\":\"REFRESH_TOKEN_SUPERSEDED\",\"message\":\"Refresh token vừa được thay thế\","
+                + "\"details\":[]}";
+        HttpServer identity = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        identity.createContext("/internal/auth/refresh", ex -> {
+            ex.getRequestBody().readAllBytes();
+            byte[] bytes = body.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            ex.getResponseHeaders().add("Content-Type", "application/json");
+            ex.sendResponseHeaders(401, bytes.length);
+            ex.getResponseBody().write(bytes);
+            ex.close();
+        });
+        identity.start();
+        try {
+            String base = "http://127.0.0.1:" + identity.getAddress().getPort();
+            ServicesProperties props = new ServicesProperties(base, base, base, base, base, base, Duration.ofSeconds(2),
+                    Duration.ofSeconds(5));
+            HttpAuthClient client = new HttpAuthClient(IdentityClientConfiguration.noRedirectClient(base, props));
+
+            var ex = assertThrows(org.springframework.web.client.RestClientResponseException.class,
+                    () -> client.refresh("tokencu"));
+            assertEquals(401, ex.getStatusCode().value());
+            assertTrue(ex.getResponseBodyAsString().contains("REFRESH_TOKEN_SUPERSEDED"),
+                    "thân JSON của 401 phải còn nguyên, thực tế: '" + ex.getResponseBodyAsString() + "'");
+        } finally {
+            identity.stop(0);
+        }
+    }
 }

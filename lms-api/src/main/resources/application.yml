@@ -38,3 +38,10 @@ management:
 logging:
   pattern:
     level: "%5p [%X{correlationId:-}]"
+
+lms:
+  api:
+    client-ip:
+      # IP/CIDR của proxy được tin khi đọc X-Real-IP để gắn nhãn thiết bị cho phiên (ADR-0017). Mặc định chỉ loopback.
+      # Sau nginx trong Docker: LMS_API_CLIENT_IP_TRUSTED_PROXIES=172.16.0.0/12. KHÔNG đọc X-Forwarded-For.
+      trusted-proxies: ${LMS_API_CLIENT_IP_TRUSTED_PROXIES:127.0.0.0/8,::1/128}

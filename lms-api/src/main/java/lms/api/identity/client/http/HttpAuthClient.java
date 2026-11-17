@@ -6,12 +6,20 @@ import lms.api.identity.dto.AuthDtos.CredentialCreated;
 import lms.api.identity.dto.AuthDtos.ExchangeRequest;
 import lms.api.identity.dto.AuthDtos.ExternalLoginView;
 import lms.api.identity.dto.AuthDtos.LoginRequest;
+import lms.api.identity.dto.AuthDtos.PasswordResetConfirmRequest;
+import lms.api.identity.dto.AuthDtos.PasswordResetRequest;
 import lms.api.identity.dto.AuthDtos.ProviderView;
 import lms.api.identity.dto.AuthDtos.RefreshRequest;
 import lms.api.identity.dto.AuthDtos.RegisterCredentialRequest;
+import lms.api.identity.dto.AuthDtos.RevokeSessionsRequest;
+import lms.api.identity.dto.AuthDtos.SessionView;
 import lms.api.identity.dto.AuthDtos.SwitchTenantRequest;
 import lms.api.identity.dto.AuthDtos.TokenView;
+import lms.api.identity.dto.UserDtos.RevokedSessionsView;
+import lms.api.support.ClientInfo;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
+import java.util.function.Supplier;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,22 +42,60 @@ public class HttpAuthClient implements AuthClient {
     private static final List<String> FORWARDED = List.of(HttpHeaders.LOCATION, HttpHeaders.SET_COOKIE,
             HttpHeaders.CACHE_CONTROL, HttpHeaders.CONTENT_TYPE);
 
+    static final String CLIENT_IP_HEADER = "X-Client-Ip";
+    static final String CLIENT_UA_HEADER = "X-Client-User-Agent";
+
     private final RestClient client;
+    private final Supplier<ClientInfo> clientInfo;
 
     public HttpAuthClient(RestClient client) {
+        this(client, () -> ClientInfo.NONE);
+    }
+
+    /** clientInfo: IP/user-agent của người gọi, chỉ gắn vào các lời gọi phát token (ADR-0017). */
+    public HttpAuthClient(RestClient client, Supplier<ClientInfo> clientInfo) {
         this.client = client;
+        this.clientInfo = clientInfo;
+    }
+
+    /** Gắn X-Client-Ip/X-Client-User-Agent (nếu có) vào lời gọi phát token. */
+    private RestClient.RequestBodySpec issuing(String uri) {
+        RestClient.RequestBodySpec spec = client.post().uri(uri);
+        ClientInfo info = clientInfo.get();
+        if (info != null) {
+            if (info.ip() != null) spec = spec.header(CLIENT_IP_HEADER, info.ip());
+            if (info.userAgent() != null) spec = spec.header(CLIENT_UA_HEADER, info.userAgent());
+        }
+        return spec;
     }
 
     @Override
     public TokenView login(String username, String password, String tenantCode) {
-        return client.post().uri("/internal/auth/login").body(new LoginRequest(username, password, tenantCode)).retrieve()
+        return issuing("/internal/auth/login").body(new LoginRequest(username, password, tenantCode)).retrieve()
                 .body(TokenView.class);
     }
 
     @Override
     public TokenView refresh(String refreshToken) {
-        return client.post().uri("/internal/auth/refresh").body(new RefreshRequest(refreshToken)).retrieve()
+        return issuing("/internal/auth/refresh").body(new RefreshRequest(refreshToken)).retrieve()
                 .body(TokenView.class);
+    }
+
+    @Override
+    public List<SessionView> mySessions() {
+        return client.get().uri("/internal/auth/sessions").retrieve()
+                .body(new ParameterizedTypeReference<List<SessionView>>() { });
+    }
+
+    @Override
+    public void revokeMySession(UUID sessionId) {
+        client.delete().uri("/internal/auth/sessions/{id}", sessionId).retrieve().toBodilessEntity();
+    }
+
+    @Override
+    public RevokedSessionsView revokeMySessions(boolean keepCurrent) {
+        return client.post().uri("/internal/auth/sessions/revocation").body(new RevokeSessionsRequest(keepCurrent))
+                .retrieve().body(RevokedSessionsView.class);
     }
 
     @Override
@@ -59,12 +105,24 @@ public class HttpAuthClient implements AuthClient {
 
     @Override
     public TokenView switchTenant(SwitchTenantRequest request) {
-        return client.post().uri("/internal/auth/switch-tenant").body(request).retrieve().body(TokenView.class);
+        return issuing("/internal/auth/switch-tenant").body(request).retrieve().body(TokenView.class);
     }
 
     @Override
     public void changePassword(ChangePasswordRequest request) {
         client.post().uri("/internal/auth/password").body(request).retrieve().toBodilessEntity();
+    }
+
+    @Override
+    public void requestPasswordReset(String username) {
+        client.post().uri("/internal/auth/password-reset-requests")
+                .body(new PasswordResetRequest(username)).retrieve().toBodilessEntity();
+    }
+
+    @Override
+    public void confirmPasswordReset(String token, String newPassword) {
+        client.post().uri("/internal/auth/password-reset-confirmations")
+                .body(new PasswordResetConfirmRequest(token, newPassword)).retrieve().toBodilessEntity();
     }
 
     @Override
@@ -108,7 +166,7 @@ public class HttpAuthClient implements AuthClient {
 
     @Override
     public TokenView externalExchange(String code) {
-        return client.post().uri("/internal/auth/external/exchange").body(new ExchangeRequest(code)).retrieve()
+        return issuing("/internal/auth/external/exchange").body(new ExchangeRequest(code)).retrieve()
                 .body(TokenView.class);
     }
 

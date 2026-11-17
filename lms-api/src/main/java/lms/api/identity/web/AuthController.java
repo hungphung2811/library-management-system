@@ -4,6 +4,8 @@ import lms.api.identity.client.AuthClient;
 import lms.api.identity.dto.AuthDtos.ChangePasswordRequest;
 import lms.api.identity.dto.AuthDtos.CredentialCreated;
 import lms.api.identity.dto.AuthDtos.LoginRequest;
+import lms.api.identity.dto.AuthDtos.PasswordResetConfirmRequest;
+import lms.api.identity.dto.AuthDtos.PasswordResetRequest;
 import lms.api.identity.dto.AuthDtos.RefreshRequest;
 import lms.api.identity.dto.AuthDtos.RegisterCredentialRequest;
 import lms.api.identity.dto.AuthDtos.SwitchTenantRequest;
@@ -50,6 +52,20 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@Valid @RequestBody RefreshRequest request) {
         auth.logout(request.refreshToken());
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Quên mật khẩu (công khai): luôn 202 dù tài khoản có tồn tại hay không. */
+    @PostMapping("/password-reset-requests")
+    public ResponseEntity<Void> requestPasswordReset(@Valid @RequestBody PasswordResetRequest request) {
+        auth.requestPasswordReset(request.username());
+        return ResponseEntity.accepted().build();
+    }
+
+    /** Đặt lại mật khẩu bằng token một lần (công khai): 204; 400 INVALID_RESET_TOKEN khi token sai/hết hạn/đã dùng. */
+    @PostMapping("/password-reset-confirmations")
+    public ResponseEntity<Void> confirmPasswordReset(@Valid @RequestBody PasswordResetConfirmRequest request) {
+        auth.confirmPasswordReset(request.token(), request.newPassword());
         return ResponseEntity.noContent().build();
     }
 
