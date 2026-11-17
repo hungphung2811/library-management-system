@@ -4,6 +4,8 @@ import lms.api.circulation.dto.BorrowBookRequest;
 import lms.api.circulation.dto.BorrowingView;
 import lms.api.circulation.dto.BorrowingPageView;
 import lms.api.circulation.dto.BorrowingSearchQuery;
+import lms.api.circulation.dto.CirculationPolicyView;
+import lms.api.circulation.dto.UpdateCirculationPolicyRequest;
 import lms.api.circulation.dto.CollectFinesResult;
 import lms.api.circulation.dto.ExpirationResult;
 import lms.api.circulation.dto.ReaderFinesView;
@@ -51,4 +53,8 @@ public interface CirculationClient {
     ReservationView cancelReservation(UUID reservationId);
 
     ExpirationResult expireReservations();
+
+    CirculationPolicyView getPolicy();
+
+    CirculationPolicyView updatePolicy(UpdateCirculationPolicyRequest request);
 }

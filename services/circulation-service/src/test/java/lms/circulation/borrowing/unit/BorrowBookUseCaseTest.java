@@ -205,6 +205,59 @@ class BorrowBookUseCaseTest {
     }
 
     @Test
+    void muonGhiSnapshotTitleIdCuaTungBanSaoVaoDongMuon() {
+        List<UUID> ids = available(2);
+
+        borrow.execute(new BorrowBookCommand(student, ids));
+
+        BorrowingRecord saved = records.values().iterator().next();
+        assertThat(saved.items()).hasSize(2);
+        for (var item : saved.items()) {
+            assertThat(item.titleId()).isNotNull().isEqualTo(copies.get(item.bookCopyId()).titleId());
+        }
+    }
+
+    @Test
+    void banSaoCatalogKhongCoTitleIdThiDongMuonGiuTitleIdNull() {
+        UUID id = UUID.randomUUID();
+        copies.put(id, new CopyInventoryPort.CopyInfo(id, null, "Sách", "BC-X", CopyStatus.AVAILABLE, new BigDecimal("1000")));
+
+        borrow.execute(new BorrowBookCommand(student, List.of(id)));
+
+        assertThat(records.values().iterator().next().items().get(0).titleId()).isNull();
+    }
+
+    @Test
+    void traSachGiuNguyenTitleIdCuaDongMuon() {
+        UUID copyId = available(1).get(0);
+        borrow.execute(new BorrowBookCommand(student, List.of(copyId)));
+        UUID title = copies.get(copyId).titleId();
+
+        giveBack.execute(new ReturnBookCommand(null, copyId, null, ItemCondition.GOOD));
+
+        var item = records.values().iterator().next().items().get(0);
+        assertThat(item.isReturned()).isTrue();
+        assertThat(item.titleId()).isEqualTo(title);
+    }
+
+    /** Biên múi giờ Asia/Ho_Chi_Minh (ADR-0018 2.6): 23:30 ngày D vẫn là ngày D, 00:10 là ngày D+1. */
+    @Test
+    void ngayMuonTheoGioVnO2330VaO0010() {
+        java.time.ZoneId vn = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
+        for (var c : new Object[][]{{"2026-03-01T16:30:00Z", LocalDate.of(2026, 3, 1)}, {"2026-03-01T17:10:00Z", LocalDate.of(2026, 3, 2)}}) {
+            records.clear();
+            Clock vnClock = Clock.fixed(Instant.parse((String) c[0]), vn);
+            BorrowBookUseCase atVn = new BorrowBookUseCase(new BorrowingDomainService(), repo, save, rules, readerPort,
+                    inventory, reservationPort, ledger, events::add, vnClock);
+
+            BorrowingResponse response = atVn.execute(new BorrowBookCommand(student, available(1)));
+
+            assertThat(response.borrowDate()).isEqualTo(c[1]);
+            assertThat(response.dueDate()).isEqualTo(((LocalDate) c[1]).plusDays(14));
+        }
+    }
+
+    @Test
     void sinhVienMuonCuonThu6BiTuChoi() {
         borrow.execute(new BorrowBookCommand(student, available(5)));
         UUID sixth = copy(CopyStatus.AVAILABLE, "100000");

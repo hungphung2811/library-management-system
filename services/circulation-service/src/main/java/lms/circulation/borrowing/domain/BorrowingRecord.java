@@ -75,6 +75,14 @@ public class BorrowingRecord {
         return record;
     }
 
+    /**
+     * Ghi snapshot đầu sách (bookCopyId -> titleId) vào các dòng của phiếu mới lập, trước khi lưu. Bản sao không có
+     * trong map giữ nguyên (titleId null).
+     */
+    public void attachTitles(java.util.Map<UUID, UUID> titleIdByCopy) {
+        items.replaceAll(i -> titleIdByCopy.containsKey(i.bookCopyId()) ? i.withTitleId(titleIdByCopy.get(i.bookCopyId())) : i);
+    }
+
     /** UC07: nhận trả một bản sao với tình trạng nguyên vẹn hoặc hỏng. */
     public void returnCopy(UUID bookCopyId, ItemCondition condition, LocalDate today) {
         if (condition == null || condition == ItemCondition.LOST) {
@@ -104,11 +112,21 @@ public class BorrowingRecord {
         throw new InvalidBorrowingException("Bản sao không thuộc phiếu mượn này: " + bookCopyId);
     }
 
+    /** Gia hạn theo mặc định: tối đa {@link #MAX_RENEWALS} lần, mỗi lần cộng đúng số ngày mượn của phiếu. */
     public void renew(LocalDate today) {
+        renew(today, MAX_RENEWALS, loanDays);
+    }
+
+    /**
+     * Gia hạn theo chính sách của tenant tại thời điểm gia hạn (số lần tối đa và số ngày mỗi lần). Số lần đã gia hạn
+     * của phiếu cũ vẫn được tính vào giới hạn mới.
+     */
+    public void renew(LocalDate today, int maxRenewals, int renewalDays) {
+        if (renewalDays <= 0) throw new InvalidBorrowingException("Số ngày gia hạn phải > 0");
         if (status() == BorrowingStatus.RETURNED) throw new InvalidBorrowingException("Phiếu mượn đã trả hết, không thể gia hạn");
         if (isOverdue(today)) throw new InvalidBorrowingException("Phiếu mượn đã quá hạn, không thể gia hạn");
-        if (renewCount >= MAX_RENEWALS) throw new InvalidBorrowingException("Đã gia hạn tối đa " + MAX_RENEWALS + " lần");
-        dueDate = dueDate.plusDays(loanDays);
+        if (renewCount >= maxRenewals) throw new InvalidBorrowingException("Đã gia hạn tối đa " + maxRenewals + " lần");
+        dueDate = dueDate.plusDays(renewalDays);
         renewCount++;
     }
 

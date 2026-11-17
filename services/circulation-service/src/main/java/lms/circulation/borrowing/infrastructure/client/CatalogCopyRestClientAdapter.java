@@ -41,6 +41,7 @@ public class CatalogCopyRestClientAdapter implements CopyInventoryPort {
         try {
             RestClient.RequestHeadersSpec<?> spec = request.get();
             BearerTokens.current().ifPresent(t -> spec.header(HttpHeaders.AUTHORIZATION, "Bearer " + t));
+            lms.security.permission.ActAsTenant.current().ifPresent(tid -> spec.header(lms.security.permission.ActAsTenant.HEADER, tid));
             CopyDto dto = spec.retrieve().body(CopyDto.class);
             return dto == null ? Optional.empty()
                     : Optional.of(new CopyInfo(dto.id(), dto.titleId(), dto.titleName(), dto.barcode(), dto.status(), dto.coverPrice()));
@@ -58,6 +59,7 @@ public class CatalogCopyRestClientAdapter implements CopyInventoryPort {
         try {
             RestClient.RequestBodySpec spec = client.put().uri("/internal/book-copies/{id}/status", copyId);
             BearerTokens.current().ifPresent(t -> spec.header(HttpHeaders.AUTHORIZATION, "Bearer " + t));
+            lms.security.permission.ActAsTenant.current().ifPresent(tid -> spec.header(lms.security.permission.ActAsTenant.HEADER, tid));
             spec.body(Map.of("status", target.name())).retrieve().toBodilessEntity();
         } catch (HttpClientErrorException.NotFound e) {
             throw new NotFoundException("COPY_NOT_FOUND", "Không tìm thấy bản sao: " + copyId);

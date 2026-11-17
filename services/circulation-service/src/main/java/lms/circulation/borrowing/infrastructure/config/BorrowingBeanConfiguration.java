@@ -15,6 +15,7 @@ import lms.circulation.borrowing.infrastructure.integration.FineLedgerAdapter;
 import lms.circulation.borrowing.infrastructure.integration.ReservationHoldAdapter;
 import lms.circulation.fine.application.AssessFineUseCase;
 import lms.circulation.fine.application.GetReaderFinesUseCase;
+import lms.circulation.policy.application.GetCirculationPolicyUseCase;
 import lms.circulation.reservation.application.FulfillReservationUseCase;
 import java.time.Duration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -39,9 +40,14 @@ import org.springframework.kafka.core.KafkaTemplate;
 @Configuration
 public class BorrowingBeanConfiguration {
 
+    /** Múi giờ nghiệp vụ của hệ thống. */
+    public static final String BUSINESS_ZONE = "Asia/Ho_Chi_Minh";
+
     @Bean
     Clock clock() {
-        return Clock.systemDefaultZone();
+        // Múi giờ nghiệp vụ cố định, không theo múi giờ máy chạy (container là UTC): borrow_date/due_date/return_date
+        // phải là ngày giờ Việt Nam (ADR-0018 mục 2.6).
+        return Clock.system(java.time.ZoneId.of(BUSINESS_ZONE));
     }
 
     @Bean
@@ -87,9 +93,10 @@ public class BorrowingBeanConfiguration {
     BorrowBookUseCase borrowBookUseCase(BorrowingDomainService domainService, BorrowingPersistenceAdapter persistence,
                                         BorrowRuleRepository rules, ReaderDirectoryPort readers,
                                         CopyInventoryPort inventory, CopyReservationPort reservations,
-                                        FineLedgerPort fines, KafkaBorrowingEventPublisher publisher, Clock clock) {
+                                        FineLedgerPort fines, KafkaBorrowingEventPublisher publisher, Clock clock,
+                                        GetCirculationPolicyUseCase policies) {
         return new BorrowBookUseCase(domainService, persistence, persistence, rules, readers, inventory, reservations,
-                fines, publisher, clock);
+                fines, publisher, clock, policies);
     }
 
     @Bean
@@ -115,8 +122,9 @@ public class BorrowingBeanConfiguration {
     }
 
     @Bean
-    RenewBorrowingUseCase renewBorrowingUseCase(BorrowingPersistenceAdapter persistence, Clock clock) {
-        return new RenewBorrowingUseCase(persistence, persistence, clock);
+    RenewBorrowingUseCase renewBorrowingUseCase(BorrowingPersistenceAdapter persistence, Clock clock,
+                                                GetCirculationPolicyUseCase policies) {
+        return new RenewBorrowingUseCase(persistence, persistence, clock, policies);
     }
 
     @Bean

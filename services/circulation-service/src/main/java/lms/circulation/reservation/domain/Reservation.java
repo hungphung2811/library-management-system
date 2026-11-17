@@ -77,13 +77,19 @@ public class Reservation {
 
     /** QĐ6, QĐ9: giữ bản sao cho đặt trước đứng đầu hàng đợi, hạn giữ 3 ngày. */
     public void markReady(UUID heldCopyId, LocalDate today, Instant now) {
+        markReady(heldCopyId, today, now, HOLD_DAYS);
+    }
+
+    /** Như {@link #markReady(UUID, LocalDate, Instant)} với số ngày giữ chỗ theo chính sách của tenant. */
+    public void markReady(UUID heldCopyId, LocalDate today, Instant now, int holdDays) {
+        if (holdDays <= 0) throw new InvalidReservationException("Số ngày giữ chỗ phải > 0");
         if (status != ReservationStatus.WAITING) {
             throw new InvalidReservationException("Chỉ đặt trước WAITING mới được giữ bản sao (" + status + ")");
         }
         if (heldCopyId == null) throw new InvalidReservationException("copyId không được null");
         this.status = ReservationStatus.READY;
         this.copyId = heldCopyId;
-        this.holdUntil = today.plusDays(HOLD_DAYS);
+        this.holdUntil = today.plusDays(holdDays);
         events.add(new ReservationReadyEvent(UUID.randomUUID(), id, readerId, titleId, heldCopyId, holdUntil, now));
     }
 

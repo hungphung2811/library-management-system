@@ -1,5 +1,6 @@
 package lms.circulation.reservation.infrastructure.config;
 
+import lms.circulation.policy.application.GetCirculationPolicyUseCase;
 import lms.circulation.reservation.application.CancelReservationUseCase;
 import lms.circulation.reservation.application.ExpireOverdueReservationsUseCase;
 import lms.circulation.reservation.application.FulfillReservationUseCase;
@@ -75,8 +76,9 @@ public class ReservationBeanConfiguration {
     @Bean
     HoldCopyForNextReservationUseCase holdCopyForNextReservationUseCase(ReservationRepository repository,
                                                                         KafkaReservationEventPublisher publisher,
-                                                                        Clock clock) {
-        return new HoldCopyForNextReservationUseCase(repository, publisher, clock);
+                                                                        Clock clock,
+                                                                        GetCirculationPolicyUseCase policies) {
+        return new HoldCopyForNextReservationUseCase(repository, publisher, clock, policies);
     }
 
     @Bean

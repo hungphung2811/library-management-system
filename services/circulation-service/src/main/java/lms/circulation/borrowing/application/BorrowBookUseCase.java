@@ -7,6 +7,8 @@ import lms.circulation.borrowing.domain.BorrowingRecord;
 import lms.circulation.borrowing.domain.BorrowingRepository;
 import lms.circulation.borrowing.domain.CopyStatus;
 import lms.circulation.borrowing.domain.NotFoundException;
+import lms.circulation.policy.application.CirculationPolicyResponse;
+import lms.circulation.policy.application.GetCirculationPolicyUseCase;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -40,11 +42,21 @@ public class BorrowBookUseCase {
     private final FineLedgerPort fines;
     private final PublishBorrowingEventPort eventPort;
     private final Clock clock;
+    private final GetCirculationPolicyUseCase policies;
 
     public BorrowBookUseCase(BorrowingDomainService domainService, BorrowingRepository repository,
                              SaveBorrowingPort savePort, BorrowRuleRepository rules, ReaderDirectoryPort readers,
                              CopyInventoryPort inventory, CopyReservationPort reservations, FineLedgerPort fines,
                              PublishBorrowingEventPort eventPort, Clock clock) {
+        this(domainService, repository, savePort, rules, readers, inventory, reservations, fines, eventPort, clock,
+                GetCirculationPolicyUseCase.defaultsOnly());
+    }
+
+    public BorrowBookUseCase(BorrowingDomainService domainService, BorrowingRepository repository,
+                             SaveBorrowingPort savePort, BorrowRuleRepository rules, ReaderDirectoryPort readers,
+                             CopyInventoryPort inventory, CopyReservationPort reservations, FineLedgerPort fines,
+                             PublishBorrowingEventPort eventPort, Clock clock, GetCirculationPolicyUseCase policies) {
+        this.policies = policies;
         this.domainService = domainService;
         this.repository = repository;
         this.savePort = savePort;
@@ -66,19 +78,28 @@ public class BorrowBookUseCase {
                 .orElseThrow(() -> new NotFoundException("READER_NOT_FOUND", "Không tìm thấy hồ sơ độc giả: " + userId));
         domainService.checkReaderEligible(reader.cardValid(),
                 repository.countOverdueItemsByUserId(userId, today), fines.unpaidTotal(userId));
-        BorrowRule rule = rules.findByReaderType(reader.readerType()).orElseThrow(() ->
-                new NotFoundException("BORROW_RULE_NOT_FOUND", "Chưa cấu hình quy định mượn cho " + reader.readerType()));
+        // Tenant đã cấu hình chính sách (custom) thì số ngày mượn và hạn mức lấy từ chính sách, áp cho mọi loại độc giả;
+        // chưa cấu hình thì giữ nguyên quy định theo loại độc giả (borrow_rules). Chỉ áp cho phiếu mới lập.
+        CirculationPolicyResponse policy = policies.execute();
+        BorrowRule rule = policy.custom()
+                ? new BorrowRule(reader.readerType(), policy.maxActiveLoansPerReader(), policy.loanDays())
+                : rules.findByReaderType(reader.readerType()).orElseThrow(() -> new NotFoundException(
+                        "BORROW_RULE_NOT_FOUND", "Chưa cấu hình quy định mượn cho " + reader.readerType()));
 
         long active = repository.countActiveItemsByUserId(userId);
         BorrowingRecord record = domainService.borrow(rule, userId, command.bookCopyIds(), active, today);
 
         Map<UUID, CopyStatus> original = new HashMap<>();
+        Map<UUID, UUID> titleByCopy = new HashMap<>();
         for (UUID copyId : command.bookCopyIds()) {
             CopyInventoryPort.CopyInfo copy = CopyResolver.requireCopy(copyId, inventory);
             Optional<UUID> holder = reservations.holderOf(copyId);
             domainService.checkCopyBorrowable(copyId, copy.status(), holder.orElse(null), userId);
             original.put(copyId, copy.status());
+            if (copy.titleId() != null) titleByCopy.put(copyId, copy.titleId());
         }
+        // Snapshot đầu sách vào dòng mượn (ADR-0018: thống kê top sách mượn nhóm theo đầu sách).
+        record.attachTitles(titleByCopy);
 
         BorrowingRecord saved = savePort.save(record);
 

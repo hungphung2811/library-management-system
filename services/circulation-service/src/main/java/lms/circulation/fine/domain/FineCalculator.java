@@ -14,6 +14,11 @@ public class FineCalculator {
         this.rates = rates;
     }
 
+    /** Bản tính phạt dùng mức phạt trễ khác (chính sách của tenant), giữ nguyên tỉ lệ hỏng/mất. */
+    public FineCalculator withLateFeePerDay(BigDecimal lateFeePerDay) {
+        return new FineCalculator(new FineRates(lateFeePerDay, rates.damagedRate(), rates.lostRate()));
+    }
+
     /**
      * Trả sách (UC07). Trễ thì có phí trễ (QĐ3); hỏng thì có phí hỏng (QĐ4); hỏng mà trễ thì chịu cả hai (QĐ8).
      * Không có khoản nào khi trả đúng hạn và nguyên vẹn.

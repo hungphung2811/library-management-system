@@ -7,6 +7,7 @@ import lms.circulation.fine.domain.FineCalculator;
 import lms.circulation.fine.domain.FineRates;
 import lms.circulation.fine.domain.FineRepository;
 import lms.circulation.fine.infrastructure.messaging.KafkaFineEventPublisher;
+import lms.circulation.policy.application.GetCirculationPolicyUseCase;
 import lms.messaging.KafkaEventPublisher;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
@@ -48,8 +49,9 @@ public class FineBeanConfiguration {
 
     @Bean
     AssessFineUseCase assessFineUseCase(FineCalculator calculator, FineRepository repository,
-                                        KafkaFineEventPublisher publisher, Clock clock) {
-        return new AssessFineUseCase(calculator, repository, publisher, clock);
+                                        KafkaFineEventPublisher publisher, Clock clock,
+                                        GetCirculationPolicyUseCase policies) {
+        return new AssessFineUseCase(calculator, repository, publisher, clock, policies);
     }
 
     @Bean

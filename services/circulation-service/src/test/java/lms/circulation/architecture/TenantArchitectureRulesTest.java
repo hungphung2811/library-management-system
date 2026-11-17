@@ -13,5 +13,7 @@ class TenantArchitectureRulesTest {
     static final ArchRule entityTheoTenantPhaiCoTenantId = TenantArchitectureRules.tenantScopedEntitiesMustUseTenantId();
 
     @ArchTest
-    static final ArchRule khongCoNativeQueryChuaRa = TenantArchitectureRules.noUnreviewedNativeQueries();
+    static final ArchRule khongCoNativeQueryChuaRa = TenantArchitectureRules.noUnreviewedNativeQueries(
+                    // ADR-0018: read model thống kê/báo cáo, mọi truy vấn có tenant_id = :t tường minh cộng RLS
+                    "LendingStatsQueryAdapter");
 }

@@ -14,6 +14,10 @@ class BorrowingItemEmbeddable {
     @Column(name = "book_copy_id", nullable = false)
     private UUID bookCopyId;
 
+    /** Snapshot đầu sách lúc mượn (migration V9); NULL ở dòng cũ. */
+    @Column(name = "title_id")
+    private UUID titleId;
+
     @Column(name = "return_date")
     private LocalDate returnDate;
 
@@ -25,13 +29,15 @@ class BorrowingItemEmbeddable {
     protected BorrowingItemEmbeddable() {
     }
 
-    BorrowingItemEmbeddable(UUID bookCopyId, LocalDate returnDate, ItemCondition condition) {
+    BorrowingItemEmbeddable(UUID bookCopyId, UUID titleId, LocalDate returnDate, ItemCondition condition) {
         this.bookCopyId = bookCopyId;
+        this.titleId = titleId;
         this.returnDate = returnDate;
         this.condition = condition;
     }
 
     UUID getBookCopyId() { return bookCopyId; }
+    UUID getTitleId() { return titleId; }
     LocalDate getReturnDate() { return returnDate; }
     ItemCondition getCondition() { return condition; }
 }

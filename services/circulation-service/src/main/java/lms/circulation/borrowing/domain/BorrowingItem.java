@@ -6,9 +6,14 @@ import java.util.UUID;
 /**
  * Một bản sao sách vật lý (BookCopy, thuộc catalog) trong phiếu mượn. Đang mượn thì returnDate và condition cùng null;
  * đóng lượt mượn (trả hoặc báo mất) thì cả hai cùng có giá trị GOOD, DAMAGED, LOST (khớp ràng buộc
- * ck_borrowing_items_closed của migration V4).
+ * ck_borrowing_items_closed của migration V4). titleId là snapshot đầu sách lúc mượn (nullable, dòng cũ không có).
  */
-public record BorrowingItem(UUID bookCopyId, LocalDate returnDate, ItemCondition condition) {
+public record BorrowingItem(UUID bookCopyId, UUID titleId, LocalDate returnDate, ItemCondition condition) {
+
+    /** Dòng không có snapshot đầu sách (dữ liệu cũ trước migration V9): titleId null. */
+    public BorrowingItem(UUID bookCopyId, LocalDate returnDate, ItemCondition condition) {
+        this(bookCopyId, null, returnDate, condition);
+    }
 
     public BorrowingItem {
         if (bookCopyId == null) throw new IllegalArgumentException("bookCopyId không được null");
@@ -18,7 +23,12 @@ public record BorrowingItem(UUID bookCopyId, LocalDate returnDate, ItemCondition
     }
 
     public static BorrowingItem borrowed(UUID bookCopyId) {
-        return new BorrowingItem(bookCopyId, null, null);
+        return new BorrowingItem(bookCopyId, null, null, null);
+    }
+
+    /** Snapshot đầu sách của bản sao lúc mượn (phục vụ thống kê top sách mượn, ADR-0018); titleId có thể null. */
+    public BorrowingItem withTitleId(UUID titleId) {
+        return new BorrowingItem(bookCopyId, titleId, returnDate, condition);
     }
 
     /** Đã đóng lượt mượn (trả hoặc báo mất). */
@@ -36,6 +46,6 @@ public record BorrowingItem(UUID bookCopyId, LocalDate returnDate, ItemCondition
         if (date == null || condition == null) {
             throw new IllegalArgumentException("Đóng lượt mượn cần ngày đóng và tình trạng bản sao");
         }
-        return new BorrowingItem(bookCopyId, date, condition);
+        return new BorrowingItem(bookCopyId, titleId, date, condition);
     }
 }

@@ -5,6 +5,8 @@ import lms.api.circulation.dto.BorrowBookRequest;
 import lms.api.circulation.dto.BorrowingPageView;
 import lms.api.circulation.dto.BorrowingSearchQuery;
 import lms.api.circulation.dto.BorrowingView;
+import lms.api.circulation.dto.CirculationPolicyView;
+import lms.api.circulation.dto.UpdateCirculationPolicyRequest;
 import lms.api.circulation.dto.CollectFinesResult;
 import lms.api.circulation.dto.ExpirationResult;
 import lms.api.circulation.dto.FineView;
@@ -204,5 +206,16 @@ public class HttpCirculationClient implements CirculationClient {
         Map<String, Integer> result = client.post().uri("/internal/reservations/expirations").retrieve()
                 .body(new ParameterizedTypeReference<>() { });
         return new ExpirationResult(result == null ? 0 : result.getOrDefault("expired", 0));
+    }
+
+    @Override
+    public CirculationPolicyView getPolicy() {
+        return client.get().uri("/internal/circulation/policy").retrieve().body(CirculationPolicyView.class);
+    }
+
+    @Override
+    public CirculationPolicyView updatePolicy(UpdateCirculationPolicyRequest request) {
+        return client.put().uri("/internal/circulation/policy").body(request).retrieve()
+                .body(CirculationPolicyView.class);
     }
 }

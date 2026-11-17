@@ -30,6 +30,7 @@ public class CatalogRestClientAdapter implements TitleCatalogPort {
         try {
             RestClient.RequestHeadersSpec<?> request = client.get().uri("/internal/books/{id}", titleId);
             BearerTokens.current().ifPresent(t -> request.header(HttpHeaders.AUTHORIZATION, "Bearer " + t));
+            lms.security.permission.ActAsTenant.current().ifPresent(tid -> request.header(lms.security.permission.ActAsTenant.HEADER, tid));
             TitleDto dto = request.retrieve().body(TitleDto.class);
             return dto == null ? Optional.empty() : Optional.of(new TitleInfo(dto.id(), dto.name(), dto.availableCopies()));
         } catch (HttpClientErrorException.NotFound e) {
