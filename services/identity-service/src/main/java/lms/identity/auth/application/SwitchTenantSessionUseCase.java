@@ -46,6 +46,11 @@ public class SwitchTenantSessionUseCase {
     }
 
     public TokenResponse execute(UUID userId, UUID tenantId, String rawRefreshToken) {
+        return execute(userId, tenantId, rawRefreshToken, null);
+    }
+
+    /** Đổi tenant giữ họ phiên (cùng thiết bị); client cập nhật nhãn thiết bị (null = giữ nhãn cũ). */
+    public TokenResponse execute(UUID userId, UUID tenantId, String rawRefreshToken, ClientInfo client) {
         Instant now = clock.instant();
         RefreshToken current = refreshRepository.findByTokenHash(codec.hash(rawRefreshToken))
                 .filter(t -> t.userId().equals(userId))
@@ -60,6 +65,6 @@ public class SwitchTenantSessionUseCase {
         credential.ensureCanLogin(now);
         TenantChoice choice = tenantAccess.switchTo(userId, tenantId); // ném NoTenantAccessException, token cũ giữ nguyên
 
-        return tokenService.issueForTenant(credential, choice, current);
+        return tokenService.issueForTenant(credential, choice, current, client);
     }
 }

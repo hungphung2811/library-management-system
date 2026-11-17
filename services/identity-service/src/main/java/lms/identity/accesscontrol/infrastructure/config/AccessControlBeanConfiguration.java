@@ -29,6 +29,18 @@ import org.springframework.kafka.core.KafkaTemplate;
 public class AccessControlBeanConfiguration {
 
     @Bean
+    lms.identity.user.application.UserRoleLookupPort userRoleLookupPort(
+            lms.identity.accesscontrol.application.ListUserRoleNamesUseCase listRoleNames) {
+        return new lms.identity.accesscontrol.infrastructure.client.InProcessUserRoleLookupAdapter(listRoleNames);
+    }
+
+    @Bean
+    lms.identity.user.application.TargetAdminLookupPort targetAdminLookupPort(
+            lms.identity.accesscontrol.application.GetUserAccessUseCase getUserAccess) {
+        return new lms.identity.accesscontrol.infrastructure.client.InProcessTargetAdminLookupAdapter(getUserAccess);
+    }
+
+    @Bean
     AccessControlPersistenceAdapter persistenceAdapter(RoleJpaRepository roles, PermissionJpaRepository permissions,
                                                        UserRoleJpaRepository userRoles) {
         return new AccessControlPersistenceAdapter(roles, permissions, userRoles);
@@ -75,6 +87,13 @@ public class AccessControlBeanConfiguration {
     UserRoleUseCase userRoleUseCase(AccessControlPersistenceAdapter persistence, KafkaAccessEventPublisher publisher,
                                     Clock clock) {
         return new UserRoleUseCase(persistence, persistence, persistence, publisher, clock);
+    }
+
+    /** Tên role của nhiều người dùng theo lô (cho xuất danh sách người dùng của context user). */
+    @Bean
+    lms.identity.accesscontrol.application.ListUserRoleNamesUseCase listUserRoleNamesUseCase(
+            AccessControlPersistenceAdapter persistence) {
+        return new lms.identity.accesscontrol.application.ListUserRoleNamesUseCase(persistence, persistence);
     }
 
     /** Role tự đăng ký của tenant (cờ signup_default), cho luồng đăng ký công khai của context auth. */

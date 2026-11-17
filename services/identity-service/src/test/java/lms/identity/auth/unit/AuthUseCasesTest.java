@@ -182,7 +182,7 @@ class AuthUseCasesTest {
     }
 
     @Test
-    void dungLaiRefreshTokenCuThuHoiMoiPhienCuaNguoiDung() {
+    void dungLaiRefreshTokenCuNgoaiAnHanChiThuHoiDungHoPhien() {
         when(codec.hash("stolen")).thenReturn("stolen-hash");
         RefreshToken used = RefreshToken.issue(userId, "stolen-hash", now.minusSeconds(60), Duration.ofDays(7));
         used.revoke();
@@ -190,7 +190,10 @@ class AuthUseCasesTest {
 
         assertThatThrownBy(() -> refresh.execute("stolen")).isInstanceOf(InvalidRefreshTokenException.class);
 
-        verify(saveRefresh).revokeAllByUserId(userId);
+        // ADR-0017: chỉ thu hồi họ phiên của token, KHÔNG đăng xuất mọi thiết bị của người dùng
+        verify(saveRefresh).revokeSession(org.mockito.ArgumentMatchers.eq(used.sessionId()),
+                org.mockito.ArgumentMatchers.eq(lms.identity.auth.domain.RevokeReason.REUSE_DETECTED), any());
+        verify(saveRefresh, never()).revokeAllByUserId(any());
         verify(issuer, never()).issue(any());
     }
 

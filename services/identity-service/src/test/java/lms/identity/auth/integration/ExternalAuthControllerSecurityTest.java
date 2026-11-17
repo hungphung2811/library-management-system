@@ -349,7 +349,7 @@ class ExternalAuthControllerSecurityTest {
 
     @Test
     void doiMaLaCongKhaiTraTokenKhongLuuCache() throws Exception {
-        when(exchange.execute("ticket-xyz")).thenReturn(TokenResponse.bearer("a", "r", 900));
+        when(exchange.execute(eq("ticket-xyz"), any())).thenReturn(TokenResponse.bearer("a", "r", 900));
 
         mvc.perform(post("/internal/auth/external/exchange").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"code\":\"ticket-xyz\"}"))
@@ -372,7 +372,7 @@ class ExternalAuthControllerSecurityTest {
 
     @Test
     void doiMaSaiHoacDaDungTra401InvalidTicket() throws Exception {
-        when(exchange.execute(anyString())).thenThrow(new ExternalAuthException(Reason.INVALID_TICKET, "mã không hợp lệ"));
+        when(exchange.execute(anyString(), any())).thenThrow(new ExternalAuthException(Reason.INVALID_TICKET, "mã không hợp lệ"));
 
         mvc.perform(post("/internal/auth/external/exchange").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"code\":\"bad\"}"))

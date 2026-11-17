@@ -78,6 +78,13 @@ class CrossTenantReadableSecurityTest {
     @MockitoBean GetUserUseCase getUser;
     @MockitoBean SearchUsersUseCase searchUsers;
     @MockitoBean ResetUserPasswordUseCase resetPassword;
+    @MockitoBean lms.identity.user.application.UnlockUserUseCase unlockUser;
+    @MockitoBean lms.identity.user.application.RevokeUserSessionsInTenantUseCase revokeUserSessions;
+    @MockitoBean lms.identity.user.application.ListUserSessionsUseCase listUserSessions;
+    @MockitoBean lms.identity.user.application.RevokeUserSessionUseCase revokeUserSession;
+    @MockitoBean lms.identity.user.application.ImportUsersUseCase importUsers;
+    @MockitoBean lms.identity.user.application.LookupUsersUseCase lookupUsers;
+    @MockitoBean lms.identity.user.application.ExportUsersUseCase exportUsers;
     @MockitoBean PermissionManagementUseCase permissions;
     @MockitoBean RoleManagementUseCase roles;
     @MockitoBean UserRoleUseCase userRoles;

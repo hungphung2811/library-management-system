@@ -78,6 +78,9 @@ public class JwtTokenIssuer implements TokenIssuerPort, ServiceTokenIssuerPort {
                 builder.claim(JwtClaims.MODULES, List.copyOf(claims.modules()));
             }
         }
+        if (claims.sessionId() != null) {
+            builder.claim(JwtClaims.SESSION_ID, claims.sessionId().toString());
+        }
         if (claims.departmentId() != null) {
             builder.claim(JwtClaims.DEPARTMENT_ID, claims.departmentId().toString());
         }

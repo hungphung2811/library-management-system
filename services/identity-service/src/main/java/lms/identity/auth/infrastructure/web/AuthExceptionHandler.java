@@ -8,6 +8,9 @@ import lms.identity.auth.domain.ExternalAuthException;
 import lms.identity.auth.domain.InvalidCredentialsException;
 import lms.identity.auth.domain.InvalidRefreshTokenException;
 import lms.identity.auth.domain.InvalidSignupException;
+import lms.identity.auth.domain.RefreshTokenSupersededException;
+import lms.identity.auth.domain.SessionNotFoundException;
+import lms.identity.auth.domain.SessionNotIdentifiedException;
 import lms.identity.auth.domain.SignupNotAvailableException;
 import lms.identity.auth.domain.WrongCurrentPasswordException;
 import lms.common.kernel.ErrorResponse;
@@ -28,6 +31,27 @@ public class AuthExceptionHandler {
     @ExceptionHandler({InvalidCredentialsException.class, InvalidRefreshTokenException.class})
     ResponseEntity<ErrorResponse> handleUnauthorized(RuntimeException ex) {
         return build(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", ex.getMessage());
+    }
+
+    /** Token vừa được xoay (ân hạn/race): client đọc lại refresh token mới nhất rồi thử lại. Mã riêng, vẫn 401. */
+    @ExceptionHandler(RefreshTokenSupersededException.class)
+    ResponseEntity<ErrorResponse> handleSuperseded(RefreshTokenSupersededException ex) {
+        return build(HttpStatus.UNAUTHORIZED, "REFRESH_TOKEN_SUPERSEDED", ex.getMessage());
+    }
+
+    @ExceptionHandler(SessionNotFoundException.class)
+    ResponseEntity<ErrorResponse> handleSessionNotFound(SessionNotFoundException ex) {
+        return build(HttpStatus.NOT_FOUND, "SESSION_NOT_FOUND", ex.getMessage());
+    }
+
+    @ExceptionHandler(SessionNotIdentifiedException.class)
+    ResponseEntity<ErrorResponse> handleSessionNotIdentified(SessionNotIdentifiedException ex) {
+        return build(HttpStatus.CONFLICT, "SESSION_NOT_IDENTIFIED", ex.getMessage());
+    }
+
+    @ExceptionHandler(lms.identity.auth.domain.InvalidPasswordResetTokenException.class)
+    ResponseEntity<ErrorResponse> handleInvalidResetToken(lms.identity.auth.domain.InvalidPasswordResetTokenException ex) {
+        return build(HttpStatus.BAD_REQUEST, "INVALID_RESET_TOKEN", ex.getMessage());
     }
 
     @ExceptionHandler(WrongCurrentPasswordException.class)

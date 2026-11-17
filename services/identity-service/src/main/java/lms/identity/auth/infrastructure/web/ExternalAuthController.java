@@ -169,8 +169,14 @@ public class ExternalAuthController {
 
     @PublicEndpoint
     @PostMapping("/external/exchange")
-    public ResponseEntity<TokenResponse> exchange(@Valid @RequestBody ExchangeRequest request) {
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(exchange.execute(request.code()));
+    public ResponseEntity<TokenResponse> exchange(
+            @Valid @RequestBody ExchangeRequest request,
+            @org.springframework.web.bind.annotation.RequestHeader(value = "X-Client-Ip", required = false)
+            String clientIp,
+            @org.springframework.web.bind.annotation.RequestHeader(value = "X-Client-User-Agent", required = false)
+            String userAgent) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(exchange.execute(request.code(),
+                lms.identity.auth.application.ClientInfo.of(clientIp, userAgent)));
     }
 
     @GetMapping("/me/external")

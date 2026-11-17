@@ -301,8 +301,9 @@ class IdentityServiceIT {
     }
 
     @Test
-    void lamMoiPhienXoayVongVaDungLaiTokenCuThuHoiMoiPhien() {
+    void lamMoiPhienXoayVongDungLaiTokenCuTrongAnHanLaSupersededConNgoaiAnHanThuHoiHoPhienDo() {
         Map<String, Object> first = login("admin", "Admin@12345", HttpStatus.OK);
+        Map<String, Object> otherDevice = login("admin", "Admin@12345", HttpStatus.OK);
         String oldRefresh = (String) first.get("refreshToken");
 
         ResponseEntity<Map> rotated = rest.postForEntity("/internal/auth/refresh", Map.of("refreshToken", oldRefresh), Map.class);
@@ -310,11 +311,26 @@ class IdentityServiceIT {
         String newRefresh = (String) rotated.getBody().get("refreshToken");
         assertThat(newRefresh).isNotEqualTo(oldRefresh);
 
-        // dùng lại token cũ: bị từ chối và mọi phiên của admin bị thu hồi, kể cả token mới
-        assertThat(rest.postForEntity("/internal/auth/refresh", Map.of("refreshToken", oldRefresh), Map.class)
+        // dùng lại token cũ TRONG ân hạn (ADR-0017): 401 SUPERSEDED, không thu hồi gì, token mới vẫn dùng được
+        ResponseEntity<Map> superseded = rest.postForEntity("/internal/auth/refresh", Map.of("refreshToken", oldRefresh), Map.class);
+        assertThat(superseded.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(superseded.getBody().get("code")).isEqualTo("REFRESH_TOKEN_SUPERSEDED");
+        ResponseEntity<Map> second = rest.postForEntity("/internal/auth/refresh", Map.of("refreshToken", newRefresh), Map.class);
+        assertThat(second.getStatusCode()).isEqualTo(HttpStatus.OK);
+        String newest = (String) second.getBody().get("refreshToken");
+
+        // lùi mốc xoay vòng ra ngoài ân hạn rồi dùng lại token cũ: thu hồi cả họ phiên này (REUSE_DETECTED)
+        jdbc.update("UPDATE refresh_tokens SET revoked_at = revoked_at - interval '5 minutes' "
+                + "WHERE revoked_reason = 'ROTATED' AND revoked_at IS NOT NULL");
+        ResponseEntity<Map> reuse = rest.postForEntity("/internal/auth/refresh", Map.of("refreshToken", oldRefresh), Map.class);
+        assertThat(reuse.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(reuse.getBody().get("code")).isNotEqualTo("REFRESH_TOKEN_SUPERSEDED");
+        assertThat(rest.postForEntity("/internal/auth/refresh", Map.of("refreshToken", newest), Map.class)
                 .getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-        assertThat(rest.postForEntity("/internal/auth/refresh", Map.of("refreshToken", newRefresh), Map.class)
-                .getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        // thiết bị/họ phiên khác của cùng người dùng không bị ảnh hưởng
+        assertThat(rest.postForEntity("/internal/auth/refresh",
+                Map.of("refreshToken", otherDevice.get("refreshToken")), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.OK);
     }
 
     @Test
@@ -381,7 +397,7 @@ class IdentityServiceIT {
 
     @Test
     @SuppressWarnings("unchecked")
-    void doiTenantLuuLastTenantVaLanDangNhapSauVaoDungTenant() {
+    void doiTenantLuuLastTenantDungLaiTokenCuTheoAnHanVaLanDangNhapSauVaoDungTenant() {
         String admin = accessToken("admin", "Admin@12345");
         UUID userId = createUser(admin, "tenant-switcher", "Switch@12345");
         UUID second = newTenant("it-second", "ACTIVE");
@@ -400,9 +416,20 @@ class IdentityServiceIT {
         ResponseEntity<Map> refreshed = refreshWith((String) switched.getBody().get("refreshToken"));
         assertThat(refreshed.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(tenantClaim(refreshed.getBody().get("accessToken"))).isEqualTo(second.toString());
-        // refresh token cũ (của tenant trước) bị thu hồi khi đổi tenant; dùng lại nó kích hoạt reuse-detection
-        assertThat(refreshWith((String) first.get("refreshToken")).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-        assertThat(refreshWith((String) refreshed.getBody().get("refreshToken")).getStatusCode())
+        // refresh token cũ (của tenant trước) bị xoay khi đổi tenant; dùng lại nó trong ân hạn (ADR-0017) là
+        // 401 REFRESH_TOKEN_SUPERSEDED, không thu hồi gì: token mới nhất vẫn dùng được
+        ResponseEntity<Map> replay = refreshWith((String) first.get("refreshToken"));
+        assertThat(replay.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(replay.getBody().get("code")).isEqualTo("REFRESH_TOKEN_SUPERSEDED");
+        ResponseEntity<Map> stillOk = refreshWith((String) refreshed.getBody().get("refreshToken"));
+        assertThat(stillOk.getStatusCode()).isEqualTo(HttpStatus.OK);
+        // ngoài ân hạn thì dùng lại token cũ thu hồi cả họ phiên đó (REUSE_DETECTED), kể cả token mới nhất
+        jdbc.update("UPDATE refresh_tokens SET revoked_at = revoked_at - interval '5 minutes' "
+                + "WHERE user_id = ? AND revoked_reason = 'ROTATED'", userId);
+        ResponseEntity<Map> reuse = refreshWith((String) first.get("refreshToken"));
+        assertThat(reuse.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(reuse.getBody().get("code")).isNotEqualTo("REFRESH_TOKEN_SUPERSEDED");
+        assertThat(refreshWith((String) stillOk.getBody().get("refreshToken")).getStatusCode())
                 .isEqualTo(HttpStatus.UNAUTHORIZED);
 
         assertThat(tenantClaim(login("tenant-switcher", "Switch@12345", HttpStatus.OK).get("accessToken")))

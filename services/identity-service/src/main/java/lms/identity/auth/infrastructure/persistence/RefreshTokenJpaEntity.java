@@ -40,7 +40,39 @@ class RefreshTokenJpaEntity {
     @Column(name = "channel", nullable = false, length = 20)
     private String channel = "STAFF";
 
+    /** Họ phiên (V24, ADR-0017): giữ nguyên khi xoay vòng. */
+    @Column(name = "session_id", nullable = false)
+    private UUID sessionId;
+
+    @Column(name = "session_started_at", nullable = false)
+    private Instant sessionStartedAt;
+
+    @Column(name = "device_summary", length = 100)
+    private String deviceSummary;
+
+    @Column(name = "client_ip", length = 45)
+    private String clientIp;
+
+    @Column(name = "revoked_at")
+    private Instant revokedAt;
+
+    @Column(name = "revoked_reason", length = 20)
+    private String revokedReason;
+
     protected RefreshTokenJpaEntity() {
+    }
+
+    RefreshTokenJpaEntity(UUID id, UUID userId, UUID tenantId, boolean platformSession, String tokenHash,
+                          Instant expiresAt, boolean revoked, Instant createdAt, String channel, UUID sessionId,
+                          Instant sessionStartedAt, String deviceSummary, String clientIp, Instant revokedAt,
+                          String revokedReason) {
+        this(id, userId, tenantId, platformSession, tokenHash, expiresAt, revoked, createdAt, channel);
+        this.sessionId = sessionId;
+        this.sessionStartedAt = sessionStartedAt;
+        this.deviceSummary = deviceSummary;
+        this.clientIp = clientIp;
+        this.revokedAt = revokedAt;
+        this.revokedReason = revokedReason;
     }
 
     RefreshTokenJpaEntity(UUID id, UUID userId, UUID tenantId, boolean platformSession, String tokenHash,
@@ -54,6 +86,8 @@ class RefreshTokenJpaEntity {
         this.revoked = revoked;
         this.createdAt = createdAt;
         this.channel = channel;
+        this.sessionId = id;
+        this.sessionStartedAt = createdAt;
     }
 
     UUID getId() { return id; }
@@ -65,4 +99,10 @@ class RefreshTokenJpaEntity {
     boolean isRevoked() { return revoked; }
     Instant getCreatedAt() { return createdAt; }
     String getChannel() { return channel; }
+    UUID getSessionId() { return sessionId; }
+    Instant getSessionStartedAt() { return sessionStartedAt; }
+    String getDeviceSummary() { return deviceSummary; }
+    String getClientIp() { return clientIp; }
+    Instant getRevokedAt() { return revokedAt; }
+    String getRevokedReason() { return revokedReason; }
 }

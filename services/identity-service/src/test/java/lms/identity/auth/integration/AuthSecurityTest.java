@@ -52,6 +52,8 @@ class AuthSecurityTest {
     @MockitoBean LogoutUseCase logout;
     @MockitoBean RegisterCredentialUseCase register;
     @MockitoBean lms.identity.auth.application.ChangePasswordUseCase changePassword;
+    @MockitoBean lms.identity.auth.application.RequestPasswordResetUseCase requestPasswordReset;
+    @MockitoBean lms.identity.auth.application.ConfirmPasswordResetUseCase confirmPasswordReset;
     @MockitoBean SwitchTenantSessionUseCase switchTenant;
     @MockitoBean SignupUseCase signup;
     @MockitoBean JwtDecoder jwtDecoder;
@@ -71,7 +73,7 @@ class AuthSecurityTest {
 
     @Test
     void dangNhapLaCongKhaiVaTraToken() throws Exception {
-        when(login.execute("alice", "secret123", null, TokenChannel.STAFF)).thenReturn(TokenResponse.bearer("a", "r", 900));
+        when(login.execute(org.mockito.ArgumentMatchers.eq("alice"), org.mockito.ArgumentMatchers.eq("secret123"), org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.eq(TokenChannel.STAFF), org.mockito.ArgumentMatchers.any(lms.identity.auth.application.ClientInfo.class))).thenReturn(TokenResponse.bearer("a", "r", 900));
 
         mvc.perform(post("/internal/auth/login").contentType(MediaType.APPLICATION_JSON).content(LOGIN_BODY))
                 .andExpect(status().isOk())
@@ -81,7 +83,7 @@ class AuthSecurityTest {
 
     @Test
     void saiThongTinTra401KhongLoChiTiet() throws Exception {
-        when(login.execute(any(), any(), any(), any())).thenThrow(new InvalidCredentialsException());
+        when(login.execute(any(), any(), any(), any(), any())).thenThrow(new InvalidCredentialsException());
 
         mvc.perform(post("/internal/auth/login").contentType(MediaType.APPLICATION_JSON).content(LOGIN_BODY))
                 .andExpect(status().isUnauthorized())
@@ -90,7 +92,7 @@ class AuthSecurityTest {
 
     @Test
     void taiKhoanBiKhoaTra423() throws Exception {
-        when(login.execute(any(), any(), any(), any())).thenThrow(new AccountLockedException(Instant.now()));
+        when(login.execute(any(), any(), any(), any(), any())).thenThrow(new AccountLockedException(Instant.now()));
 
         mvc.perform(post("/internal/auth/login").contentType(MediaType.APPLICATION_JSON).content(LOGIN_BODY))
                 .andExpect(status().isLocked());
@@ -127,7 +129,7 @@ class AuthSecurityTest {
 
     @Test
     void endpointCongKhaiVaChiCanDangNhapKhongDoiTenantId() throws Exception {
-        when(login.execute("alice", "secret123", null, TokenChannel.STAFF)).thenReturn(TokenResponse.bearer("a", "r", 900));
+        when(login.execute(org.mockito.ArgumentMatchers.eq("alice"), org.mockito.ArgumentMatchers.eq("secret123"), org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.eq(TokenChannel.STAFF), org.mockito.ArgumentMatchers.any(lms.identity.auth.application.ClientInfo.class))).thenReturn(TokenResponse.bearer("a", "r", 900));
 
         mvc.perform(post("/internal/auth/login").contentType(MediaType.APPLICATION_JSON).content(LOGIN_BODY))
                 .andExpect(status().isOk());
@@ -140,7 +142,7 @@ class AuthSecurityTest {
     @Test
     void dangNhapTheoMaTenantTraTenantIdVaDanhSachTenant() throws Exception {
         UUID tenant = UUID.randomUUID();
-        when(login.execute("alice", "secret123", "lib-a", TokenChannel.STAFF)).thenReturn(TokenResponse.bearer("a", "r", 900, false, tenant,
+        when(login.execute(org.mockito.ArgumentMatchers.eq("alice"), org.mockito.ArgumentMatchers.eq("secret123"), org.mockito.ArgumentMatchers.eq("lib-a"), org.mockito.ArgumentMatchers.eq(TokenChannel.STAFF), org.mockito.ArgumentMatchers.any(lms.identity.auth.application.ClientInfo.class))).thenReturn(TokenResponse.bearer("a", "r", 900, false, tenant,
                 List.of(new TenantSummary(tenant, "lib-a", "Thư viện A"))));
 
         mvc.perform(post("/internal/auth/login").contentType(MediaType.APPLICATION_JSON)
@@ -154,7 +156,7 @@ class AuthSecurityTest {
 
     @Test
     void khongTruyCapDuocTenantTra403NoTenantAccess() throws Exception {
-        when(login.execute(any(), any(), any(), any())).thenThrow(new NoTenantAccessException());
+        when(login.execute(any(), any(), any(), any(), any())).thenThrow(new NoTenantAccessException());
 
         mvc.perform(post("/internal/auth/login").contentType(MediaType.APPLICATION_JSON).content(LOGIN_BODY))
                 .andExpect(status().isForbidden())
@@ -167,7 +169,7 @@ class AuthSecurityTest {
         UUID user = UUID.randomUUID();
         UUID tenant = UUID.randomUUID();
         String body = "{\"tenantId\":\"" + tenant + "\",\"refreshToken\":\"r1\"}";
-        when(switchTenant.execute(user, tenant, "r1")).thenReturn(TokenResponse.bearer("a2", "r2", 900, false, tenant, List.of()));
+        when(switchTenant.execute(org.mockito.ArgumentMatchers.eq(user), org.mockito.ArgumentMatchers.eq(tenant), org.mockito.ArgumentMatchers.eq("r1"), org.mockito.ArgumentMatchers.any(lms.identity.auth.application.ClientInfo.class))).thenReturn(TokenResponse.bearer("a2", "r2", 900, false, tenant, List.of()));
 
         mvc.perform(post("/internal/auth/switch-tenant").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isUnauthorized());
@@ -182,7 +184,7 @@ class AuthSecurityTest {
     @Test
     void doiSangTenantKhongCoQuyenTra403VaThieuTenantIdTra400() throws Exception {
         UUID user = UUID.randomUUID();
-        when(switchTenant.execute(any(), any(), any())).thenThrow(new NoTenantAccessException());
+        when(switchTenant.execute(any(), any(), any(), any())).thenThrow(new NoTenantAccessException());
 
         mvc.perform(post("/internal/auth/switch-tenant").with(jwt().jwt(j -> j.subject(user.toString())))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"tenantId\":\"" + UUID.randomUUID() + "\",\"refreshToken\":\"r1\"}"))
@@ -212,6 +214,47 @@ class AuthSecurityTest {
 
         org.mockito.Mockito.verify(register).execute(any(), org.mockito.ArgumentMatchers.eq("bob"), any(), any(),
                 org.mockito.ArgumentMatchers.eq(false), org.mockito.ArgumentMatchers.eq(tenant));
+    }
+
+    @Test
+    void refreshVuaXoayTra401MaRefreshTokenSuperseded() throws Exception {
+        when(refresh.execute(any(), any(), any(), any()))
+                .thenThrow(new lms.identity.auth.domain.RefreshTokenSupersededException());
+        mvc.perform(post("/internal/auth/refresh").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"r1\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("REFRESH_TOKEN_SUPERSEDED"));
+    }
+
+    @Test
+    void refreshTokenSaiVanLa401MaUnauthorizedChung() throws Exception {
+        when(refresh.execute(any(), any(), any(), any()))
+                .thenThrow(new lms.identity.auth.domain.InvalidRefreshTokenException("x"));
+        mvc.perform(post("/internal/auth/refresh").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"r1\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    void headerClientChuyenXuongUseCaseVaIpSaiDinhDangBiBo() throws Exception {
+        when(refresh.execute(any(), any(), any(), any())).thenReturn(TokenResponse.bearer("a", "r", 900));
+        mvc.perform(post("/internal/auth/refresh").contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Client-Ip", "113.161.45.9")
+                        .header("X-Client-User-Agent", "Mozilla/5.0 Chrome/120 Safari/537.36")
+                        .content("{\"refreshToken\":\"r1\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/internal/auth/refresh").contentType(MediaType.APPLICATION_JSON)
+                        .header("X-Client-Ip", "khong-phai-ip<script>")
+                        .content("{\"refreshToken\":\"r1\"}"))
+                .andExpect(status().isOk());
+
+        org.mockito.ArgumentCaptor<lms.identity.auth.application.ClientInfo> c =
+                org.mockito.ArgumentCaptor.forClass(lms.identity.auth.application.ClientInfo.class);
+        org.mockito.Mockito.verify(refresh, org.mockito.Mockito.times(2)).execute(any(), any(), any(), c.capture());
+        org.assertj.core.api.Assertions.assertThat(c.getAllValues().get(0).ip()).isEqualTo("113.161.45.9");
+        org.assertj.core.api.Assertions.assertThat(c.getAllValues().get(0).userAgent()).contains("Chrome");
+        org.assertj.core.api.Assertions.assertThat(c.getAllValues().get(1).ip()).isNull();
     }
 
     @Test

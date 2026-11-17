@@ -62,6 +62,8 @@ class SignupSecurityTest {
     @MockitoBean LogoutUseCase logout;
     @MockitoBean RegisterCredentialUseCase register;
     @MockitoBean ChangePasswordUseCase changePassword;
+    @MockitoBean lms.identity.auth.application.RequestPasswordResetUseCase requestPasswordReset;
+    @MockitoBean lms.identity.auth.application.ConfirmPasswordResetUseCase confirmPasswordReset;
     @MockitoBean SwitchTenantSessionUseCase switchTenant;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean PermissionKeyRegistrar permissionKeyRegistrar;
@@ -164,16 +166,16 @@ class SignupSecurityTest {
 
     @Test
     void dangNhapTruyenKenhStorefrontVaMacDinhLaStaff() throws Exception {
-        when(login.execute(any(), any(), any(), any())).thenReturn(TokenResponse.bearer("a", "r", 900));
+        when(login.execute(any(), any(), any(), any(), any())).thenReturn(TokenResponse.bearer("a", "r", 900));
 
         mvc.perform(post("/internal/auth/login").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"username\":\"alice\",\"password\":\"secret123\",\"tenantCode\":\"shop\",\"channel\":\"STOREFRONT\"}"))
                 .andExpect(status().isOk());
-        verify(login).execute("alice", "secret123", "shop", TokenChannel.STOREFRONT);
+        verify(login).execute(eq("alice"), eq("secret123"), eq("shop"), eq(TokenChannel.STOREFRONT), any());
 
         mvc.perform(post("/internal/auth/login").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"username\":\"alice\",\"password\":\"secret123\"}")).andExpect(status().isOk());
-        verify(login).execute("alice", "secret123", null, TokenChannel.STAFF);
+        verify(login).execute(eq("alice"), eq("secret123"), org.mockito.ArgumentMatchers.isNull(), eq(TokenChannel.STAFF), any());
     }
 
     @Test
@@ -184,26 +186,26 @@ class SignupSecurityTest {
         mvc.perform(post("/internal/auth/refresh").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"refreshToken\":\"r\",\"channel\":\"ADMIN\"}")).andExpect(status().isBadRequest());
         verifyNoInteractions(login);
-        verify(refresh, never()).execute(any(), any(), any());
+        verify(refresh, never()).execute(any(), any(), any(), any());
     }
 
     @Test
     void lamMoiTruyenKenh() throws Exception {
-        when(refresh.execute(any(), any(), any())).thenReturn(TokenResponse.bearer("a", "r2", 900));
+        when(refresh.execute(any(), any(), any(), any())).thenReturn(TokenResponse.bearer("a", "r2", 900));
 
         mvc.perform(post("/internal/auth/refresh").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"refreshToken\":\"r\",\"channel\":\"STOREFRONT\"}")).andExpect(status().isOk());
-        verify(refresh).execute("r", TokenChannel.STOREFRONT, null);
+        verify(refresh).execute(eq("r"), eq(TokenChannel.STOREFRONT), org.mockito.ArgumentMatchers.isNull(), any());
 
         mvc.perform(post("/internal/auth/refresh").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"refreshToken\":\"r\"}")).andExpect(status().isOk());
-        verify(refresh).execute(eq("r"), eq(TokenChannel.STAFF), org.mockito.ArgumentMatchers.isNull());
+        verify(refresh).execute(eq("r"), eq(TokenChannel.STAFF), org.mockito.ArgumentMatchers.isNull(), any());
 
         // tenantId (ADR-0013 2.4) được chuyển xuống use case khi có
         java.util.UUID tenant = java.util.UUID.randomUUID();
         mvc.perform(post("/internal/auth/refresh").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"refreshToken\":\"r\",\"channel\":\"STOREFRONT\",\"tenantId\":\"" + tenant + "\"}"))
                 .andExpect(status().isOk());
-        verify(refresh).execute("r", TokenChannel.STOREFRONT, tenant);
+        verify(refresh).execute(eq("r"), eq(TokenChannel.STOREFRONT), eq(tenant), any());
     }
 }

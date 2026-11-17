@@ -31,12 +31,16 @@ public class ExchangeExternalTicketUseCase {
     }
 
     public TokenResponse execute(String rawCode) {
+        return execute(rawCode, null);
+    }
+
+    public TokenResponse execute(String rawCode, ClientInfo client) {
         Instant now = clock.instant();
         UUID userId = tickets.redeem(rawCode, now).orElseThrow(() ->
                 new ExternalAuthException(Reason.INVALID_TICKET, "Mã đăng nhập không hợp lệ hoặc đã hết hạn"));
         UserCredential credential = credentials.findByUserId(userId).orElseThrow(() ->
                 new ExternalAuthException(Reason.INVALID_TICKET, "Mã đăng nhập không hợp lệ hoặc đã hết hạn"));
         credential.ensureCanLogin(now);
-        return tokenService.issueForExternal(credential);
+        return tokenService.issueForExternal(credential, client);
     }
 }

@@ -43,6 +43,8 @@ class ChangePasswordSecurityTest {
     @MockitoBean LogoutUseCase logout;
     @MockitoBean RegisterCredentialUseCase register;
     @MockitoBean ChangePasswordUseCase changePassword;
+    @MockitoBean lms.identity.auth.application.RequestPasswordResetUseCase requestPasswordReset;
+    @MockitoBean lms.identity.auth.application.ConfirmPasswordResetUseCase confirmPasswordReset;
     @MockitoBean lms.identity.auth.application.SwitchTenantSessionUseCase switchTenant;
     @MockitoBean lms.identity.auth.application.SignupUseCase signup;
     @MockitoBean JwtDecoder jwtDecoder;

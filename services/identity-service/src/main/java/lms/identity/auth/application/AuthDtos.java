@@ -81,6 +81,19 @@ public final class AuthDtos {
         }
     }
 
+    /** Quên mật khẩu, bước yêu cầu: chỉ tên đăng nhập. */
+    public record PasswordResetRequest(@NotBlank @Size(max = 100) String username) {
+    }
+
+    /** Quên mật khẩu, bước xác nhận. Không in token/mật khẩu khi log. */
+    public record PasswordResetConfirmRequest(@NotBlank @Size(max = 200) String token,
+                                              @NotBlank @Size(min = 8, max = 72) String newPassword) {
+        @Override
+        public String toString() {
+            return "PasswordResetConfirmRequest[token=***, newPassword=***]";
+        }
+    }
+
     public record SwitchTenantRequest(@NotNull UUID tenantId, @NotBlank String refreshToken) {
     }
 

@@ -41,4 +41,9 @@ public final class JwtClaims {
     public static final String AUDIENCE_STOREFRONT = "lms-storefront";
     /** aud của token kênh nhân viên (lms-api), chỉ ghi khi bật cờ cấu hình ở identity. */
     public static final String AUDIENCE_STAFF = "lms-staff";
+    /**
+     * Mã phiên (họ refresh token, UUID dạng chuỗi) của access token người dùng (ADR-0017): giữ nguyên qua refresh và đổi
+     * tenant, đổi mỗi lần đăng nhập. Token dịch vụ ({@link #SERVICE}) và token phát trước ADR-0017 không có claim này.
+     */
+    public static final String SESSION_ID = "sid";
 }

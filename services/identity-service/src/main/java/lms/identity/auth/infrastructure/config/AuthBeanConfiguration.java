@@ -59,8 +59,9 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 public class AuthBeanConfiguration {
 
     @Bean
-    AuthPersistenceAdapter authPersistenceAdapter(CredentialJpaRepository credentials, RefreshTokenJpaRepository tokens) {
-        return new AuthPersistenceAdapter(credentials, tokens);
+    AuthPersistenceAdapter authPersistenceAdapter(CredentialJpaRepository credentials, RefreshTokenJpaRepository tokens,
+                                                  Clock clock) {
+        return new AuthPersistenceAdapter(credentials, tokens, clock);
     }
 
     @Bean
@@ -154,8 +155,14 @@ public class AuthBeanConfiguration {
     @Bean
     RefreshTokenUseCase refreshTokenUseCase(AuthPersistenceAdapter persistence, SecureRefreshTokenCodec codec,
                                             TokenService tokenService, InProcessTenantAccessAdapter tenantAccess,
-                                            Clock clock) {
-        return new RefreshTokenUseCase(persistence, persistence, persistence, codec, tokenService, tenantAccess, clock);
+                                            Clock clock,
+                                            @Value("${auth.refresh-reuse-grace:PT30S}") Duration reuseGrace) {
+        // Ân hạn dùng lại refresh token (ADR-0017): âm hoặc quá 2 phút là cấu hình sai, từ chối khởi động
+        if (reuseGrace.isNegative() || reuseGrace.compareTo(Duration.ofMinutes(2)) > 0) {
+            throw new IllegalStateException("auth.refresh-reuse-grace phải trong khoảng PT0S đến PT2M, đang là " + reuseGrace);
+        }
+        return new RefreshTokenUseCase(persistence, persistence, persistence, codec, tokenService, tenantAccess, clock,
+                reuseGrace);
     }
 
     @Bean
@@ -168,8 +175,8 @@ public class AuthBeanConfiguration {
     }
 
     @Bean
-    LogoutUseCase logoutUseCase(AuthPersistenceAdapter persistence, SecureRefreshTokenCodec codec) {
-        return new LogoutUseCase(persistence, persistence, codec);
+    LogoutUseCase logoutUseCase(AuthPersistenceAdapter persistence, SecureRefreshTokenCodec codec, Clock clock) {
+        return new LogoutUseCase(persistence, persistence, codec, clock);
     }
 
     @Bean
@@ -189,6 +196,106 @@ public class AuthBeanConfiguration {
         return new RevokeUserSessionsUseCase(persistence);
     }
 
+    // ---- Quên mật khẩu, mở khóa, thu hồi phiên theo tenant ----
+
+    @Bean
+    lms.identity.auth.infrastructure.persistence.PasswordResetPersistenceAdapter passwordResetPersistenceAdapter(
+            lms.identity.auth.infrastructure.persistence.PasswordResetTokenJpaRepository jpa) {
+        return new lms.identity.auth.infrastructure.persistence.PasswordResetPersistenceAdapter(jpa);
+    }
+
+    @Bean
+    lms.identity.auth.infrastructure.messaging.PasswordResetEventPublisher passwordResetEventPublisher(
+            KafkaTemplate<String, String> kafkaTemplate, ObjectMapper objectMapper,
+            @Value("${app.kafka.topics.password-reset-events}") String topic,
+            @Value("${lms.identity.password-reset.log-token:false}") boolean logToken) {
+        return new lms.identity.auth.infrastructure.messaging.PasswordResetEventPublisher(
+                new KafkaEventPublisher(kafkaTemplate, objectMapper, topic), logToken);
+    }
+
+    @Bean
+    NewTopic passwordResetEventsTopic(@Value("${app.kafka.topics.password-reset-events}") String name) {
+        return TopicBuilder.name(name).partitions(1).replicas(1).build();
+    }
+
+    @Bean
+    lms.identity.auth.application.RequestPasswordResetUseCase requestPasswordResetUseCase(
+            AuthPersistenceAdapter persistence,
+            lms.identity.auth.infrastructure.persistence.PasswordResetPersistenceAdapter resets,
+            SecureRefreshTokenCodec codec, lms.identity.auth.infrastructure.messaging.PasswordResetEventPublisher publisher,
+            UserDirectoryPort userDirectory, TransactionalRunner tx, Clock clock) {
+        return new lms.identity.auth.application.RequestPasswordResetUseCase(persistence, resets, resets, codec,
+                publisher, userDirectory, tx, clock);
+    }
+
+    @Bean
+    lms.identity.auth.application.ConfirmPasswordResetUseCase confirmPasswordResetUseCase(
+            AuthPersistenceAdapter persistence,
+            lms.identity.auth.infrastructure.persistence.PasswordResetPersistenceAdapter resets,
+            BcryptPasswordHasher hasher, SecureRefreshTokenCodec codec, UserDirectoryPort userDirectory, Clock clock) {
+        return new lms.identity.auth.application.ConfirmPasswordResetUseCase(resets, resets, persistence, persistence,
+                persistence, hasher, codec, userDirectory, clock);
+    }
+
+    @Bean
+    lms.identity.auth.application.UnlockCredentialUseCase unlockCredentialUseCase(AuthPersistenceAdapter persistence,
+                                                                                  KafkaAuthEventPublisher publisher,
+                                                                                  Clock clock) {
+        return new lms.identity.auth.application.UnlockCredentialUseCase(persistence, persistence, publisher, clock);
+    }
+
+    @Bean
+    lms.identity.auth.application.RevokeTenantSessionsUseCase revokeTenantSessionsUseCase(
+            AuthPersistenceAdapter persistence, KafkaAuthEventPublisher publisher, Clock clock) {
+        return new lms.identity.auth.application.RevokeTenantSessionsUseCase(persistence, publisher, clock);
+    }
+
+    // ---- Phiên đa thiết bị (ADR-0017) ----
+
+    @Bean
+    lms.identity.auth.application.ListMySessionsUseCase listMySessionsUseCase(
+            AuthPersistenceAdapter persistence, InProcessTenantAccessAdapter tenantAccess, Clock clock) {
+        return new lms.identity.auth.application.ListMySessionsUseCase(persistence, tenantAccess, clock);
+    }
+
+    @Bean
+    lms.identity.auth.application.RevokeMySessionUseCase revokeMySessionUseCase(AuthPersistenceAdapter persistence,
+                                                                                Clock clock) {
+        return new lms.identity.auth.application.RevokeMySessionUseCase(persistence, clock);
+    }
+
+    @Bean
+    lms.identity.auth.application.RevokeMySessionsUseCase revokeMySessionsUseCase(AuthPersistenceAdapter persistence,
+                                                                                  Clock clock) {
+        return new lms.identity.auth.application.RevokeMySessionsUseCase(persistence, clock);
+    }
+
+    @Bean
+    lms.identity.auth.application.ListTenantUserSessionsUseCase listTenantUserSessionsUseCase(
+            AuthPersistenceAdapter persistence, KafkaAuthEventPublisher publisher, Clock clock) {
+        return new lms.identity.auth.application.ListTenantUserSessionsUseCase(persistence, publisher, clock);
+    }
+
+    @Bean
+    lms.identity.auth.application.RevokeTenantUserSessionUseCase revokeTenantUserSessionUseCase(
+            AuthPersistenceAdapter persistence, KafkaAuthEventPublisher publisher, Clock clock) {
+        return new lms.identity.auth.application.RevokeTenantUserSessionUseCase(persistence, publisher, clock);
+    }
+
+    @Bean
+    lms.identity.auth.application.PurgeExpiredRefreshTokensUseCase purgeExpiredRefreshTokensUseCase(
+            AuthPersistenceAdapter persistence, Clock clock,
+            @Value("${lms.auth.refresh-cleanup.batch-size:1000}") int batchSize) {
+        return new lms.identity.auth.application.PurgeExpiredRefreshTokensUseCase(persistence, clock,
+                lms.identity.auth.application.PurgeExpiredRefreshTokensUseCase.DEFAULT_RETENTION, batchSize);
+    }
+
+    @Bean
+    lms.identity.auth.infrastructure.scheduling.RefreshTokenCleanupJob refreshTokenCleanupJob(
+            lms.identity.auth.application.PurgeExpiredRefreshTokensUseCase purge) {
+        return new lms.identity.auth.infrastructure.scheduling.RefreshTokenCleanupJob(purge);
+    }
+
     @Bean
     GetCredentialInfoUseCase getCredentialInfoUseCase(AuthPersistenceAdapter persistence) {
         return new GetCredentialInfoUseCase(persistence);
@@ -204,7 +311,12 @@ public class AuthBeanConfiguration {
     @Bean
     InProcessAccountCredentialAdapter accountCredentialAdapter(RegisterCredentialUseCase register,
                                                                GetCredentialInfoUseCase info,
-                                                               ResetCredentialPasswordUseCase resetPassword) {
-        return new InProcessAccountCredentialAdapter(register, info, resetPassword);
+                                                               ResetCredentialPasswordUseCase resetPassword,
+                                                               lms.identity.auth.application.UnlockCredentialUseCase unlock,
+                                                               lms.identity.auth.application.RevokeTenantSessionsUseCase revoke,
+                                                               lms.identity.auth.application.ListTenantUserSessionsUseCase listSessions,
+                                                               lms.identity.auth.application.RevokeTenantUserSessionUseCase revokeSession) {
+        return new InProcessAccountCredentialAdapter(register, info, resetPassword, unlock, revoke, listSessions,
+                revokeSession);
     }
 }

@@ -33,6 +33,11 @@ public class UserExceptionHandler {
         return build(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_READER", ex.getMessage());
     }
 
+    @ExceptionHandler(lms.identity.user.domain.UserSessionNotFoundException.class)
+    ResponseEntity<ErrorResponse> handleSessionNotFound(lms.identity.user.domain.UserSessionNotFoundException ex) {
+        return build(HttpStatus.NOT_FOUND, "SESSION_NOT_FOUND", ex.getMessage());
+    }
+
     @ExceptionHandler(UserNotFoundException.class)
     ResponseEntity<ErrorResponse> handleUserNotFound(UserNotFoundException ex) {
         return build(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", ex.getMessage());

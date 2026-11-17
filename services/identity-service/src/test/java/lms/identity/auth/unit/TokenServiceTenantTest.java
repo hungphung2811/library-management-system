@@ -59,11 +59,16 @@ class TokenServiceTenantTest {
     private final List<TokenIssuerPort.Claims> issued = new ArrayList<>();
     private final List<RefreshToken> savedRefresh = new ArrayList<>();
     private final List<UUID> revokedAllFor = new ArrayList<>();
+    private final List<String> revokedSessions = new ArrayList<>();
     private final TenantAccessPort tenants = mock(TenantAccessPort.class);
     private final RefreshTokenRepository refreshRepo = mock(RefreshTokenRepository.class);
     private final SaveRefreshTokenPort refreshSave = new SaveRefreshTokenPort() {
         public RefreshToken save(RefreshToken t) { savedRefresh.add(t); return t; }
         public void revokeAllByUserId(UUID u) { revokedAllFor.add(u); }
+        public int revokeSession(UUID s, lms.identity.auth.domain.RevokeReason r, Instant n) {
+            revokedSessions.add(s + ":" + r);
+            return 1;
+        }
     };
     private final UserCredentialRepository credentials = mock(UserCredentialRepository.class);
     private final RefreshTokenCodecPort codec = new RefreshTokenCodecPort() {
@@ -303,6 +308,10 @@ class TokenServiceTenantTest {
         return new RefreshTokenUseCase(refreshRepo, refreshSave, credentials, codec, service, tenants, clock);
     }
 
+    private RefreshTokenUseCase refreshWithGrace(Duration grace) {
+        return new RefreshTokenUseCase(refreshRepo, refreshSave, credentials, codec, service, tenants, clock, grace);
+    }
+
     private RefreshToken stored(RefreshToken token) {
         when(refreshRepo.findByTokenHash(token.tokenHash())).thenReturn(Optional.of(token));
         return token;
@@ -411,9 +420,12 @@ class TokenServiceTenantTest {
         switchTenant().execute(userId, tenantB, "raw-cur");
         issued.clear();
 
-        assertThatThrownBy(() -> refresh().execute("raw-cur")).isInstanceOf(InvalidRefreshTokenException.class);
+        // Vừa xoay (trong ân hạn): từ chối mềm, không phát token, không thu hồi gì
+        assertThatThrownBy(() -> refresh().execute("raw-cur"))
+                .isInstanceOf(lms.identity.auth.domain.RefreshTokenSupersededException.class);
         assertThat(issued).isEmpty();
-        assertThat(revokedAllFor).containsExactly(userId); // reuse-detection thu hồi mọi phiên của đúng người dùng
+        assertThat(revokedAllFor).isEmpty();
+        assertThat(revokedSessions).isEmpty();
         assertThatThrownBy(() -> switchTenant().execute(userId, tenantB, "raw-cur"))
                 .isInstanceOf(InvalidRefreshTokenException.class);
     }
@@ -585,13 +597,15 @@ class TokenServiceTenantTest {
     }
 
     @Test
-    void tokenDaThuHoiGuiQuaTenantSaiVanKichHoatThuHoiMoiPhien() {
+    void tokenDaThuHoiGuiQuaTenantSaiVanKichHoatThuHoiHoPhien() {
         RefreshToken old = stored(RefreshToken.issueForTenant(userId, tenantB, "h-raw-old", now.minusSeconds(60), Duration.ofDays(7)));
         old.revoke();
 
         assertThatThrownBy(() -> refresh().execute("raw-old", lms.identity.auth.domain.TokenChannel.STAFF, tenantA))
                 .isInstanceOf(InvalidRefreshTokenException.class);
 
-        assertThat(revokedAllFor).containsExactly(userId);
+        // Chỉ thu hồi họ phiên của token (không revokeAllByUserId)
+        assertThat(revokedSessions).containsExactly(old.sessionId() + ":REUSE_DETECTED");
+        assertThat(revokedAllFor).isEmpty();
     }
 }

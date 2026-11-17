@@ -3,7 +3,9 @@ package lms.identity.auth.application;
 import lms.identity.auth.application.AuthDtos.TokenResponse;
 import lms.identity.auth.domain.AccountDisabledException;
 import lms.identity.auth.domain.InvalidCredentialsException;
+import lms.identity.auth.domain.DeviceSummary;
 import lms.identity.auth.domain.RefreshToken;
+import lms.identity.auth.domain.RevokeReason;
 import lms.identity.auth.domain.TokenChannel;
 import lms.identity.auth.domain.UserCredential;
 import lms.identity.tenant.application.TenantChoice;
@@ -99,9 +101,15 @@ public class TokenService {
      * storefront bắt buộc có tenant. Refresh token lưu kênh để làm mới giữ kênh.
      */
     public TokenResponse issueFor(UserCredential credential, String tenantCodeOrNull, TokenChannel channel) {
+        return issueFor(credential, tenantCodeOrNull, channel, null);
+    }
+
+    /** Như trên, kèm thông tin client (IP, user-agent) để gắn nhãn thiết bị cho phiên mới (null = không rõ). */
+    public TokenResponse issueFor(UserCredential credential, String tenantCodeOrNull, TokenChannel channel,
+                                  ClientInfo client) {
         return issue(credential, credential.mustChangePassword(),
                 () -> tenantAccess.selectForLogin(credential.userId(), tenantCodeOrNull, credential.platformAdmin()),
-                null, channel);
+                null, channel, client);
     }
 
     /**
@@ -109,8 +117,13 @@ public class TokenService {
      * người dùng chưa từng biết). Tenant chọn như đăng nhập không có mã.
      */
     public TokenResponse issueForExternal(UserCredential credential) {
+        return issueForExternal(credential, null);
+    }
+
+    public TokenResponse issueForExternal(UserCredential credential, ClientInfo client) {
         return issue(credential, false,
-                () -> tenantAccess.selectForLogin(credential.userId(), null, credential.platformAdmin()));
+                () -> tenantAccess.selectForLogin(credential.userId(), null, credential.platformAdmin()), null,
+                TokenChannel.STAFF, client);
     }
 
     /** Tenant đã được kiểm tra trước (đổi tenant, làm mới phiên); choice.tenantId null = phiên nền tảng. */
@@ -123,17 +136,27 @@ public class TokenService {
      * (replacedOrNull) trong cùng giao dịch lưu refresh token mới. Lỗi trước bước lưu thì token hiện tại giữ nguyên.
      */
     public TokenResponse issueForTenant(UserCredential credential, TenantChoice choice, RefreshToken replacedOrNull) {
+        return issueForTenant(credential, choice, replacedOrNull, null);
+    }
+
+    /**
+     * Làm mới/đổi tenant: token mới giữ {@code sessionId} và thời điểm bắt đầu phiên của token cũ (cùng thiết bị). Nhãn
+     * thiết bị và IP lấy từ {@code client} nếu có, không thì chép từ token cũ. Token cũ được xoay có điều kiện; nếu
+     * request song song đã xoay trước thì ném {@code RefreshTokenSupersededException}.
+     */
+    public TokenResponse issueForTenant(UserCredential credential, TenantChoice choice, RefreshToken replacedOrNull,
+                                        ClientInfo client) {
         // Làm mới giữ kênh của refresh token gốc (token cũ không có kênh là STAFF)
         TokenChannel channel = replacedOrNull == null ? TokenChannel.STAFF : replacedOrNull.channel();
-        return issue(credential, credential.mustChangePassword(), () -> choice, replacedOrNull, channel);
+        return issue(credential, credential.mustChangePassword(), () -> choice, replacedOrNull, channel, client);
     }
 
     private TokenResponse issue(UserCredential credential, boolean mustChange, Supplier<TenantChoice> tenantChoice) {
-        return issue(credential, mustChange, tenantChoice, null, TokenChannel.STAFF);
+        return issue(credential, mustChange, tenantChoice, null, TokenChannel.STAFF, null);
     }
 
     private TokenResponse issue(UserCredential credential, boolean mustChange, Supplier<TenantChoice> tenantChoice,
-                                RefreshToken replacedOrNull, TokenChannel channel) {
+                                RefreshToken replacedOrNull, TokenChannel channel, ClientInfo client) {
         // Người dùng bị vô hiệu hóa ở context user thì không được cấp token mới (cả đăng nhập, làm mới và đăng nhập ngoài)
         Optional<UserDirectoryPort.UserInfo> directory = userDirectory.find(credential.userId());
         if (directory.isPresent() && directory.get().disabled()) {
@@ -161,20 +184,30 @@ public class TokenService {
         // Module của tenant đã chọn (ADR-0009): đọc ở mọi đường cấp token (đăng nhập, làm mới, đổi tenant); phiên nền
         // tảng không có tenant thì không có claim. Bảng toàn cục, đọc bằng transaction ngắn của riêng nó (R20).
         List<String> modules = tenantId != null ? tenantAccess.modules(tenantId) : null;
-        TokenIssuerPort.IssuedToken accessToken = tokenIssuer.issue(new TokenIssuerPort.Claims(
-                credential.userId(), credential.username(), departmentId,
-                access.roles(), mustChange ? List.of() : permissionsFor(access.permissions(), storefront), mustChange,
-                !storefront && !mustChange && access.admin(), tenantId,
-                !storefront && !mustChange && credential.platformAdmin(), modules,
-                storefront ? JwtClaims.AUDIENCE_STOREFRONT : null));
-
+        // Họ phiên quyết định MỘT chỗ này: đăng nhập thì phiên mới, xoay vòng thì chép phiên của token cũ
         String rawRefresh = codec.generate();
         String hash = codec.hash(rawRefresh);
         RefreshToken refresh = tenantId != null
                 ? RefreshToken.issueForTenant(credential.userId(), tenantId, hash, clock.instant(), refreshTokenTtl,
                         channel)
                 : RefreshToken.issueForPlatform(credential.userId(), hash, clock.instant(), refreshTokenTtl);
-        if (replacedOrNull != null) replacedOrNull.revoke();
+        if (replacedOrNull != null) {
+            refresh = refresh.inSession(replacedOrNull.sessionId(), replacedOrNull.sessionStartedAt());
+        }
+        boolean hasUa = client != null && client.userAgent() != null;
+        boolean hasIp = client != null && client.ip() != null;
+        String device = hasUa ? DeviceSummary.of(client.userAgent())
+                : (replacedOrNull != null ? replacedOrNull.deviceSummary() : null);
+        String ip = hasIp ? client.ip() : (replacedOrNull != null ? replacedOrNull.clientIp() : null);
+        refresh = refresh.withDevice(device, ip);
+        TokenIssuerPort.IssuedToken accessToken = tokenIssuer.issue(new TokenIssuerPort.Claims(
+                credential.userId(), credential.username(), departmentId,
+                access.roles(), mustChange ? List.of() : permissionsFor(access.permissions(), storefront), mustChange,
+                !storefront && !mustChange && access.admin(), tenantId,
+                !storefront && !mustChange && credential.platformAdmin(), modules,
+                storefront ? JwtClaims.AUDIENCE_STOREFRONT : null, refresh.sessionId()));
+
+        if (replacedOrNull != null) replacedOrNull.revoke(RevokeReason.ROTATED, clock.instant());
         refreshTokens.rotate(replacedOrNull, refresh);
         return TokenResponse.bearer(accessToken.value(), rawRefresh, accessToken.expiresInSeconds(), mustChange,
                 tenantId, choice.available());

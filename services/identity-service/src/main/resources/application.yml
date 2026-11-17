@@ -47,6 +47,9 @@ auth:
     private-key-pem: ${AUTH_JWT_PRIVATE_KEY:}
     public-key-pem: ${AUTH_JWT_PUBLIC_KEY:}
   refresh-token-ttl: P7D
+  # ADR-0017: token đã xoay dùng lại trong cửa sổ này (race nhiều tab) chỉ nhận 401 REFRESH_TOKEN_SUPERSEDED, không phát
+  # token và không thu hồi gì. PT0S = tắt (luôn thu hồi phiên); tối đa PT2M (khởi động từ chối giá trị lớn hơn).
+  refresh-reuse-grace: PT30S
   bootstrap-admin:
     user-id: 00000000-0000-0000-0000-000000000001
     username: admin
@@ -85,6 +88,8 @@ app:
       auth-events: auth.events
       # Vòng đời tenant (TenantCreated, TenantStatusChanged) + audit thao tác nền tảng; circulation nghe topic này
       identity-events: identity-events
+      # Quên mật khẩu: mang token thô cho kênh gửi thư; tách khỏi auth.events để audit không lưu token
+      password-reset-events: auth.password-reset
 
 # Middleware phân quyền theo endpoint (security-common). identity ghi khóa thẳng vào DB của mình.
 lms:
@@ -115,3 +120,9 @@ lms:
     job:
       enabled: true
       cron: "0 7 * * * *"
+
+  # Dọn refresh token hết hạn quá 1 ngày mỗi ngày 03:30 (ADR-0017); batch-size = số dòng xóa mỗi lô.
+  auth:
+    refresh-cleanup:
+      cron: "0 30 3 * * *"
+      batch-size: 1000

@@ -90,9 +90,66 @@ public class UserBeanConfiguration {
     }
 
     @Bean
+    lms.identity.user.application.UserLockStatus userLockStatus(AccountCredentialPort credentials, Clock clock) {
+        return new lms.identity.user.application.UserLockStatus(credentials, clock);
+    }
+
+    @Bean
     UpdateUserUseCase updateUserUseCase(UserRepository repository, DepartmentLookupPort departments,
-                                        AccountCredentialPort credentials, TenantMembershipPort memberships) {
-        return new UpdateUserUseCase(repository, departments, credentials, memberships);
+                                        AccountCredentialPort credentials, TenantMembershipPort memberships,
+                                        lms.identity.user.application.UserLockStatus lockStatus) {
+        return new UpdateUserUseCase(repository, departments, credentials, memberships, lockStatus);
+    }
+
+    @Bean
+    lms.identity.user.application.UnlockUserUseCase unlockUserUseCase(UserRepository repository,
+                                                                      AccountCredentialPort credentials) {
+        return new lms.identity.user.application.UnlockUserUseCase(repository, credentials);
+    }
+
+    @Bean
+    lms.identity.user.application.RevokeUserSessionsInTenantUseCase revokeUserSessionsInTenantUseCase(
+            UserRepository repository, AccountCredentialPort credentials,
+            lms.identity.user.application.TargetAdminLookupPort adminLookup) {
+        return new lms.identity.user.application.RevokeUserSessionsInTenantUseCase(repository, credentials,
+                adminLookup);
+    }
+
+    @Bean
+    lms.identity.user.application.ListUserSessionsUseCase listUserSessionsUseCase(
+            UserRepository repository, AccountCredentialPort credentials,
+            lms.identity.user.application.TargetAdminLookupPort adminLookup) {
+        return new lms.identity.user.application.ListUserSessionsUseCase(repository, credentials, adminLookup);
+    }
+
+    @Bean
+    lms.identity.user.application.RevokeUserSessionUseCase revokeUserSessionUseCase(
+            UserRepository repository, AccountCredentialPort credentials,
+            lms.identity.user.application.TargetAdminLookupPort adminLookup) {
+        return new lms.identity.user.application.RevokeUserSessionUseCase(repository, credentials, adminLookup);
+    }
+
+    @Bean
+    lms.identity.user.application.ExportUsersUseCase exportUsersUseCase(UserRepository repository,
+                                                                       DepartmentLookupPort departments,
+                                                                       lms.identity.user.application.UserRoleLookupPort roles) {
+        return new lms.identity.user.application.ExportUsersUseCase(repository, departments, roles);
+    }
+
+    /** Bean riêng để mỗi dòng nhập đi qua proxy giao dịch (một transaction mỗi dòng). */
+    @Bean
+    lms.identity.user.application.ImportUserRowExecutor importUserRowExecutor(CreateUserUseCase createUser,
+                                                                              IssueReaderCardUseCase issueReaderCard,
+                                                                              Clock clock) {
+        return new lms.identity.user.application.ImportUserRowExecutor(createUser, issueReaderCard, clock);
+    }
+
+    /** Không @Transactional: transaction nằm ở từng dòng (ImportUserRowExecutor). */
+    @Bean
+    lms.identity.user.application.ImportUsersUseCase importUsersUseCase(
+            UserRepository repository, AccountCredentialPort credentials, DepartmentLookupPort departments,
+            lms.identity.user.application.ImportUserRowExecutor executor) {
+        return new lms.identity.user.application.ImportUsersUseCase(repository, credentials, departments, executor);
     }
 
     @Bean
@@ -101,18 +158,25 @@ public class UserBeanConfiguration {
     }
 
     @Bean
-    ChangeUserStatusUseCase changeUserStatusUseCase(UserRepository repository, AccountCredentialPort credentials) {
-        return new ChangeUserStatusUseCase(repository, credentials);
+    ChangeUserStatusUseCase changeUserStatusUseCase(UserRepository repository, AccountCredentialPort credentials,
+                                                    lms.identity.user.application.UserLockStatus lockStatus) {
+        return new ChangeUserStatusUseCase(repository, credentials, lockStatus);
     }
 
     @Bean
-    GetUserUseCase getUserUseCase(UserRepository repository) {
-        return new GetUserUseCase(repository);
+    GetUserUseCase getUserUseCase(UserRepository repository, lms.identity.user.application.UserLockStatus lockStatus) {
+        return new GetUserUseCase(repository, lockStatus);
     }
 
     @Bean
-    SearchUsersUseCase searchUsersUseCase(UserRepository repository) {
-        return new SearchUsersUseCase(repository);
+    SearchUsersUseCase searchUsersUseCase(UserRepository repository,
+                                          lms.identity.user.application.UserLockStatus lockStatus) {
+        return new SearchUsersUseCase(repository, lockStatus);
+    }
+
+    @Bean
+    lms.identity.user.application.LookupUsersUseCase lookupUsersUseCase(UserRepository repository) {
+        return new lms.identity.user.application.LookupUsersUseCase(repository);
     }
 
     @Bean

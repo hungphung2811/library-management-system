@@ -73,6 +73,12 @@ public class LoginUseCase {
      * làm (HttpAuthClient), identity giữ mã riêng cho mọi kênh.
      */
     public TokenResponse execute(String username, String rawPassword, String tenantCodeOrNull, TokenChannel channel) {
+        return execute(username, rawPassword, tenantCodeOrNull, channel, null);
+    }
+
+    /** Như trên, thêm thông tin client (IP, user-agent) để gắn nhãn thiết bị cho phiên mới (ADR-0017). */
+    public TokenResponse execute(String username, String rawPassword, String tenantCodeOrNull, TokenChannel channel,
+                                 ClientInfo client) {
         TokenChannel ch = channel == null ? TokenChannel.STAFF : channel;
         if (ch == TokenChannel.STOREFRONT && (tenantCodeOrNull == null || tenantCodeOrNull.isBlank())) {
             throw new InvalidCredentialsException();
@@ -91,7 +97,7 @@ public class LoginUseCase {
             throw new InvalidCredentialsException();
         }
 
-        TokenResponse response = tokenService.issueFor(credential, tenantCodeOrNull, ch);
+        TokenResponse response = tokenService.issueFor(credential, tenantCodeOrNull, ch, client);
         credential.recordSuccess(now);
         savePort.save(credential);
         publishUnderTenant(credential.pullEvents(), Optional.ofNullable(response.tenantId()), credential.userId());

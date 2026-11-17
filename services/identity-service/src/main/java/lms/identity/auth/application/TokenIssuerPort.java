@@ -11,11 +11,18 @@ public interface TokenIssuerPort {
      * tenantId: tenant của phiên (null với phiên nền tảng không tenant); platformAdmin: tài khoản có cờ platform_admin;
      * modules: module đang bật của tenant (claim {@code modules}, ADR-0009), null = không ghi claim (phiên nền tảng);
      * audience: giá trị claim {@code aud} (ví dụ {@code lms-storefront} cho kênh storefront), null = để issuer quyết
-     * (kênh nhân viên).
+     * (kênh nhân viên); sessionId: họ phiên, ghi claim {@code sid} (ADR-0017), null = không ghi.
      */
     record Claims(UUID userId, String username, UUID departmentId, List<String> roles, List<String> permissions,
                   boolean mustChangePassword, boolean admin, UUID tenantId, boolean platformAdmin,
-                  List<String> modules, String audience) {
+                  List<String> modules, String audience, UUID sessionId) {
+
+        public Claims(UUID userId, String username, UUID departmentId, List<String> roles, List<String> permissions,
+                      boolean mustChangePassword, boolean admin, UUID tenantId, boolean platformAdmin,
+                      List<String> modules, String audience) {
+            this(userId, username, departmentId, roles, permissions, mustChangePassword, admin, tenantId,
+                    platformAdmin, modules, audience, null);
+        }
 
         /** Không audience: token kênh nhân viên (không ghi aud, hoặc aud=lms-staff nếu issuer được cấu hình). */
         public Claims(UUID userId, String username, UUID departmentId, List<String> roles, List<String> permissions,

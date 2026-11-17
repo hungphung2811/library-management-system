@@ -61,6 +61,13 @@ class UserControllerSecurityTest {
     @MockitoBean GetUserUseCase get;
     @MockitoBean SearchUsersUseCase search;
     @MockitoBean ResetUserPasswordUseCase resetPassword;
+    @MockitoBean lms.identity.user.application.UnlockUserUseCase unlockUser;
+    @MockitoBean lms.identity.user.application.RevokeUserSessionsInTenantUseCase revokeUserSessions;
+    @MockitoBean lms.identity.user.application.ListUserSessionsUseCase listUserSessions;
+    @MockitoBean lms.identity.user.application.RevokeUserSessionUseCase revokeUserSession;
+    @MockitoBean lms.identity.user.application.ImportUsersUseCase importUsers;
+    @MockitoBean lms.identity.user.application.LookupUsersUseCase lookupUsers;
+    @MockitoBean lms.identity.user.application.ExportUsersUseCase exportUsers;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean PermissionKeyRegistrar permissionKeyRegistrar;
 
@@ -308,5 +315,100 @@ class UserControllerSecurityTest {
                 .thenThrow(new UserOperationNotAllowedException("Không thể tự khóa chính mình"));
         mvc.perform(json(put("/internal/users/" + ID + "/status"), STATUS_BODY).with(admin()))
                 .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("USER_OPERATION_NOT_ALLOWED"));
+    }
+
+    // ---- Phiên của người dùng (ADR-0017 mục 2.9): khóa UserController/listSessions, revokeSession, revokeSessions ----
+
+    private static final UUID SESSION = UUID.randomUUID();
+
+    private List<MockHttpServletRequestBuilder> sessionEndpoints() {
+        return List.of(
+                get("/internal/users/" + ID + "/sessions"),
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/internal/users/" + ID + "/sessions/" + SESSION),
+                post("/internal/users/" + ID + "/sessions/revocation"));
+    }
+
+    @Test
+    void phienKhongTokenBi401VaThieuKhoaBi403() throws Exception {
+        for (MockHttpServletRequestBuilder r : sessionEndpoints()) {
+            mvc.perform(r).andExpect(status().isUnauthorized());
+        }
+        for (MockHttpServletRequestBuilder r : sessionEndpoints()) {
+            mvc.perform(r.with(withKey("OtherController/other"))).andExpect(status().isForbidden());
+        }
+        verifyNoInteractions(listUserSessions, revokeUserSession, revokeUserSessions);
+    }
+
+    @Test
+    void phienKhoaCuaMethodKhacKhongDuVaTokenSvcBi403() throws Exception {
+        mvc.perform(get("/internal/users/" + ID + "/sessions").with(withKey("UserController/revokeSessions")))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/internal/users/" + ID + "/sessions/revocation")
+                        .with(withKey("UserController/revokeSession")))
+                .andExpect(status().isForbidden());
+        RequestPostProcessor svc = jwt().jwt(j -> j.subject(ACTOR.toString()).claim("tenantId", TENANT)
+                .claim("svc", "customer-api"));
+        mvc.perform(get("/internal/users/" + ID + "/sessions").with(svc)).andExpect(status().isForbidden());
+        verifyNoInteractions(listUserSessions, revokeUserSession, revokeUserSessions);
+    }
+
+    @Test
+    void tokenKhongTenantBi403TenantRequiredKhongCrossTenantReadable() throws Exception {
+        for (MockHttpServletRequestBuilder r : sessionEndpoints()) {
+            mvc.perform(r.with(jwt().jwt(j -> j.subject(ACTOR.toString()).claim("admin", true))))
+                    .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("TENANT_REQUIRED"));
+        }
+        verifyNoInteractions(listUserSessions, revokeUserSession, revokeUserSessions);
+    }
+
+    @Test
+    void coKhoaListSessionsTra200KhongCoTenantIdVaCurrentVaNoStore() throws Exception {
+        java.time.Instant t = java.time.Instant.parse("2026-11-17T01:00:00Z");
+        when(listUserSessions.execute(any(), eq(ID))).thenReturn(List.of(
+                new lms.identity.user.application.UserSessionView(SESSION, "STAFF", "Chrome trên Windows",
+                        "113.161.45.9", t, t, t.plusSeconds(60))));
+
+        mvc.perform(get("/internal/users/" + ID + "/sessions").with(withKey("UserController/listSessions")))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")))
+                .andExpect(jsonPath("$[0].sessionId").value(SESSION.toString()))
+                .andExpect(jsonPath("$[0].ipAddress").value("113.161.45.9"))
+                .andExpect(jsonPath("$[0].tenantId").doesNotExist())
+                .andExpect(jsonPath("$[0].current").doesNotExist());
+        verify(permissionKeyRegistrar, org.mockito.Mockito.atLeastOnce())
+                .ensureRegistered(org.mockito.ArgumentMatchers.argThat(d -> d.key().equals("UserController/listSessions")));
+    }
+
+    @Test
+    void adminXemVaThuHoiMotPhienTruyenCoAdminChoUseCase() throws Exception {
+        when(listUserSessions.execute(any(), eq(ID))).thenReturn(List.of());
+        mvc.perform(get("/internal/users/" + ID + "/sessions").with(admin())).andExpect(status().isOk());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/internal/users/" + ID + "/sessions/" + SESSION).with(admin()))
+                .andExpect(status().isNoContent());
+        org.mockito.ArgumentCaptor<lms.identity.user.application.SessionCaller> c =
+                org.mockito.ArgumentCaptor.forClass(lms.identity.user.application.SessionCaller.class);
+        verify(revokeUserSession).execute(c.capture(), eq(ID), eq(SESSION));
+        org.assertj.core.api.Assertions.assertThat(c.getValue().admin()).isTrue();
+        org.assertj.core.api.Assertions.assertThat(c.getValue().platformAdmin()).isFalse();
+        org.assertj.core.api.Assertions.assertThat(c.getValue().userId()).isEqualTo(ACTOR);
+    }
+
+    @Test
+    void phienKhongKhopTra404MaChungVaDichLaAdminTra403() throws Exception {
+        org.mockito.Mockito.doThrow(new lms.identity.user.domain.UserSessionNotFoundException())
+                .when(revokeUserSession).execute(any(), eq(ID), eq(SESSION));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/internal/users/" + ID + "/sessions/" + SESSION).with(admin()))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("SESSION_NOT_FOUND"));
+
+        when(revokeUserSessions.execute(any(), eq(ID)))
+                .thenThrow(new UserOperationNotAllowedException("Người dùng có role quản trị"));
+        mvc.perform(post("/internal/users/" + ID + "/sessions/revocation").with(admin()))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("USER_OPERATION_NOT_ALLOWED"));
+        when(listUserSessions.execute(any(), eq(ID))).thenThrow(new UserNotFoundException(ID));
+        mvc.perform(get("/internal/users/" + ID + "/sessions").with(admin()))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("USER_NOT_FOUND"));
     }
 }
