@@ -5,5 +5,10 @@ import java.util.UUID;
 
 /** Thông tin bản sao kèm tên và giá bìa của đầu sách (circulation dùng để tính phí phạt, QĐ4). */
 public record CopyDetails(UUID id, UUID titleId, String titleName, String barcode, CopyStatus status,
-                          BigDecimal coverPrice) {
+                          BigDecimal coverPrice, UUID shelfLocationId, String shelfLocationCode) {
+
+    public CopyDetails(UUID id, UUID titleId, String titleName, String barcode, CopyStatus status,
+                       BigDecimal coverPrice) {
+        this(id, titleId, titleName, barcode, status, coverPrice, null, null);
+    }
 }

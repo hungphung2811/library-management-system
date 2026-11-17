@@ -13,6 +13,12 @@ public class ListCopiesUseCase {
     }
 
     public List<CopyResponse> execute(UUID titleId) {
-        return repository.findByTitleId(titleId).stream().map(CopyResponse::from).toList();
+        var copies = repository.findByTitleId(titleId);
+        var shelfIds = copies.stream().map(c -> c.shelfLocationId()).filter(java.util.Objects::nonNull)
+                .distinct().toList();
+        var codes = shelfIds.isEmpty() ? java.util.Map.<UUID, String>of() : repository.findShelfLocationCodes(shelfIds);
+        return copies.stream()
+                .map(c -> CopyResponse.from(c, c.shelfLocationId() == null ? null : codes.get(c.shelfLocationId())))
+                .toList();
     }
 }

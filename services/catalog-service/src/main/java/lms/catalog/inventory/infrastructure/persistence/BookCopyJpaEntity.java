@@ -33,10 +33,13 @@ class BookCopyJpaEntity {
     @Column(nullable = false)
     private CopyStatus status;
 
+    @Column(name = "shelf_location_id")
+    private UUID shelfLocationId;
+
     protected BookCopyJpaEntity() {
     }
 
-    BookCopyJpaEntity(UUID id, UUID titleId, String barcode, CopyStatus status) {
+    BookCopyJpaEntity(UUID id, UUID titleId, String barcode, CopyStatus status, UUID shelfLocationId) {
         // Điền sẵn tenant của phiên: merge (save entity mới dựng) không ghi đè tenant_id thành null, insert khớp
         // tenant phiên; không có tenant thì ném TenantRequiredException (fail-closed). Cột updatable=false.
         this.tenantId = TenantContext.require();
@@ -44,6 +47,7 @@ class BookCopyJpaEntity {
         this.titleId = titleId;
         this.barcode = barcode;
         this.status = status;
+        this.shelfLocationId = shelfLocationId;
     }
 
     UUID getId() { return id; }
@@ -51,4 +55,5 @@ class BookCopyJpaEntity {
     UUID getTitleId() { return titleId; }
     String getBarcode() { return barcode; }
     CopyStatus getStatus() { return status; }
+    UUID getShelfLocationId() { return shelfLocationId; }
 }

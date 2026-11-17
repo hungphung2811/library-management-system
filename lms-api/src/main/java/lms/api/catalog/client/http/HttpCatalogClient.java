@@ -3,6 +3,7 @@ package lms.api.catalog.client.http;
 import lms.api.catalog.client.CatalogClient;
 
 import lms.api.catalog.dto.AddCopyRequest;
+import lms.api.catalog.dto.AuthorRefView;
 import lms.api.catalog.dto.CopyDetailsView;
 import lms.api.catalog.dto.CopyStatus;
 import lms.api.catalog.dto.CopyView;
@@ -21,14 +22,16 @@ public class HttpCatalogClient implements CatalogClient {
 
     /** DTO nội bộ của catalog-service; tách khỏi DTO cho FE để hai bên đổi độc lập. */
     record InternalTitle(UUID id, String name, String author, String isbn, BigDecimal coverPrice, long availableCopies,
-                         UUID tenantId) {
+                         UUID tenantId, UUID publisherId, String publisherName, UUID categoryId, String categoryName,
+                         List<AuthorRefView> authors) {
     }
 
-    record InternalCopy(UUID id, UUID titleId, String barcode, String status, UUID tenantId) {
+    record InternalCopy(UUID id, UUID titleId, String barcode, String status, UUID tenantId, UUID shelfLocationId,
+                        String shelfLocationCode) {
     }
 
     record InternalCopyDetails(UUID id, UUID titleId, String titleName, String barcode, String status,
-                               BigDecimal coverPrice) {
+                               BigDecimal coverPrice, UUID shelfLocationId, String shelfLocationCode) {
     }
 
     private final RestClient client;
@@ -38,23 +41,35 @@ public class HttpCatalogClient implements CatalogClient {
     }
 
     private static TitleView view(InternalTitle t) {
-        return new TitleView(t.id(), t.name(), t.author(), t.isbn(), t.coverPrice(), t.availableCopies(), t.tenantId());
+        return new TitleView(t.id(), t.name(), t.author(), t.isbn(), t.coverPrice(), t.availableCopies(), t.tenantId(),
+                t.publisherId(), t.publisherName(), t.categoryId(), t.categoryName(),
+                t.authors() == null ? List.of() : t.authors());
     }
 
     private static CopyView view(InternalCopy c) {
-        return new CopyView(c.id(), c.titleId(), c.barcode(), c.status(), c.tenantId());
+        return new CopyView(c.id(), c.titleId(), c.barcode(), c.status(), c.tenantId(), c.shelfLocationId(),
+                c.shelfLocationCode());
     }
 
     private static CopyDetailsView view(InternalCopyDetails c) {
-        return new CopyDetailsView(c.id(), c.titleId(), c.titleName(), c.barcode(), c.status(), c.coverPrice());
+        return new CopyDetailsView(c.id(), c.titleId(), c.titleName(), c.barcode(), c.status(), c.coverPrice(),
+                c.shelfLocationId(), c.shelfLocationCode());
     }
 
     @Override
     public List<TitleView> searchTitles(String keyword, boolean onlyAvailable, String tenantId) {
+        return searchTitles(keyword, onlyAvailable, tenantId, null, null);
+    }
+
+    @Override
+    public List<TitleView> searchTitles(String keyword, boolean onlyAvailable, String tenantId, UUID categoryId,
+                                        UUID publisherId) {
         List<InternalTitle> titles = client.get().uri(b -> {
             b.path("/internal/books").queryParam("available", onlyAvailable);
             if (keyword != null && !keyword.isBlank()) b.queryParam("keyword", keyword);
             if (tenantId != null && !tenantId.isBlank()) b.queryParam("tenantId", tenantId);
+            if (categoryId != null) b.queryParam("categoryId", categoryId);
+            if (publisherId != null) b.queryParam("publisherId", publisherId);
             return b.build();
         }).retrieve().body(new ParameterizedTypeReference<>() { });
         return titles == null ? List.of() : titles.stream().map(HttpCatalogClient::view).toList();
@@ -118,6 +133,14 @@ public class HttpCatalogClient implements CatalogClient {
     public CopyDetailsView getCopyByBarcode(String barcode) {
         return view(client.get().uri("/internal/book-copies/by-barcode/{barcode}", barcode).retrieve()
                 .body(InternalCopyDetails.class));
+    }
+
+    @Override
+    public CopyView moveCopyShelfLocation(UUID id, UUID shelfLocationId) {
+        java.util.Map<String, Object> body = new java.util.HashMap<>();
+        body.put("shelfLocationId", shelfLocationId);
+        return view(client.put().uri("/internal/book-copies/{id}/shelf-location", id).body(body).retrieve()
+                .body(InternalCopy.class));
     }
 
     @Override

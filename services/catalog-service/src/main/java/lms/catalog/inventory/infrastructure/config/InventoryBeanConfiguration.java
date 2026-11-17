@@ -6,12 +6,15 @@ import lms.catalog.inventory.application.CopyAvailabilityQuery;
 import lms.catalog.inventory.application.GetCopyUseCase;
 import lms.catalog.inventory.application.HoldCopyUseCase;
 import lms.catalog.inventory.application.ListCopiesUseCase;
+import lms.catalog.inventory.application.MoveCopyShelfLocationUseCase;
 import lms.catalog.inventory.application.ReleaseCopyUseCase;
 import lms.catalog.inventory.domain.BookCopyRepository;
 import lms.catalog.inventory.infrastructure.messaging.KafkaInventoryEventPublisher;
 import lms.messaging.KafkaEventPublisher;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
+import java.time.ZoneId;
+import lms.catalog.inventory.application.LookupCopiesUseCase;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -23,9 +26,17 @@ import org.springframework.kafka.core.KafkaTemplate;
 @Configuration
 public class InventoryBeanConfiguration {
 
+    static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+
     @Bean
     Clock clock() {
-        return Clock.systemDefaultZone();
+        // Mốc thời gian nghiệp vụ theo giờ Việt Nam (ADR-0018), không phụ thuộc múi giờ máy/container (UTC).
+        return Clock.system(BUSINESS_ZONE);
+    }
+
+    @Bean
+    LookupCopiesUseCase lookupCopiesUseCase(BookCopyRepository repository) {
+        return new LookupCopiesUseCase(repository);
     }
 
     @Bean
@@ -48,6 +59,11 @@ public class InventoryBeanConfiguration {
     @Bean
     AddCopyUseCase addCopyUseCase(BookCopyRepository repository, KafkaInventoryEventPublisher publisher, Clock clock) {
         return new AddCopyUseCase(repository, publisher, clock);
+    }
+
+    @Bean
+    MoveCopyShelfLocationUseCase moveCopyShelfLocationUseCase(BookCopyRepository repository) {
+        return new MoveCopyShelfLocationUseCase(repository);
     }
 
     @Bean

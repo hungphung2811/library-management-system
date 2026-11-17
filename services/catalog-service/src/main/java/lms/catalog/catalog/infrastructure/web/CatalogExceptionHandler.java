@@ -1,6 +1,11 @@
 package lms.catalog.catalog.infrastructure.web;
 
+import lms.catalog.catalog.domain.CategoryHierarchyException;
 import lms.catalog.catalog.domain.DuplicateIsbnException;
+import lms.catalog.catalog.domain.DuplicateReferenceException;
+import lms.catalog.catalog.domain.InactiveReferenceException;
+import lms.catalog.catalog.domain.InvalidReferenceException;
+import lms.catalog.catalog.domain.ReferenceNotFoundException;
 import lms.catalog.catalog.domain.InvalidTitleException;
 import lms.catalog.catalog.domain.TitleNotFoundException;
 import lms.catalog.catalog.domain.TitlePreviewTooLongException;
@@ -33,6 +38,31 @@ public class CatalogExceptionHandler {
     @ExceptionHandler(InvalidTitleException.class)
     ResponseEntity<ErrorResponse> handleInvalid(InvalidTitleException ex) {
         return build(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_TITLE", ex.getMessage());
+    }
+
+    @ExceptionHandler(ReferenceNotFoundException.class)
+    ResponseEntity<ErrorResponse> handleReferenceNotFound(ReferenceNotFoundException ex) {
+        return build(HttpStatus.NOT_FOUND, ex.kind().notFoundCode(), ex.getMessage());
+    }
+
+    @ExceptionHandler(DuplicateReferenceException.class)
+    ResponseEntity<ErrorResponse> handleDuplicateReference(DuplicateReferenceException ex) {
+        return build(HttpStatus.CONFLICT, ex.kind().duplicateCode(), ex.getMessage());
+    }
+
+    @ExceptionHandler(InactiveReferenceException.class)
+    ResponseEntity<ErrorResponse> handleInactiveReference(InactiveReferenceException ex) {
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, ex.kind().inactiveCode(), ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidReferenceException.class)
+    ResponseEntity<ErrorResponse> handleInvalidReference(InvalidReferenceException ex) {
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, ex.kind().invalidCode(), ex.getMessage());
+    }
+
+    @ExceptionHandler(CategoryHierarchyException.class)
+    ResponseEntity<ErrorResponse> handleCategoryHierarchy(CategoryHierarchyException ex) {
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, ex.code(), ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

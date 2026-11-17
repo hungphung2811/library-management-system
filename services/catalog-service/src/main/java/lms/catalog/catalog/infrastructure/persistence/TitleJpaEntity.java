@@ -38,11 +38,17 @@ class TitleJpaEntity {
     @Column(name = "preview_text", length = 2000)
     private String previewText;
 
+    @Column(name = "publisher_id")
+    private UUID publisherId;
+
+    @Column(name = "category_id")
+    private UUID categoryId;
+
     protected TitleJpaEntity() {
     }
 
     TitleJpaEntity(UUID id, String name, String author, String isbn, BigDecimal coverPrice,
-                   String description, String previewText) {
+                   String description, String previewText, UUID publisherId, UUID categoryId) {
         // Điền sẵn tenant của phiên: merge (save entity mới dựng) không ghi đè tenant_id thành null, insert khớp
         // tenant phiên; không có tenant thì ném TenantRequiredException (fail-closed). Cột updatable=false.
         this.tenantId = TenantContext.require();
@@ -53,6 +59,8 @@ class TitleJpaEntity {
         this.coverPrice = coverPrice;
         this.description = description;
         this.previewText = previewText;
+        this.publisherId = publisherId;
+        this.categoryId = categoryId;
     }
 
     UUID getId() { return id; }
@@ -63,4 +71,6 @@ class TitleJpaEntity {
     BigDecimal getCoverPrice() { return coverPrice; }
     String getDescription() { return description; }
     String getPreviewText() { return previewText; }
+    UUID getPublisherId() { return publisherId; }
+    UUID getCategoryId() { return categoryId; }
 }

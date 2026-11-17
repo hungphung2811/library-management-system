@@ -2,6 +2,7 @@ package lms.catalog.catalog.domain;
 
 import java.math.BigDecimal;
 import java.text.Normalizer;
+import java.util.List;
 import java.util.UUID;
 
 /** Đầu sách. Giá bìa là cơ sở tính phí bồi thường/hỏng sách (QĐ4) ở context fine. */
@@ -21,9 +22,15 @@ public class Title {
     private final String description;
     /** Đoạn đọc thử (văn bản thuần, tối đa 2000 code point), null nếu chưa nhập. */
     private final String previewText;
+    /** Nhà xuất bản chuẩn (tùy chọn, tham chiếu publishers). */
+    private final UUID publisherId;
+    /** Thể loại chuẩn (tùy chọn, tham chiếu categories). */
+    private final UUID categoryId;
+    /** Tác giả chuẩn (tùy chọn, nhiều tác giả theo thứ tự); không đổi chuỗi {@code author} hiển thị cũ. */
+    private final List<UUID> authorIds;
 
     private Title(UUID id, String name, String author, String isbn, BigDecimal coverPrice, UUID tenantId,
-                  String description, String previewText) {
+                  String description, String previewText, UUID publisherId, UUID categoryId, List<UUID> authorIds) {
         if (id == null) throw new InvalidTitleException("id không được null");
         if (name == null || name.isBlank()) throw new InvalidTitleException("Tên sách không được để trống");
         if (author == null || author.isBlank()) throw new InvalidTitleException("Tác giả không được để trống");
@@ -36,29 +43,47 @@ public class Title {
         this.tenantId = tenantId;
         this.description = description;
         this.previewText = previewText;
+        this.publisherId = publisherId;
+        this.categoryId = categoryId;
+        this.authorIds = authorIds == null ? List.of() : List.copyOf(authorIds);
     }
 
     public static Title create(String name, String author, String isbn, BigDecimal coverPrice) {
-        return new Title(UUID.randomUUID(), name, author, isbn, coverPrice, null, null, null);
+        return new Title(UUID.randomUUID(), name, author, isbn, coverPrice, null, null, null, null, null, null);
     }
 
     public static Title restore(UUID id, String name, String author, String isbn, BigDecimal coverPrice) {
-        return new Title(id, name, author, isbn, coverPrice, null, null, null);
+        return new Title(id, name, author, isbn, coverPrice, null, null, null, null, null, null);
     }
 
     public static Title restore(UUID id, String name, String author, String isbn, BigDecimal coverPrice, UUID tenantId) {
-        return new Title(id, name, author, isbn, coverPrice, tenantId, null, null);
+        return new Title(id, name, author, isbn, coverPrice, tenantId, null, null, null, null, null);
     }
 
     /** Dựng lại từ DB: dữ liệu đã được chuẩn hóa và kiểm khi ghi nên giữ nguyên. */
     public static Title restore(UUID id, String name, String author, String isbn, BigDecimal coverPrice, UUID tenantId,
                                 String description, String previewText) {
-        return new Title(id, name, author, isbn, coverPrice, tenantId, description, previewText);
+        return new Title(id, name, author, isbn, coverPrice, tenantId, description, previewText, null, null, null);
     }
 
-    /** Bản đã sửa (cùng id): thay name/author/isbn/coverPrice, kiểm quy tắc như khi tạo; giữ mô tả và đoạn đọc thử. */
+    /** Dựng lại từ DB kèm phân loại chuẩn (nhà xuất bản, thể loại, tác giả). */
+    public static Title restore(UUID id, String name, String author, String isbn, BigDecimal coverPrice, UUID tenantId,
+                                String description, String previewText, UUID publisherId, UUID categoryId,
+                                List<UUID> authorIds) {
+        return new Title(id, name, author, isbn, coverPrice, tenantId, description, previewText, publisherId,
+                categoryId, authorIds);
+    }
+
+    /** Bản đã thay phân loại chuẩn (cùng id, giữ các trường khác). Đã kiểm tồn tại ở use case. */
+    public Title withClassification(UUID publisherId, UUID categoryId, List<UUID> authorIds) {
+        return new Title(id, name, author, isbn, coverPrice, tenantId, description, previewText, publisherId,
+                categoryId, authorIds);
+    }
+
+    /** Bản đã sửa (cùng id): thay name/author/isbn/coverPrice, kiểm quy tắc như khi tạo; giữ mô tả, đoạn đọc thử và phân loại. */
     public Title update(String name, String author, String isbn, BigDecimal coverPrice) {
-        return new Title(id, name, author, isbn, coverPrice, tenantId, description, previewText);
+        return new Title(id, name, author, isbn, coverPrice, tenantId, description, previewText, publisherId,
+                categoryId, authorIds);
     }
 
     /**
@@ -69,7 +94,7 @@ public class Title {
     public Title withPreview(String description, String previewText) {
         return new Title(id, name, author, isbn, coverPrice, tenantId,
                 normalizeText(description, MAX_DESCRIPTION, "Mô tả"),
-                normalizeText(previewText, MAX_PREVIEW_TEXT, "Đoạn đọc thử"));
+                normalizeText(previewText, MAX_PREVIEW_TEXT, "Đoạn đọc thử"), publisherId, categoryId, authorIds);
     }
 
     static String normalizeText(String raw, int max, String field) {
@@ -94,5 +119,8 @@ public class Title {
     public UUID tenantId() { return tenantId; }
     public String description() { return description; }
     public String previewText() { return previewText; }
+    public UUID publisherId() { return publisherId; }
+    public UUID categoryId() { return categoryId; }
+    public List<UUID> authorIds() { return authorIds; }
     public boolean hasPreview() { return previewText != null; }
 }

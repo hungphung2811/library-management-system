@@ -5,6 +5,8 @@ import lms.catalog.inventory.domain.CopyTitleNotFoundException;
 import lms.catalog.inventory.domain.IllegalCopyTransitionException;
 import lms.catalog.inventory.domain.DuplicateBarcodeException;
 import lms.catalog.inventory.domain.InvalidCopyException;
+import lms.catalog.inventory.domain.ShelfLocationInactiveException;
+import lms.catalog.inventory.domain.ShelfLocationNotFoundException;
 import lms.common.kernel.ErrorResponse;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -39,6 +41,16 @@ public class InventoryExceptionHandler {
     @ExceptionHandler(InvalidCopyException.class)
     ResponseEntity<ErrorResponse> handleInvalid(InvalidCopyException ex) {
         return build(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_COPY", ex.getMessage());
+    }
+
+    @ExceptionHandler(ShelfLocationNotFoundException.class)
+    ResponseEntity<ErrorResponse> handleShelfNotFound(ShelfLocationNotFoundException ex) {
+        return build(HttpStatus.NOT_FOUND, "SHELF_LOCATION_NOT_FOUND", ex.getMessage());
+    }
+
+    @ExceptionHandler(ShelfLocationInactiveException.class)
+    ResponseEntity<ErrorResponse> handleShelfInactive(ShelfLocationInactiveException ex) {
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, "SHELF_LOCATION_INACTIVE", ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

@@ -11,7 +11,12 @@ import lms.catalog.inventory.application.ChangeCopyStatusUseCase;
 import lms.catalog.inventory.application.CopyDetailsResponse;
 import lms.catalog.inventory.application.CopyResponse;
 import lms.catalog.inventory.application.GetCopyUseCase;
+import lms.catalog.inventory.application.CopyLookupView;
 import lms.catalog.inventory.application.ListCopiesUseCase;
+import lms.catalog.inventory.application.LookupCopiesRequest;
+import lms.catalog.inventory.application.LookupCopiesUseCase;
+import lms.catalog.inventory.application.MoveCopyShelfLocationRequest;
+import lms.catalog.inventory.application.MoveCopyShelfLocationUseCase;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
@@ -36,9 +41,14 @@ public class BookCopyController {
 
     private final GetCopyUseCase getCopy;
     private final ChangeCopyStatusUseCase changeStatus;
+    private final MoveCopyShelfLocationUseCase moveShelfLocation;
+    private final LookupCopiesUseCase lookupCopies;
 
     public BookCopyController(AddCopyUseCase addCopy, ListCopiesUseCase listCopies, GetCopyUseCase getCopy,
-                              ChangeCopyStatusUseCase changeStatus) {
+                              ChangeCopyStatusUseCase changeStatus, MoveCopyShelfLocationUseCase moveShelfLocation,
+                              LookupCopiesUseCase lookupCopies) {
+        this.lookupCopies = lookupCopies;
+        this.moveShelfLocation = moveShelfLocation;
         this.addCopy = addCopy;
         this.listCopies = listCopies;
         this.getCopy = getCopy;
@@ -63,9 +73,25 @@ public class BookCopyController {
         return changeStatus.execute(id, request.status());
     }
 
+    /** Gán/đổi/gỡ vị trí kệ của bản sao (shelfLocationId null = gỡ). Khóa BookCopyController/moveShelfLocation. */
+    @PutMapping("/{id}/shelf-location")
+    public CopyResponse moveShelfLocation(@PathVariable UUID id,
+                                          @Valid @RequestBody MoveCopyShelfLocationRequest request) {
+        return moveShelfLocation.execute(id, request.shelfLocationId());
+    }
+
+    /**
+     * Tra bản sao theo lô (tối đa 100 id), kèm tên/ISBN đầu sách; id không có hoặc thuộc tenant khác thì vắng.
+     * Khóa BookCopyController/lookup (ADR-0018): không đổi tên.
+     */
+    @PostMapping("/lookup")
+    public List<CopyLookupView> lookup(@Valid @RequestBody LookupCopiesRequest request) {
+        return lookupCopies.execute(request.ids());
+    }
+
     @PostMapping
     public ResponseEntity<CopyResponse> add(@Valid @RequestBody AddCopyRequest request) {
-        CopyResponse response = addCopy.execute(new AddCopyCommand(request.titleId(), request.barcode()));
+        CopyResponse response = addCopy.execute(new AddCopyCommand(request.titleId(), request.barcode(), request.shelfLocationId()));
         return ResponseEntity.created(URI.create("/internal/book-copies/" + response.id())).body(response);
     }
 

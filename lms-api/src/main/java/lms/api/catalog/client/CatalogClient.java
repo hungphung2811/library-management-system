@@ -15,6 +15,12 @@ public interface CatalogClient {
 
     List<TitleView> searchTitles(String keyword, boolean onlyAvailable, String tenantId);
 
+    /** Như searchTitles nhưng lọc thêm theo thể loại và/hoặc nhà xuất bản (null = không lọc). */
+    default List<TitleView> searchTitles(String keyword, boolean onlyAvailable, String tenantId, UUID categoryId,
+                                         UUID publisherId) {
+        return searchTitles(keyword, onlyAvailable, tenantId);
+    }
+
     TitleView getTitle(UUID id);
 
     TitleView createTitle(CreateTitleRequest request);
@@ -34,4 +40,7 @@ public interface CatalogClient {
     CopyDetailsView getCopyByBarcode(String barcode);
 
     CopyView changeCopyStatus(UUID id, CopyStatus status);
+
+    /** Gán/đổi/gỡ vị trí kệ của bản sao (shelfLocationId null = gỡ). */
+    CopyView moveCopyShelfLocation(UUID id, UUID shelfLocationId);
 }

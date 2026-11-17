@@ -60,6 +60,8 @@ class BookCopyControllerTest {
     @MockitoBean ListCopiesUseCase listCopies;
     @MockitoBean GetCopyUseCase getCopy;
     @MockitoBean ChangeCopyStatusUseCase changeStatus;
+    @MockitoBean lms.catalog.inventory.application.MoveCopyShelfLocationUseCase moveShelfLocation;
+    @MockitoBean lms.catalog.inventory.application.LookupCopiesUseCase lookupCopies;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean PermissionKeyRegistrar permissionKeyRegistrar;
 

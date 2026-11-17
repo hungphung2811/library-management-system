@@ -13,10 +13,17 @@ public class UpdateTitleUseCase {
 
     private final TitleRepository repository;
     private final CopyAvailabilityQuery availability;
+    private final TitleClassificationService classification;
 
     public UpdateTitleUseCase(TitleRepository repository, CopyAvailabilityQuery availability) {
+        this(repository, availability, null);
+    }
+
+    public UpdateTitleUseCase(TitleRepository repository, CopyAvailabilityQuery availability,
+                              TitleClassificationService classification) {
         this.repository = repository;
         this.availability = availability;
+        this.classification = classification;
     }
 
     @Transactional
@@ -26,8 +33,14 @@ public class UpdateTitleUseCase {
         if (updated.isbn() != null && repository.existsByIsbnAndIdNot(updated.isbn(), updated.id())) {
             throw new DuplicateIsbnException(updated.isbn());
         }
+        if (classification != null) {
+            // Thay toàn bộ phân loại chuẩn; giá trị đang có trên đầu sách vẫn được giữ dù mục đã ngừng dùng.
+            updated = classification.classify(updated, command.publisherId(), command.categoryId(),
+                    command.authorIds());
+        }
         Title saved = repository.save(updated);
         long available = availability.countAvailable(List.of(saved.id())).getOrDefault(saved.id(), 0L);
-        return TitleResponse.from(saved, available);
+        return classification == null ? TitleResponse.from(saved, available)
+                : TitleResponse.from(saved, available, classification.describe(saved));
     }
 }

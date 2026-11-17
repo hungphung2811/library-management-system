@@ -1,6 +1,15 @@
 package lms.catalog.catalog.infrastructure.config;
 
+import lms.catalog.catalog.application.CreateReferenceUseCase;
 import lms.catalog.catalog.application.CreateTitleUseCase;
+import lms.catalog.catalog.application.GetReferenceUseCase;
+import lms.catalog.catalog.application.ReferenceOptionsUseCase;
+import lms.catalog.catalog.application.ReferenceUseCases;
+import lms.catalog.catalog.application.SearchReferencesUseCase;
+import lms.catalog.catalog.application.SetReferenceStatusUseCase;
+import lms.catalog.catalog.application.TitleClassificationService;
+import lms.catalog.catalog.application.UpdateReferenceUseCase;
+import lms.catalog.catalog.domain.ReferenceRepository;
 import lms.catalog.catalog.application.GetTitlePreviewUseCase;
 import lms.catalog.catalog.application.GetTitleUseCase;
 import lms.catalog.catalog.application.LookupTitlesByKeywordUseCase;
@@ -17,18 +26,32 @@ import org.springframework.context.annotation.Configuration;
 public class CatalogBeanConfiguration {
 
     @Bean
-    CreateTitleUseCase createTitleUseCase(TitleRepository repository) {
-        return new CreateTitleUseCase(repository);
+    TitleClassificationService titleClassificationService(ReferenceRepository references) {
+        return new TitleClassificationService(references);
     }
 
     @Bean
-    UpdateTitleUseCase updateTitleUseCase(TitleRepository repository, CopyAvailabilityQuery availability) {
-        return new UpdateTitleUseCase(repository, availability);
+    ReferenceUseCases referenceUseCases(ReferenceRepository references) {
+        return new ReferenceUseCases(new CreateReferenceUseCase(references), new UpdateReferenceUseCase(references),
+                new SetReferenceStatusUseCase(references), new GetReferenceUseCase(references),
+                new SearchReferencesUseCase(references), new ReferenceOptionsUseCase(references));
     }
 
     @Bean
-    GetTitleUseCase getTitleUseCase(TitleRepository repository, CopyAvailabilityQuery availability) {
-        return new GetTitleUseCase(repository, availability);
+    CreateTitleUseCase createTitleUseCase(TitleRepository repository, TitleClassificationService classification) {
+        return new CreateTitleUseCase(repository, classification);
+    }
+
+    @Bean
+    UpdateTitleUseCase updateTitleUseCase(TitleRepository repository, CopyAvailabilityQuery availability,
+                                          TitleClassificationService classification) {
+        return new UpdateTitleUseCase(repository, availability, classification);
+    }
+
+    @Bean
+    GetTitleUseCase getTitleUseCase(TitleRepository repository, CopyAvailabilityQuery availability,
+                                    TitleClassificationService classification) {
+        return new GetTitleUseCase(repository, availability, classification);
     }
 
     @Bean
@@ -52,7 +75,8 @@ public class CatalogBeanConfiguration {
     }
 
     @Bean
-    SearchTitlesUseCase searchTitlesUseCase(TitleRepository repository, CopyAvailabilityQuery availability) {
-        return new SearchTitlesUseCase(repository, availability);
+    SearchTitlesUseCase searchTitlesUseCase(TitleRepository repository, CopyAvailabilityQuery availability,
+                                            TitleClassificationService classification) {
+        return new SearchTitlesUseCase(repository, availability, classification);
     }
 }

@@ -3,6 +3,8 @@ package lms.catalog.inventory.infrastructure.persistence;
 import lms.catalog.inventory.domain.BookCopy;
 import lms.catalog.inventory.domain.BookCopyRepository;
 import lms.catalog.inventory.domain.CopyDetails;
+import lms.catalog.inventory.domain.CopyLookupItem;
+import lms.tenant.TenantContext;
 import lms.catalog.inventory.domain.CopyStatus;
 import java.util.Collection;
 import java.util.HashMap;
@@ -24,10 +26,12 @@ class BookCopyPersistenceAdapter implements BookCopyRepository {
 
     @Override
     public BookCopy save(BookCopy copy) {
-        BookCopyJpaEntity entity = new BookCopyJpaEntity(copy.id(), copy.titleId(), copy.barcode(), copy.status());
+        BookCopyJpaEntity entity = new BookCopyJpaEntity(copy.id(), copy.titleId(), copy.barcode(), copy.status(),
+                copy.shelfLocationId());
         jpa.save(entity);
         // Trả bản có tenantId (lấy từ entity) để phản hồi tạo mới cũng mang tenantId; trạng thái giữ nguyên đối tượng gốc.
-        return BookCopy.restore(copy.id(), copy.titleId(), copy.barcode(), copy.status(), entity.getTenantId());
+        return BookCopy.restore(copy.id(), copy.titleId(), copy.barcode(), copy.status(), entity.getTenantId(),
+                copy.shelfLocationId());
     }
 
     @Override
@@ -52,7 +56,29 @@ class BookCopyPersistenceAdapter implements BookCopyRepository {
 
     private static CopyDetails toDetails(SpringDataBookCopyRepository.DetailsRow r) {
         return new CopyDetails(r.getId(), r.getTitleId(), r.getTitleName(), r.getBarcode(),
-                CopyStatus.valueOf(r.getStatus()), r.getCoverPrice());
+                CopyStatus.valueOf(r.getStatus()), r.getCoverPrice(), r.getShelfLocationId(), r.getShelfLocationCode());
+    }
+
+    @Override
+    public List<CopyLookupItem> findLookupByIds(Collection<UUID> ids) {
+        if (ids.isEmpty()) return List.of();
+        return jpa.findLookupRows(TenantContext.require(), ids).stream()
+                .map(r -> new CopyLookupItem(r.getId(), r.getTitleId(), r.getTitleName(), r.getIsbn(), r.getBarcode(),
+                        CopyStatus.valueOf(r.getStatus())))
+                .toList();
+    }
+
+    @Override
+    public Optional<Boolean> findShelfLocationActive(UUID shelfLocationId) {
+        return jpa.findShelfLocationActive(shelfLocationId);
+    }
+
+    @Override
+    public Map<UUID, String> findShelfLocationCodes(Collection<UUID> shelfLocationIds) {
+        Map<UUID, String> result = new HashMap<>();
+        if (shelfLocationIds.isEmpty()) return result;
+        jpa.findShelfLocationCodes(shelfLocationIds).forEach(row -> result.put(row.getId(), row.getCode()));
+        return result;
     }
 
     @Override
@@ -83,6 +109,7 @@ class BookCopyPersistenceAdapter implements BookCopyRepository {
     }
 
     private static BookCopy toDomain(BookCopyJpaEntity e) {
-        return BookCopy.restore(e.getId(), e.getTitleId(), e.getBarcode(), e.getStatus(), e.getTenantId());
+        return BookCopy.restore(e.getId(), e.getTitleId(), e.getBarcode(), e.getStatus(), e.getTenantId(),
+                e.getShelfLocationId());
     }
 }

@@ -34,7 +34,8 @@ public class CatalogController {
     }
 
     /** tenantId chỉ có tác dụng với platform admin không tenant (ADR-0008); chuyển nguyên xuống service. */
-    public record SearchBooksQuery(String keyword, Boolean available, String tenantId) {
+    public record SearchBooksQuery(String keyword, Boolean available, String tenantId, UUID categoryId,
+                                   UUID publisherId) {
     }
 
     public record CopiesQuery(@NotNull UUID titleId, String tenantId) {
@@ -42,7 +43,12 @@ public class CatalogController {
 
     @GetMapping("/books")
     public List<TitleView> search(SearchBooksQuery query) {
-        return catalog.searchTitles(query.keyword(), Boolean.TRUE.equals(query.available()), query.tenantId());
+        boolean available = Boolean.TRUE.equals(query.available());
+        if (query.categoryId() == null && query.publisherId() == null) {
+            return catalog.searchTitles(query.keyword(), available, query.tenantId());
+        }
+        return catalog.searchTitles(query.keyword(), available, query.tenantId(), query.categoryId(),
+                query.publisherId());
     }
 
     @GetMapping("/books/{id}")
@@ -96,6 +102,13 @@ public class CatalogController {
     @GetMapping("/book-copies/by-barcode/{barcode}")
     public CopyDetailsView copyByBarcode(@PathVariable String barcode) {
         return catalog.getCopyByBarcode(barcode);
+    }
+
+    /** Gán/đổi/gỡ vị trí kệ chuẩn của bản sao (shelfLocationId null = gỡ); 404 SHELF_LOCATION_NOT_FOUND, 422 SHELF_LOCATION_INACTIVE. */
+    @PutMapping("/book-copies/{id}/shelf-location")
+    public CopyView moveShelfLocation(@PathVariable UUID id,
+                                      @Valid @RequestBody lms.api.catalog.dto.MoveCopyShelfLocationRequest request) {
+        return catalog.moveCopyShelfLocation(id, request.shelfLocationId());
     }
 
     /** Đổi trạng thái bản sao (ví dụ DAMAGED, LOST); sai vòng đời thì catalog-service trả 409. */

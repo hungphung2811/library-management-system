@@ -36,6 +36,6 @@ public class ChangeCopyStatusUseCase {
                 eventPort.publish(new CopyAvailableEvent(UUID.randomUUID(), copy.id(), copy.titleId(), Instant.now(clock)));
             }
         }
-        return CopyResponse.from(copy);
+        return CopyResponse.from(copy, ShelfLocationCheck.code(repository, copy.shelfLocationId()));
     }
 }

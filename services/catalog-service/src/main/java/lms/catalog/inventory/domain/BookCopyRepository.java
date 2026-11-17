@@ -30,4 +30,19 @@ public interface BookCopyRepository {
     Map<UUID, Long> countByTitleIds(Collection<UUID> titleIds, CopyStatus status);
 
     Set<UUID> findTitleIdsHavingStatus(CopyStatus status);
+
+    /** Tra theo lô: bản sao cùng tenant kèm tên/ISBN đầu sách; id không có hoặc khác tenant thì vắng. */
+    default List<CopyLookupItem> findLookupByIds(Collection<UUID> ids) {
+        return List.of();
+    }
+
+    /** Trạng thái active của vị trí kệ cùng tenant; empty nếu không có vị trí kệ đó. */
+    default Optional<Boolean> findShelfLocationActive(UUID shelfLocationId) {
+        return Optional.empty();
+    }
+
+    /** Mã vị trí kệ theo id (để hiển thị); id không có thì không xuất hiện trong map. */
+    default Map<UUID, String> findShelfLocationCodes(Collection<UUID> shelfLocationIds) {
+        return Map.of();
+    }
 }

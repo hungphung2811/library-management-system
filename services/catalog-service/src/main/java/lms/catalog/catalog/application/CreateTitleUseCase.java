@@ -8,9 +8,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class CreateTitleUseCase {
 
     private final TitleRepository repository;
+    private final TitleClassificationService classification;
 
     public CreateTitleUseCase(TitleRepository repository) {
+        this(repository, null);
+    }
+
+    public CreateTitleUseCase(TitleRepository repository, TitleClassificationService classification) {
         this.repository = repository;
+        this.classification = classification;
     }
 
     @Transactional
@@ -19,6 +25,12 @@ public class CreateTitleUseCase {
         if (title.isbn() != null && repository.existsByIsbn(title.isbn())) {
             throw new DuplicateIsbnException(title.isbn());
         }
-        return TitleResponse.from(repository.save(title), 0);
+        if (classification == null) {
+            return TitleResponse.from(repository.save(title), 0);
+        }
+        Title classified = classification.classify(title, command.publisherId(), command.categoryId(),
+                command.authorIds());
+        Title saved = repository.save(classified);
+        return TitleResponse.from(saved, 0, classification.describe(saved));
     }
 }

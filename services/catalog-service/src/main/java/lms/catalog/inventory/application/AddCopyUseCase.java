@@ -28,12 +28,13 @@ public class AddCopyUseCase {
         if (!repository.titleExists(command.titleId())) {
             throw new CopyTitleNotFoundException(command.titleId());
         }
-        BookCopy copy = BookCopy.register(command.titleId(), command.barcode());
+        BookCopy copy = BookCopy.register(command.titleId(), command.barcode(), command.shelfLocationId());
         if (repository.existsByBarcode(copy.barcode())) {
             throw new DuplicateBarcodeException(copy.barcode());
         }
+        ShelfLocationCheck.require(repository, command.shelfLocationId(), null);
         BookCopy saved = repository.save(copy);
         eventPort.publish(new CopyAvailableEvent(UUID.randomUUID(), saved.id(), saved.titleId(), Instant.now(clock)));
-        return CopyResponse.from(saved);
+        return CopyResponse.from(saved, ShelfLocationCheck.code(repository, saved.shelfLocationId()));
     }
 }

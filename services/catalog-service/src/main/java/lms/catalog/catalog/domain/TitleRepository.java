@@ -24,5 +24,13 @@ public interface TitleRepository {
         return search(keyword).stream().limit(limit).toList();
     }
 
+    /** Như search nhưng lọc thêm theo thể loại và/hoặc nhà xuất bản (null = không lọc), khớp đúng id. */
+    default List<Title> searchFiltered(String keyword, UUID categoryId, UUID publisherId) {
+        return search(keyword).stream()
+                .filter(t -> categoryId == null || categoryId.equals(t.categoryId()))
+                .filter(t -> publisherId == null || publisherId.equals(t.publisherId()))
+                .toList();
+    }
+
     List<Title> findByIds(Collection<UUID> ids);
 }

@@ -63,21 +63,30 @@ public class TitleController {
     @PutMapping("/{id}")
     public TitleResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateTitleRequest request) {
         return updateTitle.execute(new UpdateTitleCommand(
-                id, request.name(), request.author(), request.isbn(), request.coverPrice()));
+                id, request.name(), request.author(), request.isbn(), request.coverPrice(),
+                request.publisherId(), request.categoryId(), request.authorIds()));
     }
 
     @PostMapping
     public ResponseEntity<TitleResponse> create(@Valid @RequestBody CreateTitleRequest request) {
         TitleResponse response = createTitle.execute(new CreateTitleCommand(
-                request.name(), request.author(), request.isbn(), request.coverPrice()));
+                request.name(), request.author(), request.isbn(), request.coverPrice(),
+                request.publisherId(), request.categoryId(), request.authorIds()));
         return ResponseEntity.created(URI.create("/internal/books/" + response.id())).body(response);
     }
 
     @GetMapping
     @CrossTenantReadable
-    public List<TitleResponse> search(@RequestParam(required = false) String keyword,
-                                      @RequestParam(defaultValue = "false") boolean available) {
-        return searchTitles.execute(keyword, available);
+    public List<TitleResponse> search(SearchTitlesQuery query) {
+        boolean available = Boolean.TRUE.equals(query.available());
+        if (query.categoryId() == null && query.publisherId() == null) {
+            return searchTitles.execute(query.keyword(), available);
+        }
+        return searchTitles.execute(query.keyword(), available, query.categoryId(), query.publisherId());
+    }
+
+    /** Bộ lọc tìm đầu sách; categoryId/publisherId (tùy chọn) khớp đúng id. */
+    public record SearchTitlesQuery(String keyword, Boolean available, UUID categoryId, UUID publisherId) {
     }
 
     /** Tra nhiều đầu sách theo id (sales-service gọi bằng token người dùng chuyển tiếp). Khóa TitleController/lookup. */
