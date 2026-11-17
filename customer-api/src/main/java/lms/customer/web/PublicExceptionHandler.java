@@ -61,7 +61,9 @@ public class PublicExceptionHandler {
             // Chỉ còn do refresh (đã có refresh token hợp lệ); login đã gộp thành LOGIN_FAILED ở HttpAuthClient.
             Map.entry("ACCOUNT_LOCKED", "Tài khoản tạm thời bị khóa"),
             Map.entry("ACCOUNT_DISABLED", "Tài khoản đã bị vô hiệu hóa"),
-            Map.entry("UNAUTHORIZED", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn"));
+            Map.entry("UNAUTHORIZED", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn"),
+            // ADR-0017: token vừa được làm mới ở nơi khác (tab khác); FE đọc lại token đã lưu rồi thử lại một lần.
+            Map.entry("REFRESH_TOKEN_SUPERSEDED", "Phiên vừa được làm mới ở nơi khác, vui lòng thử lại"));
 
     /**
      * Mã 400 của service phía sau có tên khác mã công khai: system-service trả VALIDATION_ERROR (body/JSON sai) và

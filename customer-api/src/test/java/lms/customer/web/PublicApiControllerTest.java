@@ -298,6 +298,19 @@ class PublicApiControllerTest {
     }
 
     @Test
+    void refreshChuyenTiepRefreshTokenSupersededVoiThongDiepCuaCustomerApi() throws Exception {
+        when(auth.refresh("ref")).thenThrow(downstream(HttpStatus.UNAUTHORIZED,
+                "{\"code\":\"REFRESH_TOKEN_SUPERSEDED\",\"message\":\"chi tiet noi bo sessionId=abc\"}"));
+        String body = mvc.perform(post("/public/auth/refresh").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"ref\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("REFRESH_TOKEN_SUPERSEDED"))
+                .andExpect(jsonPath("$.message").value("Phiên vừa được làm mới ở nơi khác, vui lòng thử lại"))
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertEquals(false, body.contains("noi bo") || body.contains("sessionId"));
+    }
+
+    @Test
     void dangNhapVaoTenantKhongKhaDungKhongChamIdentity() throws Exception {
         when(storefronts.resolve(any())).thenThrow(PublicApiException.shopNotAvailable());
         mvc.perform(post("/public/t/khong-co/auth/login").contentType(MediaType.APPLICATION_JSON)
