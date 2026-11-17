@@ -1,0 +1,61 @@
+- generic [ref=f7e1]:
+  - generic [ref=f7e2]:
+    - complementary [ref=f7e3]:
+      - navigation "Điều hướng chính" [ref=f7e4]:
+        - generic [ref=f7e5]:
+          - link "Thư viện, về trang chủ" [ref=f7e6] [cursor=pointer]:
+            - /url: /
+            - generic [ref=f7e16]:
+              - generic [ref=f7e17]: Thư viện
+              - generic [ref=f7e18]: Quản lý mượn trả
+          - button "Thu gọn menu" [expanded] [ref=f7e19] [cursor=pointer]
+        - list [ref=f7e23]:
+          - listitem [ref=f7e24]:
+            - link "Trang chủ" [ref=f7e25] [cursor=pointer]:
+              - /url: /
+        - generic [ref=f7e33]:
+          - generic [ref=f7e34]:
+            - generic [aria-hidden] [ref=f7e35]: X
+            - generic "fb320a01-6971-40ce-810e-b2c65283ba0d" [ref=f7e37]: xt-shared
+          - button "Đăng xuất" [ref=f7e38] [cursor=pointer]
+    - generic [ref=f7e42]:
+      - banner [ref=f7e43]:
+        - list [ref=f7e44]:
+          - listitem [ref=f7e45]:
+            - link "Trang chủ" [ref=f7e46] [cursor=pointer]:
+              - /url: /
+        - generic [ref=f7e47]:
+          - 'button "Đơn vị làm việc: xt-tenant-a" [active] [ref=f7e96] [cursor=pointer]':
+            - generic [ref=f7e101]: xt-tenant-a
+          - button "Thông báo, 0 chưa đọc" [ref=f7e48] [cursor=pointer]
+          - button "Tài khoản của tôi" [ref=f7e53] [cursor=pointer]:
+            - generic [aria-hidden] [ref=f7e54]: X
+      - main [ref=f7e55]:
+        - generic [ref=f7e57]:
+          - heading "Tổng quan" [level=1] [ref=f7e58]
+          - paragraph [ref=f7e59]: Chọn một phân hệ để bắt đầu làm việc
+        - generic [ref=f7e60]:
+          - generic [ref=f7e61]:
+            - link "Hồ sơ Tài khoản và thẻ thư viện" [ref=f7e62] [cursor=pointer]:
+              - /url: /profile
+              - generic [ref=f7e67]: Hồ sơ
+              - generic [ref=f7e68]: Tài khoản và thẻ thư viện
+            - link "Mật khẩu Đổi mật khẩu của bạn" [ref=f7e69] [cursor=pointer]:
+              - /url: /change-password
+              - generic [ref=f7e74]: Mật khẩu
+              - generic [ref=f7e75]: Đổi mật khẩu của bạn
+          - generic [ref=f7e77]:
+            - heading "Xin chào, xt-shared" [level=2] [ref=f7e78]
+            - paragraph [ref=f7e79]: Các phân hệ bạn thấy trong thanh bên phụ thuộc vào vai trò và quyền được cấp cho tài khoản này.
+            - generic [ref=f7e80]:
+              - generic [ref=f7e81]:
+                - term [ref=f7e82]: Vai trò
+                - definition [ref=f7e83]: "-"
+              - generic [ref=f7e84]:
+                - term [ref=f7e85]: Phạm vi quyền
+                - definition [ref=f7e86]: 0 khóa quyền được cấp
+  - button "Open Next.js Dev Tools" [ref=f7e92] [cursor=pointer]
+  - alert [ref=f7e104]
+  - menu "Danh sách đơn vị" [ref=f7e106]:
+    - menuitem "xt-tenant-a xt-tenant-a" [ref=f7e107] [cursor=pointer]
+    - menuitem "xt-tenant-b xt-tenant-b" [ref=f7e113] [cursor=pointer]

@@ -1,0 +1,122 @@
+- generic [active] [ref=f12e1]:
+  - generic [ref=f12e2]:
+    - complementary [ref=f12e3]:
+      - navigation "Điều hướng chính" [ref=f12e4]:
+        - generic [ref=f12e5]:
+          - link "Thư viện, về trang chủ" [ref=f12e6] [cursor=pointer]:
+            - /url: /
+            - generic [ref=f12e16]:
+              - generic [ref=f12e17]: Thư viện
+              - generic [ref=f12e18]: Quản lý mượn trả
+          - button "Thu gọn menu" [expanded] [ref=f12e19] [cursor=pointer]
+        - list [ref=f12e23]:
+          - listitem [ref=f12e24]:
+            - link "Trang chủ" [ref=f12e25] [cursor=pointer]:
+              - /url: /
+          - listitem [aria-hidden] [ref=f12e32]: Nghiệp vụ
+          - listitem [ref=f12e33]:
+            - button "Sách" [expanded] [ref=f12e34] [cursor=pointer]
+            - list [ref=f12e41]:
+              - listitem [ref=f12e42]:
+                - link "Danh sách sách" [ref=f12e43] [cursor=pointer]:
+                  - /url: /catalog
+              - listitem [ref=f12e44]:
+                - link "Tra mã vạch" [ref=f12e45] [cursor=pointer]:
+                  - /url: /catalog/barcode
+              - listitem [ref=f12e46]:
+                - link "Thêm sách" [ref=f12e47] [cursor=pointer]:
+                  - /url: /catalog/books/new
+          - listitem [ref=f12e48]:
+            - button "Mượn trả" [ref=f12e49] [cursor=pointer]
+          - listitem [aria-hidden] [ref=f12e57]: Hệ thống
+          - listitem [ref=f12e58]:
+            - button "Quản trị" [ref=f12e59] [cursor=pointer]
+        - generic [ref=f12e68]:
+          - generic [ref=f12e69]:
+            - generic [aria-hidden] [ref=f12e70]: A
+            - generic [ref=f12e71]:
+              - generic "00000000-0000-0000-0000-000000000001" [ref=f12e72]: admin
+              - generic [ref=f12e73]: SUPER_ADMIN
+          - button "Đăng xuất" [ref=f12e74] [cursor=pointer]
+    - generic [ref=f12e78]:
+      - banner [ref=f12e79]:
+        - list [ref=f12e80]:
+          - listitem [ref=f12e81]:
+            - link "Trang chủ" [ref=f12e82] [cursor=pointer]:
+              - /url: /
+          - listitem [aria-hidden] [ref=f12e83]
+          - listitem [ref=f12e86]: Sách
+          - listitem [aria-hidden] [ref=f12e87]
+          - listitem [ref=f12e90]: Danh sách sách
+        - generic [ref=f12e91]:
+          - button "Thông báo, 0 chưa đọc" [ref=f12e92] [cursor=pointer]
+          - button "Tài khoản của tôi" [ref=f12e97] [cursor=pointer]:
+            - generic [aria-hidden] [ref=f12e98]: A
+      - main [ref=f12e99]:
+        - generic [ref=f12e101]:
+          - heading "Sách" [level=1] [ref=f12e102]
+          - paragraph [ref=f12e103]: Tìm đầu sách và xem số bản sẵn có.
+        - generic [ref=f12e104]:
+          - generic [ref=f12e105]:
+            - searchbox "Tìm theo tên sách, tác giả hoặc ISBN" [ref=f12e111]
+            - generic [ref=f12e113]:
+              - switch "Chỉ hiện sách còn bản sẵn sàng" [ref=f12e114] [cursor=pointer]
+              - generic [ref=f12e117]: Chỉ hiện sách còn bản sẵn sàng
+          - table [ref=f12e126]:
+            - rowgroup [ref=f12e127]:
+              - row [ref=f12e128]:
+                - columnheader "Tên sách" [ref=f12e129]
+                - columnheader "Tác giả" [ref=f12e130]
+                - columnheader "ISBN" [ref=f12e131]
+                - columnheader "Giá bìa" [ref=f12e132]
+                - columnheader "Còn sẵn" [ref=f12e133]
+            - rowgroup [ref=f12e134]:
+              - row [ref=f12e135]:
+                - cell [ref=f12e136]:
+                  - link "Kinh tế vi mô" [ref=f12e137] [cursor=pointer]:
+                    - /url: /catalog/books/ed95ea97-ea29-42cf-8261-bcd191d9e8c1
+                - cell "Nguyễn Văn Dần" [ref=f12e138]
+                - cell "9786042000011" [ref=f12e139]
+                - cell "165.000 ₫" [ref=f12e140]
+                - cell "2 bản" [ref=f12e141]
+              - row [ref=f12e143]:
+                - cell [ref=f12e144]:
+                  - link "Kinh tế vĩ mô" [ref=f12e145] [cursor=pointer]:
+                    - /url: /catalog/books/ebd341ca-7868-43b3-8349-1f0257563b25
+                - cell "Dương Tấn Diệp" [ref=f12e146]
+                - cell "9786042000028" [ref=f12e147]
+                - cell "172.000 ₫" [ref=f12e148]
+                - cell "3 bản" [ref=f12e149]
+              - row [ref=f12e151]:
+                - cell [ref=f12e152]:
+                  - link "Marketing căn bản" [ref=f12e153] [cursor=pointer]:
+                    - /url: /catalog/books/18444169-91e7-4700-ac29-07210a73d055
+                - cell "Trần Minh Đạo" [ref=f12e154]
+                - cell "9786042000042" [ref=f12e155]
+                - cell "149.000 ₫" [ref=f12e156]
+                - cell "2 bản" [ref=f12e157]
+              - row [ref=f12e159]:
+                - cell [ref=f12e160]:
+                  - link "Nguyên lý kế toán" [ref=f12e161] [cursor=pointer]:
+                    - /url: /catalog/books/a11d746f-1583-4173-92fd-3438f49be188
+                - cell "Võ Văn Nhị" [ref=f12e162]
+                - cell "9786042000035" [ref=f12e163]
+                - cell "158.000 ₫" [ref=f12e164]
+                - cell "1 bản" [ref=f12e165]
+              - row [ref=f12e167]:
+                - cell [ref=f12e168]:
+                  - link "Quản trị học" [ref=f12e169] [cursor=pointer]:
+                    - /url: /catalog/books/7ffe8bc4-7222-456c-a2b6-f7352eddf20b
+                - cell "Nguyễn Thị Liên Diệp" [ref=f12e170]
+                - cell "9786042000059" [ref=f12e171]
+                - cell "138.000 ₫" [ref=f12e172]
+                - cell "2 bản" [ref=f12e173]
+              - row [ref=f12e175]:
+                - cell [ref=f12e176]:
+                  - link "Tài chính doanh nghiệp" [ref=f12e177] [cursor=pointer]:
+                    - /url: /catalog/books/f09cab0c-67d1-4d3e-a445-0ac132fa2a53
+                - cell "Nguyễn Hải Sản" [ref=f12e178]
+                - cell "9786042000066" [ref=f12e179]
+                - cell "205.000 ₫" [ref=f12e180]
+                - cell "1 bản" [ref=f12e181]
+  - button "Open Next.js Dev Tools" [ref=f12e188] [cursor=pointer]

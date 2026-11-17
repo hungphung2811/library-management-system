@@ -36,6 +36,10 @@ class RoleJpaEntity {
     @Column(name = "is_admin", nullable = false)
     private boolean admin;
 
+    /** Role đăng ký mặc định (tối đa một mỗi tenant, không phải admin: CHECK + chỉ mục duy nhất ở migration V18). */
+    @Column(name = "signup_default", nullable = false)
+    private boolean signupDefault;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "role_permissions", joinColumns = @JoinColumn(name = "role_id"))
     @Column(name = "permission_code", nullable = false)
@@ -45,6 +49,11 @@ class RoleJpaEntity {
     }
 
     RoleJpaEntity(UUID id, String name, String description, boolean admin, Set<String> permissionCodes) {
+        this(id, name, description, admin, permissionCodes, false);
+    }
+
+    RoleJpaEntity(UUID id, String name, String description, boolean admin, Set<String> permissionCodes,
+                  boolean signupDefault) {
         // Điền sẵn tenant của phiên: merge (save entity mới dựng) không ghi đè tenant_id thành null, insert khớp
         // tenant phiên; không có tenant thì ném TenantRequiredException (fail-closed). Cột updatable=false.
         this.tenantId = TenantContext.require();
@@ -52,12 +61,15 @@ class RoleJpaEntity {
         this.name = name;
         this.description = description;
         this.admin = admin;
+        this.signupDefault = signupDefault;
         this.permissionCodes = new HashSet<>(permissionCodes);
     }
 
     UUID getId() { return id; }
+    UUID getTenantId() { return tenantId; }
     String getName() { return name; }
     String getDescription() { return description; }
     boolean isAdmin() { return admin; }
+    boolean isSignupDefault() { return signupDefault; }
     Set<String> getPermissionCodes() { return permissionCodes; }
 }

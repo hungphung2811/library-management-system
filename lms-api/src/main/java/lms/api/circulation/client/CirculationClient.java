@@ -2,6 +2,8 @@ package lms.api.circulation.client;
 
 import lms.api.circulation.dto.BorrowBookRequest;
 import lms.api.circulation.dto.BorrowingView;
+import lms.api.circulation.dto.BorrowingPageView;
+import lms.api.circulation.dto.BorrowingSearchQuery;
 import lms.api.circulation.dto.CollectFinesResult;
 import lms.api.circulation.dto.ExpirationResult;
 import lms.api.circulation.dto.ReaderFinesView;
@@ -20,7 +22,11 @@ public interface CirculationClient {
 
     BorrowingView renew(UUID borrowingId);
 
+    /** Phiếu của chính người gọi; service trả 404 nếu không phải của họ. */
     BorrowingView getBorrowing(UUID borrowingId);
+
+    /** Phiếu bất kỳ trong tenant, cho nhân viên có khóa BorrowingController/getAny. */
+    BorrowingView getBorrowingDetail(UUID borrowingId);
 
     BorrowingView returnCopy(ReturnCopyRequest request);
 
@@ -28,11 +34,13 @@ public interface CirculationClient {
 
     List<BorrowingView> myBorrowings();
 
-    List<BorrowingView> borrowingsOfReader(UUID readerId);
+    List<BorrowingView> borrowingsOfReader(UUID readerId, String tenantId);
+
+    BorrowingPageView searchBorrowings(BorrowingSearchQuery query);
 
     ReaderFinesView myFines();
 
-    ReaderFinesView finesOfReader(UUID readerId);
+    ReaderFinesView finesOfReader(UUID readerId, String tenantId);
 
     CollectFinesResult collectFines(UUID readerId);
 

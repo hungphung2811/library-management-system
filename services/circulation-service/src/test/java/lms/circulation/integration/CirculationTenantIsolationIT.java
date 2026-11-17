@@ -128,6 +128,20 @@ class CirculationTenantIsolationIT {
     }
 
     @Test
+    void xemPhieuTheoIdChiChoChuPhieuVaChiNhanVienXemPhieuNguoiKhac() throws Exception {
+        UUID idB = borrow(as(TOKEN_B, TENANT_B), UUID.randomUUID());
+        var otherReaderInB = jwt().jwt(j -> j.tokenValue(TOKEN_B).subject(UUID.randomUUID().toString())
+                .claim("tenantId", TENANT_B.toString()));
+
+        // người khác cùng tenant: 404 như phiếu không tồn tại
+        mvc.perform(get("/internal/borrowings/" + idB).with(otherReaderInB))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("BORROWING_NOT_FOUND"));
+        // nhân viên (admin trong IT) xem được ở tenant của phiếu, tenant khác thì 404 nhờ RLS/@TenantId
+        mvc.perform(get("/internal/borrowings/" + idB + "/detail").with(as(TOKEN_B, TENANT_B))).andExpect(status().isOk());
+        mvc.perform(get("/internal/borrowings/" + idB + "/detail").with(as(TOKEN_A, TENANT_A))).andExpect(status().isNotFound());
+    }
+
+    @Test
     void tokenKhongCoTenantBi403TenantRequired() throws Exception {
         mvc.perform(post("/internal/borrowings").with(jwt().jwt(j -> j.subject(READER.toString()).claim("admin", true)))
                         .contentType(MediaType.APPLICATION_JSON).content(borrowBody(UUID.randomUUID())))

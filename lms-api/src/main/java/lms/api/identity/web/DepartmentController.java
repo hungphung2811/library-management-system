@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /** API phòng ban cho FE. Quyền do identity-service kiểm trên token được chuyển tiếp. */
@@ -37,14 +36,21 @@ public class DepartmentController {
         return ResponseEntity.created(URI.create("/api/departments/" + created.id())).body(created);
     }
 
+    /** tenantId chỉ có tác dụng với platform admin không tenant (ADR-0008); chuyển nguyên xuống service. */
+    public record ListDepartmentsQuery(String status, String tenantId) {
+    }
+
+    public record DepartmentTreeQuery(Boolean includeInactive, String tenantId) {
+    }
+
     @GetMapping
-    public List<DepartmentView> list(@RequestParam(required = false) String status) {
-        return departments.list(status);
+    public List<DepartmentView> list(ListDepartmentsQuery query) {
+        return departments.list(query.status(), query.tenantId());
     }
 
     @GetMapping("/tree")
-    public List<DepartmentNodeView> tree(@RequestParam(defaultValue = "false") boolean includeInactive) {
-        return departments.tree(includeInactive);
+    public List<DepartmentNodeView> tree(DepartmentTreeQuery query) {
+        return departments.tree(Boolean.TRUE.equals(query.includeInactive()), query.tenantId());
     }
 
     @GetMapping("/{id}")

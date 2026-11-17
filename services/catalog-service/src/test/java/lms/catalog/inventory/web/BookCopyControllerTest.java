@@ -77,7 +77,11 @@ class BookCopyControllerTest {
     }
 
     private static CopyResponse copy(UUID id, CopyStatus status) {
-        return new CopyResponse(id, TITLE_ID, "BC-001", status);
+        return new CopyResponse(id, TITLE_ID, "BC-001", status, TENANT);
+    }
+
+    private static RequestPostProcessor platformAdmin() {
+        return jwt().jwt(j -> j.claim("platformAdmin", true));
     }
 
     private static String addBody(String titleId, String barcode) {
@@ -302,6 +306,40 @@ class BookCopyControllerTest {
                         .with(withKey("BookCopyController/list")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    @Test
+    void platformAdminKhongTenantLietKeKhongCanKhoaVaTraTenantId() throws Exception {
+        when(listCopies.execute(TITLE_ID)).thenReturn(List.of(copy(UUID.randomUUID(), CopyStatus.AVAILABLE)));
+        mvc.perform(get("/internal/book-copies").param("titleId", TITLE_ID.toString()).with(platformAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].tenantId").value(TENANT.toString()));
+        mvc.perform(get("/internal/book-copies").param("titleId", TITLE_ID.toString())
+                        .param("tenantId", UUID.randomUUID().toString()).with(platformAdmin()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void platformAdminTenantIdSaiDinhDangTra400NhungTokenThuongBoQua() throws Exception {
+        mvc.perform(get("/internal/book-copies").param("titleId", TITLE_ID.toString()).param("tenantId", "abc")
+                        .with(platformAdmin()))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_TENANT_ID"));
+        when(listCopies.execute(TITLE_ID)).thenReturn(List.of());
+        mvc.perform(get("/internal/book-copies").param("titleId", TITLE_ID.toString()).param("tenantId", "abc")
+                        .with(admin()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void platformAdminKhongTenantVanBi403ODocTheoIdVaGhi() throws Exception {
+        mvc.perform(get("/internal/book-copies/" + UUID.randomUUID()).with(platformAdmin()))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("TENANT_REQUIRED"));
+        mvc.perform(get("/internal/book-copies/by-barcode/BC-001").with(platformAdmin()))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("TENANT_REQUIRED"));
+        mvc.perform(post("/internal/book-copies").contentType(MediaType.APPLICATION_JSON).content(ADD_VALID)
+                        .with(platformAdmin()))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("TENANT_REQUIRED"));
+        verifyNoInteractions(addCopy, getCopy);
     }
 
     @Test

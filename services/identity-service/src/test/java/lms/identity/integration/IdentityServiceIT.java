@@ -673,13 +673,14 @@ class IdentityServiceIT {
         assertThat(((Number) created.getBody().get("memberCount")).longValue()).isEqualTo(1L);
 
         // role của tenant mới = bộ role_templates (đọc dưới RLS bằng identity_app trong ngữ cảnh tenant mới)
-        Integer templates = jdbc.queryForObject("SELECT count(*) FROM role_templates", Integer.class);
+        Integer templates = jdbc.queryForObject("SELECT count(*) FROM role_templates WHERE module IS NULL OR module = 'LENDING'", Integer.class);
         assertThat(templates).isEqualTo(5);
         assertThat(lms.tenant.TenantContext.callAs(tenantId,
                 () -> jdbc.queryForObject("SELECT count(*) FROM roles", Integer.class))).isEqualTo(templates);
         assertThat(lms.tenant.TenantContext.callAs(tenantId, () -> jdbc.queryForObject(
                 "SELECT count(*) FROM role_permissions", Integer.class))).isEqualTo(jdbc.queryForObject(
-                "SELECT count(*) FROM role_template_permissions", Integer.class));
+                "SELECT count(*) FROM role_template_permissions p JOIN role_templates t ON t.id = p.template_id "
+                        + "WHERE t.module IS NULL OR t.module = 'LENDING'", Integer.class));
         // quản trị viên đầu tiên: membership ACTIVE + đúng một role quản trị của tenant mới, mật khẩu tạm buộc đổi
         UUID adminId = jdbc.queryForObject("SELECT user_id FROM credentials WHERE username = 'it-plat-roles-admin'",
                 UUID.class);
@@ -744,10 +745,13 @@ class IdentityServiceIT {
     void superAdminKhongDocDuocDuLieuNghiepVuVaQuanTriVienTenantKhongGoiDuocApiNenTang() {
         String operator = platformToken();
         // token chỉ có platformAdmin: endpoint thuộc tenant bị từ chối TENANT_REQUIRED
-        ResponseEntity<Map> users = call(HttpMethod.GET, "/internal/users", operator, null, Map.class);
+        // ADR-0008: GET danh sách users/roles gắn @CrossTenantReadable nên platform admin được qua; kiểm bằng GET theo id
+        ResponseEntity<Map> users = call(HttpMethod.GET, "/internal/users/" + java.util.UUID.randomUUID(), operator,
+                null, Map.class);
         assertThat(users.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(users.getBody().get("code")).isEqualTo("TENANT_REQUIRED");
-        ResponseEntity<Map> roles = call(HttpMethod.GET, "/internal/roles", operator, null, Map.class);
+        ResponseEntity<Map> roles = call(HttpMethod.GET, "/internal/roles/" + java.util.UUID.randomUUID(), operator,
+                null, Map.class);
         assertThat(roles.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(roles.getBody().get("code")).isEqualTo("TENANT_REQUIRED");
 

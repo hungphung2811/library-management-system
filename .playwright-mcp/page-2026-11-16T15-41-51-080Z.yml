@@ -1,0 +1,91 @@
+- generic [ref=f4e2]:
+  - complementary [ref=f4e3]:
+    - navigation "Điều hướng chính" [ref=f4e4]:
+      - generic [ref=f4e5]:
+        - link "Thư viện, về trang chủ" [ref=f4e6] [cursor=pointer]:
+          - /url: /
+          - generic [ref=f4e16]:
+            - generic [ref=f4e17]: Thư viện
+            - generic [ref=f4e18]: Quản lý mượn trả
+        - button "Thu gọn menu" [expanded] [ref=f4e19] [cursor=pointer]
+      - list [ref=f4e23]:
+        - listitem [ref=f4e24]:
+          - link "Trang chủ" [ref=f4e25] [cursor=pointer]:
+            - /url: /
+        - listitem [aria-hidden] [ref=f4e32]: Nghiệp vụ
+        - listitem [ref=f4e33]:
+          - button "Sách" [expanded] [ref=f4e34] [cursor=pointer]
+          - list [ref=f4e41]:
+            - listitem [ref=f4e42]:
+              - link "Danh sách sách" [ref=f4e43] [cursor=pointer]:
+                - /url: /catalog
+            - listitem [ref=f4e44]:
+              - link "Tra mã vạch" [ref=f4e45] [cursor=pointer]:
+                - /url: /catalog/barcode
+            - listitem [ref=f4e46]:
+              - link "Thêm sách" [ref=f4e47] [cursor=pointer]:
+                - /url: /catalog/books/new
+        - listitem [ref=f4e48]:
+          - button "Mượn trả" [expanded] [ref=f4e49] [cursor=pointer]
+          - list [ref=f4e57]:
+            - listitem [ref=f4e58]:
+              - link "Lập phiếu mượn" [ref=f4e59] [cursor=pointer]:
+                - /url: /circulation/borrow
+            - listitem [ref=f4e60]:
+              - link "Nhận trả sách" [ref=f4e61] [cursor=pointer]:
+                - /url: /circulation/return
+            - listitem [ref=f4e62]:
+              - link "Tra phiếu mượn" [ref=f4e63] [cursor=pointer]:
+                - /url: /circulation/borrowings
+            - listitem [ref=f4e64]:
+              - link "Đặt trước" [ref=f4e65] [cursor=pointer]:
+                - /url: /circulation/reservations
+            - listitem [ref=f4e66]:
+              - link "Phạt" [ref=f4e67] [cursor=pointer]:
+                - /url: /circulation/fines
+        - listitem [aria-hidden] [ref=f4e68]: Hệ thống
+        - listitem [ref=f4e69]:
+          - button "Quản trị" [expanded] [ref=f4e70] [cursor=pointer]
+          - list [ref=f4e78]:
+            - listitem [ref=f4e79]:
+              - link "Người dùng" [ref=f4e80] [cursor=pointer]:
+                - /url: /admin/users
+            - listitem [ref=f4e81]:
+              - link "Vai trò và quyền" [ref=f4e82] [cursor=pointer]:
+                - /url: /admin/roles
+            - listitem [ref=f4e83]:
+              - link "Phòng ban" [ref=f4e84] [cursor=pointer]:
+                - /url: /admin/departments
+            - listitem [ref=f4e85]:
+              - link "Nhật ký hoạt động" [ref=f4e86] [cursor=pointer]:
+                - /url: /admin/audit-logs
+      - generic [ref=f4e88]:
+        - generic [ref=f4e89]:
+          - generic [aria-hidden] [ref=f4e90]: A
+          - generic [ref=f4e91]:
+            - generic "00000000-0000-0000-0000-000000000001" [ref=f4e92]: admin
+            - generic [ref=f4e93]: SUPER_ADMIN
+        - button "Đăng xuất" [ref=f4e94] [cursor=pointer]
+  - generic [ref=f4e98]:
+    - banner [ref=f4e99]:
+      - list [ref=f4e100]:
+        - listitem [ref=f4e101]:
+          - link "Trang chủ" [ref=f4e102] [cursor=pointer]:
+            - /url: /
+        - listitem [aria-hidden] [ref=f4e103]
+        - listitem [ref=f4e106]: Sách
+        - listitem [aria-hidden] [ref=f4e107]
+        - listitem [ref=f4e110]: Tra mã vạch
+      - generic [ref=f4e111]:
+        - button "Thông báo, 0 chưa đọc" [ref=f4e112] [cursor=pointer]
+        - button "Tài khoản của tôi" [ref=f4e117] [cursor=pointer]:
+          - generic [aria-hidden] [ref=f4e118]: A
+    - main [ref=f4e119]:
+      - generic [ref=f4e121]:
+        - heading "Tra cứu theo mã vạch" [level=1] [ref=f4e122]
+        - paragraph [ref=f4e123]: Quét hoặc nhập mã vạch để xem bản sao và trạng thái.
+      - generic [ref=f4e128]:
+        - generic [ref=f4e129]: Quét hoặc nhập mã vạch
+        - textbox "Quét hoặc nhập mã vạch" [ref=f4e135]
+        - generic [ref=f4e136]: Nhấn Enter để tra.
+        - status [ref=f4e137]

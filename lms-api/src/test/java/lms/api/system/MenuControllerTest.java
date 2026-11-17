@@ -17,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import lms.api.config.SecurityConfiguration;
 import lms.api.system.client.SystemClient;
 import lms.api.system.dto.MenuDtos.CreateMenuRequest;
+import lms.api.system.dto.MenuDtos.MenuAdminListView;
 import lms.api.system.dto.MenuDtos.MenuAdminNodeView;
 import lms.api.system.dto.MenuDtos.MenuNodeView;
 import lms.api.system.dto.MenuDtos.UpdateMenuRequest;
@@ -50,7 +51,7 @@ class MenuControllerTest {
 
     private static MenuAdminNodeView admin(UUID id) {
         return new MenuAdminNodeView(id, "books", "Sách", "/books", "book", null, 10, true, "BookController/search", 0L,
-                Instant.parse("2026-01-01T00:00:00Z"));
+                Instant.parse("2026-01-01T00:00:00Z"), "LENDING");
     }
 
     private static HttpClientErrorException downstream(HttpStatus status, String code) {
@@ -83,12 +84,38 @@ class MenuControllerTest {
     @Test
     void quanTriLietKeGomMucTat() throws Exception {
         UUID id = UUID.randomUUID();
-        when(system.listMenus()).thenReturn(List.of(admin(id)));
+        when(system.listMenus()).thenReturn(new MenuAdminListView(false, List.of(admin(id))));
         mvc.perform(get("/api/admin/menus").with(jwt()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].permissionKey").value("BookController/search"))
-                .andExpect(jsonPath("$[0].version").value(0))
-                .andExpect(jsonPath("$[0].children").doesNotExist());
+                .andExpect(jsonPath("$.usingDefaults").value(false))
+                .andExpect(jsonPath("$.items[0].permissionKey").value("BookController/search"))
+                .andExpect(jsonPath("$.items[0].module").value("LENDING"))
+                .andExpect(jsonPath("$.items[0].version").value(0))
+                .andExpect(jsonPath("$.items[0].children").doesNotExist());
+    }
+
+    @Test
+    void quanTriBaoDangDungMenuMacDinhKhiTenantChuaCoDuLieu() throws Exception {
+        when(system.listMenus()).thenReturn(new MenuAdminListView(true, List.of()));
+        mvc.perform(get("/api/admin/menus").with(jwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.usingDefaults").value(true))
+                .andExpect(jsonPath("$.items.length()").value(0));
+    }
+
+    @Test
+    void chepMenuMacDinhTra201VaLoi409ChuyenNguyen() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(system.initializeDefaultMenus()).thenReturn(new MenuAdminListView(false, List.of(admin(id))));
+        mvc.perform(post("/api/admin/menus/defaults").with(jwt()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.usingDefaults").value(false))
+                .andExpect(jsonPath("$.items[0].id").value(id.toString()));
+
+        when(system.initializeDefaultMenus()).thenThrow(downstream(HttpStatus.CONFLICT, "MENU_ALREADY_INITIALIZED"));
+        mvc.perform(post("/api/admin/menus/defaults").with(jwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("MENU_ALREADY_INITIALIZED"));
     }
 
     @Test

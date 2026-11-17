@@ -7,6 +7,8 @@ import lms.circulation.reservation.application.ReservationResponse;
 import lms.circulation.reservation.application.ReserveTitleRequest;
 import lms.circulation.reservation.application.ReserveTitleUseCase;
 import lms.security.CurrentUser;
+import lms.security.permission.RequiresModule;
+import lms.security.permission.TenantModule;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
@@ -26,6 +28,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 /** Độc giả chỉ thao tác trên đặt trước của chính mình: readerId luôn lấy từ token, không nhận từ body. */
 @RestController
+@RequiresModule(TenantModule.LENDING)
 @RequestMapping("/internal/reservations")
 public class ReservationController {
 

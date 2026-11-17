@@ -68,7 +68,8 @@ public final class MenuTree {
             }
         }
         MenuItem item = new MenuItem(id, tenantId, details.parentId(), code, details.label(), details.path(),
-                details.icon(), details.sortOrder(), details.enabled(), details.permissionKey(), 0L, now, now);
+                details.icon(), details.sortOrder(), details.enabled(), details.permissionKey(), 0L, now, now,
+                details.module());
         items.put(id, item);
         return item;
     }
@@ -97,7 +98,7 @@ public final class MenuTree {
         }
         MenuItem updated = new MenuItem(id, current.tenantId(), newParent, current.code(), details.label(),
                 details.path(), details.icon(), details.sortOrder(), details.enabled(), details.permissionKey(),
-                current.version(), current.createdAt(), now);
+                current.version(), current.createdAt(), now, details.module());
         items.put(id, updated);
         return updated;
     }
@@ -123,7 +124,8 @@ public final class MenuTree {
     }
 
     /**
-     * Cây hiển thị cho một người xem: mục tắt ẩn cả nhánh; mục có khóa chỉ hiện khi admin hoặc có
+     * Cây hiển thị cho một người xem: mục tắt ẩn cả nhánh; mục có module không thuộc {@code viewer.modules()} ẩn cả
+     * nhánh (kể cả với admin; mục lõi {@code module == null} luôn qua); mục có khóa chỉ hiện khi admin hoặc có
      * khóa; nút nhóm chỉ hiện khi còn ít nhất một con hiện.
      */
     public List<MenuNode> visibleFor(MenuViewer viewer) {
@@ -133,7 +135,7 @@ public final class MenuTree {
     private List<MenuNode> visibleChildren(Map<UUID, List<MenuItem>> byParent, UUID parentId, MenuViewer viewer) {
         List<MenuNode> out = new ArrayList<>();
         for (MenuItem item : byParent.getOrDefault(parentId, List.of())) {
-            if (!item.enabled() || !viewer.canSee(item.permissionKey())) {
+            if (!item.enabled() || !viewer.hasModule(item.module()) || !viewer.canSee(item.permissionKey())) {
                 continue;
             }
             List<MenuNode> children = visibleChildren(byParent, item.id(), viewer);
@@ -166,6 +168,7 @@ public final class MenuTree {
         MenuRules.validatePath(d.path());
         MenuRules.validateIcon(d.icon());
         MenuRules.validatePermissionKey(d.permissionKey());
+        MenuRules.validateModule(d.module());
     }
 
     private MenuItem parentOrThrow(UUID parentId) {

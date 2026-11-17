@@ -2,6 +2,8 @@ package lms.api.circulation.client.http;
 
 import lms.api.circulation.client.CirculationClient;
 import lms.api.circulation.dto.BorrowBookRequest;
+import lms.api.circulation.dto.BorrowingPageView;
+import lms.api.circulation.dto.BorrowingSearchQuery;
 import lms.api.circulation.dto.BorrowingView;
 import lms.api.circulation.dto.CollectFinesResult;
 import lms.api.circulation.dto.ExpirationResult;
@@ -18,20 +20,21 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.util.UriBuilder;
 
 /** Gọi API nội bộ /internal/borrowings và /internal/reservations của circulation-service, ánh xạ sang DTO của FE. */
 public class HttpCirculationClient implements CirculationClient {
 
     /** DTO nội bộ của circulation-service; tách khỏi DTO cho FE để hai bên đổi độc lập. */
     record InternalBorrowing(UUID id, UUID userId, String status, LocalDate borrowDate, LocalDate dueDate,
-                             int renewCount, List<InternalItem> items, List<InternalFine> fines) {
+                             int renewCount, List<InternalItem> items, List<InternalFine> fines, UUID tenantId) {
     }
 
     record InternalItem(UUID bookCopyId, LocalDate returnDate, String condition) {
     }
 
     record InternalFine(UUID id, UUID readerId, UUID borrowingId, UUID bookCopyId, String reason,
-                        BigDecimal amount, String status, Instant createdAt, Instant paidAt) {
+                        BigDecimal amount, String status, Instant createdAt, Instant paidAt, UUID tenantId) {
     }
 
     record InternalReaderFines(UUID readerId, BigDecimal totalUnpaid, List<InternalFine> fines) {
@@ -51,17 +54,24 @@ public class HttpCirculationClient implements CirculationClient {
         this.client = client;
     }
 
+    /** Query readerId, thêm tenantId chỉ khi có giá trị (ADR-0008); không diễn giải, service tự kiểm. */
+    private static java.net.URI byReader(UriBuilder b, String path, UUID readerId, String tenantId) {
+        b.path(path).queryParam("readerId", readerId);
+        if (tenantId != null && !tenantId.isBlank()) b.queryParam("tenantId", tenantId);
+        return b.build();
+    }
+
     private static BorrowingView view(InternalBorrowing b) {
         List<BorrowingView.Item> items = b.items() == null ? List.of()
                 : b.items().stream()
                 .map(i -> new BorrowingView.Item(i.bookCopyId(), i.returnDate(), i.condition())).toList();
         return new BorrowingView(b.id(), b.userId(), b.status(), b.borrowDate(), b.dueDate(), b.renewCount(), items,
-                fines(b.fines()));
+                fines(b.fines()), b.tenantId());
     }
 
     private static FineView view(InternalFine f) {
         return new FineView(f.id(), f.readerId(), f.borrowingId(), f.bookCopyId(), f.reason(), f.amount(),
-                f.status(), f.createdAt(), f.paidAt());
+                f.status(), f.createdAt(), f.paidAt(), f.tenantId());
     }
 
     private static List<FineView> fines(List<InternalFine> list) {
@@ -105,6 +115,12 @@ public class HttpCirculationClient implements CirculationClient {
     }
 
     @Override
+    public BorrowingView getBorrowingDetail(UUID borrowingId) {
+        return view(client.get().uri("/internal/borrowings/{id}/detail", borrowingId).retrieve()
+                .body(InternalBorrowing.class));
+    }
+
+    @Override
     public BorrowingView returnCopy(ReturnCopyRequest request) {
         return view(client.post().uri("/internal/borrowings/returns").body(request).retrieve()
                 .body(InternalBorrowing.class));
@@ -122,9 +138,27 @@ public class HttpCirculationClient implements CirculationClient {
                 .body(new ParameterizedTypeReference<List<InternalBorrowing>>() { }));
     }
 
+    record InternalBorrowingPage(List<InternalBorrowing> items, long total, int page, int size) {
+    }
+
     @Override
-    public List<BorrowingView> borrowingsOfReader(UUID readerId) {
-        return borrowings(client.get().uri("/internal/borrowings?readerId={id}", readerId).retrieve()
+    public BorrowingPageView searchBorrowings(BorrowingSearchQuery q) {
+        InternalBorrowingPage p = client.get().uri(b -> {
+            b.path("/internal/borrowings/search");
+            if (q.status() != null && !q.status().isBlank()) b.queryParam("status", q.status());
+            if (q.overdue() != null) b.queryParam("overdue", q.overdue());
+            if (q.readerId() != null) b.queryParam("readerId", q.readerId());
+            if (q.page() != null) b.queryParam("page", q.page());
+            if (q.size() != null) b.queryParam("size", q.size());
+            if (q.tenantId() != null && !q.tenantId().isBlank()) b.queryParam("tenantId", q.tenantId());
+            return b.build();
+        }).retrieve().body(InternalBorrowingPage.class);
+        return new BorrowingPageView(borrowings(p.items()), p.total(), p.page(), p.size());
+    }
+
+    @Override
+    public List<BorrowingView> borrowingsOfReader(UUID readerId, String tenantId) {
+        return borrowings(client.get().uri(b -> byReader(b, "/internal/borrowings", readerId, tenantId)).retrieve()
                 .body(new ParameterizedTypeReference<List<InternalBorrowing>>() { }));
     }
 
@@ -134,8 +168,8 @@ public class HttpCirculationClient implements CirculationClient {
     }
 
     @Override
-    public ReaderFinesView finesOfReader(UUID readerId) {
-        return view(client.get().uri("/internal/fines?readerId={id}", readerId).retrieve()
+    public ReaderFinesView finesOfReader(UUID readerId, String tenantId) {
+        return view(client.get().uri(b -> byReader(b, "/internal/fines", readerId, tenantId)).retrieve()
                 .body(InternalReaderFines.class));
     }
 

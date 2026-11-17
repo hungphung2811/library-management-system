@@ -18,14 +18,15 @@ public class AuditLogController {
         this.support = support;
     }
 
-    /** Tham số lọc và phân trang; Spring tự bind từ query string. */
-    public record AuditLogQuery(String aggregateId, String eventType, Integer page, Integer size) {
+    /** Tham số lọc và phân trang; Spring tự bind từ query string. tenantId chỉ có tác dụng với platform admin (ADR-0008). */
+    public record AuditLogQuery(String aggregateId, String eventType, Integer page, Integer size,
+                                String tenantId) {
     }
 
     @GetMapping
     public PageView<AuditLogView> search(AuditLogQuery query) {
         int page = query.page() == null ? 0 : query.page();
         int size = query.size() == null ? 20 : query.size();
-        return support.searchAuditLogs(query.aggregateId(), query.eventType(), page, size);
+        return support.searchAuditLogs(query.aggregateId(), query.eventType(), query.tenantId(), page, size);
     }
 }

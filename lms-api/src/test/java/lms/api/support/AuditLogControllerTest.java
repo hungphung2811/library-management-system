@@ -46,8 +46,8 @@ class AuditLogControllerTest {
     @Test
     void locVaPhanTrangChuyenXuongService() throws Exception {
         AuditLogView log = new AuditLogView(UUID.randomUUID(), UUID.randomUUID(), "BookBorrowedEvent", "agg-1",
-                Instant.parse("2026-01-01T00:00:00Z"), Instant.parse("2026-01-01T00:00:01Z"), "{}");
-        when(support.searchAuditLogs(eq("agg-1"), eq("BookBorrowedEvent"), eq(1), eq(2)))
+                Instant.parse("2026-01-01T00:00:00Z"), Instant.parse("2026-01-01T00:00:01Z"), "{}", null);
+        when(support.searchAuditLogs(eq("agg-1"), eq("BookBorrowedEvent"), eq(null), eq(1), eq(2)))
                 .thenReturn(new PageView<>(List.of(log), 5, 1, 2));
         mvc.perform(get("/api/audit-logs").param("aggregateId", "agg-1").param("eventType", "BookBorrowedEvent")
                         .param("page", "1").param("size", "2").with(jwt()))
@@ -58,7 +58,7 @@ class AuditLogControllerTest {
 
     @Test
     void macDinhTrang0Kich20() throws Exception {
-        when(support.searchAuditLogs(eq(null), eq(null), eq(0), eq(20))).thenReturn(new PageView<>(List.of(), 0, 0, 20));
+        when(support.searchAuditLogs(eq(null), eq(null), eq(null), eq(0), eq(20))).thenReturn(new PageView<>(List.of(), 0, 0, 20));
         mvc.perform(get("/api/audit-logs").with(jwt()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.size").value(20));
     }
@@ -66,14 +66,14 @@ class AuditLogControllerTest {
     @Test
     void loi4xxChuyenNguyenVaMatKetNoiThanh503() throws Exception {
         String body = "{\"code\":\"INVALID_PAGE_SIZE\",\"message\":\"size quá lớn\",\"details\":[]}";
-        when(support.searchAuditLogs(eq(null), eq(null), eq(0), eq(1000))).thenThrow(
+        when(support.searchAuditLogs(eq(null), eq(null), eq(null), eq(0), eq(1000))).thenThrow(
                 HttpClientErrorException.create(HttpStatus.BAD_REQUEST, "Bad", HttpHeaders.EMPTY,
                         body.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8));
         mvc.perform(get("/api/audit-logs").param("size", "1000").with(jwt()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_PAGE_SIZE"));
 
-        when(support.searchAuditLogs(eq(null), eq(null), eq(0), eq(20))).thenThrow(new ResourceAccessException("down"));
+        when(support.searchAuditLogs(eq(null), eq(null), eq(null), eq(0), eq(20))).thenThrow(new ResourceAccessException("down"));
         mvc.perform(get("/api/audit-logs").with(jwt())).andExpect(status().isServiceUnavailable());
     }
 }

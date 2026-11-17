@@ -1,0 +1,167 @@
+- generic [ref=f1e2]:
+  - complementary [ref=f1e3]:
+    - navigation "Điều hướng chính" [ref=f1e4]:
+      - generic [ref=f1e5]:
+        - link "Thư viện, về trang chủ" [ref=f1e6] [cursor=pointer]:
+          - /url: /
+          - generic [ref=f1e16]:
+            - generic [ref=f1e17]: Thư viện
+            - generic [ref=f1e18]: Quản lý mượn trả
+        - button "Thu gọn menu" [expanded] [ref=f1e19] [cursor=pointer]
+      - list [ref=f1e23]:
+        - listitem [ref=f1e24]:
+          - link "Trang chủ" [ref=f1e25] [cursor=pointer]:
+            - /url: /
+        - listitem [aria-hidden] [ref=f1e32]: Nghiệp vụ
+        - listitem [ref=f1e33]:
+          - button "Sách" [expanded] [ref=f1e34] [cursor=pointer]
+          - list [ref=f1e41]:
+            - listitem [ref=f1e42]:
+              - link "Danh sách sách" [ref=f1e43] [cursor=pointer]:
+                - /url: /catalog
+            - listitem [ref=f1e44]:
+              - link "Tra mã vạch" [ref=f1e45] [cursor=pointer]:
+                - /url: /catalog/barcode
+            - listitem [ref=f1e46]:
+              - link "Thêm sách" [ref=f1e47] [cursor=pointer]:
+                - /url: /catalog/books/new
+        - listitem [ref=f1e48]:
+          - button "Mượn trả" [expanded] [ref=f1e49] [cursor=pointer]
+          - list [ref=f1e57]:
+            - listitem [ref=f1e58]:
+              - link "Lập phiếu mượn" [ref=f1e59] [cursor=pointer]:
+                - /url: /circulation/borrow
+            - listitem [ref=f1e60]:
+              - link "Nhận trả sách" [ref=f1e61] [cursor=pointer]:
+                - /url: /circulation/return
+            - listitem [ref=f1e62]:
+              - link "Tra phiếu mượn" [ref=f1e63] [cursor=pointer]:
+                - /url: /circulation/borrowings
+            - listitem [ref=f1e64]:
+              - link "Đặt trước" [ref=f1e65] [cursor=pointer]:
+                - /url: /circulation/reservations
+            - listitem [ref=f1e66]:
+              - link "Phạt" [ref=f1e67] [cursor=pointer]:
+                - /url: /circulation/fines
+        - listitem [aria-hidden] [ref=f1e68]: Hệ thống
+        - listitem [ref=f1e69]:
+          - button "Quản trị" [expanded] [ref=f1e70] [cursor=pointer]
+          - list [ref=f1e78]:
+            - listitem [ref=f1e79]:
+              - link "Người dùng" [ref=f1e80] [cursor=pointer]:
+                - /url: /admin/users
+            - listitem [ref=f1e81]:
+              - link "Vai trò và quyền" [ref=f1e82] [cursor=pointer]:
+                - /url: /admin/roles
+            - listitem [ref=f1e83]:
+              - link "Phòng ban" [ref=f1e84] [cursor=pointer]:
+                - /url: /admin/departments
+            - listitem [ref=f1e85]:
+              - link "Nhật ký hoạt động" [ref=f1e86] [cursor=pointer]:
+                - /url: /admin/audit-logs
+      - generic [ref=f1e88]:
+        - generic [ref=f1e89]:
+          - generic [aria-hidden] [ref=f1e90]: A
+          - generic [ref=f1e91]:
+            - generic "00000000-0000-0000-0000-000000000001" [ref=f1e92]: admin
+            - generic [ref=f1e93]: SUPER_ADMIN
+        - button "Đăng xuất" [ref=f1e94] [cursor=pointer]
+  - generic [ref=f1e98]:
+    - banner [ref=f1e99]:
+      - list [ref=f1e100]:
+        - listitem [ref=f1e101]:
+          - link "Trang chủ" [ref=f1e102] [cursor=pointer]:
+            - /url: /
+        - listitem [aria-hidden] [ref=f1e103]
+        - listitem [ref=f1e106]: Quản trị
+      - generic [ref=f1e107]:
+        - button "Thông báo, 0 chưa đọc" [ref=f1e108] [cursor=pointer]
+        - button "Tài khoản của tôi" [ref=f1e113] [cursor=pointer]:
+          - generic [aria-hidden] [ref=f1e114]: A
+    - main [ref=f1e115]:
+      - generic [ref=f1e117]:
+        - heading "Quản trị" [level=1] [ref=f1e118]
+        - paragraph [ref=f1e119]: Tổng quan người dùng, vai trò, phòng ban và hoạt động hệ thống.
+      - generic [ref=f1e120]:
+        - generic [ref=f1e121]: "Vai trò của bạn: SUPER_ADMIN"
+        - generic [ref=f1e122]:
+          - link "Người dùng 5" [ref=f1e123] [cursor=pointer]:
+            - /url: /admin/users
+            - generic [ref=f1e126]:
+              - generic [ref=f1e127]: Người dùng
+              - generic [ref=f1e129]: "5"
+          - link "Vai trò 5 1 vai trò quản trị" [ref=f1e131] [cursor=pointer]:
+            - /url: /admin/roles
+            - generic [ref=f1e133]:
+              - generic [ref=f1e134]:
+                - generic [ref=f1e135]: Vai trò
+                - generic [ref=f1e137]: "5"
+              - generic [ref=f1e139]: 1 vai trò quản trị
+          - link "Phòng ban 3 3 đang dùng" [ref=f1e140] [cursor=pointer]:
+            - /url: /admin/departments
+            - generic [ref=f1e142]:
+              - generic [ref=f1e143]:
+                - generic [ref=f1e144]: Phòng ban
+                - generic [ref=f1e146]: "3"
+              - generic [ref=f1e148]: 3 đang dùng
+          - link "Sự kiện đã ghi —" [ref=f1e149] [cursor=pointer]:
+            - /url: /admin/audit-logs
+            - generic [ref=f1e152]:
+              - generic [ref=f1e153]: Sự kiện đã ghi
+              - generic [ref=f1e155]: —
+        - generic [ref=f1e157]:
+          - link "Người dùng Tạo, sửa, khóa tài khoản và thẻ độc giả." [ref=f1e158] [cursor=pointer]:
+            - /url: /admin/users
+            - generic [ref=f1e160]:
+              - generic [ref=f1e161]: Người dùng
+              - generic [ref=f1e162]: Tạo, sửa, khóa tài khoản và thẻ độc giả.
+          - link "Vai trò và quyền Gán quyền cho vai trò, gán vai trò cho người dùng." [ref=f1e163] [cursor=pointer]:
+            - /url: /admin/roles
+            - generic [ref=f1e165]:
+              - generic [ref=f1e166]: Vai trò và quyền
+              - generic [ref=f1e167]: Gán quyền cho vai trò, gán vai trò cho người dùng.
+          - link "Phòng ban Cây phòng ban và trạng thái sử dụng." [ref=f1e168] [cursor=pointer]:
+            - /url: /admin/departments
+            - generic [ref=f1e170]:
+              - generic [ref=f1e171]: Phòng ban
+              - generic [ref=f1e172]: Cây phòng ban và trạng thái sử dụng.
+          - link "Nhật ký hoạt động Tra cứu sự kiện nghiệp vụ theo đối tượng hoặc loại." [ref=f1e173] [cursor=pointer]:
+            - /url: /admin/audit-logs
+            - generic [ref=f1e175]:
+              - generic [ref=f1e176]: Nhật ký hoạt động
+              - generic [ref=f1e177]: Tra cứu sự kiện nghiệp vụ theo đối tượng hoặc loại.
+        - generic [ref=f1e178]:
+          - generic [ref=f1e179]:
+            - generic [ref=f1e180]: Hoạt động gần đây
+            - alert [ref=f1e185]:
+              - img "close-circle" [ref=f1e187]
+              - generic [ref=f1e190]: Hệ thống tạm thời chưa phản hồi. Vui lòng thử lại sau ít phút.
+              - link "Thử lại" [ref=f1e193] [cursor=pointer]:
+                - /url: /admin
+          - generic [ref=f1e195]:
+            - generic [ref=f1e196]: Vai trò
+            - table [ref=f1e208]:
+              - rowgroup [ref=f1e209]:
+                - row [ref=f1e210]:
+                  - columnheader "Vai trò" [ref=f1e211]
+              - rowgroup [ref=f1e212]:
+                - row [ref=f1e213]:
+                  - cell [ref=f1e214]:
+                    - link "DEPARTMENT_MANAGER" [ref=f1e215] [cursor=pointer]:
+                      - /url: /admin/roles/c29d18bb-1208-4a2f-a397-004371ad1500
+                - row [ref=f1e216]:
+                  - cell [ref=f1e217]:
+                    - link "LIBRARIAN" [ref=f1e218] [cursor=pointer]:
+                      - /url: /admin/roles/f5970379-b988-4262-a491-1742fe32d619
+                - row [ref=f1e219]:
+                  - cell [ref=f1e220]:
+                    - link "LIBRARY_ADMIN" [ref=f1e221] [cursor=pointer]:
+                      - /url: /admin/roles/4fcfdbcc-e6fc-4f39-afc1-1053c8373e04
+                - row [ref=f1e222]:
+                  - cell [ref=f1e223]:
+                    - link "MEMBER" [ref=f1e224] [cursor=pointer]:
+                      - /url: /admin/roles/4a2c29b1-9ea6-41ab-9570-f92856937e17
+                - row [ref=f1e225]:
+                  - cell [ref=f1e226]:
+                    - link "SUPER_ADMIN" [ref=f1e227] [cursor=pointer]:
+                      - /url: /admin/roles/3538e45e-1716-4e45-907f-4a12fa0f33b6

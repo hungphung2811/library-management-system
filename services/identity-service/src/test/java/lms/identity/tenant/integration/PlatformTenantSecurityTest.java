@@ -159,11 +159,12 @@ class PlatformTenantSecurityTest {
 
     @Test
     void platformAdminKhongCanTenantIdGoiDuocMoiEndpoint() throws Exception {
-        TenantResponse response = new TenantResponse(TENANT, "lib-a", "Thư viện A", null, TenantStatus.ACTIVE, 1);
+        TenantResponse response = new TenantResponse(TENANT, "lib-a", "Thư viện A", null, TenantStatus.ACTIVE, 1,
+                List.of("LENDING"));
         when(create.execute(any(), eq(OPERATOR))).thenReturn(response);
         when(search.execute(any())).thenReturn(new PageResponse<>(List.of(response), 1, 0, 20));
         when(getTenant.execute(TENANT)).thenReturn(new TenantDetailResponse(TENANT, "lib-a", "Thư viện A", null,
-                TenantStatus.ACTIVE, 1, List.of()));
+                TenantStatus.ACTIVE, 1, List.of(), List.of("LENDING")));
         when(update.execute(eq(TENANT), any(), eq(OPERATOR))).thenReturn(response);
         when(status.suspend(TENANT, OPERATOR)).thenReturn(response);
         when(status.activate(TENANT, OPERATOR)).thenReturn(response);

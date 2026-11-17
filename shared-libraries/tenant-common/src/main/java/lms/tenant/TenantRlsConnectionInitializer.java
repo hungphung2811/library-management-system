@@ -41,7 +41,10 @@ public class TenantRlsConnectionInitializer implements BeanPostProcessor {
     public static final String SETTING = "app.tenant_id";
 
     private static final org.slf4j.Logger log = LoggerFactory.getLogger(TenantRlsConnectionInitializer.class);
-    private static final String SET_SQL = "SELECT set_config('" + SETTING + "', ?, false)";
+    public static final String SCOPE_SETTING = "app.tenant_scope";
+    /** Đặt cả hai biến trong cùng một câu lệnh để không bao giờ lệch nhau. */
+    static final String SET_SQL = "SELECT set_config('" + SETTING + "', ?, false), set_config('" + SCOPE_SETTING
+            + "', ?, false)";
 
     @Override
     public Object postProcessAfterInitialization(Object bean, String beanName) {
@@ -56,9 +59,16 @@ public class TenantRlsConnectionInitializer implements BeanPostProcessor {
         return dataSource instanceof TenantRlsDataSource ? dataSource : new TenantRlsDataSource(dataSource);
     }
 
-    /** Đặt {@code app.tenant_id} theo tenant hiện tại (rỗng nếu không có). */
+    /**
+     * Đặt {@code app.tenant_id} và {@code app.tenant_scope} theo {@link TenantContext}: ALL thì ('', 'all'), một tenant
+     * thì (t, ''), không có thì ('', '').
+     */
     static void apply(Connection connection) throws SQLException {
-        set(connection, TenantContext.current().map(UUID::toString).orElse(""));
+        if (TenantContext.isAllTenants()) {
+            set(connection, "", "all");
+        } else {
+            set(connection, TenantContext.current().map(UUID::toString).orElse(""), "");
+        }
     }
 
     /** Xóa {@code app.tenant_id} trước khi kết nối về pool. */
@@ -66,13 +76,14 @@ public class TenantRlsConnectionInitializer implements BeanPostProcessor {
         // Việc dở (nếu có) vốn cũng bị pool rollback khi trả kết nối; rollback trước để lệnh xóa không hỏng theo
         // một transaction đã lỗi.
         if (!connection.isClosed() && !connection.getAutoCommit()) connection.rollback();
-        set(connection, "");
+        set(connection, "", "");
     }
 
-    private static void set(Connection connection, String value) throws SQLException {
+    private static void set(Connection connection, String tenant, String scope) throws SQLException {
         if (connection.isClosed() || !isPostgres(connection)) return;
         try (PreparedStatement statement = connection.prepareStatement(SET_SQL)) {
-            statement.setString(1, value);
+            statement.setString(1, tenant);
+            statement.setString(2, scope);
             statement.execute();
         }
         // Kết nối vừa mượn/sắp trả không có việc dở; commit để giá trị phiên không bị rollback của transaction sau xóa.

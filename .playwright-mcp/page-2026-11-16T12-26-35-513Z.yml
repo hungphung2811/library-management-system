@@ -1,0 +1,154 @@
+- generic [active] [ref=f4e1]:
+  - generic [ref=f4e2]:
+    - complementary [ref=f4e3]:
+      - navigation "Điều hướng chính" [ref=f4e4]:
+        - generic [ref=f4e5]:
+          - link "Thư viện, về trang chủ" [ref=f4e6] [cursor=pointer]:
+            - /url: /
+            - generic [ref=f4e16]:
+              - generic [ref=f4e17]: Thư viện
+              - generic [ref=f4e18]: Quản lý mượn trả
+          - button "Thu gọn menu" [expanded] [ref=f4e19] [cursor=pointer]
+        - list [ref=f4e23]:
+          - listitem [ref=f4e24]:
+            - link "Trang chủ" [ref=f4e25] [cursor=pointer]:
+              - /url: /
+          - listitem [aria-hidden] [ref=f4e32]: Nghiệp vụ
+          - listitem [ref=f4e33]:
+            - button "Sách" [expanded] [ref=f4e34] [cursor=pointer]
+            - list [ref=f4e41]:
+              - listitem [ref=f4e42]:
+                - link "Danh sách sách" [ref=f4e43] [cursor=pointer]:
+                  - /url: /catalog
+              - listitem [ref=f4e44]:
+                - link "Tra mã vạch" [ref=f4e45] [cursor=pointer]:
+                  - /url: /catalog/barcode
+              - listitem [ref=f4e46]:
+                - link "Thêm sách" [ref=f4e47] [cursor=pointer]:
+                  - /url: /catalog/books/new
+          - listitem [ref=f4e48]:
+            - button "Mượn trả" [ref=f4e49] [cursor=pointer]
+          - listitem [aria-hidden] [ref=f4e57]: Hệ thống
+          - listitem [ref=f4e58]:
+            - button "Quản trị" [ref=f4e59] [cursor=pointer]
+        - generic [ref=f4e68]:
+          - generic [ref=f4e69]:
+            - generic [aria-hidden] [ref=f4e70]: A
+            - generic [ref=f4e71]:
+              - generic "00000000-0000-0000-0000-000000000001" [ref=f4e72]: admin
+              - generic [ref=f4e73]: SUPER_ADMIN
+          - button "Đăng xuất" [ref=f4e74] [cursor=pointer]
+    - generic [ref=f4e78]:
+      - banner [ref=f4e79]:
+        - list [ref=f4e80]:
+          - listitem [ref=f4e81]:
+            - link "Trang chủ" [ref=f4e82] [cursor=pointer]:
+              - /url: /
+          - listitem [aria-hidden] [ref=f4e83]
+          - listitem [ref=f4e86]: Sách
+          - listitem [aria-hidden] [ref=f4e87]
+          - listitem [ref=f4e90]: Danh sách sách
+        - generic [ref=f4e91]:
+          - button "Thông báo, 0 chưa đọc" [ref=f4e92] [cursor=pointer]
+          - button "Tài khoản của tôi" [ref=f4e97] [cursor=pointer]:
+            - generic [aria-hidden] [ref=f4e98]: A
+      - main [ref=f4e99]:
+        - generic [ref=f4e101]:
+          - heading "Sách" [level=1] [ref=f4e102]
+          - paragraph [ref=f4e103]: Tìm đầu sách và xem số bản sẵn có.
+        - generic [ref=f4e104]:
+          - generic [ref=f4e105]:
+            - searchbox "Tìm theo tên sách, tác giả hoặc ISBN" [ref=f4e111]
+            - generic [ref=f4e113]:
+              - switch "Chỉ hiện sách còn bản sẵn sàng" [ref=f4e114] [cursor=pointer]
+              - generic [ref=f4e117]: Chỉ hiện sách còn bản sẵn sàng
+          - table [ref=f4e126]:
+            - rowgroup [ref=f4e127]:
+              - row [ref=f4e128]:
+                - columnheader "Tên sách" [ref=f4e129]
+                - columnheader "Tác giả" [ref=f4e130]
+                - columnheader "ISBN" [ref=f4e131]
+                - columnheader "Giá bìa" [ref=f4e132]
+                - columnheader "Còn sẵn" [ref=f4e133]
+            - rowgroup [ref=f4e134]:
+              - row [ref=f4e135]:
+                - cell [ref=f4e136]:
+                  - link "Cấu trúc dữ liệu và giải thuật" [ref=f4e137] [cursor=pointer]:
+                    - /url: /catalog/books/8b517f83-c422-461d-ba63-790edf138e52
+                - cell "Trần Thị Bình" [ref=f4e138]
+                - cell "9786040000028" [ref=f4e139]
+                - cell "210.000 ₫" [ref=f4e140]
+                - cell "1 bản" [ref=f4e141]
+              - row [ref=f4e143]:
+                - cell [ref=f4e144]:
+                  - link "Cơ sở dữ liệu quan hệ" [ref=f4e145] [cursor=pointer]:
+                    - /url: /catalog/books/4ae8d2c1-1905-4a9a-bcac-c056aa4c1858
+                - cell "Lê Hoàng Cường" [ref=f4e146]
+                - cell "9786040000035" [ref=f4e147]
+                - cell "175.000 ₫" [ref=f4e148]
+                - cell "1 bản" [ref=f4e149]
+              - row [ref=f4e151]:
+                - cell [ref=f4e152]:
+                  - link "Dế Mèn phiêu lưu ký" [ref=f4e153] [cursor=pointer]:
+                    - /url: /catalog/books/8b0bff5c-26b7-459e-b897-37b0b0213476
+                - cell "Tô Hoài" [ref=f4e154]
+                - cell "9786040000097" [ref=f4e155]
+                - cell "62.000 ₫" [ref=f4e156]
+                - cell "3 bản" [ref=f4e157]
+              - row [ref=f4e159]:
+                - cell [ref=f4e160]:
+                  - link "Kiến trúc phần mềm" [ref=f4e161] [cursor=pointer]:
+                    - /url: /catalog/books/6970fb70-e43f-4b5c-9f87-b8497bf7e179
+                - cell "Đặng Thu Hà" [ref=f4e162]
+                - cell "9786040000066" [ref=f4e163]
+                - cell "260.000 ₫" [ref=f4e164]
+                - cell "1 bản" [ref=f4e165]
+              - row [ref=f4e167]:
+                - cell [ref=f4e168]:
+                  - link "Lập trình Java căn bản" [ref=f4e169] [cursor=pointer]:
+                    - /url: /catalog/books/36a2459f-b98c-4793-9a6d-2bc5f1eccbf7
+                - cell "Nguyễn Văn An" [ref=f4e170]
+                - cell "9786040000011" [ref=f4e171]
+                - cell "185.000 ₫" [ref=f4e172]
+                - cell "2 bản" [ref=f4e173]
+              - row [ref=f4e175]:
+                - cell [ref=f4e176]:
+                  - link "Mạng máy tính" [ref=f4e177] [cursor=pointer]:
+                    - /url: /catalog/books/da6d6611-f525-498e-a87a-f7e73847b052
+                - cell "Phạm Quốc Dũng" [ref=f4e178]
+                - cell "9786040000042" [ref=f4e179]
+                - cell "195.000 ₫" [ref=f4e180]
+                - cell "3 bản" [ref=f4e181]
+              - row [ref=f4e183]:
+                - cell [ref=f4e184]:
+                  - link "Nhà giả kim" [ref=f4e185] [cursor=pointer]:
+                    - /url: /catalog/books/1d2cef66-82fd-4266-97dc-bfecf4203a16
+                - cell "Paulo Coelho" [ref=f4e186]
+                - cell "9786040000080" [ref=f4e187]
+                - cell "89.000 ₫" [ref=f4e188]
+                - cell "3 bản" [ref=f4e189]
+              - row [ref=f4e191]:
+                - cell [ref=f4e192]:
+                  - link "Toán rời rạc" [ref=f4e193] [cursor=pointer]:
+                    - /url: /catalog/books/072791a9-ed95-4974-afeb-9c75b23b9439
+                - cell "Hoàng Gia Huy" [ref=f4e194]
+                - cell "9786040000073" [ref=f4e195]
+                - cell "150.000 ₫" [ref=f4e196]
+                - cell "3 bản" [ref=f4e197]
+              - row [ref=f4e199]:
+                - cell [ref=f4e200]:
+                  - link "Trí tuệ nhân tạo nhập môn" [ref=f4e201] [cursor=pointer]:
+                    - /url: /catalog/books/3c500d1e-56ee-4f23-952b-451510e263f5
+                - cell "Võ Minh Em" [ref=f4e202]
+                - cell "9786040000059" [ref=f4e203]
+                - cell "240.000 ₫" [ref=f4e204]
+                - cell "1 bản" [ref=f4e205]
+              - row [ref=f4e207]:
+                - cell [ref=f4e208]:
+                  - link "Việt Nam sử lược" [ref=f4e209] [cursor=pointer]:
+                    - /url: /catalog/books/a7224377-90ec-48bc-9f13-86d4636ececd
+                - cell "Trần Trọng Kim" [ref=f4e210]
+                - cell "9786040000103" [ref=f4e211]
+                - cell "120.000 ₫" [ref=f4e212]
+                - cell "2 bản" [ref=f4e213]
+  - button "Open Next.js Dev Tools" [ref=f4e220] [cursor=pointer]

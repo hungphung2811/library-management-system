@@ -8,7 +8,7 @@ import java.util.UUID;
  * (Kafka at-least-once) chỉ tạo đúng một bản ghi.
  */
 public record AuditLog(UUID id, UUID eventId, String eventType, String aggregateId, Instant occurredAt,
-                       Instant recordedAt, String payload) {
+                       Instant recordedAt, String payload, UUID tenantId) {
 
     public AuditLog {
         if (id == null) throw new InvalidAuditEventException("id không được null");
@@ -22,6 +22,7 @@ public record AuditLog(UUID id, UUID eventId, String eventType, String aggregate
 
     public static AuditLog capture(UUID eventId, String eventType, String aggregateId, Instant occurredAt,
                                    String payload, Instant now) {
-        return new AuditLog(UUID.randomUUID(), eventId, eventType, aggregateId, occurredAt, now, payload);
+        // tenantId do TenantContext/@TenantId gán lúc ghi; chỉ có giá trị khi đọc lại từ DB
+        return new AuditLog(UUID.randomUUID(), eventId, eventType, aggregateId, occurredAt, now, payload, null);
     }
 }

@@ -236,6 +236,67 @@ class TokenServiceTenantTest {
         assertThat(issued.get(0).departmentId()).isEqualTo(deptInB);
     }
 
+    // ---- claim modules (ADR-0009) ----
+
+    @Test
+    void dangNhapPhatClaimModulesCuaTenantDaChon() {
+        when(tenants.selectForLogin(userId, "lib-a", false)).thenReturn(new TenantChoice(tenantA, List.of(summaryA)));
+        when(tenants.modules(tenantA)).thenReturn(List.of("LENDING", "SALES"));
+
+        service.issueFor(credential(false, false), "lib-a");
+
+        assertThat(issued.get(0).modules()).containsExactly("LENDING", "SALES");
+        verify(tenants).modules(tenantA);
+        verify(tenants, never()).modules(tenantB);
+    }
+
+    @Test
+    void doiTenantPhatModulesCuaTenantDich() {
+        when(tenants.modules(tenantA)).thenReturn(List.of("LENDING"));
+        when(tenants.modules(tenantB)).thenReturn(List.of("SALES"));
+
+        service.issueForTenant(credential(false, false), new TenantChoice(tenantA, List.of(summaryA, summaryB)));
+        service.issueForTenant(credential(false, false), new TenantChoice(tenantB, List.of(summaryA, summaryB)));
+
+        assertThat(issued.get(0).modules()).containsExactly("LENDING");
+        assertThat(issued.get(1).modules()).containsExactly("SALES");
+    }
+
+    @Test
+    void phienNenTangKhongCoTenantThiKhongCoClaimModulesVaKhongDocModules() {
+        when(tenants.selectForLogin(userId, null, true)).thenReturn(new TenantChoice(null, List.of()));
+
+        service.issueFor(credential(false, true));
+
+        assertThat(issued.get(0).modules()).isNull();
+        verify(tenants, never()).modules(any());
+    }
+
+    @Test
+    void tokenPhaiDoiMatKhauVanMangModules() {
+        when(tenants.selectForLogin(userId, null, false)).thenReturn(new TenantChoice(tenantA, List.of(summaryA)));
+        when(tenants.modules(tenantA)).thenReturn(List.of("LENDING"));
+
+        service.issueFor(credential(true, false));
+
+        assertThat(issued.get(0).mustChangePassword()).isTrue();
+        assertThat(issued.get(0).modules()).containsExactly("LENDING");
+    }
+
+    @Test
+    void refreshDocLaiModulesMoiNhatCuaTenant() {
+        RefreshToken old = stored(RefreshToken.issueForTenant(userId, tenantB, "h-raw-old", now.minusSeconds(60),
+                Duration.ofDays(7)));
+        when(credentials.findByUserId(userId)).thenReturn(Optional.of(credential(false, false)));
+        when(tenants.verify(userId, tenantB)).thenReturn(new TenantChoice(tenantB, List.of(summaryB)));
+        when(tenants.modules(tenantB)).thenReturn(List.of("LENDING", "SALES"));
+
+        refresh().execute("raw-old");
+
+        assertThat(old.isRevoked()).isTrue();
+        assertThat(issued.get(0).modules()).containsExactly("LENDING", "SALES");
+    }
+
     // ---- refresh ----
 
     private RefreshTokenUseCase refresh() {
@@ -468,5 +529,69 @@ class TokenServiceTenantTest {
         registerWith(Set.of(member)).execute(member, "bob", "password1", null, false, tenantA);
 
         verify(tenants).addMember(member, tenantA, null);
+    }
+    // ---- refresh có tenantId (ADR-0013 2.4) ----
+
+    @Test
+    void refreshCoTenantIdDungThiXoayVongBinhThuong() {
+        RefreshToken old = stored(RefreshToken.issueForTenant(userId, tenantB, "h-raw-old", now.minusSeconds(60), Duration.ofDays(7)));
+        when(credentials.findByUserId(userId)).thenReturn(Optional.of(credential(false, false)));
+        when(tenants.verify(userId, tenantB)).thenReturn(new TenantChoice(tenantB, List.of(summaryB)));
+
+        TokenResponse response = refresh().execute("raw-old", lms.identity.auth.domain.TokenChannel.STAFF, tenantB);
+
+        assertThat(old.isRevoked()).isTrue();
+        assertThat(response.tenantId()).isEqualTo(tenantB);
+    }
+
+    @Test
+    void refreshSaiTenantIdLa401KhongXoayVongVaTokenVanDungDuocODungTenant() {
+        RefreshToken old = stored(RefreshToken.issueForTenant(userId, tenantB, "h-raw-old", now.minusSeconds(60), Duration.ofDays(7)));
+        when(credentials.findByUserId(userId)).thenReturn(Optional.of(credential(false, false)));
+        when(tenants.verify(userId, tenantB)).thenReturn(new TenantChoice(tenantB, List.of(summaryB)));
+
+        assertThatThrownBy(() -> refresh().execute("raw-old", lms.identity.auth.domain.TokenChannel.STAFF, tenantA))
+                .isInstanceOf(InvalidRefreshTokenException.class);
+
+        assertThat(old.isRevoked()).isFalse();
+        assertThat(savedRefresh).isEmpty();
+        assertThat(issued).isEmpty();
+        assertThat(revokedAllFor).isEmpty();
+        // token không bị đốt: dùng đúng tenant vẫn được
+        assertThat(refresh().execute("raw-old", lms.identity.auth.domain.TokenChannel.STAFF, tenantB).tenantId())
+                .isEqualTo(tenantB);
+    }
+
+    @Test
+    void phienNenTangCoTenantIdLa401VaKhongXoayVong() {
+        RefreshToken old = stored(RefreshToken.issueForPlatform(userId, "h-raw-old", now.minusSeconds(60), Duration.ofDays(7)));
+
+        assertThatThrownBy(() -> refresh().execute("raw-old", lms.identity.auth.domain.TokenChannel.STAFF, tenantA))
+                .isInstanceOf(InvalidRefreshTokenException.class);
+
+        assertThat(old.isRevoked()).isFalse();
+        assertThat(savedRefresh).isEmpty();
+    }
+
+    @Test
+    void khongGuiTenantIdThiNhuCu() {
+        RefreshToken old = stored(RefreshToken.issueForTenant(userId, tenantB, "h-raw-old", now.minusSeconds(60), Duration.ofDays(7)));
+        when(credentials.findByUserId(userId)).thenReturn(Optional.of(credential(false, false)));
+        when(tenants.verify(userId, tenantB)).thenReturn(new TenantChoice(tenantB, List.of(summaryB)));
+
+        refresh().execute("raw-old", lms.identity.auth.domain.TokenChannel.STAFF, null);
+
+        assertThat(old.isRevoked()).isTrue();
+    }
+
+    @Test
+    void tokenDaThuHoiGuiQuaTenantSaiVanKichHoatThuHoiMoiPhien() {
+        RefreshToken old = stored(RefreshToken.issueForTenant(userId, tenantB, "h-raw-old", now.minusSeconds(60), Duration.ofDays(7)));
+        old.revoke();
+
+        assertThatThrownBy(() -> refresh().execute("raw-old", lms.identity.auth.domain.TokenChannel.STAFF, tenantA))
+                .isInstanceOf(InvalidRefreshTokenException.class);
+
+        assertThat(revokedAllFor).containsExactly(userId);
     }
 }

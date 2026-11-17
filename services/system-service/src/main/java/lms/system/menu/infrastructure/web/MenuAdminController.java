@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 import lms.system.menu.application.CreateMenuUseCase;
 import lms.system.menu.application.DeleteMenuUseCase;
+import lms.system.menu.application.InitializeDefaultMenusUseCase;
 import lms.system.menu.application.ListMenusUseCase;
 import lms.system.menu.application.UpdateMenuUseCase;
 import lms.tenant.TenantContext;
@@ -20,7 +21,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Quản trị menu. Khóa quyền động mặc định MenuAdminController/{listMenus,createMenu,updateMenu,deleteMenu}
+ * Quản trị menu. Khóa quyền động mặc định MenuAdminController/{listMenus,createMenu,updateMenu,deleteMenu,initializeDefaults}
  * (ADR-0003): admin dùng ngay, người khác cần được gán khóa. Đặt tên xong không đổi (đổi là role mất quyền).
  */
 @RestController
@@ -31,18 +32,32 @@ public class MenuAdminController {
     private final CreateMenuUseCase createMenu;
     private final UpdateMenuUseCase updateMenu;
     private final DeleteMenuUseCase deleteMenu;
+    private final InitializeDefaultMenusUseCase initializeDefaults;
 
     public MenuAdminController(ListMenusUseCase listMenus, CreateMenuUseCase createMenu,
-                               UpdateMenuUseCase updateMenu, DeleteMenuUseCase deleteMenu) {
+                               UpdateMenuUseCase updateMenu, DeleteMenuUseCase deleteMenu,
+                               InitializeDefaultMenusUseCase initializeDefaults) {
         this.listMenus = listMenus;
         this.createMenu = createMenu;
         this.updateMenu = updateMenu;
         this.deleteMenu = deleteMenu;
+        this.initializeDefaults = initializeDefaults;
     }
 
     @GetMapping
-    public List<MenuResponses.AdminNode> listMenus() {
-        return listMenus.execute(TenantContext.require()).stream().map(MenuResponses.AdminNode::from).toList();
+    public MenuResponses.AdminList listMenus() {
+        ListMenusUseCase.Result result = listMenus.result(TenantContext.require());
+        return new MenuResponses.AdminList(result.usingDefaults(),
+                result.items().stream().map(MenuResponses.AdminNode::from).toList());
+    }
+
+    /** Chép bộ menu mặc định thành dữ liệu của tenant; đã có dữ liệu thì 409 MENU_ALREADY_INITIALIZED. */
+    @PostMapping("/defaults")
+    @ResponseStatus(HttpStatus.CREATED)
+    public MenuResponses.AdminList initializeDefaults() {
+        List<MenuResponses.AdminNode> items = initializeDefaults.execute(TenantContext.require()).stream()
+                .map(MenuResponses.AdminNode::from).toList();
+        return new MenuResponses.AdminList(false, items);
     }
 
     @PostMapping

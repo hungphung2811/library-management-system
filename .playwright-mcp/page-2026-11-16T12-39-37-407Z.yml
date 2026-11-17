@@ -1,0 +1,84 @@
+- generic [active] [ref=f11e1]:
+  - generic [ref=f11e2]:
+    - complementary [ref=f11e3]:
+      - navigation "Điều hướng chính" [ref=f11e4]:
+        - generic [ref=f11e5]:
+          - link "Thư viện, về trang chủ" [ref=f11e6] [cursor=pointer]:
+            - /url: /
+            - generic [ref=f11e16]:
+              - generic [ref=f11e17]: Thư viện
+              - generic [ref=f11e18]: Quản lý mượn trả
+          - button "Thu gọn menu" [expanded] [ref=f11e19] [cursor=pointer]
+        - list [ref=f11e23]:
+          - listitem [ref=f11e24]:
+            - link "Trang chủ" [ref=f11e25] [cursor=pointer]:
+              - /url: /
+          - listitem [aria-hidden] [ref=f11e32]: Nghiệp vụ
+          - listitem [ref=f11e33]:
+            - button "Sách" [ref=f11e34] [cursor=pointer]
+          - listitem [ref=f11e41]:
+            - button "Mượn trả" [ref=f11e42] [cursor=pointer]
+          - listitem [aria-hidden] [ref=f11e50]: Hệ thống
+          - listitem [ref=f11e51]:
+            - button "Quản trị" [ref=f11e52] [cursor=pointer]
+        - generic [ref=f11e61]:
+          - generic [ref=f11e62]:
+            - generic [aria-hidden] [ref=f11e63]: A
+            - generic [ref=f11e64]:
+              - generic "00000000-0000-0000-0000-000000000001" [ref=f11e65]: admin
+              - generic [ref=f11e66]: SUPER_ADMIN
+          - button "Đăng xuất" [ref=f11e67] [cursor=pointer]
+    - generic [ref=f11e71]:
+      - banner [ref=f11e72]:
+        - list [ref=f11e73]:
+          - listitem [ref=f11e74]:
+            - link "Trang chủ" [ref=f11e75] [cursor=pointer]:
+              - /url: /
+        - generic [ref=f11e76]:
+          - 'button "Đơn vị làm việc: Thư viện Đại học Kinh tế" [ref=f11e149] [cursor=pointer]':
+            - generic [ref=f11e154]: Thư viện Đại học Kinh tế
+          - button "Thông báo, 0 chưa đọc" [ref=f11e77] [cursor=pointer]
+          - button "Tài khoản của tôi" [ref=f11e82] [cursor=pointer]:
+            - generic [aria-hidden] [ref=f11e83]: A
+      - main [ref=f11e84]:
+        - generic [ref=f11e86]:
+          - heading "Tổng quan" [level=1] [ref=f11e87]
+          - paragraph [ref=f11e88]: Chọn một phân hệ để bắt đầu làm việc
+        - generic [ref=f11e89]:
+          - generic [ref=f11e90]:
+            - link "Sách Đầu sách và bản sao" [ref=f11e91] [cursor=pointer]:
+              - /url: /catalog
+              - generic [ref=f11e95]: Sách
+              - generic [ref=f11e96]: Đầu sách và bản sao
+            - link "Mượn trả Mượn, trả, gia hạn" [ref=f11e97] [cursor=pointer]:
+              - /url: /circulation
+              - generic [ref=f11e102]: Mượn trả
+              - generic [ref=f11e103]: Mượn, trả, gia hạn
+            - link "Quản trị Phân quyền hệ thống" [ref=f11e104] [cursor=pointer]:
+              - /url: /admin
+              - generic [ref=f11e109]: Quản trị
+              - generic [ref=f11e110]: Phân quyền hệ thống
+            - link "Hồ sơ Tài khoản và thẻ thư viện" [ref=f11e111] [cursor=pointer]:
+              - /url: /profile
+              - generic [ref=f11e116]: Hồ sơ
+              - generic [ref=f11e117]: Tài khoản và thẻ thư viện
+            - link "Mật khẩu Đổi mật khẩu của bạn" [ref=f11e118] [cursor=pointer]:
+              - /url: /change-password
+              - generic [ref=f11e123]: Mật khẩu
+              - generic [ref=f11e124]: Đổi mật khẩu của bạn
+          - generic [ref=f11e125]:
+            - generic [ref=f11e126]:
+              - heading "Xin chào, admin" [level=2] [ref=f11e127]
+              - paragraph [ref=f11e128]: Các phân hệ bạn thấy trong thanh bên phụ thuộc vào vai trò và quyền được cấp cho tài khoản này.
+              - generic [ref=f11e129]:
+                - generic [ref=f11e130]:
+                  - term [ref=f11e131]: Vai trò
+                  - definition [ref=f11e132]:
+                    - generic [ref=f11e133]: SUPER_ADMIN
+                - generic [ref=f11e134]:
+                  - term [ref=f11e135]: Phạm vi quyền
+                  - definition [ref=f11e136]: Quản trị viên (toàn quyền)
+            - link "Mở phân hệ Mượn trả" [ref=f11e138] [cursor=pointer]:
+              - /url: /circulation
+  - button "Open Next.js Dev Tools" [ref=f11e144] [cursor=pointer]
+  - alert [ref=f11e148]

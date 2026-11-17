@@ -13,9 +13,9 @@ public interface DepartmentClient {
 
     DepartmentView create(CreateDepartmentRequest request);
 
-    List<DepartmentView> list(String status);
+    List<DepartmentView> list(String status, String tenantId);
 
-    List<DepartmentNodeView> tree(boolean includeInactive);
+    List<DepartmentNodeView> tree(boolean includeInactive, String tenantId);
 
     DepartmentView get(UUID id);
 

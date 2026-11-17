@@ -81,6 +81,39 @@ class JwtTokenIssuerTest {
     }
 
     @Test
+    void ghiClaimModulesLaMangChuoiChiKhiTokenCoTenantId() throws Exception {
+        KeyPair pair = PemKeys.generate();
+        RSAKey rsaKey = new RSAKey.Builder((RSAPublicKey) pair.getPublic()).privateKey((RSAPrivateKey) pair.getPrivate())
+                .keyIDFromThumbprint().build();
+        JwtTokenIssuer issuer = new JwtTokenIssuer(new NimbusJwtEncoder(new ImmutableJWKSet<>(new JWKSet(rsaKey))),
+                rsaKey.getKeyID(), "library-auth-service", Duration.ofMinutes(15), Clock.systemUTC());
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withPublicKey(rsaKey.toRSAPublicKey()).build();
+        UUID userId = UUID.randomUUID();
+        UUID tenantId = UUID.randomUUID();
+
+        Jwt tenantToken = decoder.decode(issuer.issue(new TokenIssuerPort.Claims(userId, "alice", null, List.of(),
+                List.of("k"), false, false, tenantId, false, List.of("LENDING", "SALES"))).value());
+        Object rawModules = tenantToken.getClaim(JwtClaims.MODULES);
+        assertThat(rawModules).isInstanceOf(java.util.Collection.class);
+        assertThat(tenantToken.getClaimAsStringList(JwtClaims.MODULES)).containsExactly("LENDING", "SALES");
+
+        // phiên nền tảng (không tenantId): không có claim modules dù người gọi có truyền
+        Jwt platformToken = decoder.decode(issuer.issue(new TokenIssuerPort.Claims(userId, "root", null, List.of(),
+                List.of(), false, false, null, true, List.of("LENDING"))).value());
+        assertThat(platformToken.hasClaim(JwtClaims.MODULES)).isFalse();
+
+        // không truyền modules (null): không ghi claim, resource server áp dụng cờ legacy-modules-claim-fallback
+        Jwt legacy = decoder.decode(issuer.issue(new TokenIssuerPort.Claims(userId, "alice", null, List.of(),
+                List.of("k"), false, false, tenantId, false)).value());
+        assertThat(legacy.hasClaim(JwtClaims.MODULES)).isFalse();
+
+        // token phải-đổi-mật-khẩu vẫn mang modules (không phải đặc quyền)
+        Jwt forced = decoder.decode(issuer.issue(new TokenIssuerPort.Claims(userId, "alice", null, List.of(),
+                List.of(), true, false, tenantId, false, List.of("LENDING"))).value());
+        assertThat(forced.getClaimAsStringList(JwtClaims.MODULES)).containsExactly("LENDING");
+    }
+
+    @Test
     void khoaPemDocGhiKhuHoi() {
         KeyPair pair = PemKeys.generate();
 

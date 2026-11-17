@@ -9,8 +9,10 @@ public class BookCopy {
     private final UUID titleId;
     private final String barcode;
     private CopyStatus status;
+    /** Tenant sở hữu (chỉ để hiển thị khi đọc; null với đối tượng mới đăng ký chưa lưu). */
+    private final UUID tenantId;
 
-    private BookCopy(UUID id, UUID titleId, String barcode, CopyStatus status) {
+    private BookCopy(UUID id, UUID titleId, String barcode, CopyStatus status, UUID tenantId) {
         if (id == null) throw new InvalidCopyException("id không được null");
         if (titleId == null) throw new InvalidCopyException("titleId không được null");
         if (barcode == null || barcode.isBlank()) throw new InvalidCopyException("Mã vạch không được để trống");
@@ -20,14 +22,19 @@ public class BookCopy {
         this.titleId = titleId;
         this.barcode = barcode.trim();
         this.status = status;
+        this.tenantId = tenantId;
     }
 
     public static BookCopy register(UUID titleId, String barcode) {
-        return new BookCopy(UUID.randomUUID(), titleId, barcode, CopyStatus.AVAILABLE);
+        return new BookCopy(UUID.randomUUID(), titleId, barcode, CopyStatus.AVAILABLE, null);
     }
 
     public static BookCopy restore(UUID id, UUID titleId, String barcode, CopyStatus status) {
-        return new BookCopy(id, titleId, barcode, status);
+        return new BookCopy(id, titleId, barcode, status, null);
+    }
+
+    public static BookCopy restore(UUID id, UUID titleId, String barcode, CopyStatus status, UUID tenantId) {
+        return new BookCopy(id, titleId, barcode, status, tenantId);
     }
 
     public boolean isAvailable() {
@@ -73,4 +80,5 @@ public class BookCopy {
     public UUID titleId() { return titleId; }
     public String barcode() { return barcode; }
     public CopyStatus status() { return status; }
+    public UUID tenantId() { return tenantId; }
 }

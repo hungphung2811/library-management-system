@@ -149,12 +149,12 @@ class IdentityControllerTest {
 
     @Test
     void loiPermissionCuaServiceChuyenNguyen403Va5xxThanh502() throws Exception {
-        when(access.listRoles()).thenThrow(error(HttpStatus.FORBIDDEN,
+        when(access.listRoles(null)).thenThrow(error(HttpStatus.FORBIDDEN,
                 "{\"code\":\"FORBIDDEN\",\"message\":\"Không đủ quyền\",\"details\":[]}"));
         mvc.perform(get("/api/roles").with(jwt())).andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
 
-        when(departments.tree(false)).thenThrow(HttpServerErrorException.create(HttpStatus.INTERNAL_SERVER_ERROR, "x",
+        when(departments.tree(false, null)).thenThrow(HttpServerErrorException.create(HttpStatus.INTERNAL_SERVER_ERROR, "x",
                 HttpHeaders.EMPTY, "bí mật".getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8));
         mvc.perform(get("/api/departments/tree").with(jwt())).andExpect(status().isBadGateway())
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("bí mật"))));
@@ -220,7 +220,7 @@ class IdentityControllerTest {
     void nguoiDungVaTimKiemAnhXaDto() throws Exception {
         UUID id = UUID.randomUUID();
         when(users.search(any())).thenReturn(new UserPageView(
-                List.of(new UserView(id, "alice", "Alice", "a@x.vn", null, "ACTIVE")), 1, 0, 20));
+                List.of(new UserView(id, "alice", "Alice", "a@x.vn", null, "ACTIVE", null)), 1, 0, 20));
         mvc.perform(get("/api/users").param("keyword", "ali").param("size", "20").with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].username").value("alice"))
@@ -230,7 +230,7 @@ class IdentityControllerTest {
         Assertions.assertEquals("ali", q.getValue().keyword());
         Assertions.assertEquals(20, q.getValue().size());
 
-        when(users.create(any())).thenReturn(new UserView(id, "bob", "Bob", "b@x.vn", null, "ACTIVE"));
+        when(users.create(any())).thenReturn(new UserView(id, "bob", "Bob", "b@x.vn", null, "ACTIVE", null));
         mvc.perform(post("/api/users").with(jwt()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"username\":\"bob\",\"fullName\":\"Bob\",\"email\":\"b@x.vn\"}"))
                 .andExpect(status().isCreated())
@@ -272,7 +272,7 @@ class IdentityControllerTest {
     void huyQuyenGiuDauGachCheoTrongKhoa() throws Exception {
         UUID role = UUID.randomUUID();
         when(access.revokePermission(eq(role), eq("BorrowingController/borrow")))
-                .thenReturn(new RoleView(role, "r", "d", false, List.of()));
+                .thenReturn(new RoleView(role, "r", "d", false, List.of(), null));
         mvc.perform(delete("/api/roles/" + role + "/permissions/BorrowingController/borrow").with(jwt()))
                 .andExpect(status().isOk());
         verify(access).revokePermission(role, "BorrowingController/borrow");
@@ -281,7 +281,7 @@ class IdentityControllerTest {
     @Test
     void suaVaXoaRoleChuyenTiepVaGiuMaLoi409() throws Exception {
         UUID role = UUID.randomUUID();
-        when(access.updateRole(eq(role), any())).thenReturn(new RoleView(role, "REVIEWER", "Duyệt", false, List.of()));
+        when(access.updateRole(eq(role), any())).thenReturn(new RoleView(role, "REVIEWER", "Duyệt", false, List.of(), null));
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/roles/" + role)
                         .with(jwt()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"REVIEWER\",\"description\":\"Duyệt\"}"))
@@ -289,6 +289,18 @@ class IdentityControllerTest {
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/roles/" + role)
                         .with(jwt()).contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"\"}"))
                 .andExpect(status().isBadRequest());
+
+        // signupDefault được chuyển tiếp nguyên (true/false/vắng = null) và phản hồi mang cờ về FE
+        when(access.updateRole(eq(role), any())).thenReturn(
+                new RoleView(role, "CUSTOMER", "Khách", false, List.of(), null, true));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/roles/" + role)
+                        .with(jwt()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"CUSTOMER\",\"description\":\"Khách\",\"signupDefault\":true}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.signupDefault").value(true));
+        org.mockito.ArgumentCaptor<lms.api.identity.dto.AccessDtos.UpdateRoleRequest> sent =
+                org.mockito.ArgumentCaptor.forClass(lms.api.identity.dto.AccessDtos.UpdateRoleRequest.class);
+        verify(access, org.mockito.Mockito.atLeastOnce()).updateRole(eq(role), sent.capture());
+        org.junit.jupiter.api.Assertions.assertEquals(Boolean.TRUE, sent.getValue().signupDefault());
 
         mvc.perform(delete("/api/roles/" + role).with(jwt())).andExpect(status().isNoContent());
         verify(access).deleteRole(role);
@@ -303,7 +315,7 @@ class IdentityControllerTest {
     @Test
     void cayPhongBanTraDanhSachLongNhau() throws Exception {
         UUID id = UUID.randomUUID();
-        when(departments.tree(true)).thenReturn(List.of(new DepartmentNodeView(id, "A", "A", "ACTIVE", List.of())));
+        when(departments.tree(true, null)).thenReturn(List.of(new DepartmentNodeView(id, "A", "A", "ACTIVE", List.of(), null)));
         mvc.perform(get("/api/departments/tree").param("includeInactive", "true").with(jwt()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].code").value("A"));
     }

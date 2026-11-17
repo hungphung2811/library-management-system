@@ -36,11 +36,15 @@ class RefreshTokenJpaEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    /** STAFF hoặc STOREFRONT (V18); refresh giữ kênh của token gốc. */
+    @Column(name = "channel", nullable = false, length = 20)
+    private String channel = "STAFF";
+
     protected RefreshTokenJpaEntity() {
     }
 
     RefreshTokenJpaEntity(UUID id, UUID userId, UUID tenantId, boolean platformSession, String tokenHash,
-                          Instant expiresAt, boolean revoked, Instant createdAt) {
+                          Instant expiresAt, boolean revoked, Instant createdAt, String channel) {
         this.id = id;
         this.userId = userId;
         this.tenantId = tenantId;
@@ -49,6 +53,7 @@ class RefreshTokenJpaEntity {
         this.expiresAt = expiresAt;
         this.revoked = revoked;
         this.createdAt = createdAt;
+        this.channel = channel;
     }
 
     UUID getId() { return id; }
@@ -59,4 +64,5 @@ class RefreshTokenJpaEntity {
     Instant getExpiresAt() { return expiresAt; }
     boolean isRevoked() { return revoked; }
     Instant getCreatedAt() { return createdAt; }
+    String getChannel() { return channel; }
 }

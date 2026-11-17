@@ -1,0 +1,92 @@
+- generic [ref=f2e2]:
+  - complementary [ref=f2e3]:
+    - navigation "Điều hướng chính" [ref=f2e4]:
+      - generic [ref=f2e5]:
+        - link "Thư viện, về trang chủ" [ref=f2e6] [cursor=pointer]:
+          - /url: /
+          - generic [ref=f2e16]:
+            - generic [ref=f2e17]: Thư viện
+            - generic [ref=f2e18]: Quản lý mượn trả
+        - button "Thu gọn menu" [expanded] [ref=f2e19] [cursor=pointer]
+      - list [ref=f2e23]:
+        - listitem [ref=f2e24]:
+          - link "Trang chủ" [ref=f2e25] [cursor=pointer]:
+            - /url: /
+        - listitem [aria-hidden] [ref=f2e32]: Nghiệp vụ
+        - listitem [ref=f2e33]:
+          - button "Sách" [expanded] [ref=f2e34] [cursor=pointer]
+          - list [ref=f2e41]:
+            - listitem [ref=f2e42]:
+              - link "Danh sách sách" [ref=f2e43] [cursor=pointer]:
+                - /url: /catalog
+            - listitem [ref=f2e44]:
+              - link "Tra mã vạch" [ref=f2e45] [cursor=pointer]:
+                - /url: /catalog/barcode
+            - listitem [ref=f2e46]:
+              - link "Thêm sách" [ref=f2e47] [cursor=pointer]:
+                - /url: /catalog/books/new
+        - listitem [ref=f2e48]:
+          - button "Mượn trả" [expanded] [ref=f2e49] [cursor=pointer]
+          - list [ref=f2e57]:
+            - listitem [ref=f2e58]:
+              - link "Lập phiếu mượn" [ref=f2e59] [cursor=pointer]:
+                - /url: /circulation/borrow
+            - listitem [ref=f2e60]:
+              - link "Nhận trả sách" [ref=f2e61] [cursor=pointer]:
+                - /url: /circulation/return
+            - listitem [ref=f2e62]:
+              - link "Tra phiếu mượn" [ref=f2e63] [cursor=pointer]:
+                - /url: /circulation/borrowings
+            - listitem [ref=f2e64]:
+              - link "Đặt trước" [ref=f2e65] [cursor=pointer]:
+                - /url: /circulation/reservations
+            - listitem [ref=f2e66]:
+              - link "Phạt" [ref=f2e67] [cursor=pointer]:
+                - /url: /circulation/fines
+        - listitem [aria-hidden] [ref=f2e68]: Hệ thống
+        - listitem [ref=f2e69]:
+          - button "Quản trị" [expanded] [ref=f2e70] [cursor=pointer]
+          - list [ref=f2e78]:
+            - listitem [ref=f2e79]:
+              - link "Người dùng" [ref=f2e80] [cursor=pointer]:
+                - /url: /admin/users
+            - listitem [ref=f2e81]:
+              - link "Vai trò và quyền" [ref=f2e82] [cursor=pointer]:
+                - /url: /admin/roles
+            - listitem [ref=f2e83]:
+              - link "Phòng ban" [ref=f2e84] [cursor=pointer]:
+                - /url: /admin/departments
+            - listitem [ref=f2e85]:
+              - link "Nhật ký hoạt động" [ref=f2e86] [cursor=pointer]:
+                - /url: /admin/audit-logs
+      - generic [ref=f2e88]:
+        - generic [ref=f2e89]:
+          - generic [aria-hidden] [ref=f2e90]: A
+          - generic [ref=f2e91]:
+            - generic "00000000-0000-0000-0000-000000000001" [ref=f2e92]: admin
+            - generic [ref=f2e93]: SUPER_ADMIN
+        - button "Đăng xuất" [ref=f2e94] [cursor=pointer]
+  - generic [ref=f2e98]:
+    - banner [ref=f2e99]:
+      - list [ref=f2e100]:
+        - listitem [ref=f2e101]:
+          - link "Trang chủ" [ref=f2e102] [cursor=pointer]:
+            - /url: /
+        - listitem [aria-hidden] [ref=f2e103]
+        - listitem [ref=f2e106]: Mượn trả
+        - listitem [aria-hidden] [ref=f2e107]
+        - listitem [ref=f2e110]: Phạt
+      - generic [ref=f2e111]:
+        - button "Thông báo, 0 chưa đọc" [ref=f2e112] [cursor=pointer]
+        - button "Tài khoản của tôi" [ref=f2e117] [cursor=pointer]:
+          - generic [aria-hidden] [ref=f2e118]: A
+    - main [ref=f2e119]:
+      - generic [ref=f2e120]:
+        - generic [ref=f2e122]:
+          - heading "Phạt" [level=1] [ref=f2e123]
+          - paragraph [ref=f2e124]: Tra cứu và thu phí phạt của độc giả.
+        - generic [ref=f2e125]:
+          - generic [ref=f2e128]:
+            - generic: Tìm độc giả theo tên, tài khoản hoặc email
+            - combobox [ref=f2e129]
+          - paragraph [ref=f2e134]: Chọn một độc giả để xem các khoản phạt.

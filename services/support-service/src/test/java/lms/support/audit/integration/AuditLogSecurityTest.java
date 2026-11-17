@@ -83,6 +83,41 @@ class AuditLogSecurityTest {
     }
 
     @Test
+    void platformAdminKhongTenantDuocXemXuyenTenantKhongCanKhoa() throws Exception {
+        when(query.execute(any())).thenReturn(new PageResponse<>(List.of(), 0, 0, 20));
+
+        mvc.perform(get("/internal/audit-logs").with(jwt().jwt(j -> j.claim("platformAdmin", true))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(0));
+        mvc.perform(get("/internal/audit-logs").param("tenantId", TENANT)
+                        .with(jwt().jwt(j -> j.claim("platformAdmin", true))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void platformAdminTenantIdSaiDinhDangBi400() throws Exception {
+        mvc.perform(get("/internal/audit-logs").param("tenantId", "xyz")
+                        .with(jwt().jwt(j -> j.claim("platformAdmin", true))))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_TENANT_ID"));
+    }
+
+    @Test
+    void nguoiThuongKhongTenantVanBi403DuGuiTenantId() throws Exception {
+        mvc.perform(get("/internal/audit-logs").param("tenantId", TENANT)
+                        .with(jwt().authorities(new SimpleGrantedAuthority("AuditLogController/search"))))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("TENANT_REQUIRED"));
+    }
+
+    @Test
+    void nguoiThuongBoQuaTenantIdSaiDinhDang() throws Exception {
+        when(query.execute(any())).thenReturn(new PageResponse<>(List.of(), 0, 0, 20));
+
+        mvc.perform(get("/internal/audit-logs").param("tenantId", "xyz")
+                        .with(jwt().jwt(j -> j.claim("tenantId", TENANT))
+                                .authorities(new SimpleGrantedAuthority("AuditLogController/search"))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void adminDuocBoQuaKiemTraKhoaQuyen() throws Exception {
         when(query.execute(any())).thenReturn(new PageResponse<>(List.of(), 0, 0, 20));
 

@@ -1,0 +1,116 @@
+- generic [ref=f3e55]:
+  - complementary [ref=f3e56]:
+    - navigation "Điều hướng chính" [ref=f3e57]:
+      - generic [ref=f3e58]:
+        - link "Thư viện, về trang chủ" [ref=f3e59] [cursor=pointer]:
+          - /url: /
+          - generic [ref=f3e69]:
+            - generic [ref=f3e70]: Thư viện
+            - generic [ref=f3e71]: Quản lý mượn trả
+        - button "Thu gọn menu" [expanded] [ref=f3e72] [cursor=pointer]
+      - list [ref=f3e76]:
+        - listitem [ref=f3e77]:
+          - link "Trang chủ" [ref=f3e78] [cursor=pointer]:
+            - /url: /
+        - listitem [aria-hidden] [ref=f3e85]: Nghiệp vụ
+        - listitem [ref=f3e86]:
+          - button "Sách" [expanded] [ref=f3e87] [cursor=pointer]
+          - list [ref=f3e94]:
+            - listitem [ref=f3e95]:
+              - link "Danh sách sách" [ref=f3e96] [cursor=pointer]:
+                - /url: /catalog
+            - listitem [ref=f3e97]:
+              - link "Tra mã vạch" [ref=f3e98] [cursor=pointer]:
+                - /url: /catalog/barcode
+            - listitem [ref=f3e99]:
+              - link "Thêm sách" [ref=f3e100] [cursor=pointer]:
+                - /url: /catalog/books/new
+        - listitem [ref=f3e101]:
+          - button "Mượn trả" [expanded] [ref=f3e102] [cursor=pointer]
+          - list [ref=f3e110]:
+            - listitem [ref=f3e111]:
+              - link "Lập phiếu mượn" [ref=f3e112] [cursor=pointer]:
+                - /url: /circulation/borrow
+            - listitem [ref=f3e113]:
+              - link "Nhận trả sách" [ref=f3e114] [cursor=pointer]:
+                - /url: /circulation/return
+            - listitem [ref=f3e115]:
+              - link "Tra phiếu mượn" [ref=f3e116] [cursor=pointer]:
+                - /url: /circulation/borrowings
+            - listitem [ref=f3e117]:
+              - link "Đặt trước" [ref=f3e118] [cursor=pointer]:
+                - /url: /circulation/reservations
+            - listitem [ref=f3e119]:
+              - link "Phạt" [ref=f3e120] [cursor=pointer]:
+                - /url: /circulation/fines
+        - listitem [aria-hidden] [ref=f3e121]: Hệ thống
+        - listitem [ref=f3e122]:
+          - button "Quản trị" [expanded] [ref=f3e123] [cursor=pointer]
+          - list [ref=f3e131]:
+            - listitem [ref=f3e132]:
+              - link "Người dùng" [ref=f3e133] [cursor=pointer]:
+                - /url: /admin/users
+            - listitem [ref=f3e134]:
+              - link "Vai trò và quyền" [ref=f3e135] [cursor=pointer]:
+                - /url: /admin/roles
+            - listitem [ref=f3e136]:
+              - link "Phòng ban" [ref=f3e137] [cursor=pointer]:
+                - /url: /admin/departments
+            - listitem [ref=f3e138]:
+              - link "Nhật ký hoạt động" [ref=f3e139] [cursor=pointer]:
+                - /url: /admin/audit-logs
+  - generic [ref=f3e140]:
+    - banner [ref=f3e141]:
+      - list [ref=f3e142]:
+        - listitem [ref=f3e143]:
+          - link "Trang chủ" [ref=f3e144] [cursor=pointer]:
+            - /url: /
+      - generic [ref=f3e145]:
+        - 'button "Đơn vị làm việc: Thư viện mặc định" [ref=f3e146] [cursor=pointer]':
+          - generic [ref=f3e151]: Thư viện mặc định
+        - button "Thông báo, 0 chưa đọc" [ref=f3e154] [cursor=pointer]
+        - button "Tài khoản của tôi" [ref=f3e159] [cursor=pointer]:
+          - generic [aria-hidden] [ref=f3e160]: A
+          - generic [ref=f3e161]:
+            - generic [ref=f3e162]: admin
+            - generic [ref=f3e163]: SUPER_ADMIN
+    - main [ref=f3e166]:
+      - generic [ref=f3e168]:
+        - heading "Tổng quan" [level=1] [ref=f3e169]
+        - paragraph [ref=f3e170]: Chọn một phân hệ để bắt đầu làm việc
+      - generic [ref=f3e171]:
+        - generic [ref=f3e172]:
+          - link "Sách Đầu sách và bản sao" [ref=f3e173] [cursor=pointer]:
+            - /url: /catalog
+            - generic [ref=f3e177]: Sách
+            - generic [ref=f3e178]: Đầu sách và bản sao
+          - link "Mượn trả Mượn, trả, gia hạn" [ref=f3e179] [cursor=pointer]:
+            - /url: /circulation
+            - generic [ref=f3e184]: Mượn trả
+            - generic [ref=f3e185]: Mượn, trả, gia hạn
+          - link "Quản trị Phân quyền hệ thống" [ref=f3e186] [cursor=pointer]:
+            - /url: /admin
+            - generic [ref=f3e191]: Quản trị
+            - generic [ref=f3e192]: Phân quyền hệ thống
+          - link "Hồ sơ Tài khoản và thẻ thư viện" [ref=f3e193] [cursor=pointer]:
+            - /url: /profile
+            - generic [ref=f3e198]: Hồ sơ
+            - generic [ref=f3e199]: Tài khoản và thẻ thư viện
+          - link "Mật khẩu Đổi mật khẩu của bạn" [ref=f3e200] [cursor=pointer]:
+            - /url: /change-password
+            - generic [ref=f3e205]: Mật khẩu
+            - generic [ref=f3e206]: Đổi mật khẩu của bạn
+        - generic [ref=f3e207]:
+          - generic [ref=f3e208]:
+            - heading "Xin chào, admin" [level=2] [ref=f3e209]
+            - paragraph [ref=f3e210]: Các phân hệ bạn thấy trong thanh bên phụ thuộc vào vai trò và quyền được cấp cho tài khoản này.
+            - generic [ref=f3e211]:
+              - generic [ref=f3e212]:
+                - term [ref=f3e213]: Vai trò
+                - definition [ref=f3e214]:
+                  - generic [ref=f3e215]: SUPER_ADMIN
+              - generic [ref=f3e216]:
+                - term [ref=f3e217]: Phạm vi quyền
+                - definition [ref=f3e218]: Quản trị viên (toàn quyền)
+          - link "Mở phân hệ Mượn trả" [ref=f3e220] [cursor=pointer]:
+            - /url: /circulation

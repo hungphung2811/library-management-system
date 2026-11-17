@@ -1,0 +1,101 @@
+- generic [ref=f11e1]:
+  - generic [ref=f11e12]:
+    - complementary [ref=f11e13]:
+      - navigation "Điều hướng chính" [ref=f11e14]:
+        - generic [ref=f11e15]:
+          - link "Thư viện, về trang chủ" [ref=f11e16] [cursor=pointer]:
+            - /url: /
+            - generic [ref=f11e26]:
+              - generic [ref=f11e27]: Thư viện
+              - generic [ref=f11e28]: Quản lý mượn trả
+          - button "Thu gọn menu" [expanded] [ref=f11e29] [cursor=pointer]
+        - list [ref=f11e33]:
+          - listitem [ref=f11e34]:
+            - link "Trang chủ" [ref=f11e35] [cursor=pointer]:
+              - /url: /
+          - listitem [aria-hidden] [ref=f11e42]: Nghiệp vụ
+          - listitem [ref=f11e43]:
+            - button "Sách" [expanded] [ref=f11e44] [cursor=pointer]
+            - list [ref=f11e51]:
+              - listitem [ref=f11e52]:
+                - link "Danh sách sách" [ref=f11e53] [cursor=pointer]:
+                  - /url: /catalog
+              - listitem [ref=f11e54]:
+                - link "Tra mã vạch" [ref=f11e55] [cursor=pointer]:
+                  - /url: /catalog/barcode
+              - listitem [ref=f11e56]:
+                - link "Thêm sách" [ref=f11e57] [cursor=pointer]:
+                  - /url: /catalog/books/new
+          - listitem [ref=f11e58]:
+            - button "Mượn trả" [expanded] [ref=f11e59] [cursor=pointer]
+            - list [ref=f11e67]:
+              - listitem [ref=f11e68]:
+                - link "Lập phiếu mượn" [ref=f11e69] [cursor=pointer]:
+                  - /url: /circulation/borrow
+              - listitem [ref=f11e70]:
+                - link "Nhận trả sách" [ref=f11e71] [cursor=pointer]:
+                  - /url: /circulation/return
+              - listitem [ref=f11e72]:
+                - link "Tra phiếu mượn" [ref=f11e73] [cursor=pointer]:
+                  - /url: /circulation/borrowings
+              - listitem [ref=f11e74]:
+                - link "Đặt trước" [ref=f11e75] [cursor=pointer]:
+                  - /url: /circulation/reservations
+              - listitem [ref=f11e76]:
+                - link "Phạt" [ref=f11e77] [cursor=pointer]:
+                  - /url: /circulation/fines
+          - listitem [aria-hidden] [ref=f11e78]: Hệ thống
+          - listitem [ref=f11e79]:
+            - button "Quản trị" [expanded] [ref=f11e80] [cursor=pointer]
+            - list [ref=f11e88]:
+              - listitem [ref=f11e89]:
+                - link "Người dùng" [ref=f11e90] [cursor=pointer]:
+                  - /url: /admin/users
+              - listitem [ref=f11e91]:
+                - link "Vai trò và quyền" [ref=f11e92] [cursor=pointer]:
+                  - /url: /admin/roles
+              - listitem [ref=f11e93]:
+                - link "Phòng ban" [ref=f11e94] [cursor=pointer]:
+                  - /url: /admin/departments
+              - listitem [ref=f11e95]:
+                - link "Nhật ký hoạt động" [ref=f11e96] [cursor=pointer]:
+                  - /url: /admin/audit-logs
+    - generic [ref=f11e97]:
+      - banner [ref=f11e98]:
+        - list [ref=f11e99]:
+          - listitem [ref=f11e100]:
+            - link "Trang chủ" [ref=f11e101] [cursor=pointer]:
+              - /url: /
+          - listitem [aria-hidden] [ref=f11e102]
+          - listitem [ref=f11e105]: Hồ sơ
+        - generic [ref=f11e106]:
+          - 'button "Đơn vị làm việc: Thư viện mặc định" [ref=f11e107] [cursor=pointer]':
+            - generic [ref=f11e112]: Thư viện mặc định
+          - button "Thông báo, 0 chưa đọc" [ref=f11e115] [cursor=pointer]
+          - button "Tài khoản của tôi" [expanded] [active] [ref=f11e120] [cursor=pointer]:
+            - generic [aria-hidden] [ref=f11e121]: A
+            - generic [ref=f11e122]:
+              - generic [ref=f11e123]: admin
+              - generic [ref=f11e124]: SUPER_ADMIN
+      - main [ref=f11e127]:
+        - generic [ref=f11e129]:
+          - heading "Hồ sơ của tôi" [level=1] [ref=f11e130]
+          - paragraph [ref=f11e131]: Thông tin tài khoản và thẻ thư viện của bạn.
+        - generic [ref=f11e133]:
+          - generic [ref=f11e134]: Tài khoản
+          - alert [ref=f11e138]:
+            - img "close-circle" [ref=f11e140]
+            - generic [ref=f11e143]: "Không tìm thấy người dùng: 00000000-0000-0000-0000-000000000001"
+            - button "Thử lại" [ref=f11e146] [cursor=pointer]
+  - generic [ref=f11e149]:
+    - generic [ref=f11e150]:
+      - generic "00000000-0000-0000-0000-000000000001" [ref=f11e151]: admin
+      - generic [ref=f11e152]: SUPER_ADMIN
+      - generic [ref=f11e153]: "Đơn vị: Thư viện mặc định"
+    - generic [ref=f11e154]:
+      - link "Hồ sơ của tôi" [ref=f11e155] [cursor=pointer]:
+        - /url: /profile
+      - link "Đổi mật khẩu" [ref=f11e156] [cursor=pointer]:
+        - /url: /change-password
+      - button "Chuyển đơn vị" [ref=f11e157] [cursor=pointer]
+      - button "Đăng xuất" [ref=f11e158] [cursor=pointer]

@@ -1,0 +1,136 @@
+- generic [ref=f5e1]:
+  - generic [ref=f5e12]:
+    - complementary [ref=f5e13]:
+      - navigation "Điều hướng chính" [ref=f5e14]:
+        - generic [ref=f5e15]:
+          - link "Thư viện, về trang chủ" [ref=f5e16] [cursor=pointer]:
+            - /url: /
+            - generic [ref=f5e26]:
+              - generic [ref=f5e27]: Thư viện
+              - generic [ref=f5e28]: Quản lý mượn trả
+          - button "Thu gọn menu" [expanded] [ref=f5e29] [cursor=pointer]
+        - list [ref=f5e33]:
+          - listitem [ref=f5e34]:
+            - link "Trang chủ" [ref=f5e35] [cursor=pointer]:
+              - /url: /
+          - listitem [aria-hidden] [ref=f5e42]: Nghiệp vụ
+          - listitem [ref=f5e43]:
+            - button "Sách" [expanded] [ref=f5e44] [cursor=pointer]
+            - list [ref=f5e51]:
+              - listitem [ref=f5e52]:
+                - link "Danh sách sách" [ref=f5e53] [cursor=pointer]:
+                  - /url: /catalog
+              - listitem [ref=f5e54]:
+                - link "Tra mã vạch" [ref=f5e55] [cursor=pointer]:
+                  - /url: /catalog/barcode
+              - listitem [ref=f5e56]:
+                - link "Thêm sách" [ref=f5e57] [cursor=pointer]:
+                  - /url: /catalog/books/new
+          - listitem [ref=f5e58]:
+            - button "Mượn trả" [expanded] [ref=f5e59] [cursor=pointer]
+            - list [ref=f5e67]:
+              - listitem [ref=f5e68]:
+                - link "Lập phiếu mượn" [ref=f5e69] [cursor=pointer]:
+                  - /url: /circulation/borrow
+              - listitem [ref=f5e70]:
+                - link "Nhận trả sách" [ref=f5e71] [cursor=pointer]:
+                  - /url: /circulation/return
+              - listitem [ref=f5e72]:
+                - link "Tra phiếu mượn" [ref=f5e73] [cursor=pointer]:
+                  - /url: /circulation/borrowings
+              - listitem [ref=f5e74]:
+                - link "Đặt trước" [ref=f5e75] [cursor=pointer]:
+                  - /url: /circulation/reservations
+              - listitem [ref=f5e76]:
+                - link "Phạt" [ref=f5e77] [cursor=pointer]:
+                  - /url: /circulation/fines
+          - listitem [aria-hidden] [ref=f5e78]: Hệ thống
+          - listitem [ref=f5e79]:
+            - button "Quản trị" [expanded] [ref=f5e80] [cursor=pointer]
+            - list [ref=f5e88]:
+              - listitem [ref=f5e89]:
+                - link "Người dùng" [ref=f5e90] [cursor=pointer]:
+                  - /url: /admin/users
+              - listitem [ref=f5e91]:
+                - link "Vai trò và quyền" [ref=f5e92] [cursor=pointer]:
+                  - /url: /admin/roles
+              - listitem [ref=f5e93]:
+                - link "Phòng ban" [ref=f5e94] [cursor=pointer]:
+                  - /url: /admin/departments
+              - listitem [ref=f5e95]:
+                - link "Nhật ký hoạt động" [ref=f5e96] [cursor=pointer]:
+                  - /url: /admin/audit-logs
+    - generic [ref=f5e97]:
+      - banner [ref=f5e98]:
+        - list [ref=f5e99]:
+          - listitem [ref=f5e100]:
+            - link "Trang chủ" [ref=f5e101] [cursor=pointer]:
+              - /url: /
+          - listitem [aria-hidden] [ref=f5e102]
+          - listitem [ref=f5e105]: Mượn trả
+          - listitem [aria-hidden] [ref=f5e106]
+          - listitem [ref=f5e109]: Đặt trước
+        - generic [ref=f5e110]:
+          - 'button "Đơn vị làm việc: Thư viện mặc định" [ref=f5e111] [cursor=pointer]':
+            - generic [ref=f5e116]: Thư viện mặc định
+          - button "Thông báo, 0 chưa đọc" [ref=f5e119] [cursor=pointer]
+          - button "Tài khoản của tôi" [ref=f5e124] [cursor=pointer]:
+            - generic [aria-hidden] [ref=f5e125]: A
+            - generic [ref=f5e126]:
+              - generic [ref=f5e127]: admin
+              - generic [ref=f5e128]: SUPER_ADMIN
+      - main [ref=f5e131]:
+        - generic [ref=f5e132]:
+          - generic [ref=f5e133]:
+            - generic [ref=f5e136]:
+              - heading "Đặt trước" [level=1] [ref=f5e137]
+              - paragraph [ref=f5e138]: Hàng đợi và hạn nhận sách bạn đã đặt trước.
+            - generic [ref=f5e139]:
+              - button "Hủy đặt trước quá hạn" [ref=f5e140] [cursor=pointer]
+              - button "plus Đặt trước sách" [ref=f5e142] [cursor=pointer]:
+                - img "plus" [ref=f5e144]
+                - generic [ref=f5e148]: Đặt trước sách
+          - generic [ref=f5e150]:
+            - tablist [ref=f5e151]:
+              - generic [ref=f5e153]:
+                - tab "Đang hiệu lực (0)" [selected] [ref=f5e155] [cursor=pointer]
+                - tab "Lịch sử (0)" [ref=f5e157] [cursor=pointer]
+            - tabpanel "Đang hiệu lực (0)" [ref=f5e160]:
+              - table [ref=f5e169]:
+                - rowgroup [ref=f5e170]:
+                  - row [ref=f5e171]:
+                    - columnheader "Tên sách" [ref=f5e172]
+                    - columnheader "Trạng thái" [ref=f5e173]
+                    - columnheader "Thông tin" [ref=f5e174]
+                    - columnheader "Ngày đặt" [ref=f5e175]
+                    - columnheader "Thao tác" [ref=f5e176]
+                - rowgroup [ref=f5e177]:
+                  - row [ref=f5e178]:
+                    - cell "Trống Bạn chưa đặt trước sách nào. Tìm sách ở trang Sách rồi chọn Đặt trước. Tìm sách" [ref=f5e179]:
+                      - generic [ref=f5e181]:
+                        - img "Trống" [ref=f5e183]
+                        - generic [ref=f5e190]:
+                          - generic [ref=f5e191]: Bạn chưa đặt trước sách nào.
+                          - generic [ref=f5e192]: Tìm sách ở trang Sách rồi chọn Đặt trước.
+                        - link "Tìm sách" [ref=f5e194] [cursor=pointer]:
+                          - /url: /catalog
+  - generic [ref=f5e196]:
+    - dialog "Đặt trước sách":
+      - generic [ref=f5e197]:
+        - button "Đóng" [ref=f5e198] [cursor=pointer]:
+          - generic "Đóng" [ref=f5e199]:
+            - img "close" [ref=f5e200]
+        - generic [ref=f5e203]: Đặt trước sách
+        - generic [ref=f5e209]:
+          - generic "Đầu sách" [ref=f5e211]: "* Đầu sách"
+          - generic [ref=f5e214]:
+            - generic: Toán rời rạc · Hoàng Gia Huy
+            - generic [ref=f5e215]:
+              - generic "Toán rời rạc · Hoàng Gia Huy" [ref=f5e227]:
+                - text: Toán rời rạc · Hoàng Gia Huy
+                - combobox "* Đầu sách" [active] [ref=f5e217]
+              - button "Clear" [ref=f5e228] [cursor=pointer]:
+                - img "close-circle" [ref=f5e229]
+        - generic [ref=f5e222]:
+          - button "Hủy" [ref=f5e223] [cursor=pointer]
+          - button "Đặt trước" [ref=f5e225] [cursor=pointer]

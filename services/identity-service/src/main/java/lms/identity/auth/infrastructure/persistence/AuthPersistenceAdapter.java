@@ -4,6 +4,7 @@ import lms.identity.auth.application.SaveCredentialPort;
 import lms.identity.auth.application.SaveRefreshTokenPort;
 import lms.identity.auth.domain.UserCredential;
 import lms.identity.auth.domain.RefreshToken;
+import lms.identity.auth.domain.TokenChannel;
 import lms.identity.auth.domain.RefreshTokenRepository;
 import lms.identity.auth.domain.UserCredentialRepository;
 import java.util.Optional;
@@ -57,7 +58,7 @@ public class AuthPersistenceAdapter implements UserCredentialRepository, SaveCre
     public RefreshToken save(RefreshToken t) {
         refreshTokens.save(new RefreshTokenJpaEntity(t.id(), t.userId(), t.tenantId(), t.platformSession(),
                 t.tokenHash(), t.expiresAt(),
-                t.isRevoked(), t.createdAt()));
+                t.isRevoked(), t.createdAt(), t.channel().name()));
         return t;
     }
 
@@ -65,7 +66,8 @@ public class AuthPersistenceAdapter implements UserCredentialRepository, SaveCre
     public Optional<RefreshToken> findByTokenHash(String tokenHash) {
         return refreshTokens.findByTokenHash(tokenHash).map(e -> RefreshToken.restore(e.getId(), e.getUserId(),
                 e.getTenantId(), e.isPlatformSession(),
-                e.getTokenHash(), e.getExpiresAt(), e.isRevoked(), e.getCreatedAt()));
+                e.getTokenHash(), e.getExpiresAt(), e.isRevoked(), e.getCreatedAt(),
+                TokenChannel.parse(e.getChannel())));
     }
 
     /** Câu UPDATE cần transaction: tự mở (transaction ngắn) khi người gọi không ở trong transaction nào. */

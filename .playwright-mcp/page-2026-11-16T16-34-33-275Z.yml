@@ -1,0 +1,150 @@
+- generic [ref=f1e12]:
+  - complementary [ref=f1e13]:
+    - navigation "Điều hướng chính" [ref=f1e14]:
+      - generic [ref=f1e15]:
+        - link "Thư viện, về trang chủ" [ref=f1e16] [cursor=pointer]:
+          - /url: /
+          - generic [ref=f1e26]:
+            - generic [ref=f1e27]: Thư viện
+            - generic [ref=f1e28]: Quản lý mượn trả
+        - button "Thu gọn menu" [expanded] [ref=f1e29] [cursor=pointer]
+      - list [ref=f1e33]:
+        - listitem [ref=f1e34]:
+          - link "Trang chủ" [ref=f1e35] [cursor=pointer]:
+            - /url: /
+        - listitem [aria-hidden] [ref=f1e42]: Nghiệp vụ
+        - listitem [ref=f1e43]:
+          - button "Sách" [expanded] [ref=f1e44] [cursor=pointer]
+          - list [ref=f1e51]:
+            - listitem [ref=f1e52]:
+              - link "Danh sách sách" [ref=f1e53] [cursor=pointer]:
+                - /url: /catalog
+            - listitem [ref=f1e54]:
+              - link "Tra mã vạch" [ref=f1e55] [cursor=pointer]:
+                - /url: /catalog/barcode
+            - listitem [ref=f1e56]:
+              - link "Thêm sách" [ref=f1e57] [cursor=pointer]:
+                - /url: /catalog/books/new
+        - listitem [ref=f1e58]:
+          - button "Mượn trả" [expanded] [ref=f1e59] [cursor=pointer]
+          - list [ref=f1e67]:
+            - listitem [ref=f1e68]:
+              - link "Lập phiếu mượn" [ref=f1e69] [cursor=pointer]:
+                - /url: /circulation/borrow
+            - listitem [ref=f1e70]:
+              - link "Nhận trả sách" [ref=f1e71] [cursor=pointer]:
+                - /url: /circulation/return
+            - listitem [ref=f1e72]:
+              - link "Tra phiếu mượn" [ref=f1e73] [cursor=pointer]:
+                - /url: /circulation/borrowings
+            - listitem [ref=f1e74]:
+              - link "Đặt trước" [ref=f1e75] [cursor=pointer]:
+                - /url: /circulation/reservations
+            - listitem [ref=f1e76]:
+              - link "Phạt" [ref=f1e77] [cursor=pointer]:
+                - /url: /circulation/fines
+        - listitem [aria-hidden] [ref=f1e78]: Hệ thống
+        - listitem [ref=f1e79]:
+          - button "Quản trị" [expanded] [ref=f1e80] [cursor=pointer]
+          - list [ref=f1e88]:
+            - listitem [ref=f1e89]:
+              - link "Người dùng" [ref=f1e90] [cursor=pointer]:
+                - /url: /admin/users
+            - listitem [ref=f1e91]:
+              - link "Vai trò và quyền" [ref=f1e92] [cursor=pointer]:
+                - /url: /admin/roles
+            - listitem [ref=f1e93]:
+              - link "Phòng ban" [ref=f1e94] [cursor=pointer]:
+                - /url: /admin/departments
+            - listitem [ref=f1e95]:
+              - link "Nhật ký hoạt động" [ref=f1e96] [cursor=pointer]:
+                - /url: /admin/audit-logs
+  - generic [ref=f1e97]:
+    - banner [ref=f1e98]:
+      - list [ref=f1e99]:
+        - listitem [ref=f1e100]:
+          - link "Trang chủ" [ref=f1e101] [cursor=pointer]:
+            - /url: /
+        - listitem [aria-hidden] [ref=f1e102]
+        - listitem [ref=f1e105]: Mượn trả
+        - listitem [aria-hidden] [ref=f1e106]
+        - listitem [ref=f1e109]: Tra phiếu mượn
+      - generic [ref=f1e110]:
+        - 'button "Đơn vị làm việc: Thư viện mặc định" [ref=f1e111] [cursor=pointer]':
+          - generic [ref=f1e116]: Thư viện mặc định
+        - button "Thông báo, 0 chưa đọc" [ref=f1e119] [cursor=pointer]
+        - button "Tài khoản của tôi" [ref=f1e124] [cursor=pointer]:
+          - generic [aria-hidden] [ref=f1e125]: A
+          - generic [ref=f1e126]:
+            - generic [ref=f1e127]: admin
+            - generic [ref=f1e128]: SUPER_ADMIN
+    - main [ref=f1e131]:
+      - generic [ref=f1e132]:
+        - generic [ref=f1e134]:
+          - heading "Phiếu mượn" [level=1] [ref=f1e135]
+          - paragraph [ref=f1e136]: Danh sách phiếu mượn và tra phiếu theo mã phiếu.
+        - generic [ref=f1e137]:
+          - generic [ref=f1e138]:
+            - generic [ref=f1e139]: Tra phiếu mượn theo mã
+            - generic [ref=f1e142]:
+              - generic [ref=f1e143]: Mã phiếu mượn (UUID)
+              - generic [ref=f1e144]:
+                - textbox "Mã phiếu mượn (UUID)" [ref=f1e145]
+                - button "Xem phiếu" [disabled] [ref=f1e146]
+          - generic [ref=f1e147]:
+            - radiogroup "Lọc theo trạng thái phiếu mượn" [ref=f1e148]:
+              - generic [ref=f1e149]:
+                - generic [ref=f1e150] [cursor=pointer]:
+                  - radio "Tất cả"
+                  - generic "Tất cả" [ref=f1e151]
+                - generic [ref=f1e152] [cursor=pointer]:
+                  - radio "Đang mượn"
+                  - generic "Đang mượn" [ref=f1e153]
+                - generic [ref=f1e154] [cursor=pointer]:
+                  - radio "Quá hạn" [checked] [active]
+                  - generic "Quá hạn" [ref=f1e155]
+                - generic [ref=f1e156] [cursor=pointer]:
+                  - radio "Đã trả hết"
+                  - generic "Đã trả hết" [ref=f1e157]
+            - generic [ref=f1e258]: 3 phiếu
+          - table [ref=f1e267]:
+            - rowgroup [ref=f1e268]:
+              - row [ref=f1e269]:
+                - columnheader "Mã phiếu" [ref=f1e270]
+                - columnheader "Độc giả" [ref=f1e271]
+                - columnheader "Ngày mượn" [ref=f1e272]
+                - columnheader "Hạn trả" [ref=f1e273]
+                - columnheader "Số sách" [ref=f1e274]
+                - columnheader "Gia hạn" [ref=f1e275]
+                - columnheader "Trạng thái" [ref=f1e276]
+            - rowgroup [ref=f1e277]:
+              - row [ref=f1e278]:
+                - cell [ref=f1e279]:
+                  - link "35787fb9" [ref=f1e280] [cursor=pointer]:
+                    - /url: /circulation/borrowings/35787fb9-8036-4965-bcdf-3d92a19e7a8a
+                - cell "Lê Thị Hoa (le.thi.hoa)" [ref=f1e281]
+                - cell "17/10/2026" [ref=f1e282]
+                - cell "31/10/2026" [ref=f1e283]
+                - cell "2 cuốn" [ref=f1e284]
+                - cell "0" [ref=f1e285]
+                - cell "Quá hạn" [ref=f1e286]
+              - row [ref=f1e288]:
+                - cell [ref=f1e289]:
+                  - link "98e9bc38" [ref=f1e290] [cursor=pointer]:
+                    - /url: /circulation/borrowings/98e9bc38-1ad2-47bd-9b56-a11dbe88ee0c
+                - cell "Trần Văn Minh (tran.van.minh)" [ref=f1e291]
+                - cell "17/10/2026" [ref=f1e292]
+                - cell "31/10/2026" [ref=f1e293]
+                - cell "1 cuốn" [ref=f1e294]
+                - cell "0" [ref=f1e295]
+                - cell "Quá hạn" [ref=f1e296]
+              - row [ref=f1e298]:
+                - cell [ref=f1e299]:
+                  - link "3c52cb39" [ref=f1e300] [cursor=pointer]:
+                    - /url: /circulation/borrowings/3c52cb39-797d-4c58-afcf-3864da8a3105
+                - cell "Hoàng Văn Long (hoang.van.long)" [ref=f1e301]
+                - cell "02/10/2026" [ref=f1e302]
+                - cell "01/11/2026" [ref=f1e303]
+                - cell "2 cuốn" [ref=f1e304]
+                - cell "0" [ref=f1e305]
+                - cell "Quá hạn" [ref=f1e306]

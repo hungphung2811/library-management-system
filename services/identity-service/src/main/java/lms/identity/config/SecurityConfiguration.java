@@ -29,9 +29,13 @@ public class SecurityConfiguration {
                         .requestMatchers("/.well-known/jwks.json").permitAll()
                         // Đúng một đường dẫn nội bộ có khóa chia sẻ riêng; KHÔNG mở cả /internal/**
                         .requestMatchers(HttpMethod.POST, "/internal/permissions/registrations").permitAll()
+                        // Cấp token dịch vụ storefront cho customer-api (ADR-0011): bí mật riêng STOREFRONT_CLIENT_SECRET
+                        .requestMatchers(HttpMethod.POST, "/internal/storefront/access-tokens").permitAll()
 
                         .requestMatchers(HttpMethod.POST, "/internal/auth/login", "/internal/auth/refresh",
                                 "/internal/auth/logout").permitAll()
+                        // tự đăng ký của khách (ADR-0010 B2.1): đúng một đường dẫn, body allowlist, chống lạm dụng ở nginx
+                        .requestMatchers(HttpMethod.POST, "/internal/auth/signup").permitAll()
                         // đăng nhập ngoài (OIDC): trình duyệt chưa có token ở các bước này
                         .requestMatchers(HttpMethod.GET, "/internal/auth/external/providers",
                                 "/internal/auth/external/*/start", "/internal/auth/external/*/callback").permitAll()

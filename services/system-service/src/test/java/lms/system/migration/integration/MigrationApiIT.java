@@ -37,7 +37,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class MigrationApiIT {
 
-    private static final List<String> DBS = List.of("identity", "catalog", "circulation", "audit", "system");
+    private static final List<String> DBS = List.of("identity", "catalog", "circulation", "audit", "system", "sales");
 
     @Container
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16");
@@ -111,15 +111,17 @@ class MigrationApiIT {
         int circulation = demScript("circulation");
         int audit = demScript("audit");
         int system = demScript("system");
+        int sales = demScript("sales");
         mvc.perform(get("/internal/migrations"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.applied").value(identity + catalog + circulation + audit + system))
+                .andExpect(jsonPath("$.applied").value(identity + catalog + circulation + audit + system + sales))
                 .andExpect(jsonPath("$.pending").value(0))
                 .andExpect(jsonPath("$.targets[?(@.target=='identity')].applied").value(identity))
                 .andExpect(jsonPath("$.targets[?(@.target=='catalog')].applied").value(catalog))
                 .andExpect(jsonPath("$.targets[?(@.target=='circulation')].applied").value(circulation))
                 .andExpect(jsonPath("$.targets[?(@.target=='audit')].applied").value(audit))
-                .andExpect(jsonPath("$.targets[?(@.target=='system')].applied").value(system));
+                .andExpect(jsonPath("$.targets[?(@.target=='system')].applied").value(system))
+                .andExpect(jsonPath("$.targets[?(@.target=='sales')].applied").value(sales));
 
         mvc.perform(get("/internal/migrations/identity"))
                 .andExpect(status().isOk())
@@ -187,7 +189,7 @@ class MigrationApiIT {
     @Order(4)
     void vaiTroAppDuocCapQuyenDuLieuNhungKhongPhaiChuBang() throws Exception {
         String[][] bangMau = {{"identity", "users"}, {"catalog", "titles"}, {"circulation", "borrowings"},
-                {"audit", "audit_logs"}, {"system", "menus"}};
+                {"audit", "audit_logs"}, {"system", "menus"}, {"sales", "sales_orders"}};
         for (String[] t : bangMau) {
             String role = t[0] + "_app";
             try (Connection c = connect(t[0], postgres.getUsername(), postgres.getPassword());

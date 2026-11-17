@@ -1,6 +1,8 @@
 # Hạ tầng local. Chạy service bằng IDE/Maven (profile dev) hoặc dùng profile "apps".
+# Cổng nội bộ: identity 8081, catalog 8082, circulation 8083, support 8084, lms-api 8085, system 8086, sales 8087, customer-api 8088.
 #   docker compose up -d                          -> postgres, kafka, redis
-#   docker compose --profile apps up -d --build   -> thêm nginx, lms-api, system-service, các service
+#   docker compose --profile apps up -d --build   -> thêm nginx, lms-api, system-service, các service (KHÔNG gồm support-service)
+#   docker compose --profile apps --profile support up -d --build   -> bật thêm support-service (audit, thông báo)
 # system-service (chạy Flyway cho mọi DB) phải healthy trước khi identity/catalog/circulation/support khởi động.
 # Postgres: system-service dùng vai trò chủ DB (identity, catalog, ...); các service chạy bằng vai trò *_app
 # (không phải chủ bảng, chịu Row-Level Security), tạo trong infrastructure/postgres/init-databases.sql.
@@ -10,6 +12,9 @@
 services:
   postgres:
     image: postgres:16
+    # Tham số nhẹ cho dev (mặc định shared_buffers 128MB); chỉnh bằng PG_* trong .env.
+    command: ["postgres", "-c", "shared_buffers=${PG_SHARED_BUFFERS:-64MB}", "-c", "max_connections=${PG_MAX_CONNECTIONS:-100}", "-c", "work_mem=${PG_WORK_MEM:-4MB}", "-c", "maintenance_work_mem=${PG_MAINTENANCE_WORK_MEM:-32MB}"]
+    mem_limit: ${PG_MEM_LIMIT:-512m}
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -40,9 +45,21 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      # Broker một nút cho dev: heap mặc định của Kafka là 1G. Chỉnh bằng KAFKA_HEAP_OPTS (ví dụ "-Xms512m -Xmx512m" khi tải lớn).
+      KAFKA_HEAP_OPTS: ${KAFKA_HEAP_OPTS:--Xms128m -Xmx256m}
+      KAFKA_NUM_NETWORK_THREADS: 2
+      KAFKA_NUM_IO_THREADS: 4
+      KAFKA_NUM_RECOVERY_THREADS_PER_DATA_DIR: 1
+      KAFKA_OFFSETS_TOPIC_NUM_PARTITIONS: 1
+      # Mặc định 128MB nằm trên heap, sẽ chiếm nửa heap 256m
+      KAFKA_LOG_CLEANER_DEDUPE_BUFFER_SIZE: 16777216
+    mem_limit: ${KAFKA_MEM_LIMIT:-768m}
 
   redis:
     image: redis:7
+    # Redis chỉ làm cache menu: giới hạn bộ nhớ và đẩy bớt key cũ.
+    command: ["redis-server", "--maxmemory", "${REDIS_MAXMEMORY:-64mb}", "--maxmemory-policy", "allkeys-lru"]
+    mem_limit: ${REDIS_MEM_LIMIT:-128m}
     ports:
       - "6379:6379"
 
@@ -50,6 +67,9 @@ services:
   # transaction của Mongo (MongoTransactionManager) thì phải chạy replica set.
   mongo:
     image: mongo:7
+    # WiredTiger mặc định dùng 50% RAM; tối thiểu cho phép là 0.25.
+    command: ["--wiredTigerCacheSizeGB", "${MONGO_CACHE_GB:-0.25}"]
+    mem_limit: ${MONGO_MEM_LIMIT:-512m}
     ports:
       - "27017:27017"
     volumes:
@@ -60,10 +80,11 @@ services:
       timeout: 3s
       retries: 10
 
-  # Runner migration tập trung: chạy Flyway lên identity_db, catalog_db, circulation_db, audit_db, system_db lúc khởi động.
+  # Runner migration tập trung: chạy Flyway lên identity_db, catalog_db, circulation_db, audit_db, system_db, sales_db lúc khởi động.
   # Health UP chỉ sau khi migrate xong nên các service khác chờ service_healthy rồi mới khởi động (chỉ validate schema).
   system-service:
-    profiles: [apps]
+    profiles: [apps, core, catalog, circulation, support, sales, lending, bookstore]
+    mem_limit: ${JVM_MEM_LIMIT:-768m}
     build:
       context: .
       dockerfile: services/system-service/Dockerfile
@@ -75,7 +96,11 @@ services:
         condition: service_started
     environment:
       # Giới hạn heap để tiết kiệm RAM khi chạy local; đặt biến JAVA_TOOL_OPTIONS trong .env để ghi đè.
-      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xmx256m -XX:+UseSerialGC -XX:TieredStopAtLevel=1}
+      # Mặc định tiết kiệm RAM; chỉnh từng phần bằng JVM_XMX, JVM_MAX_METASPACE, JVM_CODE_CACHE, JVM_EXTRA_OPTS hoặc ghi đè cả chuỗi bằng JAVA_TOOL_OPTIONS.
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xmx${JVM_XMX:-256m} -XX:MaxMetaspaceSize=${JVM_MAX_METASPACE:-192m} -XX:ReservedCodeCacheSize=${JVM_CODE_CACHE:-64m} -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:CICompilerCount=1 ${JVM_EXTRA_OPTS:-}}
+      SERVER_TOMCAT_THREADS_MAX: ${TOMCAT_THREADS_MAX:-20}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${DB_POOL_MAX:-5}
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: ${DB_POOL_MIN_IDLE:-1}
       SPRING_PROFILES_ACTIVE: prod
       IDENTITY_DB_URL: jdbc:postgresql://postgres:5432/identity_db
       IDENTITY_DB_USERNAME: identity
@@ -92,6 +117,9 @@ services:
       SYSTEM_DB_URL: jdbc:postgresql://postgres:5432/system_db
       SYSTEM_DB_USERNAME: system
       SYSTEM_DB_PASSWORD: system
+      SALES_DB_URL: jdbc:postgresql://postgres:5432/sales_db
+      SALES_DB_USERNAME: sales
+      SALES_DB_PASSWORD: sales
       # Context menu chạy bằng vai trò app (chịu RLS) trên system_db
       DB_URL: jdbc:postgresql://postgres:5432/system_db
       DB_USERNAME: system_app
@@ -112,7 +140,8 @@ services:
       - "8086"
 
   identity-service:
-    profiles: [apps]
+    profiles: [apps, core, catalog, circulation, support, sales, lending, bookstore]
+    mem_limit: ${JVM_MEM_LIMIT:-768m}
     build:
       context: .
       dockerfile: services/identity-service/Dockerfile
@@ -125,7 +154,11 @@ services:
         condition: service_started
     environment:
       # Giới hạn heap để tiết kiệm RAM khi chạy local; đặt biến JAVA_TOOL_OPTIONS trong .env để ghi đè.
-      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xmx256m -XX:+UseSerialGC -XX:TieredStopAtLevel=1}
+      # Mặc định tiết kiệm RAM; chỉnh từng phần bằng JVM_XMX, JVM_MAX_METASPACE, JVM_CODE_CACHE, JVM_EXTRA_OPTS hoặc ghi đè cả chuỗi bằng JAVA_TOOL_OPTIONS.
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xmx${JVM_XMX:-256m} -XX:MaxMetaspaceSize=${JVM_MAX_METASPACE:-192m} -XX:ReservedCodeCacheSize=${JVM_CODE_CACHE:-64m} -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:CICompilerCount=1 ${JVM_EXTRA_OPTS:-}}
+      SERVER_TOMCAT_THREADS_MAX: ${TOMCAT_THREADS_MAX:-20}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${DB_POOL_MAX:-5}
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: ${DB_POOL_MIN_IDLE:-1}
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://postgres:5432/identity_db
       DB_USERNAME: identity_app
@@ -136,11 +169,14 @@ services:
       AUTH_JWT_PRIVATE_KEY: ${AUTH_JWT_PRIVATE_KEY:-}
       AUTH_JWT_PUBLIC_KEY: ${AUTH_JWT_PUBLIC_KEY:-}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      # Bí mật riêng của customer-api khi xin token storefront (ADR-0011 2.1); production phải ghi đè.
+      STOREFRONT_CLIENT_SECRET: ${STOREFRONT_CLIENT_SECRET:-dev-storefront-secret}
     expose:
       - "8081"
 
   circulation-service:
-    profiles: [apps]
+    profiles: [apps, circulation, lending]
+    mem_limit: ${JVM_MEM_LIMIT:-768m}
     build:
       context: .
       dockerfile: services/circulation-service/Dockerfile
@@ -153,7 +189,11 @@ services:
         condition: service_started
     environment:
       # Giới hạn heap để tiết kiệm RAM khi chạy local; đặt biến JAVA_TOOL_OPTIONS trong .env để ghi đè.
-      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xmx256m -XX:+UseSerialGC -XX:TieredStopAtLevel=1}
+      # Mặc định tiết kiệm RAM; chỉnh từng phần bằng JVM_XMX, JVM_MAX_METASPACE, JVM_CODE_CACHE, JVM_EXTRA_OPTS hoặc ghi đè cả chuỗi bằng JAVA_TOOL_OPTIONS.
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xmx${JVM_XMX:-256m} -XX:MaxMetaspaceSize=${JVM_MAX_METASPACE:-192m} -XX:ReservedCodeCacheSize=${JVM_CODE_CACHE:-64m} -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:CICompilerCount=1 ${JVM_EXTRA_OPTS:-}}
+      SERVER_TOMCAT_THREADS_MAX: ${TOMCAT_THREADS_MAX:-20}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${DB_POOL_MAX:-5}
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: ${DB_POOL_MIN_IDLE:-1}
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://postgres:5432/circulation_db
       DB_USERNAME: circulation_app
@@ -167,7 +207,8 @@ services:
       - "8083"
 
   catalog-service:
-    profiles: [apps]
+    profiles: [apps, catalog, sales, circulation, lending, bookstore]
+    mem_limit: ${JVM_MEM_LIMIT:-768m}
     build:
       context: .
       dockerfile: services/catalog-service/Dockerfile
@@ -178,7 +219,11 @@ services:
         condition: service_healthy
     environment:
       # Giới hạn heap để tiết kiệm RAM khi chạy local; đặt biến JAVA_TOOL_OPTIONS trong .env để ghi đè.
-      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xmx256m -XX:+UseSerialGC -XX:TieredStopAtLevel=1}
+      # Mặc định tiết kiệm RAM; chỉnh từng phần bằng JVM_XMX, JVM_MAX_METASPACE, JVM_CODE_CACHE, JVM_EXTRA_OPTS hoặc ghi đè cả chuỗi bằng JAVA_TOOL_OPTIONS.
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xmx${JVM_XMX:-256m} -XX:MaxMetaspaceSize=${JVM_MAX_METASPACE:-192m} -XX:ReservedCodeCacheSize=${JVM_CODE_CACHE:-64m} -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:CICompilerCount=1 ${JVM_EXTRA_OPTS:-}}
+      SERVER_TOMCAT_THREADS_MAX: ${TOMCAT_THREADS_MAX:-20}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${DB_POOL_MAX:-5}
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: ${DB_POOL_MIN_IDLE:-1}
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://postgres:5432/catalog_db
       DB_USERNAME: catalog_app
@@ -190,8 +235,11 @@ services:
     expose:
       - "8082"
 
+  # Mặc định KHÔNG bật cùng `--profile apps` (tiết kiệm tài nguyên dev). Bật bằng `--profile support`, hoặc chỉ định
+  # đích danh: `docker compose --profile apps up -d --build support-service` (profile của service tự được bật).
   support-service:
-    profiles: [apps]
+    profiles: [support, lending]
+    mem_limit: ${JVM_MEM_LIMIT:-768m}
     build:
       context: .
       dockerfile: services/support-service/Dockerfile
@@ -206,7 +254,9 @@ services:
         condition: service_started
     environment:
       # Giới hạn heap để tiết kiệm RAM khi chạy local; đặt biến JAVA_TOOL_OPTIONS trong .env để ghi đè.
-      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xmx256m -XX:+UseSerialGC -XX:TieredStopAtLevel=1}
+      # Mặc định tiết kiệm RAM; chỉnh từng phần bằng JVM_XMX, JVM_MAX_METASPACE, JVM_CODE_CACHE, JVM_EXTRA_OPTS hoặc ghi đè cả chuỗi bằng JAVA_TOOL_OPTIONS.
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xmx${JVM_XMX:-256m} -XX:MaxMetaspaceSize=${JVM_MAX_METASPACE:-192m} -XX:ReservedCodeCacheSize=${JVM_CODE_CACHE:-64m} -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:CICompilerCount=1 ${JVM_EXTRA_OPTS:-}}
+      SERVER_TOMCAT_THREADS_MAX: ${TOMCAT_THREADS_MAX:-20}
       SPRING_PROFILES_ACTIVE: prod
       AUDIT_DB_URL: jdbc:postgresql://postgres:5432/audit_db
       AUDIT_DB_USERNAME: audit_app
@@ -219,39 +269,137 @@ services:
     expose:
       - "8084"
 
+  # Module bán hàng (ADR-0010): sales_db do system-service migrate (target sales). Gọi catalog bằng token chuyển tiếp.
+  sales-service:
+    profiles: [apps, sales, bookstore]
+    mem_limit: ${JVM_MEM_LIMIT:-768m}
+    build:
+      context: .
+      dockerfile: services/sales-service/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      system-service:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      # Giới hạn heap để tiết kiệm RAM khi chạy local; đặt biến JAVA_TOOL_OPTIONS trong .env để ghi đè.
+      # Mặc định tiết kiệm RAM; chỉnh từng phần bằng JVM_XMX, JVM_MAX_METASPACE, JVM_CODE_CACHE, JVM_EXTRA_OPTS hoặc ghi đè cả chuỗi bằng JAVA_TOOL_OPTIONS.
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xmx${JVM_XMX:-256m} -XX:MaxMetaspaceSize=${JVM_MAX_METASPACE:-192m} -XX:ReservedCodeCacheSize=${JVM_CODE_CACHE:-64m} -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:CICompilerCount=1 ${JVM_EXTRA_OPTS:-}}
+      SERVER_TOMCAT_THREADS_MAX: ${TOMCAT_THREADS_MAX:-20}
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${DB_POOL_MAX:-5}
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: ${DB_POOL_MIN_IDLE:-1}
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://postgres:5432/sales_db
+      DB_USERNAME: sales_app
+      DB_PASSWORD: sales_app
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_JWK_SET_URI: http://identity-service:8081/.well-known/jwks.json
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      IDENTITY_SERVICE_URL: http://identity-service:8081
+      CATALOG_SERVICE_URL: http://catalog-service:8082
+    expose:
+      - "8087"
+
   # Service duy nhất đưa API ra cho FE. Các service khác chỉ gọi được trong mạng compose (API nội bộ /internal/**).
   lms-api:
-    profiles: [apps]
+    profiles: [apps, core]
+    mem_limit: ${JVM_MEM_LIMIT:-768m}
     build:
       context: .
       dockerfile: lms-api/Dockerfile
     environment:
       # Giới hạn heap để tiết kiệm RAM khi chạy local; đặt biến JAVA_TOOL_OPTIONS trong .env để ghi đè.
-      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xmx256m -XX:+UseSerialGC -XX:TieredStopAtLevel=1}
+      # Mặc định tiết kiệm RAM; chỉnh từng phần bằng JVM_XMX, JVM_MAX_METASPACE, JVM_CODE_CACHE, JVM_EXTRA_OPTS hoặc ghi đè cả chuỗi bằng JAVA_TOOL_OPTIONS.
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xmx${JVM_XMX:-256m} -XX:MaxMetaspaceSize=${JVM_MAX_METASPACE:-192m} -XX:ReservedCodeCacheSize=${JVM_CODE_CACHE:-64m} -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:CICompilerCount=1 ${JVM_EXTRA_OPTS:-}}
+      SERVER_TOMCAT_THREADS_MAX: ${TOMCAT_THREADS_MAX:-20}
       IDENTITY_SERVICE_URL: http://identity-service:8081
       CATALOG_SERVICE_URL: http://catalog-service:8082
       CIRCULATION_SERVICE_URL: http://circulation-service:8083
       SUPPORT_SERVICE_URL: http://support-service:8084
       SYSTEM_SERVICE_URL: http://system-service:8086
+      SALES_SERVICE_URL: http://sales-service:8087
       JWT_JWK_SET_URI: http://identity-service:8081/.well-known/jwks.json
+    # catalog, sales chỉ có khi bật profile tương ứng (core không có): lms-api chỉ gọi HTTP khi có request nên required false.
     depends_on:
-      - identity-service
-      - catalog-service
+      identity-service:
+        condition: service_started
+      catalog-service:
+        condition: service_started
+        required: false
+      sales-service:
+        condition: service_started
+        required: false
     expose:
       - "8085"
 
+  # BFF công khai cho khách (ADR-0011): trang giới thiệu, form liên hệ, storefront. Không DB, chỉ expose trong mạng
+  # compose; ra ngoài qua nginx (/public/**). Gọi sales-service (storefront) qua SALES_SERVICE_URL.
+  customer-api:
+    profiles: [apps, bookstore]
+    mem_limit: ${JVM_MEM_LIMIT:-768m}
+    build:
+      context: .
+      dockerfile: customer-api/Dockerfile
+    environment:
+      # Mặc định tiết kiệm RAM; chỉnh từng phần bằng JVM_XMX, JVM_MAX_METASPACE, JVM_CODE_CACHE, JVM_EXTRA_OPTS hoặc ghi đè cả chuỗi bằng JAVA_TOOL_OPTIONS.
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xmx${JVM_XMX:-256m} -XX:MaxMetaspaceSize=${JVM_MAX_METASPACE:-192m} -XX:ReservedCodeCacheSize=${JVM_CODE_CACHE:-64m} -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:CICompilerCount=1 ${JVM_EXTRA_OPTS:-}}
+      SERVER_TOMCAT_THREADS_MAX: ${TOMCAT_THREADS_MAX:-20}
+      IDENTITY_SERVICE_URL: http://identity-service:8081
+      SYSTEM_SERVICE_URL: http://system-service:8086
+      SALES_SERVICE_URL: http://sales-service:8087
+      JWT_JWK_SET_URI: http://identity-service:8081/.well-known/jwks.json
+      STOREFRONT_CLIENT_SECRET: ${STOREFRONT_CLIENT_SECRET:-dev-storefront-secret}
+      # CORS động của /public/** (ADR-0013). Compose chạy dev nên mặc định OFF (cho mọi origin, chỉ log); application.yml
+      # mặc định ENFORCE. Production đặt ENFORCE (hoặc REPORT khi chuyển đổi), PUBLIC_CORS_PLATFORM_ORIGINS = domain trang
+      # SaaS và PUBLIC_CORS_DEV_ORIGINS rỗng. customer-api (B-O4) và nginx (B-O6) phải triển khai CÙNG MỘT LẦN: nginx cũ
+      # còn trả CORS cho /public/** thì phản hồi có hai Access-Control-Allow-Origin.
+      PUBLIC_CORS_MODE: ${PUBLIC_CORS_MODE:-OFF}
+      PUBLIC_CORS_PLATFORM_ORIGINS: ${PUBLIC_CORS_PLATFORM_ORIGINS:-}
+      PUBLIC_CORS_DEV_ORIGINS: ${PUBLIC_CORS_DEV_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      # Mặc định dev vì bí mật mặc định ở trên chỉ dành cho dev. Profile prod là fail-fast khi bí mật rỗng/mặc định dev
+      # hoặc JWT_JWK_SET_URI trỏ localhost (StartupConfigurationCheck): production đặt CUSTOMER_API_PROFILE=prod và
+      # STOREFRONT_CLIENT_SECRET riêng (cùng giá trị với identity).
+      SPRING_PROFILES_ACTIVE: ${CUSTOMER_API_PROFILE:-dev}
+    depends_on:
+      - identity-service
+      - system-service
+      - sales-service
+    healthcheck:
+      # eclipse-temurin:21-jre (Ubuntu) có sẵn curl. Chỉ kiểm tiến trình customer-api, KHÔNG kiểm JWKS/identity: identity
+      # chậm tạm thời không được làm container bị coi là hỏng (tránh vòng lặp khởi động lại ở orchestrator).
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8088/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 40s
+    expose:
+      - "8088"
+
   # Cổng vào duy nhất ra host (8080): CORS, header bảo mật, giới hạn tốc độ đăng nhập, chặn /internal. Cấu hình ở infrastructure/nginx.
   nginx:
-    profiles: [apps]
+    profiles: [apps, core]
+    mem_limit: ${NGINX_MEM_LIMIT:-64m}
     image: nginx:1.27-alpine
     command: ["nginx", "-c", "/etc/nginx/lms/nginx.conf", "-g", "daemon off;"]
     volumes:
       - ./infrastructure/nginx:/etc/nginx/lms:ro
+    # customer-api, circulation, support chỉ có khi bật profile tương ứng (core không có): required false để không chặn khởi động.
     depends_on:
-      - lms-api
-      - identity-service
-      - circulation-service
-      - support-service
+      lms-api:
+        condition: service_started
+      identity-service:
+        condition: service_started
+      customer-api:
+        condition: service_started
+        required: false
+      circulation-service:
+        condition: service_started
+        required: false
+      support-service:
+        condition: service_started
+        required: false
     ports:
       - "8080:8080"
 

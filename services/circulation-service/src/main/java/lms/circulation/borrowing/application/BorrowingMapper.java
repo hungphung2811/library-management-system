@@ -37,7 +37,7 @@ public final class BorrowingMapper {
                 .map(BorrowingMapper::toItem)
                 .toList();
         return new BorrowingResponse(record.id().value(), record.userId(), record.status().name(),
-                record.borrowDate(), record.dueDate(), record.renewCount(), items, fines);
+                record.borrowDate(), record.dueDate(), record.renewCount(), items, fines, record.tenantId());
     }
 
     private static BorrowingResponse.Item toItem(BorrowingItem i) {

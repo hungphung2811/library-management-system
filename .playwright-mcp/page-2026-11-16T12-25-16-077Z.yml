@@ -1,0 +1,134 @@
+- generic [ref=f3e1]:
+  - generic [ref=f3e2]:
+    - complementary [ref=f3e3]:
+      - navigation "Điều hướng chính" [ref=f3e4]:
+        - generic [ref=f3e5]:
+          - link "Thư viện, về trang chủ" [ref=f3e6] [cursor=pointer]:
+            - /url: /
+            - generic [ref=f3e16]:
+              - generic [ref=f3e17]: Thư viện
+              - generic [ref=f3e18]: Quản lý mượn trả
+          - button "Thu gọn menu" [expanded] [ref=f3e19] [cursor=pointer]
+        - list [ref=f3e23]:
+          - listitem [ref=f3e24]:
+            - link "Trang chủ" [ref=f3e25] [cursor=pointer]:
+              - /url: /
+          - listitem [aria-hidden] [ref=f3e32]: Nghiệp vụ
+          - listitem [ref=f3e33]:
+            - button "Sách" [expanded] [ref=f3e34] [cursor=pointer]
+            - list [ref=f3e41]:
+              - listitem [ref=f3e42]:
+                - link "Danh sách sách" [ref=f3e43] [cursor=pointer]:
+                  - /url: /catalog
+              - listitem [ref=f3e44]:
+                - link "Tra mã vạch" [ref=f3e45] [cursor=pointer]:
+                  - /url: /catalog/barcode
+              - listitem [ref=f3e46]:
+                - link "Thêm sách" [ref=f3e47] [cursor=pointer]:
+                  - /url: /catalog/books/new
+          - listitem [ref=f3e48]:
+            - button "Mượn trả" [ref=f3e49] [cursor=pointer]
+          - listitem [aria-hidden] [ref=f3e57]: Hệ thống
+          - listitem [ref=f3e58]:
+            - button "Quản trị" [ref=f3e59] [cursor=pointer]
+        - generic [ref=f3e68]:
+          - generic [ref=f3e69]:
+            - generic [aria-hidden] [ref=f3e70]: A
+            - generic [ref=f3e71]:
+              - generic "00000000-0000-0000-0000-000000000001" [ref=f3e72]: admin
+              - generic [ref=f3e73]: SUPER_ADMIN
+          - button "Đăng xuất" [ref=f3e74] [cursor=pointer]
+    - generic [ref=f3e78]:
+      - banner [ref=f3e79]:
+        - list [ref=f3e80]:
+          - listitem [ref=f3e81]:
+            - link "Trang chủ" [ref=f3e82] [cursor=pointer]:
+              - /url: /
+          - listitem [aria-hidden] [ref=f3e83]
+          - listitem [ref=f3e86]: Sách
+          - listitem [aria-hidden] [ref=f3e87]
+          - listitem [ref=f3e90]: Danh sách sách
+        - generic [ref=f3e91]:
+          - button "Thông báo, 0 chưa đọc" [ref=f3e92] [cursor=pointer]
+          - button "Tài khoản của tôi" [ref=f3e97] [cursor=pointer]:
+            - generic [aria-hidden] [ref=f3e98]: A
+      - main [ref=f3e99]:
+        - generic [ref=f3e188]:
+          - navigation [ref=f3e189]:
+            - list [ref=f3e190]:
+              - listitem [ref=f3e191]:
+                - link "Sách" [ref=f3e193] [cursor=pointer]:
+                  - /url: /catalog
+              - listitem [aria-hidden] [ref=f3e194]: /
+              - listitem [ref=f3e195]: Lập trình Java căn bản
+          - generic [ref=f3e196]:
+            - generic [ref=f3e197]:
+              - heading "Lập trình Java căn bản" [level=1] [ref=f3e198]
+              - paragraph [ref=f3e199]: Nguyễn Văn An
+            - button "Đặt trước" [ref=f3e201] [cursor=pointer]
+          - generic [ref=f3e203]:
+            - generic [ref=f3e204]: Thông tin
+            - generic [ref=f3e207]:
+              - table [ref=f3e210]:
+                - rowgroup [ref=f3e211]:
+                  - row [ref=f3e212]:
+                    - 'cell "Tên sách : Lập trình Java căn bản" [ref=f3e213]':
+                      - generic [ref=f3e214]:
+                        - generic [ref=f3e215]: "Tên sách :"
+                        - generic [ref=f3e216]: Lập trình Java căn bản
+                    - 'cell "Tác giả : Nguyễn Văn An" [ref=f3e217]':
+                      - generic [ref=f3e218]:
+                        - generic [ref=f3e219]: "Tác giả :"
+                        - generic [ref=f3e220]: Nguyễn Văn An
+                  - row [ref=f3e221]:
+                    - 'cell "ISBN : 9786040000011" [ref=f3e222]':
+                      - generic [ref=f3e223]:
+                        - generic [ref=f3e224]: "ISBN :"
+                        - generic [ref=f3e225]: "9786040000011"
+                    - 'cell "Giá bìa : 185.000 ₫" [ref=f3e227]':
+                      - generic [ref=f3e228]:
+                        - generic [ref=f3e229]: "Giá bìa :"
+                        - generic [ref=f3e230]: 185.000 ₫
+                  - row [ref=f3e231]:
+                    - 'cell "Số bản sẵn có : 0" [ref=f3e232]':
+                      - generic [ref=f3e233]:
+                        - generic [ref=f3e234]: "Số bản sẵn có :"
+                        - generic [ref=f3e235]: "0"
+              - text: Chức năng sửa thông tin sách chưa có vì hệ thống chưa hỗ trợ.
+          - generic [ref=f3e239]:
+            - generic [ref=f3e241]:
+              - generic [ref=f3e242]: Bản sao
+              - button "plus Thêm bản sao" [ref=f3e244] [cursor=pointer]:
+                - img "plus" [ref=f3e246]
+                - generic [ref=f3e250]: Thêm bản sao
+            - table [ref=f3e261]:
+              - rowgroup [ref=f3e262]:
+                - row [ref=f3e263]:
+                  - columnheader "Mã vạch" [ref=f3e264]
+                  - columnheader "Trạng thái" [ref=f3e265]
+                  - columnheader "Thao tác" [ref=f3e266]
+              - rowgroup [ref=f3e267]:
+                - row [ref=f3e268]:
+                  - cell "Trống Đầu sách này chưa có bản sao nào." [ref=f3e269]:
+                    - generic [ref=f3e271]:
+                      - img "Trống" [ref=f3e273]
+                      - generic [ref=f3e279]: Đầu sách này chưa có bản sao nào.
+  - button "Open Next.js Dev Tools" [ref=f3e166] [cursor=pointer]
+  - alert [ref=f3e180]
+  - generic [ref=f3e282]:
+    - dialog "Thêm bản sao cho «Lập trình Java căn bản»":
+      - generic [ref=f3e283]:
+        - button "Đóng" [ref=f3e284] [cursor=pointer]:
+          - generic "Đóng" [ref=f3e285]:
+            - img "close" [ref=f3e286]
+        - generic [ref=f3e289]: Thêm bản sao cho «Lập trình Java căn bản»
+        - generic [ref=f3e293]:
+          - alert [ref=f3e294]:
+            - img "info-circle" [ref=f3e296]
+            - generic [ref=f3e299]: Quét mã vạch hoặc nhập tay rồi nhấn Enter để lưu.
+          - generic [ref=f3e302]:
+            - generic "Mã vạch" [ref=f3e304]: "* Mã vạch"
+            - textbox "* Mã vạch" [active] [ref=f3e308]
+        - generic [ref=f3e309]:
+          - button "Hủy" [ref=f3e310] [cursor=pointer]
+          - button "Lưu" [ref=f3e312] [cursor=pointer]

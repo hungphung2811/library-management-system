@@ -1,0 +1,49 @@
+- generic [active] [ref=f5e1]:
+  - generic [ref=f5e2]:
+    - main [ref=f5e3]:
+      - generic [ref=f5e4]:
+        - heading "Đăng nhập vào Thư viện" [level=1] [ref=f5e5]
+        - paragraph [ref=f5e6]: Nhập tài khoản được cấp để vào hệ thống quản lý thư viện.
+        - generic [ref=f5e7]:
+          - generic [ref=f5e9]:
+            - generic "Tên đăng nhập" [ref=f5e11]
+            - textbox "Tên đăng nhập" [ref=f5e20]:
+              - /placeholder: Nhập tên đăng nhập
+          - generic [ref=f5e22]:
+            - generic "Mật khẩu" [ref=f5e24]
+            - generic [ref=f5e28]:
+              - textbox "Mật khẩu" [ref=f5e33]:
+                - /placeholder: Nhập mật khẩu
+              - button "Hiển thị" [ref=f5e35] [cursor=pointer]:
+                - img "eye-invisible" [ref=f5e36]
+          - button "Đăng nhập" [ref=f5e40] [cursor=pointer]
+    - complementary [ref=f5e42]:
+      - generic [ref=f5e43]:
+        - generic [ref=f5e53]:
+          - generic [ref=f5e54]: Thư viện
+          - generic [ref=f5e55]: Quản lý mượn trả
+        - heading "Truy cập hệ thống an toàn" [level=3] [ref=f5e56]
+        - paragraph [ref=f5e57]:
+          - text: Cổng xác thực giúp thủ thư và quản trị viên vào hệ thống
+          - strong [ref=f5e58]: nhanh và an toàn
+          - text: . Quyền thao tác của mỗi tài khoản do vai trò quyết định.
+      - generic [aria-hidden] [ref=f5e59]:
+        - generic [ref=f5e60]:
+          - generic [ref=f5e61]: Phiếu mượn gần đây
+          - list [ref=f5e62]:
+            - listitem [ref=f5e63]:
+              - generic [ref=f5e64]:
+                - generic [ref=f5e65]: Clean Architecture
+                - generic [ref=f5e66]: Đang mượn
+            - listitem [ref=f5e69]:
+              - generic [ref=f5e70]:
+                - generic [ref=f5e71]: Domain-Driven Design
+                - generic [ref=f5e72]: Đã đặt trước
+            - listitem [ref=f5e75]:
+              - generic [ref=f5e76]:
+                - generic [ref=f5e77]: Designing Data-Intensive Applications
+                - generic [ref=f5e78]: Sẵn sàng
+        - generic [ref=f5e81]:
+          - generic [ref=f5e82]: Sách đang cho mượn
+          - generic [ref=f5e83]: "1.248"
+  - button "Open Next.js Dev Tools" [ref=f5e97] [cursor=pointer]

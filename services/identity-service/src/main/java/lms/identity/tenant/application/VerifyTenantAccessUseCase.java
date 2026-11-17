@@ -5,6 +5,7 @@ import java.util.UUID;
 import lms.identity.tenant.domain.MembershipRepository;
 import lms.identity.tenant.domain.NoTenantAccessException;
 import lms.identity.tenant.domain.Tenant;
+import lms.identity.tenant.domain.TenantModuleRepository;
 import lms.identity.tenant.domain.TenantRepository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,10 +17,13 @@ public class VerifyTenantAccessUseCase {
 
     private final TenantRepository tenants;
     private final MembershipRepository memberships;
+    private final TenantModuleRepository modules;
 
-    public VerifyTenantAccessUseCase(TenantRepository tenants, MembershipRepository memberships) {
+    public VerifyTenantAccessUseCase(TenantRepository tenants, MembershipRepository memberships,
+                                     TenantModuleRepository modules) {
         this.tenants = tenants;
         this.memberships = memberships;
+        this.modules = modules;
     }
 
     /** @throws NoTenantAccessException nếu không truy cập được tenant đó */
@@ -29,7 +33,7 @@ public class VerifyTenantAccessUseCase {
         if (tenantId == null || accessible.stream().noneMatch(t -> t.id().equals(tenantId))) {
             throw new NoTenantAccessException();
         }
-        return new TenantChoice(tenantId, AccessibleTenants.summaries(accessible),
+        return new TenantChoice(tenantId, AccessibleTenants.summaries(accessible, modules),
                 AccessibleTenants.departmentIn(userId, tenantId, memberships));
     }
 }

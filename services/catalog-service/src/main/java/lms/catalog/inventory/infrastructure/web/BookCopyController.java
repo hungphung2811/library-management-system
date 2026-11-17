@@ -1,5 +1,8 @@
 package lms.catalog.inventory.infrastructure.web;
 
+import lms.security.permission.CrossTenantReadable;
+import lms.security.permission.RequiresModule;
+import lms.security.permission.TenantModule;
 import lms.catalog.inventory.application.AddCopyCommand;
 import lms.catalog.inventory.application.AddCopyRequest;
 import lms.catalog.inventory.application.AddCopyUseCase;
@@ -24,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@RequiresModule(TenantModule.LENDING)
 @RequestMapping("/internal/book-copies")
 public class BookCopyController {
 
@@ -66,6 +70,7 @@ public class BookCopyController {
     }
 
     @GetMapping
+    @CrossTenantReadable
     public List<CopyResponse> list(@RequestParam UUID titleId) {
         return listCopies.execute(titleId);
     }

@@ -42,6 +42,7 @@ class AuditLogJpaEntity {
     }
 
     UUID getId() { return id; }
+    UUID getTenantId() { return tenantId; }
     UUID getEventId() { return eventId; }
     String getEventType() { return eventType; }
     String getAggregateId() { return aggregateId; }

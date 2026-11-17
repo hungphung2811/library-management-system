@@ -19,6 +19,8 @@ public class Fine {
     private FineStatus status;
     private final Instant createdAt;
     private Instant paidAt;
+    /** Tenant sở hữu, chỉ có khi dựng lại từ persistence (đọc); khoản mới lập chưa có (null). Không tham gia nghiệp vụ. */
+    private UUID tenantId;
     private final List<DomainEvent> events = new ArrayList<>();
 
     private Fine(UUID id, UUID readerId, UUID borrowingId, UUID bookCopyId, FineReason reason, BigDecimal amount,
@@ -55,6 +57,14 @@ public class Fine {
         return new Fine(id, readerId, borrowingId, bookCopyId, reason, amount, status, createdAt, paidAt);
     }
 
+    /** Như {@link #restore} kèm tenant sở hữu (đọc xuyên tenant, ADR-0008). */
+    public static Fine restore(UUID id, UUID readerId, UUID borrowingId, UUID bookCopyId, FineReason reason,
+                               BigDecimal amount, FineStatus status, Instant createdAt, Instant paidAt, UUID tenantId) {
+        Fine fine = new Fine(id, readerId, borrowingId, bookCopyId, reason, amount, status, createdAt, paidAt);
+        fine.tenantId = tenantId;
+        return fine;
+    }
+
     /** UC09: thu khoản phạt. Thu hai lần là lỗi để không ghi nhận trùng. */
     public void pay(Instant now) {
         if (status == FineStatus.PAID) throw new InvalidFineException("Khoản phạt đã được thanh toán");
@@ -82,4 +92,6 @@ public class Fine {
     public FineStatus status() { return status; }
     public Instant createdAt() { return createdAt; }
     public Instant paidAt() { return paidAt; }
+    /** Null với khoản mới lập chưa qua persistence. */
+    public UUID tenantId() { return tenantId; }
 }

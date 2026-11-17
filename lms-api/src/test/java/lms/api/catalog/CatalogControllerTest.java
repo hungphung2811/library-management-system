@@ -58,8 +58,8 @@ class CatalogControllerTest {
 
     @Test
     void timKiemTraDanhSachChoFe() throws Exception {
-        when(catalog.searchTitles(eq("clean"), eq(true))).thenReturn(List.of(
-                new TitleView(TITLE, "Clean Code", "Martin", null, new BigDecimal("250000"), 2)));
+        when(catalog.searchTitles(eq("clean"), eq(true), eq(null))).thenReturn(List.of(
+                new TitleView(TITLE, "Clean Code", "Martin", null, new BigDecimal("250000"), 2, null)));
         mvc.perform(get("/api/books").param("keyword", "clean").param("available", "true").with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].name").value("Clean Code"))
@@ -68,7 +68,7 @@ class CatalogControllerTest {
 
     @Test
     void taoDauSachTraCreatedVaLocationTheoDuongDanFe() throws Exception {
-        when(catalog.createTitle(any())).thenReturn(new TitleView(TITLE, "A", "B", null, BigDecimal.ONE, 0));
+        when(catalog.createTitle(any())).thenReturn(new TitleView(TITLE, "A", "B", null, BigDecimal.ONE, 0, null));
         mvc.perform(post("/api/books").with(jwt()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"A\",\"author\":\"B\",\"coverPrice\":1}"))
                 .andExpect(status().isCreated())
@@ -79,7 +79,7 @@ class CatalogControllerTest {
     @Test
     void suaDauSachChuyenTiepVaTraDauSachMoi() throws Exception {
         when(catalog.updateTitle(eq(TITLE), any())).thenReturn(
-                new TitleView(TITLE, "Clean Code 2", "Martin", "978", new BigDecimal("300000"), 1));
+                new TitleView(TITLE, "Clean Code 2", "Martin", "978", new BigDecimal("300000"), 1, null));
         mvc.perform(put("/api/books/" + TITLE).with(jwt()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"Clean Code 2\",\"author\":\"Martin\",\"isbn\":\"978\",\"coverPrice\":300000}"))
                 .andExpect(status().isOk())
@@ -148,7 +148,7 @@ class CatalogControllerTest {
                 .andExpect(jsonPath("$.code").value("DEPENDENCY_ERROR"))
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("bí mật"))));
 
-        when(catalog.listCopies(TITLE)).thenThrow(new ResourceAccessException("down", new SocketTimeoutException()));
+        when(catalog.listCopies(TITLE, null)).thenThrow(new ResourceAccessException("down", new SocketTimeoutException()));
         mvc.perform(get("/api/book-copies").param("titleId", TITLE.toString()).with(jwt()))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.code").value("DEPENDENCY_UNAVAILABLE"));
@@ -173,7 +173,7 @@ class CatalogControllerTest {
     void doiTrangThaiBanSaoChuyenDungTrangThaiVaTuChoiGiaTriSai() throws Exception {
         UUID copy = UUID.randomUUID();
         when(catalog.changeCopyStatus(copy, CopyStatus.DAMAGED))
-                .thenReturn(new CopyView(copy, TITLE, "CC-1", "DAMAGED"));
+                .thenReturn(new CopyView(copy, TITLE, "CC-1", "DAMAGED", null));
         mvc.perform(put("/api/book-copies/" + copy + "/status").with(jwt()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"DAMAGED\"}"))
                 .andExpect(status().isOk())
@@ -187,7 +187,55 @@ class CatalogControllerTest {
     }
 
     @Test
-    void chuyenTrangThaiSaiVongDoiCuaServiceNoiBoThanh409() throws Exception {
+    void docPreviewTraVanBanThuanVaKhongTokenBi401() throws Exception {
+        when(catalog.getPreview(TITLE)).thenReturn(
+                new lms.api.catalog.dto.TitlePreviewView(TITLE, "Clean Code", "Mô tả", "<b>x</b>"));
+        mvc.perform(get("/api/books/" + TITLE + "/preview").with(jwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Clean Code"))
+                .andExpect(jsonPath("$.description").value("Mô tả"))
+                .andExpect(jsonPath("$.previewText").value("<b>x</b>"))
+                .andExpect(jsonPath("$.isbn").doesNotExist());
+        mvc.perform(get("/api/books/" + TITLE + "/preview")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/books/khong-phai-uuid/preview").with(jwt())).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void suaPreviewChuyenBodyVaChoPhepNullDeXoa() throws Exception {
+        when(catalog.updatePreview(eq(TITLE), any()))
+                .thenReturn(new lms.api.catalog.dto.TitlePreviewView(TITLE, "A", null, null));
+        mvc.perform(put("/api/books/" + TITLE + "/preview").with(jwt()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"description\":null,\"previewText\":\"\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.previewText").doesNotExist());
+        org.mockito.Mockito.verify(catalog).updatePreview(eq(TITLE),
+                eq(new lms.api.catalog.dto.UpdateTitlePreviewRequest(null, "")));
+        mvc.perform(put("/api/books/" + TITLE + "/preview").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(put("/api/books/" + TITLE + "/preview").with(jwt()).contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void preview4xxCuaCatalogChuyenNguyen() throws Exception {
+        when(catalog.updatePreview(eq(TITLE), any())).thenThrow(HttpClientErrorException.create(
+                HttpStatus.BAD_REQUEST, "Bad Request", HttpHeaders.EMPTY,
+                "{\"code\":\"TITLE_PREVIEW_TOO_LONG\",\"message\":\"x\",\"details\":[]}"
+                        .getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8));
+        mvc.perform(put("/api/books/" + TITLE + "/preview").with(jwt()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"previewText\":\"dài\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("TITLE_PREVIEW_TOO_LONG"));
+        when(catalog.getPreview(TITLE)).thenThrow(HttpClientErrorException.create(HttpStatus.NOT_FOUND, "NF",
+                HttpHeaders.EMPTY, "{\"code\":\"TITLE_NOT_FOUND\",\"message\":\"x\",\"details\":[]}"
+                        .getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8));
+        mvc.perform(get("/api/books/" + TITLE + "/preview").with(jwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("TITLE_NOT_FOUND"));
+    }
+
+    @Test
+    void chuyenTrangThaiSaiVongDoiCuaServiceNoiBoThanh409()throws Exception {
         UUID copy = UUID.randomUUID();
         when(catalog.changeCopyStatus(copy, CopyStatus.LOST)).thenThrow(HttpClientErrorException.create(
                 HttpStatus.CONFLICT, "Conflict", HttpHeaders.EMPTY,

@@ -1,0 +1,22 @@
+- generic [active] [ref=e1]:
+  - main [ref=e3]:
+    - generic [ref=e13]:
+      - generic [ref=e14]: Thư viện
+      - generic [ref=e15]: Quản lý mượn trả
+    - generic [ref=e16]:
+      - heading "Đăng nhập vào Thư viện" [level=1] [ref=e17]
+      - paragraph [ref=e18]: Nhập tài khoản được cấp để vào hệ thống quản lý thư viện.
+      - generic [ref=e19]:
+        - generic [ref=e21]:
+          - generic "Tên đăng nhập" [ref=e23]
+          - textbox "Tên đăng nhập" [ref=e32]:
+            - /placeholder: Nhập tên đăng nhập
+        - generic [ref=e34]:
+          - generic "Mật khẩu" [ref=e36]
+          - generic [ref=e40]:
+            - textbox "Mật khẩu" [ref=e45]:
+              - /placeholder: Nhập mật khẩu
+            - button "Hiển thị" [ref=e47] [cursor=pointer]:
+              - img "eye-invisible" [ref=e48]
+        - button "Đăng nhập" [ref=e52] [cursor=pointer]
+  - button "Open Next.js Dev Tools" [ref=e59] [cursor=pointer]

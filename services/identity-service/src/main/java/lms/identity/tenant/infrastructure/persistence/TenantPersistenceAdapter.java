@@ -37,7 +37,7 @@ class TenantPersistenceAdapter implements TenantRepository, TenantQueryRepositor
     public Tenant save(Tenant t) {
         try {
             jpa.saveAndFlush(new TenantJpaEntity(t.id(), t.code(), t.name(), t.organizationId(), t.status(),
-                    t.createdAt()));
+                    t.createdAt(), t.suspensionCause(), t.suspendedByContractId()));
         } catch (DataIntegrityViolationException e) {
             // unique(code): hai yêu cầu tạo cùng mã đồng thời; vi phạm khác (FK organization, check...) ném lại
             if (isCodeUniqueViolation(e)) throw new DuplicateTenantException("Mã tenant đã tồn tại: " + t.code());
@@ -113,6 +113,6 @@ class TenantPersistenceAdapter implements TenantRepository, TenantQueryRepositor
 
     private static Tenant toDomain(TenantJpaEntity e) {
         return Tenant.restore(e.getId(), e.getCode(), e.getName(), e.getOrganizationId(), e.getStatus(),
-                e.getCreatedAt());
+                e.getCreatedAt(), e.getSuspensionCause(), e.getSuspendedByContractId());
     }
 }

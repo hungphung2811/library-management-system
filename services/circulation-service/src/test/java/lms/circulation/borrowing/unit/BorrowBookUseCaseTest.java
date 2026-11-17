@@ -70,6 +70,9 @@ class BorrowBookUseCaseTest {
 
     final BorrowingRepository repository = new BorrowingRepository() {
         public Optional<BorrowingRecord> findById(BorrowingId id) { return Optional.ofNullable(records.get(id.value())); }
+        public Optional<BorrowingRecord> findByIdAndUserId(BorrowingId id, UUID userId) {
+            return findById(id).filter(r -> r.userId().equals(userId));
+        }
         public Optional<BorrowingRecord> findByIdForUpdate(BorrowingId id) { return findById(id); }
         public Optional<BorrowingRecord> findOpenByCopyIdForUpdate(UUID copyId) {
             return records.values().stream().filter(r -> r.items().stream()
@@ -84,6 +87,10 @@ class BorrowBookUseCaseTest {
         public long countOverdueItemsByUserId(UUID userId, LocalDate today) {
             return records.values().stream().filter(r -> r.userId().equals(userId) && r.isOverdue(today))
                     .mapToLong(BorrowingRecord::activeItemCount).sum();
+        }
+        public lms.circulation.borrowing.domain.BorrowingSearchResult search(
+                lms.circulation.borrowing.domain.BorrowingSearchCriteria criteria) {
+            throw new UnsupportedOperationException();
         }
     };
 

@@ -17,4 +17,11 @@ interface SpringDataTitleRepository extends JpaRepository<TitleJpaEntity, UUID> 
     List<TitleJpaEntity> search(@Param("keyword") String keyword);
 
     List<TitleJpaEntity> findAllByOrderByName();
+
+    @Query("select t from TitleJpaEntity t where lower(t.name) like lower(concat('%', :keyword, '%')) "
+            + "or lower(t.author) like lower(concat('%', :keyword, '%')) order by t.name")
+    List<TitleJpaEntity> searchPage(@Param("keyword") String keyword, org.springframework.data.domain.Pageable page);
+
+    @Query("select t from TitleJpaEntity t order by t.name")
+    List<TitleJpaEntity> findAllByOrderByName(org.springframework.data.domain.Pageable page);
 }

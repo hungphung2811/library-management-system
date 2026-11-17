@@ -6,7 +6,8 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 interface SpringDataUserMembershipRepository
-        extends JpaRepository<UserMembershipJpaEntity, UserMembershipJpaEntity.Key> {
+        extends JpaRepository<UserMembershipJpaEntity, UserMembershipJpaEntity.Key>,
+        org.springframework.data.jpa.repository.JpaSpecificationExecutor<UserMembershipJpaEntity> {
 
     long countByUserId(UUID userId);
 

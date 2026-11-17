@@ -22,11 +22,12 @@ public final class MenuRequests {
             UUID parentId,
             Integer sortOrder,
             Boolean enabled,
-            @Size(max = 255) String permissionKey) {
+            @Size(max = 255) String permissionKey,
+            @Size(max = 20) String module) {
 
         CreateMenuUseCase.Command toCommand() {
             return new CreateMenuUseCase.Command(code, new MenuDetails(label, path, icon, parentId,
-                    sortOrder == null ? 0 : sortOrder, enabled == null || enabled, permissionKey));
+                    sortOrder == null ? 0 : sortOrder, enabled == null || enabled, permissionKey, module));
         }
     }
 
@@ -39,11 +40,12 @@ public final class MenuRequests {
             @NotNull Integer sortOrder,
             @NotNull Boolean enabled,
             @Size(max = 255) String permissionKey,
-            @NotNull Long version) {
+            @NotNull Long version,
+            @Size(max = 20) String module) {
 
         UpdateMenuUseCase.Command toCommand(UUID id) {
             return new UpdateMenuUseCase.Command(id,
-                    new MenuDetails(label, path, icon, parentId, sortOrder, enabled, permissionKey), version);
+                    new MenuDetails(label, path, icon, parentId, sortOrder, enabled, permissionKey, module), version);
         }
     }
 }

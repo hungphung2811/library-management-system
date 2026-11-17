@@ -1,0 +1,117 @@
+- generic [active] [ref=f17e1]:
+  - generic [ref=f17e2]:
+    - complementary [ref=f17e3]:
+      - navigation "Điều hướng chính" [ref=f17e4]:
+        - generic [ref=f17e5]:
+          - link "Thư viện, về trang chủ" [ref=f17e6] [cursor=pointer]:
+            - /url: /
+            - generic [ref=f17e16]:
+              - generic [ref=f17e17]: Thư viện
+              - generic [ref=f17e18]: Quản lý mượn trả
+          - button "Thu gọn menu" [expanded] [ref=f17e19] [cursor=pointer]
+        - list [ref=f17e23]:
+          - listitem [ref=f17e24]:
+            - link "Trang chủ" [ref=f17e25] [cursor=pointer]:
+              - /url: /
+          - listitem [aria-hidden] [ref=f17e32]: Nghiệp vụ
+          - listitem [ref=f17e33]:
+            - button "Sách" [expanded] [ref=f17e34] [cursor=pointer]
+            - list [ref=f17e41]:
+              - listitem [ref=f17e42]:
+                - link "Danh sách sách" [ref=f17e43] [cursor=pointer]:
+                  - /url: /catalog
+              - listitem [ref=f17e44]:
+                - link "Tra mã vạch" [ref=f17e45] [cursor=pointer]:
+                  - /url: /catalog/barcode
+              - listitem [ref=f17e46]:
+                - link "Thêm sách" [ref=f17e47] [cursor=pointer]:
+                  - /url: /catalog/books/new
+          - listitem [ref=f17e48]:
+            - button "Mượn trả" [expanded] [ref=f17e49] [cursor=pointer]
+            - list [ref=f17e57]:
+              - listitem [ref=f17e58]:
+                - link "Lập phiếu mượn" [ref=f17e59] [cursor=pointer]:
+                  - /url: /circulation/borrow
+              - listitem [ref=f17e60]:
+                - link "Nhận trả sách" [ref=f17e61] [cursor=pointer]:
+                  - /url: /circulation/return
+              - listitem [ref=f17e62]:
+                - link "Tra phiếu mượn" [ref=f17e63] [cursor=pointer]:
+                  - /url: /circulation/borrowings
+              - listitem [ref=f17e64]:
+                - link "Đặt trước" [ref=f17e65] [cursor=pointer]:
+                  - /url: /circulation/reservations
+          - listitem [aria-hidden] [ref=f17e66]: Hệ thống
+          - listitem [ref=f17e67]:
+            - button "Quản trị" [expanded] [ref=f17e68] [cursor=pointer]
+            - list [ref=f17e76]:
+              - listitem [ref=f17e77]:
+                - link "Người dùng" [ref=f17e78] [cursor=pointer]:
+                  - /url: /admin/users
+              - listitem [ref=f17e79]:
+                - link "Vai trò và quyền" [ref=f17e80] [cursor=pointer]:
+                  - /url: /admin/roles
+              - listitem [ref=f17e81]:
+                - link "Phòng ban" [ref=f17e82] [cursor=pointer]:
+                  - /url: /admin/departments
+              - listitem [ref=f17e83]:
+                - link "Nhật ký hoạt động" [ref=f17e84] [cursor=pointer]:
+                  - /url: /admin/audit-logs
+        - generic [ref=f17e86]:
+          - generic [ref=f17e87]:
+            - generic [aria-hidden] [ref=f17e88]: A
+            - generic [ref=f17e89]:
+              - generic "00000000-0000-0000-0000-000000000001" [ref=f17e90]: admin
+              - generic [ref=f17e91]: SUPER_ADMIN
+          - button "Đăng xuất" [ref=f17e92] [cursor=pointer]
+    - generic [ref=f17e96]:
+      - banner [ref=f17e97]:
+        - list [ref=f17e98]:
+          - listitem [ref=f17e99]:
+            - link "Trang chủ" [ref=f17e100] [cursor=pointer]:
+              - /url: /
+        - generic [ref=f17e101]:
+          - button "Thông báo, 0 chưa đọc" [ref=f17e102] [cursor=pointer]
+          - button "Tài khoản của tôi" [ref=f17e107] [cursor=pointer]:
+            - generic [aria-hidden] [ref=f17e108]: A
+      - main [ref=f17e109]:
+        - generic [ref=f17e111]:
+          - heading "Tổng quan" [level=1] [ref=f17e112]
+          - paragraph [ref=f17e113]: Chọn một phân hệ để bắt đầu làm việc
+        - generic [ref=f17e114]:
+          - generic [ref=f17e115]:
+            - link "Sách Đầu sách và bản sao" [ref=f17e116] [cursor=pointer]:
+              - /url: /catalog
+              - generic [ref=f17e120]: Sách
+              - generic [ref=f17e121]: Đầu sách và bản sao
+            - link "Mượn trả Mượn, trả, gia hạn" [ref=f17e122] [cursor=pointer]:
+              - /url: /circulation
+              - generic [ref=f17e127]: Mượn trả
+              - generic [ref=f17e128]: Mượn, trả, gia hạn
+            - link "Quản trị Phân quyền hệ thống" [ref=f17e129] [cursor=pointer]:
+              - /url: /admin
+              - generic [ref=f17e134]: Quản trị
+              - generic [ref=f17e135]: Phân quyền hệ thống
+            - link "Hồ sơ Tài khoản và thẻ thư viện" [ref=f17e136] [cursor=pointer]:
+              - /url: /profile
+              - generic [ref=f17e141]: Hồ sơ
+              - generic [ref=f17e142]: Tài khoản và thẻ thư viện
+            - link "Mật khẩu Đổi mật khẩu của bạn" [ref=f17e143] [cursor=pointer]:
+              - /url: /change-password
+              - generic [ref=f17e148]: Mật khẩu
+              - generic [ref=f17e149]: Đổi mật khẩu của bạn
+          - generic [ref=f17e150]:
+            - generic [ref=f17e151]:
+              - heading "Xin chào, admin" [level=2] [ref=f17e152]
+              - paragraph [ref=f17e153]: Các phân hệ bạn thấy trong thanh bên phụ thuộc vào vai trò và quyền được cấp cho tài khoản này.
+              - generic [ref=f17e154]:
+                - generic [ref=f17e155]:
+                  - term [ref=f17e156]: Vai trò
+                  - definition [ref=f17e157]:
+                    - generic [ref=f17e158]: SUPER_ADMIN
+                - generic [ref=f17e159]:
+                  - term [ref=f17e160]: Phạm vi quyền
+                  - definition [ref=f17e161]: Quản trị viên (toàn quyền)
+            - link "Mở phân hệ Mượn trả" [ref=f17e163] [cursor=pointer]:
+              - /url: /circulation
+  - button "Open Next.js Dev Tools" [ref=f17e169] [cursor=pointer]

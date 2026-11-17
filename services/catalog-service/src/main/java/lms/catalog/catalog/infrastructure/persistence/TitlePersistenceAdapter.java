@@ -19,8 +19,10 @@ class TitlePersistenceAdapter implements TitleRepository {
 
     @Override
     public Title save(Title title) {
-        jpa.save(new TitleJpaEntity(title.id(), title.name(), title.author(), title.isbn(), title.coverPrice()));
-        return title;
+        TitleJpaEntity entity = new TitleJpaEntity(title.id(), title.name(), title.author(), title.isbn(), title.coverPrice(),
+                title.description(), title.previewText());
+        jpa.save(entity);
+        return toDomain(entity);
     }
 
     @Override
@@ -46,11 +48,20 @@ class TitlePersistenceAdapter implements TitleRepository {
     }
 
     @Override
+    public List<Title> searchLimited(String keyword, int limit) {
+        boolean all = keyword == null || keyword.isBlank();
+        var page = org.springframework.data.domain.PageRequest.of(0, limit);
+        List<TitleJpaEntity> rows = all ? jpa.findAllByOrderByName(page) : jpa.searchPage(keyword.trim(), page);
+        return rows.stream().map(TitlePersistenceAdapter::toDomain).toList();
+    }
+
+    @Override
     public List<Title> findByIds(Collection<UUID> ids) {
         return jpa.findAllById(ids).stream().map(TitlePersistenceAdapter::toDomain).toList();
     }
 
     private static Title toDomain(TitleJpaEntity e) {
-        return Title.restore(e.getId(), e.getName(), e.getAuthor(), e.getIsbn(), e.getCoverPrice());
+        return Title.restore(e.getId(), e.getName(), e.getAuthor(), e.getIsbn(), e.getCoverPrice(), e.getTenantId(),
+                e.getDescription(), e.getPreviewText());
     }
 }

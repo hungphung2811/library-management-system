@@ -15,6 +15,7 @@ import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
 import java.util.UUID;
+import lms.security.permission.CrossTenantReadable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -55,11 +56,13 @@ public class DepartmentController {
         return ResponseEntity.created(URI.create("/internal/departments/" + response.id())).body(response);
     }
 
+    @CrossTenantReadable
     @GetMapping
     public List<DepartmentResponse> list(@RequestParam(required = false) DepartmentStatus status) {
         return list.list(status);
     }
 
+    @CrossTenantReadable
     @GetMapping("/tree")
     public List<DepartmentNode> tree(@RequestParam(defaultValue = "false") boolean includeInactive) {
         return list.tree(includeInactive);

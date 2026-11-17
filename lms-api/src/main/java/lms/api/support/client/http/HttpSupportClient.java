@@ -17,7 +17,7 @@ public class HttpSupportClient implements SupportClient {
 
     /** DTO nội bộ của support-service; tách khỏi DTO cho FE để hai bên đổi độc lập. */
     record InternalAuditLog(UUID id, UUID eventId, String eventType, String aggregateId, Instant occurredAt,
-                            Instant recordedAt, String payload) {
+                            Instant recordedAt, String payload, UUID tenantId) {
     }
 
     record InternalPage(List<InternalAuditLog> items, long total, int page, int size) {
@@ -56,17 +56,19 @@ public class HttpSupportClient implements SupportClient {
     }
 
     @Override
-    public PageView<AuditLogView> searchAuditLogs(String aggregateId, String eventType, int page, int size) {
+    public PageView<AuditLogView> searchAuditLogs(String aggregateId, String eventType, String tenantId, int page,
+                                                  int size) {
         InternalPage result = client.get().uri(b -> {
             b.path("/internal/audit-logs").queryParam("page", page).queryParam("size", size);
             if (aggregateId != null && !aggregateId.isBlank()) b.queryParam("aggregateId", aggregateId);
             if (eventType != null && !eventType.isBlank()) b.queryParam("eventType", eventType);
+            if (tenantId != null && !tenantId.isBlank()) b.queryParam("tenantId", tenantId);
             return b.build();
         }).retrieve().body(InternalPage.class);
         if (result == null) return new PageView<>(List.of(), 0, page, size);
         List<AuditLogView> items = result.items() == null ? List.of() : result.items().stream()
                 .map(l -> new AuditLogView(l.id(), l.eventId(), l.eventType(), l.aggregateId(), l.occurredAt(),
-                        l.recordedAt(), l.payload())).toList();
+                        l.recordedAt(), l.payload(), l.tenantId())).toList();
         return new PageView<>(items, result.total(), result.page(), result.size());
     }
 }

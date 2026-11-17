@@ -7,6 +7,7 @@ import lms.circulation.borrowing.application.FineLedgerPort;
 import lms.circulation.borrowing.application.ListBorrowingsUseCase;
 import lms.circulation.borrowing.application.ReaderDirectoryPort;
 import lms.circulation.borrowing.application.ReportLostUseCase;
+import lms.circulation.borrowing.application.SearchBorrowingsUseCase;
 import lms.circulation.borrowing.domain.BorrowRuleRepository;
 import lms.circulation.borrowing.infrastructure.client.CatalogCopyRestClientAdapter;
 import lms.circulation.borrowing.infrastructure.client.IdentityReaderRestClientAdapter;
@@ -106,6 +107,11 @@ public class BorrowingBeanConfiguration {
     @Bean
     ListBorrowingsUseCase listBorrowingsUseCase(BorrowingPersistenceAdapter persistence) {
         return new ListBorrowingsUseCase(persistence);
+    }
+
+    @Bean
+    SearchBorrowingsUseCase searchBorrowingsUseCase(BorrowingPersistenceAdapter persistence, Clock clock) {
+        return new SearchBorrowingsUseCase(persistence, clock);
     }
 
     @Bean

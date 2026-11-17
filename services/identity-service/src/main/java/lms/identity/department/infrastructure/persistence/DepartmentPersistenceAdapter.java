@@ -20,13 +20,14 @@ class DepartmentPersistenceAdapter implements DepartmentRepository {
 
     @Override
     public Department save(Department d) {
+        DepartmentJpaEntity saved;
         try {
-            jpa.saveAndFlush(new DepartmentJpaEntity(d.id(), d.code(), d.name(), d.parentId(), d.status()));
+            saved = jpa.saveAndFlush(new DepartmentJpaEntity(d.id(), d.code(), d.name(), d.parentId(), d.status()));
         } catch (DataIntegrityViolationException e) {
             // unique(code): hai yêu cầu tạo cùng mã đồng thời
             throw new DuplicateDepartmentException("Mã phòng ban đã tồn tại: " + d.code());
         }
-        return d;
+        return toDomain(saved);
     }
 
     @Override
@@ -45,6 +46,7 @@ class DepartmentPersistenceAdapter implements DepartmentRepository {
     }
 
     private static Department toDomain(DepartmentJpaEntity e) {
-        return Department.restore(e.getId(), e.getCode(), e.getName(), e.getParentId(), e.getStatus());
+        return Department.restore(e.getId(), e.getCode(), e.getName(), e.getParentId(), e.getStatus(),
+                e.getTenantId());
     }
 }

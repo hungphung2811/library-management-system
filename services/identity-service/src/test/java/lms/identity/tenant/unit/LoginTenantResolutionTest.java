@@ -31,10 +31,11 @@ class LoginTenantResolutionTest {
 
     private final FakeTenants tenants = new FakeTenants();
     private final FakeMemberships memberships = new FakeMemberships();
-    private final ResolveLoginTenantUseCase resolve = new ResolveLoginTenantUseCase(tenants, memberships);
-    private final SwitchTenantUseCase switchTenant = new SwitchTenantUseCase(tenants, memberships);
-    private final VerifyTenantAccessUseCase verify = new VerifyTenantAccessUseCase(tenants, memberships);
-    private final ListMyTenantsUseCase listMine = new ListMyTenantsUseCase(tenants, memberships);
+    private final InMemoryTenantModules modules = new InMemoryTenantModules();
+    private final ResolveLoginTenantUseCase resolve = new ResolveLoginTenantUseCase(tenants, memberships, modules);
+    private final SwitchTenantUseCase switchTenant = new SwitchTenantUseCase(tenants, memberships, modules);
+    private final VerifyTenantAccessUseCase verify = new VerifyTenantAccessUseCase(tenants, memberships, modules);
+    private final ListMyTenantsUseCase listMine = new ListMyTenantsUseCase(tenants, memberships, modules);
 
     private final UUID user = UUID.randomUUID();
     private final Instant t0 = Instant.parse("2026-01-01T00:00:00Z");

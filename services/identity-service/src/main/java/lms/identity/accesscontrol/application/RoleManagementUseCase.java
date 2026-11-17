@@ -55,6 +55,22 @@ public class RoleManagementUseCase {
         if (!updated.name().equals(role.name()) && roles.existsByName(updated.name())) {
             throw new DuplicateAccessControlException("Role đã tồn tại: " + updated.name());
         }
+        if (command.signupDefault() != null && command.signupDefault() != role.isSignupDefault()) {
+            if (command.signupDefault()) {
+                if (!command.requestedByAdmin()) {
+                    throw new AccessControlForbiddenException(
+                            "Chỉ quản trị viên mới đặt được role đăng ký mặc định (signupDefault)");
+                }
+                // withSignupDefault ném InvalidAccessControlException với role quản trị (không bao giờ mang cờ)
+                updated = updated.withSignupDefault(true);
+                if (roles.findAll().stream().anyMatch(r -> r.isSignupDefault() && !r.id().equals(role.id()))) {
+                    throw new RoleConflictException("SIGNUP_ROLE_EXISTS",
+                            "Tenant đã có role đăng ký mặc định khác, hãy tắt cờ đó trước");
+                }
+            } else {
+                updated = updated.withSignupDefault(false);
+            }
+        }
         return AccessMapper.toResponse(savePort.save(updated));
     }
 
@@ -84,6 +100,10 @@ public class RoleManagementUseCase {
     @Transactional
     public RoleResponse grantPermission(GrantPermission command) {
         Role role = load(command.roleId());
+        if (role.isSignupDefault() && !command.requestedByAdmin()) {
+            throw new AccessControlForbiddenException(
+                    "Chỉ quản trị viên mới thêm được khóa vào role đăng ký mặc định (signupDefault)");
+        }
         if (!permissions.existsByCode(command.permissionCode())) {
             throw new AccessControlNotFoundException("Không tìm thấy permission: " + command.permissionCode());
         }

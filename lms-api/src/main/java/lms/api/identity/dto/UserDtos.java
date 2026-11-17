@@ -37,7 +37,9 @@ public final class UserDtos {
         }
     }
 
-    public record SearchUsersQuery(String keyword, UUID departmentId, String status, Integer page, Integer size) {
+    /** tenantId: chỉ platform admin không tenant có tác dụng (ADR-0008); để chuỗi để service tự kiểm định dạng. */
+    public record SearchUsersQuery(String keyword, UUID departmentId, String status, Integer page, Integer size,
+                                   String tenantId) {
     }
 
     public record IssueReaderCardRequest(@NotBlank @Size(max = 32) String cardNo,
@@ -50,7 +52,9 @@ public final class UserDtos {
     public record RenewReaderCardRequest(@NotNull LocalDate newExpiryDate) {
     }
 
-    public record UserView(UUID id, String username, String fullName, String email, UUID departmentId, String status) {
+    /** tenantId: tenant của dòng (ADR-0008); null khi service chưa trả. */
+    public record UserView(UUID id, String username, String fullName, String email, UUID departmentId, String status,
+                           UUID tenantId) {
     }
 
     public record UserPageView(List<UserView> items, long total, int page, int size) {

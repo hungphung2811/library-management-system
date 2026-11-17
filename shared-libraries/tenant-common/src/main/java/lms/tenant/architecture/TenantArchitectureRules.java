@@ -29,7 +29,14 @@ public final class TenantArchitectureRules {
      */
     public static final Set<String> TENANT_EXEMPT_TABLES = Set.of(
             "credentials", "users", "external_logins", "permissions", "tenants", "organizations",
-            "tenant_memberships", "refresh_tokens", "known_tenants");
+            "tenant_memberships", "refresh_tokens", "known_tenants", "tenant_modules",
+            // ADR-0012: hợp đồng thuê dịch vụ cấp nền tảng (bảng toàn cục, lọc tenant tường minh trong use case)
+            "tenant_contracts", "tenant_contract_modules", "tenant_contract_payments", "tenant_contract_history",
+            "tenant_contract_reminders",
+            // ADR-0013: origin storefront theo tenant (bảng toàn cục do platform admin ghi, lọc tenant tường minh)
+            "tenant_storefront_origins", "tenant_storefront_origin_history",
+            // ADR-0011: nội dung và yêu cầu liên hệ cấp nền tảng của system-service (không thuộc tenant nào)
+            "cms_pages", "cms_contact_requests");
 
     private static final String SPRING_QUERY = "org.springframework.data.jpa.repository.Query";
 
@@ -61,6 +68,15 @@ public final class TenantArchitectureRules {
                 })
                 .should(useNativeQueries())
                 .because("query native bỏ qua @TenantId; chỉ lớp đã rà " + reviewed + " được dùng");
+    }
+
+    /** {@code @CrossTenantReadable} (đọc xuyên tenant, ADR-0008) chỉ được đặt trên method {@code @GetMapping}. */
+    public static ArchRule crossTenantReadableOnlyOnGetMapping() {
+        return ArchRuleDefinition.methods()
+                .that().areAnnotatedWith(lms.security.permission.CrossTenantReadable.class)
+                .should().beAnnotatedWith("org.springframework.web.bind.annotation.GetMapping")
+                .allowEmptyShould(true)
+                .because("@CrossTenantReadable chỉ cho phép đọc, nên chỉ đi với @GetMapping");
     }
 
     private static DescribedPredicate<JavaClass> hasTenantIdColumn() {

@@ -1,0 +1,47 @@
+package lms.sales.shared.domain;
+
+/** Mã lỗi nghiệp vụ của sales-service kèm HTTP status gợi ý (adapter web ánh xạ, domain không phụ thuộc HTTP). */
+public enum ErrorCode {
+    ORDER_NOT_FOUND(404),
+    STOCK_ITEM_NOT_FOUND(404),
+    SUPPLIER_NOT_FOUND(404),
+    RECEIPT_NOT_FOUND(404),
+    RETURN_NOT_FOUND(404),
+    REFUND_NOT_FOUND(404),
+    SHOP_CONTACT_NOT_FOUND(404),
+    SHOP_CONTACT_STATE_CONFLICT(409),
+    SHOP_CONTACT_LIMIT_EXCEEDED(429),
+    CONSENT_REQUIRED(400),
+    USER_REQUIRED(401),
+    INSUFFICIENT_STOCK(409),
+    TITLE_NOT_AVAILABLE(409),
+    STOCK_ITEM_EXISTS(409),
+    STOCK_ITEM_NOT_REGISTERED(409),
+    SUPPLIER_EXISTS(409),
+    ORDER_STATE_CONFLICT(409),
+    RECEIPT_STATE_CONFLICT(409),
+    RETURN_WINDOW_EXPIRED(409),
+    RETURN_QUANTITY_EXCEEDED(409),
+    ORDER_NOT_PAID(409),
+    CLIENT_REQUEST_CONFLICT(409),
+    SETTINGS_VERSION_CONFLICT(409),
+    DISCOUNT_NOT_ALLOWED(400),
+    DISCOUNT_EXCEEDS_AMOUNT(400),
+    REASON_REQUIRED(400),
+    LATE_REASON_REQUIRED(400),
+    INVALID_SETTINGS(400),
+    INVALID_QUANTITY(400),
+    INVALID_PRICE(400),
+    INVALID_REQUEST(400),
+    CATALOG_UNAVAILABLE(503);
+
+    private final int httpStatus;
+
+    ErrorCode(int httpStatus) {
+        this.httpStatus = httpStatus;
+    }
+
+    public int httpStatus() {
+        return httpStatus;
+    }
+}

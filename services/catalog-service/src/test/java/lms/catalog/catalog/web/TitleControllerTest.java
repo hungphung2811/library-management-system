@@ -58,6 +58,10 @@ class TitleControllerTest {
     @MockitoBean GetTitleUseCase getTitle;
     @MockitoBean SearchTitlesUseCase searchTitles;
     @MockitoBean UpdateTitleUseCase updateTitle;
+    @MockitoBean lms.catalog.catalog.application.LookupTitlesUseCase lookupTitles;
+    @MockitoBean lms.catalog.catalog.application.LookupTitlesByKeywordUseCase lookupByKeyword;
+    @MockitoBean lms.catalog.catalog.application.GetTitlePreviewUseCase getPreview;
+    @MockitoBean lms.catalog.catalog.application.UpdateTitlePreviewUseCase updatePreview;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean PermissionKeyRegistrar permissionKeyRegistrar;
 
@@ -75,7 +79,11 @@ class TitleControllerTest {
     }
 
     private static TitleResponse title(UUID id) {
-        return new TitleResponse(id, "Clean Code", "Robert Martin", "9780132350884", new BigDecimal("250000"), 3);
+        return new TitleResponse(id, "Clean Code", "Robert Martin", "9780132350884", new BigDecimal("250000"), 3, TENANT);
+    }
+
+    private static RequestPostProcessor platformAdmin() {
+        return jwt().jwt(j -> j.claim("platformAdmin", true));
     }
 
     // --- xác thực / phân quyền ---
@@ -254,9 +262,237 @@ class TitleControllerTest {
     }
 
     @Test
+    void timKiemTraTenantIdTrongPhanTuVaTokenThuongBoQuaThamSoTenantId() throws Exception {
+        when(searchTitles.execute(null, false)).thenReturn(List.of(title(UUID.randomUUID())));
+        mvc.perform(get("/internal/books").param("tenantId", "khong-phai-uuid").with(admin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].tenantId").value(TENANT.toString()));
+    }
+
+    @Test
+    void platformAdminKhongTenantTimKiemKhongCanKhoaVaKhongCanTenantId() throws Exception {
+        when(searchTitles.execute(null, false)).thenReturn(List.of(title(UUID.randomUUID())));
+        mvc.perform(get("/internal/books").with(platformAdmin())).andExpect(status().isOk());
+        mvc.perform(get("/internal/books").param("tenantId", UUID.randomUUID().toString()).with(platformAdmin()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void platformAdminTenantIdSaiDinhDangTra400() throws Exception {
+        mvc.perform(get("/internal/books").param("tenantId", "abc").with(platformAdmin()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_TENANT_ID"));
+        verifyNoInteractions(searchTitles);
+    }
+
+    @Test
+    void platformAdminKhongTenantVanBi403ODocTheoIdVaGhi() throws Exception {
+        mvc.perform(get("/internal/books/" + UUID.randomUUID()).with(platformAdmin()))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("TENANT_REQUIRED"));
+        mvc.perform(post("/internal/books").contentType(MediaType.APPLICATION_JSON).content(VALID)
+                        .with(platformAdmin()))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("TENANT_REQUIRED"));
+        verifyNoInteractions(getTitle, createTitle);
+    }
+
+    @Test
     void timKiemAvailableKhongPhaiBooleanTra400() throws Exception {
         mvc.perform(get("/internal/books").param("available", "abc").with(admin()))
                 .andExpect(status().isBadRequest());
+    }
+
+    // --- lookup ---
+
+    private static String lookupBody(int n) {
+        return "{\"ids\":[" + java.util.stream.IntStream.range(0, n)
+                .mapToObj(i -> "\"" + UUID.randomUUID() + "\"")
+                .collect(java.util.stream.Collectors.joining(",")) + "]}";
+    }
+
+    @Test
+    void lookupVoiKhoaLookupTra200VaChiCacTruongToiThieu() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(lookupTitles.execute(List.of(id))).thenReturn(List.of(new lms.catalog.catalog.application.TitleLookupView(
+                id, "Clean Code", "Robert Martin", "9780132350884", new BigDecimal("250000"), "Mo ta", true)));
+        mvc.perform(post("/internal/books/lookup").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ids\":[\"" + id + "\"]}").with(withKey("TitleController/lookup")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(id.toString()))
+                .andExpect(jsonPath("$[0].name").value("Clean Code"))
+                .andExpect(jsonPath("$[0].author").value("Robert Martin"))
+                .andExpect(jsonPath("$[0].isbn").value("9780132350884"))
+                .andExpect(jsonPath("$[0].coverPrice").value(250000))
+                .andExpect(jsonPath("$[0].description").value("Mo ta"))
+                .andExpect(jsonPath("$[0].hasPreview").value(true))
+                .andExpect(jsonPath("$[0].previewText").doesNotExist())
+                .andExpect(jsonPath("$[0].tenantId").doesNotExist())
+                .andExpect(jsonPath("$[0].availableCopies").doesNotExist());
+    }
+
+    @Test
+    void lookupKhoaKhacHoacChuaGanBi403KhongTokenBi401() throws Exception {
+        String body = lookupBody(1);
+        mvc.perform(post("/internal/books/lookup").contentType(MediaType.APPLICATION_JSON).content(body)
+                        .with(withKey("TitleController/get")))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/internal/books/lookup").contentType(MediaType.APPLICATION_JSON).content(body)
+                        .with(noPermission()))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/internal/books/lookup").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(lookupTitles);
+    }
+
+    @Test
+    void lookupAdminKhongCanKhoaVaToiDa100Id() throws Exception {
+        when(lookupTitles.execute(any())).thenReturn(List.of());
+        mvc.perform(post("/internal/books/lookup").contentType(MediaType.APPLICATION_JSON).content(lookupBody(100))
+                        .with(admin()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void lookupQua100IdHoacRongHoacThieuIdTra400() throws Exception {
+        for (String body : new String[] {lookupBody(101), "{\"ids\":[]}", "{}", "{\"ids\":[null]}",
+                "{\"ids\":[\"khong-phai-uuid\"]}"}) {
+            mvc.perform(post("/internal/books/lookup").contentType(MediaType.APPLICATION_JSON).content(body)
+                            .with(admin()))
+                    .andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(lookupTitles);
+    }
+
+    @Test
+    void lookupTokenKhongCoTenantBi403() throws Exception {
+        mvc.perform(post("/internal/books/lookup").contentType(MediaType.APPLICATION_JSON).content(lookupBody(1))
+                        .with(jwt().jwt(j -> j.claim("admin", true))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("TENANT_REQUIRED"));
+    }
+
+    // --- preview / mô tả (ADR-0011 2.12) ---
+
+    private static RequestPostProcessor svcToken() {
+        return jwt().jwt(j -> j.claim("svc", "customer-api").claim("tenantId", TENANT.toString())
+                .claim("modules", List.of("SALES")).claim("permissions", List.of()));
+    }
+
+    private static lms.catalog.catalog.application.TitlePreviewResponse previewOf(UUID id) {
+        return new lms.catalog.catalog.application.TitlePreviewResponse(id, "Clean Code", "Mo ta", "Doan doc thu");
+    }
+
+    @Test
+    void docPreviewVoiKhoaPreviewTra200KhongIsbnGiaBiaTenant() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(getPreview.execute(id)).thenReturn(previewOf(id));
+        mvc.perform(get("/internal/books/" + id + "/preview").with(withKey("TitleController/preview")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id.toString()))
+                .andExpect(jsonPath("$.name").value("Clean Code"))
+                .andExpect(jsonPath("$.description").value("Mo ta"))
+                .andExpect(jsonPath("$.previewText").value("Doan doc thu"))
+                .andExpect(jsonPath("$.isbn").doesNotExist())
+                .andExpect(jsonPath("$.coverPrice").doesNotExist())
+                .andExpect(jsonPath("$.tenantId").doesNotExist());
+    }
+
+    @Test
+    void docPreviewKhoaKhacBi403KhongTokenBi401() throws Exception {
+        UUID id = UUID.randomUUID();
+        mvc.perform(get("/internal/books/" + id + "/preview").with(withKey("TitleController/updatePreview")))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/internal/books/" + id + "/preview").with(noPermission())).andExpect(status().isForbidden());
+        mvc.perform(get("/internal/books/" + id + "/preview")).andExpect(status().isUnauthorized());
+        verifyNoInteractions(getPreview);
+    }
+
+    @Test
+    void tokenDichVuDocDuocPreviewLookupVaLookupTheoTuKhoa() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(getPreview.execute(id)).thenReturn(previewOf(id));
+        when(lookupTitles.execute(any())).thenReturn(List.of());
+        when(lookupByKeyword.execute("clean")).thenReturn(List.of());
+        mvc.perform(get("/internal/books/" + id + "/preview").with(svcToken())).andExpect(status().isOk());
+        mvc.perform(post("/internal/books/lookup").contentType(MediaType.APPLICATION_JSON).content(lookupBody(1))
+                        .with(svcToken())).andExpect(status().isOk());
+        mvc.perform(get("/internal/books/lookup").param("keyword", "clean").with(svcToken()))
+                .andExpect(status().isOk());
+        verify(lookupByKeyword).execute("clean");
+    }
+
+    @Test
+    void tokenDichVuBi403OUpdatePreviewVaCacEndpointKhac() throws Exception {
+        UUID id = UUID.randomUUID();
+        mvc.perform(put("/internal/books/" + id + "/preview").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"description\":\"a\",\"previewText\":\"b\"}").with(svcToken()))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/internal/books/" + id).with(svcToken())).andExpect(status().isForbidden());
+        mvc.perform(get("/internal/books").with(svcToken())).andExpect(status().isForbidden());
+        mvc.perform(post("/internal/books").contentType(MediaType.APPLICATION_JSON).content(VALID).with(svcToken()))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(updatePreview, getTitle, searchTitles, createTitle);
+    }
+
+    @Test
+    void capNhatPreviewVoiKhoaUpdatePreviewTra200() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(updatePreview.execute(id, "Mo ta", "Doan doc thu")).thenReturn(previewOf(id));
+        mvc.perform(put("/internal/books/" + id + "/preview").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"description\":\"Mo ta\",\"previewText\":\"Doan doc thu\"}")
+                        .with(withKey("TitleController/updatePreview")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.previewText").value("Doan doc thu"));
+    }
+
+    @Test
+    void capNhatPreviewKhoaPreviewHoacChuaGanBi403KhongTokenBi401() throws Exception {
+        UUID id = UUID.randomUUID();
+        String body = "{\"description\":\"a\"}";
+        mvc.perform(put("/internal/books/" + id + "/preview").contentType(MediaType.APPLICATION_JSON).content(body)
+                        .with(withKey("TitleController/preview"))).andExpect(status().isForbidden());
+        mvc.perform(put("/internal/books/" + id + "/preview").contentType(MediaType.APPLICATION_JSON).content(body)
+                        .with(noPermission())).andExpect(status().isForbidden());
+        mvc.perform(put("/internal/books/" + id + "/preview").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(updatePreview);
+    }
+
+    @Test
+    void capNhatPreviewQuaDaiTra400TitlePreviewTooLong() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(updatePreview.execute(any(), any(), any()))
+                .thenThrow(new lms.catalog.catalog.domain.TitlePreviewTooLongException("Đoạn đọc thử", 2000));
+        mvc.perform(put("/internal/books/" + id + "/preview").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"previewText\":\"x\"}").with(admin()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("TITLE_PREVIEW_TOO_LONG"));
+    }
+
+    @Test
+    void capNhatPreviewKhongChanEmojiDuoi2000CodePointNhungChanThoThanQuaLon() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(updatePreview.execute(any(), any(), any())).thenReturn(previewOf(id));
+        // 1500 emoji = 3000 đơn vị UTF-16 nhưng 1500 code point: không bị chặn thô (không có @Size 2000 ở previewText)
+        String emoji = "\\uD83D\\uDE00".repeat(1500);
+        mvc.perform(put("/internal/books/" + id + "/preview").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"previewText\":\"" + emoji + "\"}").with(admin()))
+                .andExpect(status().isOk());
+        mvc.perform(put("/internal/books/" + id + "/preview").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"previewText\":\"" + "x".repeat(8001) + "\"}").with(admin()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        mvc.perform(put("/internal/books/" + id + "/preview").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"description\":\"" + "x".repeat(2001) + "\"}").with(admin()))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void previewKhongThayTra404() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(getPreview.execute(id)).thenThrow(new TitleNotFoundException(id));
+        mvc.perform(get("/internal/books/" + id + "/preview").with(admin()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("TITLE_NOT_FOUND"));
     }
 
     // --- get ---

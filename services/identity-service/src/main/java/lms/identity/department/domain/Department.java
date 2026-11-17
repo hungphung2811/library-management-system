@@ -16,8 +16,10 @@ public class Department {
     private String name;
     private UUID parentId;
     private DepartmentStatus status;
+    /** Tenant sở hữu (chỉ điền khi đọc từ kho; null với đối tượng vừa tạo). */
+    private final UUID tenantId;
 
-    private Department(UUID id, String code, String name, UUID parentId, DepartmentStatus status) {
+    private Department(UUID id, String code, String name, UUID parentId, DepartmentStatus status, UUID tenantId) {
         if (id == null) throw new InvalidDepartmentException("id không được null");
         if (code == null || !CODE.matcher(code.trim().toUpperCase()).matches()) {
             throw new InvalidDepartmentException("Mã phòng ban chỉ gồm chữ, số, '_' và '-', tối đa 50 ký tự");
@@ -31,14 +33,20 @@ public class Department {
         this.name = name.trim();
         this.parentId = parentId;
         this.status = status;
+        this.tenantId = tenantId;
     }
 
     public static Department create(String code, String name, UUID parentId) {
-        return new Department(UUID.randomUUID(), code, name, parentId, DepartmentStatus.ACTIVE);
+        return new Department(UUID.randomUUID(), code, name, parentId, DepartmentStatus.ACTIVE, null);
     }
 
     public static Department restore(UUID id, String code, String name, UUID parentId, DepartmentStatus status) {
-        return new Department(id, code, name, parentId, status);
+        return new Department(id, code, name, parentId, status, null);
+    }
+
+    public static Department restore(UUID id, String code, String name, UUID parentId, DepartmentStatus status,
+                                     UUID tenantId) {
+        return new Department(id, code, name, parentId, status, tenantId);
     }
 
     public void rename(String newName) {
@@ -70,4 +78,5 @@ public class Department {
     public String name() { return name; }
     public UUID parentId() { return parentId; }
     public DepartmentStatus status() { return status; }
+    public UUID tenantId() { return tenantId; }
 }

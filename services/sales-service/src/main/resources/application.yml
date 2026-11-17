@@ -1,0 +1,69 @@
+server:
+  port: 8087
+  shutdown: graceful
+
+spring:
+  application:
+    name: sales-service
+  profiles:
+    default: dev
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    # Migration do system-service chạy tập trung (target sales); service chỉ validate schema (ddl-auto: validate)
+    enabled: false
+  kafka:
+    producer:
+      properties:
+        # Không chặn request lâu khi broker sự cố; publish là best-effort (xem KafkaEventPublisher)
+        max.block.ms: 2000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  pattern:
+    level: "%5p [%X{correlationId:-}]"
+
+app:
+  security:
+    # Mặc định bật xác thực JWT; chỉ profile dev tắt (application-dev.yml)
+    enabled: true
+
+  kafka:
+    topics:
+      sales-events: ${SALES_EVENTS_TOPIC:sales.events}
+    topic-partitions: ${SALES_EVENTS_PARTITIONS:3}
+    topic-replicas: ${SALES_EVENTS_REPLICAS:1}
+
+# Middleware phân quyền theo endpoint (security-common): khóa Controller/method được đăng ký về identity-service
+lms:
+  security:
+    permission:
+      service-name: ${spring.application.name}
+      identity-base-url: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+      internal-api-key: ${INTERNAL_API_KEY:}
+      # Endpoint thường bắt buộc token có claim tenantId (403 TENANT_REQUIRED)
+      require-tenant: true
+  # tenant-common: TenantContext theo claim tenantId, Hibernate @TenantId và RLS (app.tenant_id)
+  tenant:
+    enabled: true
+  # Gọi catalog bằng token người dùng chuyển tiếp (ADR-0010 2.2); dùng từ B1.3
+  sales:
+    catalog:
+      base-url: ${CATALOG_SERVICE_URL:http://localhost:8082}
+    # Liên hệ của khách (ADR-0015 mục 2.7): chống spam theo người, cấu hình nền tảng (không theo tenant)
+    contact:
+      max-per-user-per-day: 5
+      duplicate-window: PT10M

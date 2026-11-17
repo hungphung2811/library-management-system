@@ -53,7 +53,7 @@ class FineSecurityTest {
         when(getFines.execute(userId)).thenReturn(
                 new GetReaderFinesUseCase.ReaderFinesResponse(userId, new BigDecimal("15000"), List.of()));
 
-        mvc.perform(get("/internal/fines/mine").with(jwt().jwt(j -> j.subject(userId.toString()))))
+        mvc.perform(get("/internal/fines/mine").with(jwt().jwt(j -> j.subject(userId.toString()).claim("tenantId", UUID.randomUUID().toString()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalUnpaid").value(15000));
     }
@@ -62,6 +62,49 @@ class FineSecurityTest {
     void xemPhatCuaDocGiaKhacCanQuyen() throws Exception {
         mvc.perform(get("/internal/fines").param("readerId", UUID.randomUUID().toString()).with(jwt()))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void platformAdminKhongTenantXemPhatTheoDocGiaXuyenTenant() throws Exception {
+        UUID readerId = UUID.randomUUID();
+        when(getFines.execute(readerId)).thenReturn(
+                new GetReaderFinesUseCase.ReaderFinesResponse(readerId, new BigDecimal("15000"), List.of()));
+
+        mvc.perform(get("/internal/fines").param("readerId", readerId.toString())
+                        .with(jwt().jwt(j -> j.claim("platformAdmin", true))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalUnpaid").value(15000));
+        mvc.perform(get("/internal/fines").param("readerId", readerId.toString())
+                        .param("tenantId", UUID.randomUUID().toString())
+                        .with(jwt().jwt(j -> j.claim("platformAdmin", true))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void platformAdminTenantIdSaiDinhDangBi400() throws Exception {
+        mvc.perform(get("/internal/fines").param("readerId", UUID.randomUUID().toString())
+                        .param("tenantId", "123").with(jwt().jwt(j -> j.claim("platformAdmin", true))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_TENANT_ID"));
+    }
+
+    @Test
+    void nguoiKhacKhongTenantVanBi403TenantRequiredDuGuiTenantId() throws Exception {
+        for (var token : List.of(jwt(), jwt().jwt(j -> j.claim("admin", true)))) {
+            mvc.perform(get("/internal/fines").param("readerId", UUID.randomUUID().toString())
+                            .param("tenantId", UUID.randomUUID().toString()).with(token))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("TENANT_REQUIRED"));
+        }
+    }
+
+    @Test
+    void platformAdminKhongTenantKhongThuPhatDuoc() throws Exception {
+        mvc.perform(post("/internal/fines/payments").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"readerId\":\"" + UUID.randomUUID() + "\"}")
+                        .with(jwt().jwt(j -> j.claim("platformAdmin", true))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("TENANT_REQUIRED"));
     }
 
     @Test

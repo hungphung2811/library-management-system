@@ -20,7 +20,15 @@ public final class AccessDtos {
         }
     }
 
-    public record UpdateRoleRequest(@NotBlank String name, @NotBlank String description) {
+    /**
+     * signupDefault: tùy chọn. null = giữ nguyên; true = đặt làm role tự đăng ký (chỉ quản trị viên, role không phải
+     * admin, tenant chưa có role đăng ký khác); false = tắt tự đăng ký.
+     */
+    public record UpdateRoleRequest(@NotBlank String name, @NotBlank String description, Boolean signupDefault) {
+
+        public UpdateRoleRequest(String name, String description) {
+            this(name, description, null);
+        }
     }
 
     public record CreatePermissionRequest(@NotBlank String code, @NotBlank String description) {
@@ -32,10 +40,20 @@ public final class AccessDtos {
     public record AssignRoleRequest(@NotNull UUID roleId) {
     }
 
-    public record RoleResponse(UUID id, String name, String description, boolean isAdmin, List<String> permissions) {
+    public record RoleResponse(UUID id, String name, String description, boolean isAdmin, List<String> permissions,
+                               UUID tenantId, boolean signupDefault) {
+
+        public RoleResponse(UUID id, String name, String description, boolean isAdmin, List<String> permissions,
+                            UUID tenantId) {
+            this(id, name, description, isAdmin, permissions, tenantId, false);
+        }
+
+        public RoleResponse(UUID id, String name, String description, boolean isAdmin, List<String> permissions) {
+            this(id, name, description, isAdmin, permissions, null, false);
+        }
 
         public RoleResponse(UUID id, String name, String description, List<String> permissions) {
-            this(id, name, description, false, permissions);
+            this(id, name, description, false, permissions, null, false);
         }
     }
 

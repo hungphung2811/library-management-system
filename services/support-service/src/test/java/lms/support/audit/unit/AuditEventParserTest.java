@@ -102,4 +102,54 @@ class AuditEventParserTest {
         verify(ingest).execute(captured.capture());
         assertThat(captured.getValue().topic()).isEqualTo("access-control.events");
     }
+
+    // ===== sales.events (B1.7) =====
+
+    private static String salesEnvelope(UUID eventId, String tenantField) {
+        return "{\"eventId\":\"" + eventId + "\",\"eventType\":\"OrderCompleted\",\"aggregateId\":\"o-1\","
+                + "\"occurredAt\":\"2026-01-01T00:00:00Z\",\"version\":1,\"payload\":{\"eventId\":\"" + eventId
+                + "\",\"eventType\":\"OrderCompleted\",\"aggregateId\":\"o-1\",\"action\":\"ORDER_CREATED\","
+                + "\"aggregateType\":\"ORDER\",\"actorId\":\"" + UUID.randomUUID() + "\",\"data\":{\"total\":150000}}"
+                + tenantField + "}";
+    }
+
+    @Test
+    void salesEventDuocParseThanhCommandVoiPayloadGiuActorVaHanhDong() {
+        IngestAuditEventCommand command = parser.parse("sales.events",
+                salesEnvelope(eventId, ",\"tenantId\":\"" + tenantId + "\"")).orElseThrow();
+
+        assertThat(command.topic()).isEqualTo("sales.events");
+        assertThat(command.eventType()).isEqualTo("OrderCompleted");
+        assertThat(command.aggregateId()).isEqualTo("o-1");
+        assertThat(command.tenantId()).isEqualTo(tenantId);
+        assertThat(command.payload()).contains("\"action\":\"ORDER_CREATED\"", "\"actorId\"", "\"total\":150000");
+    }
+
+    @Test
+    void salesEventThieuTenantIdBiBoQuaKhongGoiUseCase() {
+        IngestAuditEventUseCase ingest = mock(IngestAuditEventUseCase.class);
+
+        new AuditEventConsumer(parser, ingest).onEvent(salesEnvelope(eventId, ""), "sales.events");
+
+        verify(ingest, never()).execute(any());
+    }
+
+    @Test
+    void salesEventGoiUseCaseTrongTenantCuaEvent() {
+        IngestAuditEventUseCase ingest = mock(IngestAuditEventUseCase.class);
+        java.util.List<java.util.Optional<UUID>> seen = new java.util.ArrayList<>();
+        when(ingest.execute(any())).thenAnswer(i -> seen.add(lms.tenant.TenantContext.current()));
+
+        new AuditEventConsumer(parser, ingest).onEvent(salesEnvelope(eventId, ",\"tenantId\":\"" + tenantId + "\""), "sales.events");
+
+        assertThat(seen).containsExactly(java.util.Optional.of(tenantId));
+    }
+
+    @Test
+    void consumerLangNgheTopicSalesEvents() throws Exception {
+        var listener = AuditEventConsumer.class.getMethod("onEvent", String.class, String.class)
+                .getAnnotation(org.springframework.kafka.annotation.KafkaListener.class);
+
+        assertThat(listener.topics()).contains("${app.kafka.topics.sales-events}");
+    }
 }

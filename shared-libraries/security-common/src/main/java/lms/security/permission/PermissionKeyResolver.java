@@ -18,7 +18,15 @@ public class PermissionKeyResolver {
     private static final Pattern VALID_KEY = Pattern.compile("^[A-Za-z0-9_./:-]{1,200}$");
 
     /** key và source chỉ có nghĩa khi mode là PERMISSION. */
-    public record Resolved(Mode mode, String key, String source, String description) {
+    public record Resolved(Mode mode, String key, String source, String description, TenantModule requiredModule,
+                           boolean storefrontAccessible) {
+        public Resolved(Mode mode, String key, String source, String description, TenantModule requiredModule) {
+            this(mode, key, source, description, requiredModule, false);
+        }
+
+        public Resolved(Mode mode, String key, String source, String description) {
+            this(mode, key, source, description, null, false);
+        }
     }
 
     private static final Resolved PUBLIC = new Resolved(Mode.PUBLIC, null, null, null);
@@ -26,6 +34,30 @@ public class PermissionKeyResolver {
     private static final Resolved PLATFORM_ADMIN = new Resolved(Mode.PLATFORM_ADMIN, null, null, null);
 
     public Resolved resolve(HandlerMethod handler) {
+        Resolved base = resolveMode(handler);
+        TenantModule module = requiredModule(handler);
+        boolean storefront = storefrontAccessible(handler);
+        return module == null && !storefront ? base
+                : new Resolved(base.mode(), base.key(), base.source(), base.description(), module, storefront);
+    }
+
+    /** ADR-0011: {@code @StorefrontAccessible} trên method hoặc class (cộng thêm, không đổi chế độ). */
+    private static boolean storefrontAccessible(HandlerMethod handler) {
+        Class<?> type = ClassUtils.getUserClass(handler.getBeanType());
+        return find(handler.getMethod(), StorefrontAccessible.class) != null
+                || find(type, StorefrontAccessible.class) != null;
+    }
+
+    /** ADR-0009: {@code @RequiresModule} trên method thắng class; null nếu không có. */
+    private static TenantModule requiredModule(HandlerMethod handler) {
+        Class<?> type = ClassUtils.getUserClass(handler.getBeanType());
+        RequiresModule onMethod = find(handler.getMethod(), RequiresModule.class);
+        if (onMethod != null) return onMethod.value();
+        RequiresModule onClass = find(type, RequiresModule.class);
+        return onClass != null ? onClass.value() : null;
+    }
+
+    private Resolved resolveMode(HandlerMethod handler) {
         Method method = handler.getMethod();
         Class<?> type = ClassUtils.getUserClass(handler.getBeanType());
 

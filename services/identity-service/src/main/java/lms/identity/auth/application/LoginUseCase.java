@@ -5,6 +5,7 @@ import lms.identity.auth.application.PasswordHasherPort;
 import lms.identity.auth.application.PublishAuthEventPort;
 import lms.identity.auth.application.SaveCredentialPort;
 import lms.identity.auth.domain.InvalidCredentialsException;
+import lms.identity.auth.domain.TokenChannel;
 import lms.identity.auth.domain.UserCredential;
 import lms.identity.auth.domain.UserCredentialRepository;
 import java.time.Clock;
@@ -61,6 +62,21 @@ public class LoginUseCase {
      * các lần sai mật khẩu đó không có trong audit của tenant nào. Tên đăng nhập không tồn tại không phát sự kiện.
      */
     public TokenResponse execute(String username, String rawPassword, String tenantCodeOrNull) {
+        return execute(username, rawPassword, tenantCodeOrNull, TokenChannel.STAFF);
+    }
+
+    /**
+     * Đăng nhập theo kênh. STOREFRONT (customer-api): bắt buộc có mã tenant (thiếu thì từ chối như sai thông tin, trước
+     * khi đụng tới tài khoản), token bị thu hẹp (xem {@link TokenService#issueFor(UserCredential, String, TokenChannel)}).
+     * Thứ tự kiểm tra giữ nguyên cho mọi kênh: tài khoản, khóa/vô hiệu, mật khẩu, tenant. Việc gộp mọi lỗi đăng nhập
+     * (sai mật khẩu, không có tài khoản, không thuộc tenant, khóa, vô hiệu) thành {@code 401 LOGIN_FAILED} do customer-api
+     * làm (HttpAuthClient), identity giữ mã riêng cho mọi kênh.
+     */
+    public TokenResponse execute(String username, String rawPassword, String tenantCodeOrNull, TokenChannel channel) {
+        TokenChannel ch = channel == null ? TokenChannel.STAFF : channel;
+        if (ch == TokenChannel.STOREFRONT && (tenantCodeOrNull == null || tenantCodeOrNull.isBlank())) {
+            throw new InvalidCredentialsException();
+        }
         Instant now = clock.instant();
         String normalized = username == null ? "" : username.trim().toLowerCase();
         UserCredential credential = repository.findByUsername(normalized).orElseThrow(InvalidCredentialsException::new);
@@ -75,7 +91,7 @@ public class LoginUseCase {
             throw new InvalidCredentialsException();
         }
 
-        TokenResponse response = tokenService.issueFor(credential, tenantCodeOrNull);
+        TokenResponse response = tokenService.issueFor(credential, tenantCodeOrNull, ch);
         credential.recordSuccess(now);
         savePort.save(credential);
         publishUnderTenant(credential.pullEvents(), Optional.ofNullable(response.tenantId()), credential.userId());

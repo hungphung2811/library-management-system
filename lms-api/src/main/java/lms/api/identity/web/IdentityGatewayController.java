@@ -36,4 +36,28 @@ public class IdentityGatewayController {
     public ResponseEntity<byte[]> myTenants(HttpServletRequest request) {
         return identity.forward(HttpMethod.GET, "/internal/me/tenants", request.getQueryString(), null, null);
     }
+
+    /**
+     * Hợp đồng thuê dịch vụ của chính tenant (ADR-0012, chỉ đọc). Identity kiểm khóa động
+     * {@code TenantContractController/list} và {@code .../current} trên token được chuyển tiếp; chỉ có GET.
+     */
+    @GetMapping("/api/contracts")
+    public ResponseEntity<byte[]> myContracts(HttpServletRequest request) {
+        return identity.forward(HttpMethod.GET, "/internal/contracts", request.getQueryString(), null, null);
+    }
+
+    /**
+     * Origin storefront của chính tenant (ADR-0013, chỉ đọc). Identity kiểm khóa động
+     * {@code TenantStorefrontOriginController/list} trên token được chuyển tiếp; chỉ có GET. Platform admin quản lý qua
+     * {@code /api/platform/tenants/{tenantId}/storefront-origins} (chuyển nguyên).
+     */
+    @GetMapping("/api/storefront-origins")
+    public ResponseEntity<byte[]> myStorefrontOrigins(HttpServletRequest request) {
+        return identity.forward(HttpMethod.GET, "/internal/storefront-origins", request.getQueryString(), null, null);
+    }
+
+    @GetMapping("/api/contracts/current")
+    public ResponseEntity<byte[]> myCurrentContract(HttpServletRequest request) {
+        return identity.forward(HttpMethod.GET, "/internal/contracts/current", request.getQueryString(), null, null);
+    }
 }

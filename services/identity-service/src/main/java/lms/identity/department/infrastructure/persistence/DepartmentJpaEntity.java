@@ -51,6 +51,7 @@ class DepartmentJpaEntity {
     }
 
     UUID getId() { return id; }
+    UUID getTenantId() { return tenantId; }
     String getCode() { return code; }
     String getName() { return name; }
     UUID getParentId() { return parentId; }

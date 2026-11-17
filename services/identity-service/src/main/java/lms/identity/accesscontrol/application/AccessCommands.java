@@ -17,8 +17,16 @@ public final class AccessCommands {
         }
     }
 
-    /** Chỉ đổi tên/mô tả; role quản trị (isAdmin) chỉ quản trị viên được sửa. */
-    public record UpdateRole(UUID roleId, String name, String description, boolean requestedByAdmin) {
+    /**
+     * Đổi tên/mô tả (và cờ signupDefault khi không null); role quản trị (isAdmin) chỉ quản trị viên được sửa, bật cờ
+     * signupDefault cũng chỉ quản trị viên (role đó sẽ cấp cho mọi tài khoản tự đăng ký).
+     */
+    public record UpdateRole(UUID roleId, String name, String description, boolean requestedByAdmin,
+                             Boolean signupDefault) {
+
+        public UpdateRole(UUID roleId, String name, String description, boolean requestedByAdmin) {
+            this(roleId, name, description, requestedByAdmin, null);
+        }
     }
 
     public record DeleteRole(UUID roleId, boolean requestedByAdmin) {
@@ -27,7 +35,15 @@ public final class AccessCommands {
     public record CreatePermission(String code, String description) {
     }
 
-    public record GrantPermission(UUID roleId, String permissionCode) {
+    /**
+     * requestedByAdmin: khóa thêm vào role signup_default (cấp cho mọi tài khoản tự đăng ký công khai) chỉ quản trị
+     * viên được thêm; người chỉ có ROLE_GRANT không admin bị 403 (chống leo thang đặc quyền qua đăng ký).
+     */
+    public record GrantPermission(UUID roleId, String permissionCode, boolean requestedByAdmin) {
+
+        public GrantPermission(UUID roleId, String permissionCode) {
+            this(roleId, permissionCode, false);
+        }
     }
 
     /** callerIsAdmin: chỉ quản trị viên mới gán hoặc thu hồi được role quản trị (chống leo thang đặc quyền). */

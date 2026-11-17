@@ -1,0 +1,72 @@
+server:
+  port: 8088
+  shutdown: graceful
+  # Không bao giờ lộ stack trace/thông điệp nội bộ ra công khai (ADR-0011 2.9).
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-exception: false
+    include-binding-errors: never
+
+spring:
+  application:
+    name: customer-api
+  profiles:
+    # Như các service khác (CLAUDE.md): mặc định dev. Ngoài dev (profile prod) cấu hình không an toàn là fail-fast,
+    # xem StartupConfigurationCheck. docker-compose chọn profile bằng CUSTOMER_API_PROFILE.
+    default: dev
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Khóa công khai của identity-service. customer-api chỉ xác thực; phân quyền/module do sales kiểm.
+          jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8081/.well-known/jwks.json}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  pattern:
+    level: "%5p [%X{correlationId:-}]"
+
+# Khối cấp cao mới đặt ở cuối file; chỉ có một khối `app:`.
+app:
+  services:
+    identity-url: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+    system-url: ${SYSTEM_SERVICE_URL:http://localhost:8086}
+    sales-url: ${SALES_SERVICE_URL:http://localhost:8087}
+    # Luôn hữu hạn: thiếu/0/âm thì dùng mặc định (2s/5s), tối đa 30s (ServicesProperties).
+    connect-timeout: 2s
+    read-timeout: 5s
+  resilience:
+    # Bulkhead: số lời gọi đồng thời tối đa tới mỗi đích (identity, system); hết chỗ thì 503 ngay.
+    max-concurrent-calls: 8
+  storefront:
+    # Bí mật riêng của customer-api với identity (KHÔNG dùng INTERNAL_API_KEY). Rỗng thì identity từ chối mọi lời gọi.
+    client-secret: ${STOREFRONT_CLIENT_SECRET:}
+    cache-max-size: 10000
+    negative-ttl: 60s
+    refresh-margin: 60s
+    # Trần TTL của mục cache (token + danh sách origin của tenant): origin đổi có hiệu lực trong <= 60 giây (ADR-0013 2.3).
+    origin-ttl: 60s
+    # Gửi tenantId khi làm mới ở /public/t/{code}/auth/refresh (ADR-0013 2.4). Chỉ tắt nếu identity cũ từ chối trường lạ.
+    refresh-tenant-id-enabled: true
+  cms:
+    cache-ttl: 60s
+    cache-max-size: 500
+  # CORS động của /public/** (ADR-0013 2.7). Mặc định ENFORCE (fail-closed); docker-compose dev đặt PUBLIC_CORS_MODE=OFF.
+  public-cors:
+    mode: ${PUBLIC_CORS_MODE:ENFORCE}                   # OFF | REPORT | ENFORCE
+    platform-origins: ${PUBLIC_CORS_PLATFORM_ORIGINS:}  # domain nền tảng (trang SaaS), phân tách dấu phẩy
+    # customer-api không có profile dev riêng: localhost mặc định để FE dev không bị chặn. Production đặt rỗng.
+    dev-origins: ${PUBLIC_CORS_DEV_ORIGINS:http://localhost:3000,http://localhost:5173}
+    max-age: 600s

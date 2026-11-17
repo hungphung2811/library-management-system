@@ -30,3 +30,8 @@ CREATE USER catalog_app WITH PASSWORD 'catalog_app' NOSUPERUSER NOBYPASSRLS NOCR
 CREATE USER system WITH PASSWORD 'system';
 CREATE DATABASE system_db OWNER system;
 CREATE USER system_app WITH PASSWORD 'system_app' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+
+-- sales-service (ADR-0010): sales_db do system-service migrate (target `sales`); sales_app dùng lúc chạy, chịu RLS.
+CREATE USER sales WITH PASSWORD 'sales';
+CREATE DATABASE sales_db OWNER sales;
+CREATE USER sales_app WITH PASSWORD 'sales_app' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;

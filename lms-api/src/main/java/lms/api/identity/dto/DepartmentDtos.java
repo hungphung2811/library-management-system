@@ -21,10 +21,11 @@ public final class DepartmentDtos {
     public record ChangeStatusRequest(@NotBlank String status) {
     }
 
-    public record DepartmentView(UUID id, String code, String name, UUID parentId, String status) {
+    /** tenantId: tenant của dòng (ADR-0008); null khi service chưa trả. */
+    public record DepartmentView(UUID id, String code, String name, UUID parentId, String status, UUID tenantId) {
     }
 
     public record DepartmentNodeView(UUID id, String code, String name, String status,
-                                     List<DepartmentNodeView> children) {
+                                     List<DepartmentNodeView> children, UUID tenantId) {
     }
 }

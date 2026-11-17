@@ -8,10 +8,28 @@ public interface TokenIssuerPort {
     IssuedToken issue(Claims claims);
 
     /**
-     * tenantId: tenant của phiên (null với phiên nền tảng không tenant); platformAdmin: tài khoản có cờ platform_admin.
+     * tenantId: tenant của phiên (null với phiên nền tảng không tenant); platformAdmin: tài khoản có cờ platform_admin;
+     * modules: module đang bật của tenant (claim {@code modules}, ADR-0009), null = không ghi claim (phiên nền tảng);
+     * audience: giá trị claim {@code aud} (ví dụ {@code lms-storefront} cho kênh storefront), null = để issuer quyết
+     * (kênh nhân viên).
      */
     record Claims(UUID userId, String username, UUID departmentId, List<String> roles, List<String> permissions,
-                  boolean mustChangePassword, boolean admin, UUID tenantId, boolean platformAdmin) {
+                  boolean mustChangePassword, boolean admin, UUID tenantId, boolean platformAdmin,
+                  List<String> modules, String audience) {
+
+        /** Không audience: token kênh nhân viên (không ghi aud, hoặc aud=lms-staff nếu issuer được cấu hình). */
+        public Claims(UUID userId, String username, UUID departmentId, List<String> roles, List<String> permissions,
+                      boolean mustChangePassword, boolean admin, UUID tenantId, boolean platformAdmin,
+                      List<String> modules) {
+            this(userId, username, departmentId, roles, permissions, mustChangePassword, admin, tenantId,
+                    platformAdmin, modules, null);
+        }
+
+        public Claims(UUID userId, String username, UUID departmentId, List<String> roles, List<String> permissions,
+                      boolean mustChangePassword, boolean admin, UUID tenantId, boolean platformAdmin) {
+            this(userId, username, departmentId, roles, permissions, mustChangePassword, admin, tenantId,
+                    platformAdmin, null);
+        }
 
         public Claims(UUID userId, String username, UUID departmentId, List<String> roles, List<String> permissions,
                       boolean mustChangePassword, boolean admin) {

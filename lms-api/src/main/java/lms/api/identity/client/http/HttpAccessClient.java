@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.util.UriBuilder;
 
 /** Gọi API nội bộ /internal/permissions, /internal/roles, /internal/access của identity-service. */
 public class HttpAccessClient implements AccessClient {
@@ -29,8 +30,8 @@ public class HttpAccessClient implements AccessClient {
     }
 
     @Override
-    public List<PermissionView> listPermissions() {
-        return client.get().uri("/internal/permissions").retrieve()
+    public List<PermissionView> listPermissions(String tenantId) {
+        return client.get().uri(b -> tenantQuery(b.path("/internal/permissions"), tenantId).build()).retrieve()
                 .body(new ParameterizedTypeReference<List<PermissionView>>() { });
     }
 
@@ -40,8 +41,14 @@ public class HttpAccessClient implements AccessClient {
     }
 
     @Override
-    public List<RoleView> listRoles() {
-        return client.get().uri("/internal/roles").retrieve().body(new ParameterizedTypeReference<List<RoleView>>() { });
+    public List<RoleView> listRoles(String tenantId) {
+        return client.get().uri(b -> tenantQuery(b.path("/internal/roles"), tenantId).build()).retrieve()
+                .body(new ParameterizedTypeReference<List<RoleView>>() { });
+    }
+
+    /** Chỉ thêm query tenantId khi có giá trị (ADR-0008); không diễn giải, service tự kiểm. */
+    private static UriBuilder tenantQuery(UriBuilder b, String tenantId) {
+        return (tenantId == null || tenantId.isBlank()) ? b : b.queryParam("tenantId", tenantId);
     }
 
     @Override

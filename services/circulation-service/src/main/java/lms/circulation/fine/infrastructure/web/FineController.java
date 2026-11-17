@@ -5,6 +5,9 @@ import lms.circulation.fine.application.CollectFinesUseCase;
 import lms.circulation.fine.application.GetReaderFinesUseCase;
 import lms.security.CurrentUser;
 import lms.security.permission.AuthenticatedOnly;
+import lms.security.permission.CrossTenantReadable;
+import lms.security.permission.RequiresModule;
+import lms.security.permission.TenantModule;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -19,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
+@RequiresModule(TenantModule.LENDING)
 @RequestMapping("/internal/fines")
 public class FineController {
 
@@ -41,6 +45,7 @@ public class FineController {
     }
 
     /** Thủ thư xem phí phạt của một độc giả (UC06 bước 2b, UC09). */
+    @CrossTenantReadable
     @GetMapping
     public GetReaderFinesUseCase.ReaderFinesResponse byReader(@RequestParam UUID readerId) {
         return getFines.execute(readerId);

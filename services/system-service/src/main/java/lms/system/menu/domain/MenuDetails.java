@@ -10,4 +10,12 @@ public record MenuDetails(
         UUID parentId,
         int sortOrder,
         boolean enabled,
-        String permissionKey) {}
+        String permissionKey,
+        String module) {
+
+    /** Không gắn module (mục lõi). */
+    public MenuDetails(String label, String path, String icon, UUID parentId, int sortOrder, boolean enabled,
+                       String permissionKey) {
+        this(label, path, icon, parentId, sortOrder, enabled, permissionKey, null);
+    }
+}

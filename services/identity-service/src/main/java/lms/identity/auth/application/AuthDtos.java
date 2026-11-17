@@ -2,6 +2,7 @@ package lms.identity.auth.application;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.UUID;
@@ -27,14 +28,57 @@ public final class AuthDtos {
     }
 
     /** tenantCode: tùy chọn, mã tenant muốn vào (đường dẫn/QR của thư viện); bỏ trống thì chọn theo tenant dùng gần nhất. */
-    public record LoginRequest(@NotBlank String username, @NotBlank String password, String tenantCode) {
+    public record LoginRequest(@NotBlank String username, @NotBlank String password, String tenantCode,
+                               @Pattern(regexp = "STAFF|STOREFRONT", message = "channel phải là STAFF hoặc STOREFRONT")
+                               String channel) {
+
+        public LoginRequest(String username, String password, String tenantCode) {
+            this(username, password, tenantCode, null);
+        }
 
         public LoginRequest(String username, String password) {
-            this(username, password, null);
+            this(username, password, null, null);
         }
     }
 
-    public record RefreshRequest(@NotBlank String refreshToken) {
+    /**
+     * channel: tùy chọn, kênh của người gọi (customer-api gửi STOREFRONT, lms-api không gửi = STAFF). Refresh token chỉ
+     * làm mới được ở đúng kênh đã phát hành; lệch kênh thì 401.
+     * tenantId: tùy chọn (ADR-0013 2.4, customer-api gửi tenant đã phân giải từ {code}). Có giá trị mà khác tenant của refresh
+     * token (kể cả phiên nền tảng không có tenant) thì 401 như token không hợp lệ và token KHÔNG bị xoay vòng. Không gửi =
+     * hành vi cũ. Chỉ refresh dùng; logout bỏ qua (thu hồi token nào cũng vô hại, idempotent).
+     */
+    public record RefreshRequest(@NotBlank String refreshToken,
+                                 @Pattern(regexp = "STAFF|STOREFRONT", message = "channel phải là STAFF hoặc STOREFRONT")
+                                 String channel,
+                                 java.util.UUID tenantId) {
+
+        public RefreshRequest(String refreshToken) {
+            this(refreshToken, null, null);
+        }
+
+        public RefreshRequest(String refreshToken, String channel) {
+            this(refreshToken, channel, null);
+        }
+    }
+
+    /**
+     * Tự đăng ký (ADR-0010 B2.1): allowlist trường. KHÔNG có role, flag, tenantId, trạng thái hay phòng ban: tài khoản
+     * luôn nhận role signup_default của tenant {@code tenantCode} (mã công khai do customer-api lấy từ đường dẫn).
+     * Trường JSON lạ bị bỏ qua. email bắt buộc vì hồ sơ người dùng yêu cầu email duy nhất.
+     */
+    public record SignupRequest(
+            @NotBlank @Size(max = 50) String tenantCode,
+            @NotBlank @Size(min = 3, max = 100) String username,
+            @NotBlank @Size(min = 8, max = 72) String password,
+            @NotBlank @Size(max = 255) String fullName,
+            @NotBlank @jakarta.validation.constraints.Email @Size(max = 255) String email) {
+
+        /** Không in mật khẩu/email/họ tên khi log. */
+        @Override
+        public String toString() {
+            return "SignupRequest[tenantCode=" + tenantCode + ", username=" + username + "]";
+        }
     }
 
     public record SwitchTenantRequest(@NotNull UUID tenantId, @NotBlank String refreshToken) {

@@ -5,12 +5,10 @@ import lms.api.circulation.dto.CollectFinesRequest;
 import lms.api.circulation.dto.CollectFinesResult;
 import lms.api.circulation.dto.ReaderFinesView;
 import jakarta.validation.Valid;
-import java.util.UUID;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /** API cho FE: xem và thu phí phạt. Quyền do circulation-service kiểm. */
@@ -30,8 +28,8 @@ public class FineController {
     }
 
     @GetMapping
-    public ReaderFinesView byReader(@RequestParam UUID readerId) {
-        return circulation.finesOfReader(readerId);
+    public ReaderFinesView byReader(@Valid BorrowingController.ByReaderQuery query) {
+        return circulation.finesOfReader(query.readerId(), query.tenantId());
     }
 
     @PostMapping("/payments")

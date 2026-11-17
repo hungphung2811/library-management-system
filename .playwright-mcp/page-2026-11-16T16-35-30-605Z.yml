@@ -1,0 +1,137 @@
+- generic [ref=f3e12]:
+  - complementary [ref=f3e13]:
+    - navigation "Điều hướng chính" [ref=f3e14]:
+      - generic [ref=f3e15]:
+        - link "Thư viện, về trang chủ" [ref=f3e16] [cursor=pointer]:
+          - /url: /
+          - generic [ref=f3e26]:
+            - generic [ref=f3e27]: Thư viện
+            - generic [ref=f3e28]: Quản lý mượn trả
+        - button "Thu gọn menu" [expanded] [ref=f3e29] [cursor=pointer]
+      - list [ref=f3e33]:
+        - listitem [ref=f3e34]:
+          - link "Trang chủ" [ref=f3e35] [cursor=pointer]:
+            - /url: /
+        - listitem [aria-hidden] [ref=f3e42]: Nghiệp vụ
+        - listitem [ref=f3e43]:
+          - button "Sách" [expanded] [ref=f3e44] [cursor=pointer]
+          - list [ref=f3e51]:
+            - listitem [ref=f3e52]:
+              - link "Danh sách sách" [ref=f3e53] [cursor=pointer]:
+                - /url: /catalog
+            - listitem [ref=f3e54]:
+              - link "Tra mã vạch" [ref=f3e55] [cursor=pointer]:
+                - /url: /catalog/barcode
+            - listitem [ref=f3e56]:
+              - link "Thêm sách" [ref=f3e57] [cursor=pointer]:
+                - /url: /catalog/books/new
+        - listitem [ref=f3e58]:
+          - button "Mượn trả" [expanded] [ref=f3e59] [cursor=pointer]
+          - list [ref=f3e67]:
+            - listitem [ref=f3e68]:
+              - link "Lập phiếu mượn" [ref=f3e69] [cursor=pointer]:
+                - /url: /circulation/borrow
+            - listitem [ref=f3e70]:
+              - link "Nhận trả sách" [ref=f3e71] [cursor=pointer]:
+                - /url: /circulation/return
+            - listitem [ref=f3e72]:
+              - link "Tra phiếu mượn" [ref=f3e73] [cursor=pointer]:
+                - /url: /circulation/borrowings
+            - listitem [ref=f3e74]:
+              - link "Đặt trước" [ref=f3e75] [cursor=pointer]:
+                - /url: /circulation/reservations
+            - listitem [ref=f3e76]:
+              - link "Phạt" [ref=f3e77] [cursor=pointer]:
+                - /url: /circulation/fines
+        - listitem [aria-hidden] [ref=f3e78]: Hệ thống
+        - listitem [ref=f3e79]:
+          - button "Quản trị" [expanded] [ref=f3e80] [cursor=pointer]
+          - list [ref=f3e88]:
+            - listitem [ref=f3e89]:
+              - link "Người dùng" [ref=f3e90] [cursor=pointer]:
+                - /url: /admin/users
+            - listitem [ref=f3e91]:
+              - link "Vai trò và quyền" [ref=f3e92] [cursor=pointer]:
+                - /url: /admin/roles
+            - listitem [ref=f3e93]:
+              - link "Phòng ban" [ref=f3e94] [cursor=pointer]:
+                - /url: /admin/departments
+            - listitem [ref=f3e95]:
+              - link "Nhật ký hoạt động" [ref=f3e96] [cursor=pointer]:
+                - /url: /admin/audit-logs
+  - generic [ref=f3e97]:
+    - banner [ref=f3e98]:
+      - list [ref=f3e99]:
+        - listitem [ref=f3e100]:
+          - link "Trang chủ" [ref=f3e101] [cursor=pointer]:
+            - /url: /
+        - listitem [aria-hidden] [ref=f3e102]
+        - listitem [ref=f3e105]: Mượn trả
+        - listitem [aria-hidden] [ref=f3e106]
+        - listitem [ref=f3e109]: Lập phiếu mượn
+      - generic [ref=f3e110]:
+        - 'button "Đơn vị làm việc: Thư viện mặc định" [ref=f3e111] [cursor=pointer]':
+          - generic [ref=f3e116]: Thư viện mặc định
+        - button "Thông báo, 0 chưa đọc" [ref=f3e119] [cursor=pointer]
+        - button "Tài khoản của tôi" [ref=f3e124] [cursor=pointer]:
+          - generic [aria-hidden] [ref=f3e125]: A
+          - generic [ref=f3e126]:
+            - generic [ref=f3e127]: admin
+            - generic [ref=f3e128]: SUPER_ADMIN
+    - main [ref=f3e131]:
+      - generic [ref=f3e132]:
+        - generic [ref=f3e134]:
+          - heading "Lập phiếu mượn" [level=1] [ref=f3e135]
+          - paragraph [ref=f3e136]: Chọn độc giả, quét mã vạch sách rồi lập phiếu.
+        - generic [ref=f3e137]:
+          - generic [ref=f3e138]:
+            - generic [ref=f3e139]: 1. Độc giả
+            - generic [ref=f3e142]:
+              - generic [ref=f3e143]:
+                - generic [ref=f3e144]: Tìm độc giả theo tên, tên đăng nhập hoặc email
+                - generic [ref=f3e145]:
+                  - generic "Nguyễn Thị Lan · nguyen.thi.lan · lan.nt@example.edu.vn" [ref=f3e146]:
+                    - text: Nguyễn Thị Lan · nguyen.thi.lan · lan.nt@example.edu.vn
+                    - combobox "Tìm độc giả theo tên, tên đăng nhập hoặc email" [ref=f3e147]
+                  - button "Clear" [ref=f3e152] [cursor=pointer]:
+                    - img "close-circle" [ref=f3e153]
+              - generic [ref=f3e157]:
+                - generic [ref=f3e158]: Thẻ hợp lệ
+                - table [ref=f3e162]:
+                  - rowgroup [ref=f3e163]:
+                    - row [ref=f3e164]:
+                      - 'cell "Họ tên : Nguyễn Thị Lan" [ref=f3e165]':
+                        - generic [ref=f3e166]:
+                          - generic [ref=f3e167]: "Họ tên :"
+                          - generic [ref=f3e168]: Nguyễn Thị Lan
+                      - 'cell "Số thẻ : TV2026-001" [ref=f3e169]':
+                        - generic [ref=f3e170]:
+                          - generic [ref=f3e171]: "Số thẻ :"
+                          - generic [ref=f3e172]: TV2026-001
+                    - row [ref=f3e174]:
+                      - 'cell "Loại độc giả : Sinh viên" [ref=f3e175]':
+                        - generic [ref=f3e176]:
+                          - generic [ref=f3e177]: "Loại độc giả :"
+                          - generic [ref=f3e178]: Sinh viên
+                      - 'cell "Hạn thẻ : 31/12/2027" [ref=f3e179]':
+                        - generic [ref=f3e180]:
+                          - generic [ref=f3e181]: "Hạn thẻ :"
+                          - generic [ref=f3e182]: 31/12/2027
+                    - row [ref=f3e183]:
+                      - 'cell "Trạng thái : Đang hoạt động" [ref=f3e184]':
+                        - generic [ref=f3e185]:
+                          - generic [ref=f3e186]: "Trạng thái :"
+                          - generic [ref=f3e187]: Đang hoạt động
+          - generic [ref=f3e189]:
+            - generic [ref=f3e190]: 2. Sách
+            - generic [ref=f3e193]:
+              - generic [ref=f3e194]:
+                - generic [ref=f3e195]: Quét hoặc nhập mã vạch sách
+                - textbox "Quét hoặc nhập mã vạch sách" [active] [ref=f3e201]
+                - generic [ref=f3e202]: Nhấn Enter để thêm vào phiếu.
+                - status [ref=f3e203]
+              - paragraph [ref=f3e204]: Chưa có sách. Quét mã vạch trên sách để thêm.
+          - generic [ref=f3e205]:
+            - generic [ref=f3e206]: Độc giả Nguyễn Thị Lan · nguyen.thi.lan · lan.nt@example.edu.vn · 0 cuốn
+            - button "Lập phiếu mượn" [disabled] [ref=f3e207]
+          - paragraph [ref=f3e208]: "Phím tắt: Ctrl+Enter để lập phiếu."

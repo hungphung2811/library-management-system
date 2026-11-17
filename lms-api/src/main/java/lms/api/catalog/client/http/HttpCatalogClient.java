@@ -20,10 +20,11 @@ import org.springframework.web.client.RestClient;
 public class HttpCatalogClient implements CatalogClient {
 
     /** DTO nội bộ của catalog-service; tách khỏi DTO cho FE để hai bên đổi độc lập. */
-    record InternalTitle(UUID id, String name, String author, String isbn, BigDecimal coverPrice, long availableCopies) {
+    record InternalTitle(UUID id, String name, String author, String isbn, BigDecimal coverPrice, long availableCopies,
+                         UUID tenantId) {
     }
 
-    record InternalCopy(UUID id, UUID titleId, String barcode, String status) {
+    record InternalCopy(UUID id, UUID titleId, String barcode, String status, UUID tenantId) {
     }
 
     record InternalCopyDetails(UUID id, UUID titleId, String titleName, String barcode, String status,
@@ -37,11 +38,11 @@ public class HttpCatalogClient implements CatalogClient {
     }
 
     private static TitleView view(InternalTitle t) {
-        return new TitleView(t.id(), t.name(), t.author(), t.isbn(), t.coverPrice(), t.availableCopies());
+        return new TitleView(t.id(), t.name(), t.author(), t.isbn(), t.coverPrice(), t.availableCopies(), t.tenantId());
     }
 
     private static CopyView view(InternalCopy c) {
-        return new CopyView(c.id(), c.titleId(), c.barcode(), c.status());
+        return new CopyView(c.id(), c.titleId(), c.barcode(), c.status(), c.tenantId());
     }
 
     private static CopyDetailsView view(InternalCopyDetails c) {
@@ -49,10 +50,11 @@ public class HttpCatalogClient implements CatalogClient {
     }
 
     @Override
-    public List<TitleView> searchTitles(String keyword, boolean onlyAvailable) {
+    public List<TitleView> searchTitles(String keyword, boolean onlyAvailable, String tenantId) {
         List<InternalTitle> titles = client.get().uri(b -> {
             b.path("/internal/books").queryParam("available", onlyAvailable);
             if (keyword != null && !keyword.isBlank()) b.queryParam("keyword", keyword);
+            if (tenantId != null && !tenantId.isBlank()) b.queryParam("tenantId", tenantId);
             return b.build();
         }).retrieve().body(new ParameterizedTypeReference<>() { });
         return titles == null ? List.of() : titles.stream().map(HttpCatalogClient::view).toList();
@@ -73,10 +75,32 @@ public class HttpCatalogClient implements CatalogClient {
         return view(client.put().uri("/internal/books/{id}", id).body(request).retrieve().body(InternalTitle.class));
     }
 
+    record InternalPreview(UUID id, String name, String description, String previewText) {
+    }
+
+    private static lms.api.catalog.dto.TitlePreviewView view(InternalPreview p) {
+        return new lms.api.catalog.dto.TitlePreviewView(p.id(), p.name(), p.description(), p.previewText());
+    }
+
     @Override
-    public List<CopyView> listCopies(UUID titleId) {
-        List<InternalCopy> copies = client.get().uri("/internal/book-copies?titleId={id}", titleId).retrieve()
-                .body(new ParameterizedTypeReference<>() { });
+    public lms.api.catalog.dto.TitlePreviewView getPreview(UUID id) {
+        return view(client.get().uri("/internal/books/{id}/preview", id).retrieve().body(InternalPreview.class));
+    }
+
+    @Override
+    public lms.api.catalog.dto.TitlePreviewView updatePreview(UUID id,
+                                                              lms.api.catalog.dto.UpdateTitlePreviewRequest request) {
+        return view(client.put().uri("/internal/books/{id}/preview", id).body(request).retrieve()
+                .body(InternalPreview.class));
+    }
+
+    @Override
+    public List<CopyView> listCopies(UUID titleId, String tenantId) {
+        List<InternalCopy> copies = client.get().uri(b -> {
+            b.path("/internal/book-copies").queryParam("titleId", titleId);
+            if (tenantId != null && !tenantId.isBlank()) b.queryParam("tenantId", tenantId);
+            return b.build();
+        }).retrieve().body(new ParameterizedTypeReference<>() { });
         return copies == null ? List.of() : copies.stream().map(HttpCatalogClient::view).toList();
     }
 

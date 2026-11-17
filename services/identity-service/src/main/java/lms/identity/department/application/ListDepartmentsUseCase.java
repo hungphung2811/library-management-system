@@ -50,6 +50,6 @@ public class ListDepartmentsUseCase {
     private static DepartmentNode node(Department d, Map<UUID, List<Department>> childrenOf) {
         List<DepartmentNode> children = childrenOf.getOrDefault(d.id(), List.of()).stream()
                 .map(c -> node(c, childrenOf)).toList();
-        return new DepartmentNode(d.id(), d.code(), d.name(), d.status(), children);
+        return new DepartmentNode(d.id(), d.code(), d.name(), d.status(), d.tenantId(), children);
     }
 }

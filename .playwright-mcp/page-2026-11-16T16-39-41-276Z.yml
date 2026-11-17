@@ -1,0 +1,125 @@
+- generic [ref=f7e1]:
+  - generic [ref=f7e12]:
+    - complementary [ref=f7e13]:
+      - navigation "Điều hướng chính" [ref=f7e14]:
+        - generic [ref=f7e15]:
+          - link "Thư viện, về trang chủ" [ref=f7e16] [cursor=pointer]:
+            - /url: /
+            - generic [ref=f7e26]:
+              - generic [ref=f7e27]: Thư viện
+              - generic [ref=f7e28]: Quản lý mượn trả
+          - button "Thu gọn menu" [expanded] [ref=f7e29] [cursor=pointer]
+        - list [ref=f7e33]:
+          - listitem [ref=f7e34]:
+            - link "Trang chủ" [ref=f7e35] [cursor=pointer]:
+              - /url: /
+          - listitem [aria-hidden] [ref=f7e42]: Nghiệp vụ
+          - listitem [ref=f7e43]:
+            - button "Sách" [expanded] [ref=f7e44] [cursor=pointer]
+            - list [ref=f7e51]:
+              - listitem [ref=f7e52]:
+                - link "Danh sách sách" [ref=f7e53] [cursor=pointer]:
+                  - /url: /catalog
+              - listitem [ref=f7e54]:
+                - link "Tra mã vạch" [ref=f7e55] [cursor=pointer]:
+                  - /url: /catalog/barcode
+              - listitem [ref=f7e56]:
+                - link "Thêm sách" [ref=f7e57] [cursor=pointer]:
+                  - /url: /catalog/books/new
+          - listitem [ref=f7e58]:
+            - button "Mượn trả" [expanded] [ref=f7e59] [cursor=pointer]
+            - list [ref=f7e67]:
+              - listitem [ref=f7e68]:
+                - link "Lập phiếu mượn" [ref=f7e69] [cursor=pointer]:
+                  - /url: /circulation/borrow
+              - listitem [ref=f7e70]:
+                - link "Nhận trả sách" [ref=f7e71] [cursor=pointer]:
+                  - /url: /circulation/return
+              - listitem [ref=f7e72]:
+                - link "Tra phiếu mượn" [ref=f7e73] [cursor=pointer]:
+                  - /url: /circulation/borrowings
+              - listitem [ref=f7e74]:
+                - link "Đặt trước" [ref=f7e75] [cursor=pointer]:
+                  - /url: /circulation/reservations
+              - listitem [ref=f7e76]:
+                - link "Phạt" [ref=f7e77] [cursor=pointer]:
+                  - /url: /circulation/fines
+          - listitem [aria-hidden] [ref=f7e78]: Hệ thống
+          - listitem [ref=f7e79]:
+            - button "Quản trị" [expanded] [ref=f7e80] [cursor=pointer]
+            - list [ref=f7e88]:
+              - listitem [ref=f7e89]:
+                - link "Người dùng" [ref=f7e90] [cursor=pointer]:
+                  - /url: /admin/users
+              - listitem [ref=f7e91]:
+                - link "Vai trò và quyền" [ref=f7e92] [cursor=pointer]:
+                  - /url: /admin/roles
+              - listitem [ref=f7e93]:
+                - link "Phòng ban" [ref=f7e94] [cursor=pointer]:
+                  - /url: /admin/departments
+              - listitem [ref=f7e95]:
+                - link "Nhật ký hoạt động" [ref=f7e96] [cursor=pointer]:
+                  - /url: /admin/audit-logs
+    - generic [ref=f7e97]:
+      - banner [ref=f7e98]:
+        - list [ref=f7e99]:
+          - listitem [ref=f7e100]:
+            - link "Trang chủ" [ref=f7e101] [cursor=pointer]:
+              - /url: /
+          - listitem [aria-hidden] [ref=f7e102]
+          - listitem [ref=f7e105]: Mượn trả
+          - listitem [aria-hidden] [ref=f7e106]
+          - listitem [ref=f7e109]: Phạt
+        - generic [ref=f7e110]:
+          - 'button "Đơn vị làm việc: Thư viện mặc định" [ref=f7e111] [cursor=pointer]':
+            - generic [ref=f7e116]: Thư viện mặc định
+          - button "Thông báo, 0 chưa đọc" [ref=f7e119] [cursor=pointer]
+          - button "Tài khoản của tôi" [ref=f7e124] [cursor=pointer]:
+            - generic [aria-hidden] [ref=f7e125]: A
+            - generic [ref=f7e126]:
+              - generic [ref=f7e127]: admin
+              - generic [ref=f7e128]: SUPER_ADMIN
+      - main [ref=f7e131]:
+        - generic [ref=f7e132]:
+          - generic [ref=f7e134]:
+            - heading "Phạt" [level=1] [ref=f7e135]
+            - paragraph [ref=f7e136]: Tra cứu và thu phí phạt của độc giả.
+          - generic [ref=f7e137]:
+            - generic [ref=f7e139]:
+              - generic "Nguyễn Thị Lan · nguyen.thi.lan · lan.nt@example.edu.vn" [ref=f7e140]:
+                - text: Nguyễn Thị Lan · nguyen.thi.lan · lan.nt@example.edu.vn
+                - combobox [ref=f7e141]
+              - button "Clear" [ref=f7e146] [cursor=pointer]:
+                - img "close-circle" [ref=f7e147]
+            - generic [ref=f7e150]:
+              - generic [ref=f7e151]:
+                - generic [ref=f7e152]: Tổng chưa thanh toán
+                - generic [ref=f7e153]: 75.000 ₫
+              - button "Thu phạt" [active] [ref=f7e154] [cursor=pointer]
+            - table [ref=f7e164]:
+              - rowgroup [ref=f7e165]:
+                - row [ref=f7e166]:
+                  - columnheader "Ngày phát sinh" [ref=f7e167]
+                  - columnheader "Lý do" [ref=f7e168]
+                  - columnheader "Phiếu mượn" [ref=f7e169]
+                  - columnheader "Số tiền" [ref=f7e170]
+                  - columnheader "Trạng thái" [ref=f7e171]
+                  - columnheader "Ngày thanh toán" [ref=f7e172]
+              - rowgroup [ref=f7e173]:
+                - row [ref=f7e174]:
+                  - cell "16/11/2026" [ref=f7e175]
+                  - cell "Sách hỏng" [ref=f7e176]
+                  - cell "8eabadc8" [ref=f7e177]
+                  - cell "75.000 ₫" [ref=f7e178]
+                  - cell "Chưa thanh toán" [ref=f7e179]
+                  - cell "—" [ref=f7e181]
+  - tooltip "exclamation-circle Thu 75.000 ₫? Đánh dấu mọi khoản phạt chưa thanh toán của độc giả này là đã thanh toán. Không Thu phạt" [ref=f7e183]:
+    - generic [ref=f7e185]:
+      - generic [ref=f7e186]:
+        - img "exclamation-circle" [ref=f7e188]
+        - generic [ref=f7e191]:
+          - generic [ref=f7e192]: Thu 75.000 ₫?
+          - generic [ref=f7e193]: Đánh dấu mọi khoản phạt chưa thanh toán của độc giả này là đã thanh toán.
+      - generic [ref=f7e194]:
+        - button "Không" [ref=f7e195] [cursor=pointer]
+        - button "Thu phạt" [ref=f7e197] [cursor=pointer]

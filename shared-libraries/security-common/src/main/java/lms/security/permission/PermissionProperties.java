@@ -12,6 +12,11 @@ public class PermissionProperties {
     private boolean enabled = true;
     /** Bắt buộc token có claim tenantId trên endpoint thường (403 TENANT_REQUIRED); mặc định tắt cho tới khi service sẵn sàng. */
     private boolean requireTenant = false;
+    /**
+     * ADR-0009, chuyển tiếp: token thiếu hẳn claim {@code modules} (phát trước khi triển khai) coi như {@code [LENDING]}.
+     * Gỡ (false) sau một chu kỳ refresh token (7 ngày) kể từ đợt triển khai đầu.
+     */
+    private boolean legacyModulesFallback = true;
     /** Tên service ghi vào danh mục permission, thường lấy từ spring.application.name. */
     private String serviceName = "unknown-service";
     /** Địa chỉ identity-service để đăng ký khóa; bỏ trống thì không đăng ký (chỉ cảnh báo). */
@@ -30,6 +35,8 @@ public class PermissionProperties {
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
     public boolean isRequireTenant() { return requireTenant; }
     public void setRequireTenant(boolean requireTenant) { this.requireTenant = requireTenant; }
+    public boolean isLegacyModulesFallback() { return legacyModulesFallback; }
+    public void setLegacyModulesFallback(boolean legacyModulesFallback) { this.legacyModulesFallback = legacyModulesFallback; }
     public String getServiceName() { return serviceName; }
     public void setServiceName(String serviceName) { this.serviceName = serviceName; }
     public String getIdentityBaseUrl() { return identityBaseUrl; }

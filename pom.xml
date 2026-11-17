@@ -24,10 +24,12 @@
         <module>shared-libraries/observability-common</module>
         <module>shared-libraries/database-common</module>
         <module>lms-api</module>
+        <module>customer-api</module>
         <module>services/identity-service</module>
         <module>services/catalog-service</module>
         <module>services/circulation-service</module>
         <module>services/support-service</module>
+        <module>services/sales-service</module>
         <module>services/system-service</module>
     </modules>
 
@@ -36,6 +38,7 @@
         <spring-cloud.version>2025.0.0</spring-cloud.version>
         <springdoc.version>2.8.13</springdoc.version>
         <archunit.version>1.5.1</archunit.version>
+        <commonmark.version>0.27.1</commonmark.version>
     </properties>
 
     <dependencyManagement>
@@ -86,6 +89,12 @@
                 <groupId>com.tngtech.archunit</groupId>
                 <artifactId>archunit-junit5</artifactId>
                 <version>${archunit.version}</version>
+            </dependency>
+            <dependency>
+                <!-- ADR-0011: render Markdown của context cms (system-service) -->
+                <groupId>org.commonmark</groupId>
+                <artifactId>commonmark</artifactId>
+                <version>${commonmark.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

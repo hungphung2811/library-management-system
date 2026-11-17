@@ -81,6 +81,12 @@ migration:
       username: ${SYSTEM_DB_USERNAME:system}
       password: ${SYSTEM_DB_PASSWORD:system}
       locations: classpath:db/migration/system
+    # sales_db (module bán hàng, ADR-0010): khai báo cuối danh sách
+    sales:
+      url: ${SALES_DB_URL:jdbc:postgresql://localhost:5432/sales_db}
+      username: ${SALES_DB_USERNAME:sales}
+      password: ${SALES_DB_PASSWORD:sales}
+      locations: classpath:db/migration/sales
 
 # Middleware phân quyền theo endpoint (security-common): khóa Controller/method được đăng ký về identity-service
 lms:
@@ -101,3 +107,10 @@ lms:
       cache:
         enabled: true
         ttl: 10m
+    # Context cms (ADR-0011): yeu cau lien he giu 12 thang roi an danh (cap nen tang, khong theo tenant)
+    cms:
+      contact-retention: P365D
+      anonymization:
+        enabled: true
+        cron: "0 30 3 * * *"
+        batch-size: 500

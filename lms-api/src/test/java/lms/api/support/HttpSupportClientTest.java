@@ -45,7 +45,7 @@ class HttpSupportClientTest {
                         + "\"payload\":\"{}\",\"campoMoi\":1}],\"total\":7,\"page\":1,\"size\":2}",
                         MediaType.APPLICATION_JSON));
 
-        var page = client.searchAuditLogs("agg", "E", 1, 2);
+        var page = client.searchAuditLogs("agg", "E", null, 1, 2);
         assertEquals(7, page.total());
         assertEquals("E", page.items().get(0).eventType());
         server.verify();

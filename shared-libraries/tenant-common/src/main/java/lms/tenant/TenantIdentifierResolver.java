@@ -10,9 +10,19 @@ public class TenantIdentifierResolver implements CurrentTenantIdentifierResolver
 
     public static final UUID NIL_TENANT = new UUID(0L, 0L);
 
+    /** UUID canh gác cho phạm vi đọc ALL (ADR-0008); khác {@link #NIL_TENANT}, không phải tenant thật. */
+    public static final UUID ROOT = UUID.fromString("ffffffff-ffff-ffff-ffff-ffffffffffff");
+
     @Override
     public UUID resolveCurrentTenantIdentifier() {
+        if (TenantContext.isAllTenants()) return ROOT;
         return TenantContext.current().orElse(NIL_TENANT);
+    }
+
+    /** Hibernate bỏ điều kiện @TenantId cho truy vấn đọc khi nhận ROOT. */
+    @Override
+    public boolean isRoot(UUID tenantId) {
+        return ROOT.equals(tenantId);
     }
 
     @Override

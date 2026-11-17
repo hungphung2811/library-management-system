@@ -115,9 +115,87 @@ class LmsApiRoutingTest {
     }
 
     @Test
+    void hopDongCuaTenantChiGetChuyenToiIdentityGiuTokenVaMaLoi() throws Exception {
+        identity.expect(requestTo("http://identity/internal/contracts"))
+                .andExpect(header("Authorization", "Bearer token-tenant"))
+                .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
+        identity.expect(requestTo("http://identity/internal/contracts/current"))
+                .andExpect(header("Authorization", "Bearer token-tenant"))
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators
+                        .withStatus(org.springframework.http.HttpStatus.NOT_FOUND)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"code\":\"CONTRACT_NOT_FOUND\",\"message\":\"x\"}"));
+
+        mvc.perform(get("/api/contracts").with(jwt().jwt(j -> j.tokenValue("token-tenant"))))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/contracts/current").with(jwt().jwt(j -> j.tokenValue("token-tenant"))))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("CONTRACT_NOT_FOUND"));
+        identity.verify();
+        // chỉ đọc: không có route ghi
+        mvc.perform(post("/api/contracts").contentType(MediaType.APPLICATION_JSON).content("{}")
+                .with(jwt().jwt(j -> j.tokenValue("token-tenant")))).andExpect(status().is4xxClientError());
+    }
+
+    @Test
+    void originStorefrontCuaTenantChiGetChuyenToiIdentityGiuTokenVaMaLoi() throws Exception {
+        identity.expect(requestTo("http://identity/internal/storefront-origins"))
+                .andExpect(method(org.springframework.http.HttpMethod.GET))
+                .andExpect(header("Authorization", "Bearer token-tenant"))
+                .andRespond(withSuccess("{\"origins\":[{\"origin\":\"https://shop.a.vn\",\"enabled\":true}]}",
+                        MediaType.APPLICATION_JSON));
+        identity.expect(requestTo("http://identity/internal/storefront-origins"))
+                .andExpect(header("Authorization", "Bearer token-thuong"))
+                .andRespond(withStatus(HttpStatus.FORBIDDEN).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"code\":\"FORBIDDEN\"}"));
+
+        mvc.perform(get("/api/storefront-origins").with(jwt().jwt(j -> j.tokenValue("token-tenant"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.origins[0].origin").value("https://shop.a.vn"));
+        mvc.perform(get("/api/storefront-origins").with(jwt().jwt(j -> j.tokenValue("token-thuong"))))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        identity.verify();
+        // chỉ đọc: không có route ghi cho tenant admin
+        mvc.perform(post("/api/storefront-origins").contentType(MediaType.APPLICATION_JSON).content("{}")
+                .with(jwt().jwt(j -> j.tokenValue("token-tenant")))).andExpect(status().is4xxClientError());
+    }
+
+    @Test
+    void platformOriginStorefrontChuyenNguyenCaBonPhuongThuc() throws Exception {
+        String base = "http://identity/api/platform/tenants/11111111-1111-1111-1111-111111111111/storefront-origins";
+        identity.expect(requestTo(base)).andExpect(method(org.springframework.http.HttpMethod.POST))
+                .andExpect(header("Authorization", "Bearer token-platform"))
+                .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.content()
+                        .json("{\"origin\":\"https://shop.a.vn\"}"))
+                .andRespond(withStatus(HttpStatus.CREATED).contentType(MediaType.APPLICATION_JSON).body("{\"id\":\"x\"}"));
+        identity.expect(requestTo(base + "/22222222-2222-2222-2222-222222222222"))
+                .andExpect(method(org.springframework.http.HttpMethod.PUT))
+                .andRespond(withSuccess("{\"enabled\":false}", MediaType.APPLICATION_JSON));
+        identity.expect(requestTo(base + "/22222222-2222-2222-2222-222222222222"))
+                .andExpect(method(org.springframework.http.HttpMethod.DELETE))
+                .andRespond(withStatus(HttpStatus.NO_CONTENT));
+
+        var platform = jwt().jwt(j -> j.tokenValue("token-platform"));
+        mvc.perform(post("/api/platform/tenants/11111111-1111-1111-1111-111111111111/storefront-origins")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"origin\":\"https://shop.a.vn\"}").with(platform))
+                .andExpect(status().isCreated());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .put("/api/platform/tenants/11111111-1111-1111-1111-111111111111/storefront-origins/22222222-2222-2222-2222-222222222222")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":false}").with(platform))
+                .andExpect(status().isOk());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/api/platform/tenants/11111111-1111-1111-1111-111111111111/storefront-origins/22222222-2222-2222-2222-222222222222")
+                        .with(platform))
+                .andExpect(status().isNoContent());
+        identity.verify();
+    }
+
+    @Test
     void khongTokenBi401() throws Exception {
+        mvc.perform(get("/api/contracts")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/contracts/current")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/platform/tenants")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/me/tenants")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/storefront-origins")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/notifications/me")).andExpect(status().isUnauthorized());
     }
 

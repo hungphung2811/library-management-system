@@ -71,12 +71,15 @@ class PlatformTenantUseCasesTest {
     private final RecordingEvents events = new RecordingEvents();
     private final TransactionalRunner tx = new TransactionalRunner();
 
+    private final InMemoryTenantModules modules = new InMemoryTenantModules();
+
     private final CreateTenantUseCase create = new CreateTenantUseCase(tenants, organizations, memberships, roles,
-            accounts, events, tx);
-    private final UpdateTenantUseCase update = new UpdateTenantUseCase(tenants, organizations, tenants, events, tx);
-    private final SetTenantStatusUseCase status = new SetTenantStatusUseCase(tenants, tenants, events, tx);
-    private final SearchTenantsUseCase search = new SearchTenantsUseCase(tenants);
-    private final GetTenantUseCase get = new GetTenantUseCase(tenants, tenants, roles, tx);
+            accounts, events, tx, modules);
+    private final UpdateTenantUseCase update = new UpdateTenantUseCase(tenants, organizations, tenants, events, tx,
+            modules);
+    private final SetTenantStatusUseCase status = new SetTenantStatusUseCase(tenants, tenants, events, tx, modules);
+    private final SearchTenantsUseCase search = new SearchTenantsUseCase(tenants, modules);
+    private final GetTenantUseCase get = new GetTenantUseCase(tenants, tenants, roles, tx, modules);
     private final ManageOrganizationUseCase orgs = new ManageOrganizationUseCase(organizations);
     private final AddTenantAdminUseCase addAdmin = new AddTenantAdminUseCase(tenants, memberships, roles, accounts,
             events, tx);
@@ -319,14 +322,48 @@ class PlatformTenantUseCasesTest {
         final Map<UUID, List<UUID>> admins = new HashMap<>();
         final List<UUID> seededInContext = new ArrayList<>();
 
+        /** Mẫu giả: SUPER_ADMIN là lõi; LIBRARIAN, MEMBER, READER, AUDITOR thuộc LENDING; CASHIER thuộc SALES. */
+        static final Map<String, String> TEMPLATE_MODULE = new java.util.LinkedHashMap<>();
+
+        static {
+            TEMPLATE_MODULE.put("SUPER_ADMIN", null);
+            TEMPLATE_MODULE.put("LIBRARIAN", "LENDING");
+            TEMPLATE_MODULE.put("MEMBER", "LENDING");
+            TEMPLATE_MODULE.put("READER", "LENDING");
+            TEMPLATE_MODULE.put("AUDITOR", "LENDING");
+            TEMPLATE_MODULE.put("CASHIER", "SALES");
+            TEMPLATE_MODULE.put("STOCKKEEPER", "SALES");
+        }
+
+        final List<String> seededModules = new ArrayList<>();
+
         @Override
-        public int seedFromTemplates() {
+        public int seedFromTemplates(java.util.Collection<String> modules) {
             UUID tenant = TenantContext.require();
             seededInContext.add(tenant);
-            for (String name : TEMPLATES) {
-                roles.add(new FakeRole(UUID.randomUUID(), tenant, name, name.equals("SUPER_ADMIN")));
+            seededModules.addAll(modules);
+            int created = 0;
+            for (Map.Entry<String, String> t : TEMPLATE_MODULE.entrySet()) {
+                if (t.getValue() == null || modules.contains(t.getValue())) created += addIfAbsent(tenant, t.getKey());
             }
-            return TEMPLATES.size();
+            return created;
+        }
+
+        @Override
+        public int seedModuleTemplates(String module) {
+            UUID tenant = TenantContext.require();
+            seededInContext.add(tenant);
+            int created = 0;
+            for (Map.Entry<String, String> t : TEMPLATE_MODULE.entrySet()) {
+                if (module.equals(t.getValue())) created += addIfAbsent(tenant, t.getKey());
+            }
+            return created;
+        }
+
+        private int addIfAbsent(UUID tenant, String name) {
+            if (rolesOf(tenant).stream().anyMatch(r -> r.name().equals(name))) return 0;
+            roles.add(new FakeRole(UUID.randomUUID(), tenant, name, name.equals("SUPER_ADMIN")));
+            return 1;
         }
 
         @Override

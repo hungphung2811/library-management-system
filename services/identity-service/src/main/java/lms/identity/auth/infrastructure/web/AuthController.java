@@ -4,6 +4,7 @@ import lms.identity.auth.application.AuthDtos.ChangePasswordRequest;
 import lms.identity.auth.application.AuthDtos.LoginRequest;
 import lms.identity.auth.application.AuthDtos.RefreshRequest;
 import lms.identity.auth.application.AuthDtos.RegisterRequest;
+import lms.identity.auth.application.AuthDtos.SignupRequest;
 import lms.identity.auth.application.AuthDtos.SwitchTenantRequest;
 import lms.identity.auth.application.AuthDtos.TokenResponse;
 import lms.identity.auth.application.ChangePasswordUseCase;
@@ -11,7 +12,9 @@ import lms.identity.auth.application.LoginUseCase;
 import lms.identity.auth.application.LogoutUseCase;
 import lms.identity.auth.application.RefreshTokenUseCase;
 import lms.identity.auth.application.RegisterCredentialUseCase;
+import lms.identity.auth.application.SignupUseCase;
 import lms.identity.auth.application.SwitchTenantSessionUseCase;
+import lms.identity.auth.domain.TokenChannel;
 import lms.security.CurrentUser;
 import lms.security.JwtClaims;
 import lms.security.permission.AuthenticatedOnly;
@@ -20,6 +23,7 @@ import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -38,28 +42,44 @@ public class AuthController {
     private final RegisterCredentialUseCase register;
     private final ChangePasswordUseCase changePassword;
     private final SwitchTenantSessionUseCase switchTenant;
+    private final SignupUseCase signup;
 
     public AuthController(LoginUseCase login, RefreshTokenUseCase refresh, LogoutUseCase logout,
                           RegisterCredentialUseCase register, ChangePasswordUseCase changePassword,
-                          SwitchTenantSessionUseCase switchTenant) {
+                          SwitchTenantSessionUseCase switchTenant, SignupUseCase signup) {
         this.login = login;
         this.refresh = refresh;
         this.logout = logout;
         this.register = register;
         this.changePassword = changePassword;
         this.switchTenant = switchTenant;
+        this.signup = signup;
     }
 
     @PublicEndpoint
     @PostMapping("/login")
     public TokenResponse login(@Valid @RequestBody LoginRequest request) {
-        return login.execute(request.username(), request.password(), request.tenantCode());
+        return login.execute(request.username(), request.password(), request.tenantCode(),
+                TokenChannel.parse(request.channel()));
+    }
+
+    /**
+     * Tự đăng ký của khách (ADR-0010 B2.1). Công khai nhưng KHÔNG nhận role/flag/tenantId nào: body là allowlist
+     * {@link SignupRequest}, role do tenant quyết (signup_default). 403 SIGNUP_NOT_AVAILABLE là mã chung duy nhất cho
+     * mọi trường hợp không đăng ký được. Thành công: 201 không thân.
+     */
+    @PublicEndpoint
+    @PostMapping("/signup")
+    public ResponseEntity<Void> signup(@Valid @RequestBody SignupRequest request) {
+        signup.execute(new SignupUseCase.Command(request.tenantCode(), request.username(), request.password(),
+                request.fullName(), request.email()));
+        return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
     @PublicEndpoint
     @PostMapping("/refresh")
     public TokenResponse refresh(@Valid @RequestBody RefreshRequest request) {
-        return refresh.execute(request.refreshToken());
+        return refresh.execute(request.refreshToken(), TokenChannel.parse(request.channel()), request.tenantId());
     }
 
     @PublicEndpoint

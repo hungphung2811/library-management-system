@@ -1,0 +1,84 @@
+- generic [active] [ref=f6e1]:
+  - generic [ref=f6e2]:
+    - complementary [ref=f6e3]:
+      - navigation "Điều hướng chính" [ref=f6e4]:
+        - generic [ref=f6e5]:
+          - link "Thư viện, về trang chủ" [ref=f6e6] [cursor=pointer]:
+            - /url: /
+            - generic [ref=f6e16]:
+              - generic [ref=f6e17]: Thư viện
+              - generic [ref=f6e18]: Quản lý mượn trả
+          - button "Thu gọn menu" [expanded] [ref=f6e19] [cursor=pointer]
+        - list [ref=f6e23]:
+          - listitem [ref=f6e24]:
+            - link "Trang chủ" [ref=f6e25] [cursor=pointer]:
+              - /url: /
+          - listitem [aria-hidden] [ref=f6e32]: Nghiệp vụ
+          - listitem [ref=f6e33]:
+            - button "Sách" [expanded] [ref=f6e34] [cursor=pointer]
+            - list [ref=f6e41]:
+              - listitem [ref=f6e42]:
+                - link "Danh sách sách" [ref=f6e43] [cursor=pointer]:
+                  - /url: /catalog
+              - listitem [ref=f6e44]:
+                - link "Tra mã vạch" [ref=f6e45] [cursor=pointer]:
+                  - /url: /catalog/barcode
+              - listitem [ref=f6e46]:
+                - link "Thêm sách" [ref=f6e47] [cursor=pointer]:
+                  - /url: /catalog/books/new
+          - listitem [ref=f6e48]:
+            - button "Mượn trả" [expanded] [ref=f6e49] [cursor=pointer]
+            - list [ref=f6e57]:
+              - listitem [ref=f6e58]:
+                - link "Lập phiếu mượn" [ref=f6e59] [cursor=pointer]:
+                  - /url: /circulation/borrow
+              - listitem [ref=f6e60]:
+                - link "Nhận trả sách" [ref=f6e61] [cursor=pointer]:
+                  - /url: /circulation/return
+              - listitem [ref=f6e62]:
+                - link "Tra phiếu mượn" [ref=f6e63] [cursor=pointer]:
+                  - /url: /circulation/borrowings
+              - listitem [ref=f6e64]:
+                - link "Đặt trước" [ref=f6e65] [cursor=pointer]:
+                  - /url: /circulation/reservations
+              - listitem [ref=f6e66]:
+                - link "Phạt" [ref=f6e67] [cursor=pointer]:
+                  - /url: /circulation/fines
+          - listitem [aria-hidden] [ref=f6e68]: Hệ thống
+          - listitem [ref=f6e69]:
+            - button "Quản trị" [expanded] [ref=f6e70] [cursor=pointer]
+            - list [ref=f6e78]:
+              - listitem [ref=f6e79]:
+                - link "Người dùng" [ref=f6e80] [cursor=pointer]:
+                  - /url: /admin/users
+              - listitem [ref=f6e81]:
+                - link "Vai trò và quyền" [ref=f6e82] [cursor=pointer]:
+                  - /url: /admin/roles
+              - listitem [ref=f6e83]:
+                - link "Phòng ban" [ref=f6e84] [cursor=pointer]:
+                  - /url: /admin/departments
+              - listitem [ref=f6e85]:
+                - link "Nhật ký hoạt động" [ref=f6e86] [cursor=pointer]:
+                  - /url: /admin/audit-logs
+    - generic [ref=f6e87]:
+      - banner [ref=f6e88]:
+        - list [ref=f6e89]:
+          - listitem [ref=f6e90]:
+            - link "Trang chủ" [ref=f6e91] [cursor=pointer]:
+              - /url: /
+        - generic [ref=f6e92]:
+          - button "Thông báo, 0 chưa đọc" [ref=f6e93] [cursor=pointer]
+          - button "Tài khoản của tôi" [ref=f6e98] [cursor=pointer]:
+            - generic [aria-hidden] [ref=f6e99]: A
+            - generic [ref=f6e100]:
+              - generic [ref=f6e101]: admin
+              - generic [ref=f6e102]: SUPER_ADMIN
+      - main [ref=f6e105]:
+        - generic [ref=f6e106]:
+          - status [ref=f6e107]:
+            - generic [ref=f6e108]: Đang tải…
+          - status [ref=f6e147]:
+            - generic [ref=f6e148]: Đang tải…
+          - status [ref=f6e183]:
+            - generic [ref=f6e184]: Đang tải…
+  - alert [ref=f6e204]

@@ -13,7 +13,7 @@ public final class AccessMapper {
 
     public static RoleResponse toResponse(Role role) {
         return new RoleResponse(role.id().value(), role.name(), role.description(), role.isAdmin(),
-                role.permissionCodes().stream().sorted().toList());
+                role.permissionCodes().stream().sorted().toList(), role.tenantId(), role.isSignupDefault());
     }
 
     public static PermissionResponse toResponse(Permission permission) {

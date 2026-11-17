@@ -1,0 +1,20 @@
+- main [ref=e4]:
+  - generic [ref=e14]:
+    - generic [ref=e15]: Thư viện
+    - generic [ref=e16]: Quản lý mượn trả
+  - generic [ref=e17]:
+    - heading "Đăng nhập vào Thư viện" [level=1] [ref=e18]
+    - paragraph [ref=e19]: Nhập tài khoản được cấp để vào hệ thống quản lý thư viện.
+    - generic [ref=e20]:
+      - generic [ref=e22]:
+        - generic "Tên đăng nhập" [ref=e24]
+        - textbox "Tên đăng nhập" [ref=e33]:
+          - /placeholder: Nhập tên đăng nhập
+      - generic [ref=e35]:
+        - generic "Mật khẩu" [ref=e37]
+        - generic [ref=e41]:
+          - textbox "Mật khẩu" [ref=e46]:
+            - /placeholder: Nhập mật khẩu
+          - button "Hiển thị" [ref=e48] [cursor=pointer]:
+            - img "eye-invisible" [ref=e49]
+      - button "Đăng nhập" [ref=e53] [cursor=pointer]

@@ -2,9 +2,11 @@ package lms.identity.tenant.application;
 
 import java.util.List;
 import java.util.UUID;
+import lms.identity.tenant.domain.ModuleCode;
 import lms.identity.tenant.domain.Tenant;
 import lms.identity.tenant.domain.TenantNotFoundException;
 import lms.identity.tenant.domain.TenantQueryRepository;
+import lms.identity.tenant.domain.TenantModuleRepository;
 import lms.identity.tenant.domain.TenantRepository;
 import lms.tenant.TenantContext;
 
@@ -15,13 +17,15 @@ public class GetTenantUseCase {
     private final TenantQueryRepository queries;
     private final TenantRoleProvisioningPort roles;
     private final TransactionalRunner tx;
+    private final TenantModuleRepository modules;
 
     public GetTenantUseCase(TenantRepository tenants, TenantQueryRepository queries, TenantRoleProvisioningPort roles,
-                            TransactionalRunner tx) {
+                            TransactionalRunner tx, TenantModuleRepository modules) {
         this.tenants = tenants;
         this.queries = queries;
         this.roles = roles;
         this.tx = tx;
+        this.modules = modules;
     }
 
     public TenantDetailResponse execute(UUID tenantId) {
@@ -29,6 +33,8 @@ public class GetTenantUseCase {
                 .orElseThrow(() -> new TenantNotFoundException("Không tìm thấy tenant " + tenantId));
         List<UUID> admins = TenantContext.callAs(tenantId, () -> tx.inTransaction(roles::listTenantAdmins));
         long members = queries.countActiveMembers(List.of(tenantId)).getOrDefault(tenantId, 0L);
-        return new TenantDetailResponse(t.id(), t.code(), t.name(), t.organizationId(), t.status(), members, admins);
+        return new TenantDetailResponse(t.id(), t.code(), t.name(), t.organizationId(), t.status(), members, admins,
+                modules.findByTenant(tenantId).enabled().stream().map(ModuleCode::name).toList(),
+                t.suspensionCause() == null ? null : t.suspensionCause().name());
     }
 }

@@ -1,6 +1,9 @@
 package lms.identity.auth.infrastructure.config;
 
 import lms.identity.auth.application.ChangePasswordUseCase;
+import lms.identity.auth.application.IssueStorefrontTokenUseCase;
+import lms.identity.auth.infrastructure.client.InProcessStorefrontTenantAdapter;
+import lms.identity.tenant.application.ResolveStorefrontTenantUseCase;
 import lms.identity.auth.application.GetCredentialInfoUseCase;
 import lms.identity.auth.application.ResetCredentialPasswordUseCase;
 import lms.identity.auth.infrastructure.client.InProcessAccountCredentialAdapter;
@@ -9,13 +12,20 @@ import lms.identity.auth.application.LogoutUseCase;
 import lms.identity.auth.application.RefreshTokenUseCase;
 import lms.identity.auth.application.RegisterCredentialUseCase;
 import lms.identity.auth.application.RevokeUserSessionsUseCase;
+import lms.identity.auth.application.SignupUseCase;
 import lms.identity.auth.application.SwitchTenantSessionUseCase;
+import lms.identity.auth.infrastructure.client.InProcessSignupAccountAdapter;
+import lms.identity.auth.infrastructure.client.InProcessSignupRoleAdapter;
+import lms.identity.accesscontrol.application.SignupRoleUseCase;
+import lms.identity.tenant.application.TransactionalRunner;
+import lms.identity.user.application.SelfRegisterUserUseCase;
 import lms.identity.auth.application.TokenService;
 import lms.identity.auth.application.UserDirectoryPort;
 import lms.identity.auth.infrastructure.client.InProcessUserDirectoryAdapter;
 import lms.identity.auth.infrastructure.client.InProcessTenantAccessAdapter;
 import lms.identity.tenant.application.AddMembershipUseCase;
 import lms.identity.tenant.application.ListMyTenantsUseCase;
+import lms.identity.tenant.application.ListTenantModulesUseCase;
 import lms.identity.tenant.application.MembershipLookupUseCase;
 import lms.identity.tenant.application.ResolveLoginTenantUseCase;
 import lms.identity.tenant.application.SwitchTenantUseCase;
@@ -35,6 +45,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.jwk.RSAKey;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.List;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -65,8 +76,9 @@ public class AuthBeanConfiguration {
     @Bean
     JwtTokenIssuer tokenIssuer(JwtEncoder encoder, RSAKey rsaKey, Clock clock,
                                @Value("${auth.jwt.issuer}") String issuer,
-                               @Value("${auth.jwt.access-token-ttl}") Duration ttl) {
-        return new JwtTokenIssuer(encoder, rsaKey.getKeyID(), issuer, ttl, clock);
+                               @Value("${auth.jwt.access-token-ttl}") Duration ttl,
+                               @Value("${lms.identity.token.staff-audience:false}") boolean staffAudience) {
+        return new JwtTokenIssuer(encoder, rsaKey.getKeyID(), issuer, ttl, clock, staffAudience);
     }
 
     @Bean
@@ -94,16 +106,42 @@ public class AuthBeanConfiguration {
     InProcessTenantAccessAdapter tenantAccessAdapter(ResolveLoginTenantUseCase resolve, SwitchTenantUseCase switchTenant,
                                                      VerifyTenantAccessUseCase verify, ListMyTenantsUseCase listMine,
                                                      AddMembershipUseCase addMembership,
-                                                     MembershipLookupUseCase lookup) {
-        return new InProcessTenantAccessAdapter(resolve, switchTenant, verify, listMine, addMembership, lookup);
+                                                     MembershipLookupUseCase lookup,
+                                                     ListTenantModulesUseCase moduleLookup) {
+        return new InProcessTenantAccessAdapter(resolve, switchTenant, verify, listMine, addMembership, lookup,
+                moduleLookup);
+    }
+
+    @Bean
+    InProcessStorefrontTenantAdapter storefrontTenantAdapter(ResolveStorefrontTenantUseCase resolve) {
+        return new InProcessStorefrontTenantAdapter(resolve);
+    }
+
+    @Bean
+    IssueStorefrontTokenUseCase issueStorefrontTokenUseCase(InProcessStorefrontTenantAdapter tenants,
+                                                            JwtTokenIssuer issuer,
+                                                            @Value("${lms.identity.storefront.token-ttl:PT5M}")
+                                                            Duration ttl) {
+        return new IssueStorefrontTokenUseCase(tenants, issuer, ttl);
+    }
+
+    /** Tự đăng ký công khai (ADR-0010 B2.1): tenant từ storefront (ACTIVE + SALES), role signup_default. */
+    @Bean
+    SignupUseCase signupUseCase(InProcessStorefrontTenantAdapter tenants, SelfRegisterUserUseCase selfRegister,
+                                SignupRoleUseCase signupRole, TransactionalRunner tx) {
+        return new SignupUseCase(tenants, new InProcessSignupAccountAdapter(selfRegister),
+                new InProcessSignupRoleAdapter(signupRole), tx);
     }
 
     @Bean
     TokenService tokenService(InProcessUserAccessAdapter accessClient, JwtTokenIssuer issuer, SecureRefreshTokenCodec codec,
                               AuthPersistenceAdapter persistence, Clock clock, UserDirectoryPort userDirectory,
                               InProcessTenantAccessAdapter tenantAccess,
-                              @Value("${auth.refresh-token-ttl}") Duration refreshTtl) {
-        return new TokenService(accessClient, issuer, codec, persistence, clock, refreshTtl, userDirectory, tenantAccess);
+                              @Value("${auth.refresh-token-ttl}") Duration refreshTtl,
+                              @Value("${lms.identity.token.storefront-permissions:ShopController/*,TitleController/lookup}")
+                              List<String> storefrontPermissions) {
+        return new TokenService(accessClient, issuer, codec, persistence, clock, refreshTtl, userDirectory, tenantAccess,
+                storefrontPermissions);
     }
 
     @Bean

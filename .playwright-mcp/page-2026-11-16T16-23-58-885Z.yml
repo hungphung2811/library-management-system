@@ -1,0 +1,94 @@
+- generic [ref=f10e1]:
+  - generic [ref=f10e12]:
+    - complementary [ref=f10e13]:
+      - navigation "Điều hướng chính" [ref=f10e14]:
+        - generic [ref=f10e15]:
+          - link "Thư viện, về trang chủ" [ref=f10e16] [cursor=pointer]:
+            - /url: /
+            - generic [ref=f10e26]:
+              - generic [ref=f10e27]: Thư viện
+              - generic [ref=f10e28]: Quản lý mượn trả
+          - button "Thu gọn menu" [expanded] [ref=f10e29] [cursor=pointer]
+        - list [ref=f10e33]:
+          - listitem [ref=f10e34]:
+            - link "Trang chủ" [ref=f10e35] [cursor=pointer]:
+              - /url: /
+          - listitem [aria-hidden] [ref=f10e42]: Nghiệp vụ
+          - listitem [ref=f10e43]:
+            - button "Sách" [expanded] [ref=f10e44] [cursor=pointer]
+            - list [ref=f10e51]:
+              - listitem [ref=f10e52]:
+                - link "Danh sách sách" [ref=f10e53] [cursor=pointer]:
+                  - /url: /catalog
+              - listitem [ref=f10e54]:
+                - link "Tra mã vạch" [ref=f10e55] [cursor=pointer]:
+                  - /url: /catalog/barcode
+              - listitem [ref=f10e56]:
+                - link "Thêm sách" [ref=f10e57] [cursor=pointer]:
+                  - /url: /catalog/books/new
+          - listitem [ref=f10e58]:
+            - button "Mượn trả" [expanded] [ref=f10e59] [cursor=pointer]
+            - list [ref=f10e67]:
+              - listitem [ref=f10e68]:
+                - link "Lập phiếu mượn" [ref=f10e69] [cursor=pointer]:
+                  - /url: /circulation/borrow
+              - listitem [ref=f10e70]:
+                - link "Nhận trả sách" [ref=f10e71] [cursor=pointer]:
+                  - /url: /circulation/return
+              - listitem [ref=f10e72]:
+                - link "Tra phiếu mượn" [ref=f10e73] [cursor=pointer]:
+                  - /url: /circulation/borrowings
+              - listitem [ref=f10e74]:
+                - link "Đặt trước" [ref=f10e75] [cursor=pointer]:
+                  - /url: /circulation/reservations
+              - listitem [ref=f10e76]:
+                - link "Phạt" [ref=f10e77] [cursor=pointer]:
+                  - /url: /circulation/fines
+          - listitem [aria-hidden] [ref=f10e78]: Hệ thống
+          - listitem [ref=f10e79]:
+            - button "Quản trị" [expanded] [ref=f10e80] [cursor=pointer]
+            - list [ref=f10e88]:
+              - listitem [ref=f10e89]:
+                - link "Người dùng" [ref=f10e90] [cursor=pointer]:
+                  - /url: /admin/users
+              - listitem [ref=f10e91]:
+                - link "Vai trò và quyền" [ref=f10e92] [cursor=pointer]:
+                  - /url: /admin/roles
+              - listitem [ref=f10e93]:
+                - link "Phòng ban" [ref=f10e94] [cursor=pointer]:
+                  - /url: /admin/departments
+              - listitem [ref=f10e95]:
+                - link "Nhật ký hoạt động" [ref=f10e96] [cursor=pointer]:
+                  - /url: /admin/audit-logs
+    - generic [ref=f10e97]:
+      - banner [ref=f10e98]:
+        - list [ref=f10e99]:
+          - listitem [ref=f10e100]:
+            - link "Trang chủ" [ref=f10e101] [cursor=pointer]:
+              - /url: /
+          - listitem [aria-hidden] [ref=f10e102]
+          - listitem [ref=f10e105]: Hồ sơ
+        - generic [ref=f10e106]:
+          - 'button "Đơn vị làm việc: Thư viện Đại học Bách Khoa" [active] [ref=f10e107] [cursor=pointer]':
+            - generic [ref=f10e112]: Thư viện Đại học Bách Khoa
+          - button "Thông báo, 0 chưa đọc" [ref=f10e115] [cursor=pointer]
+          - button "Tài khoản của tôi" [ref=f10e120] [cursor=pointer]:
+            - generic [aria-hidden] [ref=f10e121]: A
+            - generic [ref=f10e122]:
+              - generic [ref=f10e123]: admin
+              - generic [ref=f10e124]: SUPER_ADMIN
+      - main [ref=f10e127]:
+        - generic [ref=f10e129]:
+          - heading "Hồ sơ của tôi" [level=1] [ref=f10e130]
+          - paragraph [ref=f10e131]: Thông tin tài khoản và thẻ thư viện của bạn.
+        - generic [ref=f10e133]:
+          - generic [ref=f10e134]: Tài khoản
+          - alert [ref=f10e138]:
+            - img "close-circle" [ref=f10e140]
+            - generic [ref=f10e143]: "Không tìm thấy người dùng: 00000000-0000-0000-0000-000000000001"
+            - button "Thử lại" [ref=f10e146] [cursor=pointer]
+  - menu "Danh sách đơn vị" [ref=f10e149]:
+    - menuitem "Thư viện mặc định default" [ref=f10e150] [cursor=pointer]
+    - menuitem "Thư viện Đại học Bách Khoa bachkhoa" [ref=f10e154] [cursor=pointer]
+    - menuitem "Thư viện Đại học Kinh tế kinhte" [ref=f10e160] [cursor=pointer]
+    - menuitem "Thư viện Tổng hợp Thành phố tonghop" [ref=f10e164] [cursor=pointer]

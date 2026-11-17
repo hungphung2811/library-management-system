@@ -71,6 +71,7 @@ class HttpIdentityClientTest {
                         + "\"description\":\"d\",\"isAdmin\":true,\"permissions\":[]}", MediaType.APPLICATION_JSON));
         server.expect(requestTo("http://identity/internal/roles/" + ROLE)).andExpect(method(HttpMethod.PUT))
                 .andExpect(jsonPath("$.name").value("REVIEWER"))
+                .andExpect(jsonPath("$.signupDefault").value(true))
                 .andRespond(withSuccess("{\"id\":\"" + ROLE + "\",\"name\":\"REVIEWER\","
                         + "\"description\":\"d\",\"isAdmin\":false,\"permissions\":[]}", MediaType.APPLICATION_JSON));
         server.expect(requestTo("http://identity/internal/roles/" + ROLE)).andExpect(method(HttpMethod.DELETE))
@@ -85,11 +86,11 @@ class HttpIdentityClientTest {
         var token = new HttpAuthClient(rc).login("alice", "pw", null);
         assertEquals("a", token.accessToken());
         assertTrue(token.mustChangePassword());
-        assertEquals(5, new HttpUserClient(rc).search(new SearchUsersQuery("a b", null, null, null, 5)).size());
+        assertEquals(5, new HttpUserClient(rc).search(new SearchUsersQuery("a b", null, null, null, 5, null)).size());
         var role = new HttpAccessClient(rc).revokePermission(ROLE, "BorrowingController/borrow");
         assertTrue(role.isAdmin());
         assertEquals("REVIEWER", new HttpAccessClient(rc)
-                .updateRole(ROLE, new lms.api.identity.dto.AccessDtos.UpdateRoleRequest("REVIEWER", "d")).name());
+                .updateRole(ROLE, new lms.api.identity.dto.AccessDtos.UpdateRoleRequest("REVIEWER", "d", true)).name());
         new HttpAccessClient(rc).deleteRole(ROLE);
         new HttpAuthClient(rc).changePassword(new ChangePasswordRequest("a", "12345678"));
         new HttpUserClient(rc).resetPassword(uid, new lms.api.identity.dto.UserDtos.ResetPasswordRequest("Tam-12345"));
@@ -129,7 +130,7 @@ class HttpIdentityClientTest {
         idp.start();
         try {
             String base = "http://127.0.0.1:" + idp.getAddress().getPort();
-            ServicesProperties props = new ServicesProperties(base, base, base, base, base, Duration.ofSeconds(2),
+            ServicesProperties props = new ServicesProperties(base, base, base, base, base, base, Duration.ofSeconds(2),
                     Duration.ofSeconds(5));
             HttpAuthClient client = new HttpAuthClient(IdentityClientConfiguration.noRedirectClient(base, props));
 

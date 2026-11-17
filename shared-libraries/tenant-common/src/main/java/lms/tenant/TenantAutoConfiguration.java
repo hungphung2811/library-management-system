@@ -16,9 +16,26 @@ import org.springframework.context.annotation.Configuration;
  * Bật TenantContextFilter, lớp bọc DataSource đặt {@code app.tenant_id} cho RLS và (nếu có Hibernate) bộ phân giải
  * tenant. Tắt toàn bộ bằng {@code lms.tenant.enabled=false}.
  */
-@AutoConfiguration
+@AutoConfiguration(before = lms.security.permission.PermissionAutoConfiguration.class)
 @ConditionalOnProperty(prefix = "lms.tenant", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class TenantAutoConfiguration {
+
+    /** Cài đặt SPI của security-common: interceptor gắn phạm vi đọc xuyên tenant qua TenantContext (ADR-0008). */
+    @Bean
+    @ConditionalOnMissingBean(lms.security.permission.TenantScopeBinder.class)
+    lms.security.permission.TenantScopeBinder tenantScopeBinder() {
+        return new lms.security.permission.TenantScopeBinder() {
+            @Override
+            public void bindAll() {
+                TenantContext.bindAllTenants();
+            }
+
+            @Override
+            public void bindSingle(java.util.UUID tenantId) {
+                TenantContext.set(tenantId);
+            }
+        };
+    }
 
     @Configuration(proxyBeanMethods = false)
     @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)

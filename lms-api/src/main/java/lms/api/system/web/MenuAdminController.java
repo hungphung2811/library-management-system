@@ -2,6 +2,7 @@ package lms.api.system.web;
 
 import lms.api.system.client.SystemClient;
 import lms.api.system.dto.MenuDtos.CreateMenuRequest;
+import lms.api.system.dto.MenuDtos.MenuAdminListView;
 import lms.api.system.dto.MenuDtos.MenuAdminNodeView;
 import lms.api.system.dto.MenuDtos.UpdateMenuRequest;
 import jakarta.validation.Valid;
@@ -30,8 +31,14 @@ public class MenuAdminController {
     }
 
     @GetMapping
-    public List<MenuAdminNodeView> list() {
+    public MenuAdminListView list() {
         return system.listMenus();
+    }
+
+    /** Chép menu mặc định thành dữ liệu của tenant; đã có dữ liệu thì 409 MENU_ALREADY_INITIALIZED. */
+    @PostMapping("/defaults")
+    public ResponseEntity<MenuAdminListView> initializeDefaults() {
+        return ResponseEntity.status(201).body(system.initializeDefaultMenus());
     }
 
     @PostMapping

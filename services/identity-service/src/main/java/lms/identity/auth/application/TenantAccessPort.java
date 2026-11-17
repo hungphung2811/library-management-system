@@ -21,6 +21,9 @@ public interface TenantAccessPort {
     /** Kiểm tra lại quyền ở tenant, không ghi gì (dùng khi làm mới phiên). */
     TenantChoice verify(UUID userId, UUID tenantId);
 
+    /** Module đang bật của tenant (mã như LENDING), để phát claim {@code modules} của access token (ADR-0009). */
+    List<String> modules(UUID tenantId);
+
     /** Các tenant truy cập được. */
     List<TenantSummary> available(UUID userId);
 

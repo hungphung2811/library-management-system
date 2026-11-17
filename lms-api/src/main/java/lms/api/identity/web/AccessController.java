@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /** API role, permission và gán role cho FE. Quyền do identity-service kiểm trên token được chuyển tiếp. */
@@ -44,8 +45,8 @@ public class AccessController {
     }
 
     @GetMapping("/permissions")
-    public List<PermissionView> listPermissions() {
-        return access.listPermissions();
+    public List<PermissionView> listPermissions(@RequestParam(required = false) String tenantId) {
+        return access.listPermissions(tenantId);
     }
 
     @PostMapping("/roles")
@@ -55,8 +56,8 @@ public class AccessController {
     }
 
     @GetMapping("/roles")
-    public List<RoleView> listRoles() {
-        return access.listRoles();
+    public List<RoleView> listRoles(@RequestParam(required = false) String tenantId) {
+        return access.listRoles(tenantId);
     }
 
     @GetMapping("/roles/{roleId}")

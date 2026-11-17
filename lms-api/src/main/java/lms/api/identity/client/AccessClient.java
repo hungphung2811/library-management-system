@@ -16,11 +16,11 @@ public interface AccessClient {
 
     PermissionView createPermission(CreatePermissionRequest request);
 
-    List<PermissionView> listPermissions();
+    List<PermissionView> listPermissions(String tenantId);
 
     RoleView createRole(CreateRoleRequest request);
 
-    List<RoleView> listRoles();
+    List<RoleView> listRoles(String tenantId);
 
     RoleView getRole(UUID roleId);
 

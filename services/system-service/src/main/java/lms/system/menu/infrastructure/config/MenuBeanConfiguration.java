@@ -6,6 +6,7 @@ import java.time.Duration;
 import lms.system.menu.application.CreateMenuUseCase;
 import lms.system.menu.application.DeleteMenuUseCase;
 import lms.system.menu.application.GetMyMenuUseCase;
+import lms.system.menu.application.InitializeDefaultMenusUseCase;
 import lms.system.menu.application.ListMenusUseCase;
 import lms.system.menu.application.MenuCachePort;
 import lms.system.menu.application.MenuRepositoryPort;
@@ -61,6 +62,12 @@ public class MenuBeanConfiguration {
     @Bean
     UpdateMenuUseCase updateMenuUseCase(MenuRepositoryPort repository, MenuCachePort cache, Clock clock) {
         return new UpdateMenuUseCase(repository, cache, clock);
+    }
+
+    @Bean
+    InitializeDefaultMenusUseCase initializeDefaultMenusUseCase(MenuRepositoryPort repository, MenuCachePort cache,
+                                                                Clock clock) {
+        return new InitializeDefaultMenusUseCase(repository, cache, clock);
     }
 
     @Bean

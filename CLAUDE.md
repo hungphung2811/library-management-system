@@ -11,20 +11,34 @@ docker compose up -d                                        # postgres, kafka, r
 mvn test                                                    # unit + ArchUnit + WebMvc (không chạy *IT)
 mvn -pl services/identity-service -am test                  # một module (luôn có -am để build shared-libraries)
 mvn -pl services/identity-service -am test -Dtest=AdminRoleAndPermissionKeyTest -Dsurefire.failIfNoSpecifiedTests=false
-mvn -pl services/system-service -am spring-boot:run      # chạy TRƯỚC: migrate 5 DB (cổng 8086); các service chỉ validate schema
-mvn -pl services/identity-service -am spring-boot:run       # profile dev
 ```
 
+Chạy từng service bằng Maven (cần `docker compose up -d` trước; mọi service mặc định profile `dev`, `lms-api` thì không có profile mặc định). Thứ tự: system-service trước, các service còn lại sau (chạy mỗi lệnh trong một terminal riêng):
+
+```bash
+mvn -pl services/system-service -am spring-boot:run       # 8086, chạy TRƯỚC: migrate 6 DB rồi mới UP; các service khác chỉ validate schema
+mvn -pl services/identity-service -am spring-boot:run     # 8081, đăng nhập/phân quyền/người dùng
+mvn -pl services/catalog-service -am spring-boot:run      # 8082, đầu sách/bản sao
+mvn -pl services/circulation-service -am spring-boot:run  # 8083, mượn trả/đặt trước/phạt
+mvn -pl services/support-service -am spring-boot:run      # 8084, audit/thông báo (cần Kafka, Mongo)
+mvn -pl services/sales-service -am spring-boot:run        # 8087, bán hàng (module SALES, ADR-0010): tồn kho, đơn POS/online
+mvn -pl lms-api -am spring-boot:run                       # 8085, BFF: /api/** → /internal/** của các service
+mvn -pl customer-api -am spring-boot:run                  # 8088, BFF công khai: /public/** (cần identity, system-service)
+```
+
+- Profile dev tắt kiểm xác thực/phân quyền ở các service, nên không có JWT/tenant: ghi bảng tenant bị chặn (xem mục Multi-tenant), cần Bearer token. Muốn chạy kiểu production thêm `-Dspring-boot.run.profiles=prod`.
+- Chạy cả hệ thống bằng Docker: `docker compose --profile apps up -d --build` (thêm nginx 8080 làm cổng vào, lms-api, system-service, sales-service và 4 service). Đặt `AUTH_BOOTSTRAP_ADMIN_PASSWORD` trước, nếu không identity không tạo tài khoản admin. Volume Postgres cũ chưa có `system_db`/vai trò `<svc>_app`: `docker compose down -v`.
+- Chạy tập con để đỡ RAM: `docker compose --profile core up -d --build` (system, identity, lms-api, nginx), thêm `--profile lending|catalog|circulation|support|sales|bookstore` tùy nhu cầu; `apps` vẫn là đủ. Compose đã đặt sẵn heap Kafka/Mongo/Redis/Postgres, cờ JVM, pool Hikari, Tomcat threads và `mem_limit`, đều ghi đè được bằng biến môi trường (`JVM_XMX`, `KAFKA_HEAP_OPTS`, `DB_POOL_MAX`, `JVM_MEM_LIMIT`...): bảng đầy đủ ở README mục "Giảm RAM/CPU khi chạy Docker". Không bật `spring.main.lazy-initialization` (làm `@KafkaListener`/`@Scheduled` không chạy).
 - Integration test (`*IT`, Testcontainers, cần Docker) mặc định bị Surefire bỏ qua; chạy bằng `-Dtest=<TênIT>`. Với Docker 29 thêm `-DargLine=-Dapi.version=1.44`, nếu không Testcontainers không tìm thấy Docker.
 - `OracleIT` chỉ chạy khi có `ORACLE_TEST_URL/USERNAME/PASSWORD` (dùng container `oracle-free` có sẵn, không tạo DB Oracle riêng).
-- Máy này không có `mvn` toàn cục; dùng Maven trong scratchpad nếu cần.
-- Cổng: identity 8081, catalog 8082, circulation 8083, support 8084, migration 8086. FE chỉ gọi qua nginx (8080) → `lms-api` (BFF, 8085); BFF gọi service qua `/internal/**`.
+- Máy này không có `mvn` toàn cục; dùng Maven trong scratchpad nếu cần (thay `mvn` bằng đường dẫn Maven đó và đặt `JAVA_HOME`).
+- Cổng: identity 8081, catalog 8082, circulation 8083, support 8084, system 8086, sales 8087, customer-api 8088. FE chỉ gọi qua nginx (8080) → `lms-api` (BFF, 8085); BFF gọi service qua `/internal/**`. FE storefront/khách chưa đăng nhập gọi `/public/**` → `customer-api` (xem mục dưới).
 
 ## Kiến trúc
 
 4 service theo bounded context, mỗi service một database riêng (không truy cập DB của nhau, tham chiếu chéo bằng ID hoặc event Kafka):
-identity (`auth`, `accesscontrol`, `user`, `department`), catalog (`catalog`, `inventory`), circulation (`borrowing`, `reservation`, `fine`), support (`audit`, `notification`).
-Thêm `system-service` (ADR-0004): runner Flyway tập trung, giữ mọi file SQL và chạy lên identity_db/catalog_db/circulation_db/audit_db/system_db lúc khởi động (ngoại lệ có chủ đích với luật "không truy cập DB của nhau", chỉ chạy DDL). `system_db` (vai trò `system_app`, RLS, ADR-0007) là DB riêng của context `menu` trong chính system-service: datasource Spring Boot chuẩn `spring.datasource.*`, và migration chạy trong bean khởi tạo mà `EntityManagerFactory` phụ thuộc (không dùng Flyway autoconfig, `spring.flyway.enabled=false`). API migration là `@PlatformAdminOnly`. Sổ cái là `flyway_schema_history` trong từng DB; API `GET /internal/migrations[/{target}]`, `POST /internal/migrations/run`, `POST /internal/migrations/{target}/run` (target: identity, catalog, circulation, audit, system). Các service không chạy Flyway, chỉ validate schema.
+identity (`auth`, `accesscontrol`, `user`, `department`), catalog (`catalog`, `inventory`), circulation (`borrowing`, `reservation`, `fine`), support (`audit`, `notification`), sales (`stock`, `ordering`, `settings`; module bán hàng ADR-0010, DB `sales_db`, vai trò `sales_app`, mọi controller `@RequiresModule(SALES)`).
+Thêm `system-service` (ADR-0004): runner Flyway tập trung, giữ mọi file SQL và chạy lên identity_db/catalog_db/circulation_db/audit_db/system_db/sales_db lúc khởi động (ngoại lệ có chủ đích với luật "không truy cập DB của nhau", chỉ chạy DDL). `system_db` (vai trò `system_app`, RLS, ADR-0007) là DB riêng của context `menu` trong chính system-service: datasource Spring Boot chuẩn `spring.datasource.*`, và migration chạy trong bean khởi tạo mà `EntityManagerFactory` phụ thuộc (không dùng Flyway autoconfig, `spring.flyway.enabled=false`). API migration là `@PlatformAdminOnly`. Sổ cái là `flyway_schema_history` trong từng DB; API `GET /internal/migrations[/{target}]`, `POST /internal/migrations/run`, `POST /internal/migrations/{target}/run` (target: identity, catalog, circulation, audit, system, sales). Các service không chạy Flyway, chỉ validate schema.
 
 **Thêm migration mới** = thêm file `V<n>__*.sql` vào `services/system-service/src/main/resources/db/migration/<target>/` (không còn nằm trong từng service). Kiểm tra số `n` kế tiếp vì nhiều người cùng sửa; không sửa file đã chạy (đổi checksum). IT của service bật Flyway ở test scope (jar thường của system-service) với location `classpath:db/migration/<target>`.
 
@@ -58,6 +72,12 @@ Không có hằng số permission và không dùng `hasAuthority`. `PermissionIn
 ### Nhiều database (`database-common`)
 
 Kết nối khai báo ở `database.connections.*` (PostgreSQL, Oracle, MongoDB, Redis; không có MySQL/SQL Server). Mỗi kết nối JPA có TransactionManager tên `<name>TransactionManager`. Không có atomicity xuyên DB: mỗi use case chỉ ghi một DB, bản Mongo là best-effort. Mẫu tham khảo: `support-service` (context `audit`, `AUDIT_DB` Postgres + `LOG_DB` Mongo), xem `docs/architecture/multi-database-report.md`.
+
+### customer-api (BFF công khai, ADR-0011)
+
+Module `customer-api/` (cổng 8088, package `lms.customer`, không DB/JPA/Kafka, không phụ thuộc `security-common`/`tenant-common`): cổng công khai cho khách qua nginx `/public/**` (vùng `limit_req` `public_read` 20r/s, `public_form` 5r/m). Cấu trúc như `lms-api` theo nhóm `site`, `storefront`, `auth` (`client` interface + `http`, `dto`, `web`). Hiện có C0: `GET /public/site/pages[/{slug}]`, `POST /public/site/contact-requests` (honeypot `website`), `GET /public/t/{code}`, `POST /public/t/{code}/auth/login`, `POST /public/auth/{refresh,logout}`; sách và đặt hàng thuộc C1/C2.
+- Gọi nội bộ thay khách chưa đăng nhập bằng token dịch vụ (claim `svc`, TTL 5 phút) xin từ identity bằng `STOREFRONT_CLIENT_SECRET` (bí mật riêng, không dùng `INTERNAL_API_KEY`); tra tenant theo `{code}` đi qua `StorefrontAccessCache` (Caffeine, kết quả không khả dụng giữ 60 giây). Mọi lý do storefront không khả dụng cùng một `404 SHOP_NOT_AVAILABLE`.
+- Chỉ xác thực JWT (phân quyền do sales kiểm), `permitAll` theo danh sách, còn lại `denyAll`; token `svc` bị 401; token khách khác tenant của `{code}` bị `403 SHOP_SESSION_MISMATCH` (`ShopSessionGuard`). Lỗi phía sau: chỉ chuyển mã trong danh sách cho phép (`PublicExceptionHandler`), thông điệp do customer-api viết, 5xx và mất kết nối thành `503 SERVICE_UNAVAILABLE` chung. Không log thân request.
 
 ## Quy ước code
 

@@ -51,10 +51,18 @@ public class PermissionAutoConfiguration {
                 CachingPermissionKeyRegistrar.backgroundExecutor(), Clock.systemUTC(), properties.getRegistrationCooldown());
     }
 
+    /** Mặc định no-op; tenant-common đăng ký bản thật (nạp trước cấu hình này). */
+    @Bean
+    @ConditionalOnMissingBean(TenantScopeBinder.class)
+    TenantScopeBinder noopTenantScopeBinder() {
+        return TenantScopeBinder.NOOP;
+    }
+
     @Bean
     PermissionInterceptor permissionInterceptor(PermissionKeyResolver resolver, PermissionKeyRegistrar registrar,
-                                                PermissionProperties properties) {
-        return new PermissionInterceptor(resolver, registrar, properties.getServiceName(), properties.isRequireTenant());
+                                                PermissionProperties properties, TenantScopeBinder tenantScopeBinder) {
+        return new PermissionInterceptor(resolver, registrar, properties.getServiceName(), properties.isRequireTenant(),
+                tenantScopeBinder, properties.isLegacyModulesFallback());
     }
 
     @Bean

@@ -75,6 +75,8 @@ app:
       reservation-events: reservation.events
       # Vòng đời tenant + PlatformOperationPerformed (tenantId = tenant bị tác động) vào audit_logs
       identity-events: identity-events
+      # Bản tóm tắt audit của sales-service (ADR-0010 mục 2.6); data không chứa dữ liệu cá nhân
+      sales-events: ${SALES_EVENTS_TOPIC:sales.events}
 
 # Middleware phân quyền theo endpoint (security-common): khóa Controller/method được đăng ký về identity-service
 lms:

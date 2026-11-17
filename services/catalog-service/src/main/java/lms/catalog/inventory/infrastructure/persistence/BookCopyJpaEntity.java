@@ -47,6 +47,7 @@ class BookCopyJpaEntity {
     }
 
     UUID getId() { return id; }
+    UUID getTenantId() { return tenantId; }
     UUID getTitleId() { return titleId; }
     String getBarcode() { return barcode; }
     CopyStatus getStatus() { return status; }

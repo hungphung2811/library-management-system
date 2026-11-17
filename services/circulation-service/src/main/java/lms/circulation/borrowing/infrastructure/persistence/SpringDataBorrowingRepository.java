@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -15,10 +16,14 @@ import org.springframework.data.repository.query.Param;
  * Không có SQL native. Đọc theo id dùng {@link #findInTenantById} hoặc {@link #findByIdForUpdate} thay cho findById
  * (find theo khóa chính không đi qua bộ lọc tenant của Hibernate, chỉ còn RLS chặn).
  */
-public interface SpringDataBorrowingRepository extends JpaRepository<BorrowingJpaEntity, UUID> {
+public interface SpringDataBorrowingRepository extends JpaRepository<BorrowingJpaEntity, UUID>,
+        JpaSpecificationExecutor<BorrowingJpaEntity> {
 
     @Query("select b from BorrowingJpaEntity b where b.id = :id")
     Optional<BorrowingJpaEntity> findInTenantById(@Param("id") UUID id);
+
+    @Query("select b from BorrowingJpaEntity b where b.id = :id and b.userId = :userId")
+    Optional<BorrowingJpaEntity> findInTenantByIdAndUserId(@Param("id") UUID id, @Param("userId") UUID userId);
 
     @Query("select count(i) from BorrowingJpaEntity b join b.items i where b.userId = :userId and i.returnDate is null")
     long countActiveItemsByUserId(@Param("userId") UUID userId);

@@ -15,6 +15,7 @@ import lms.identity.user.application.UserResponse;
 import lms.identity.user.domain.UserStatus;
 import lms.security.CurrentUser;
 import lms.security.permission.AuthenticatedOnly;
+import lms.security.permission.CrossTenantReadable;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.UUID;
@@ -62,6 +63,7 @@ public class UserController {
         return ResponseEntity.created(URI.create("/internal/users/" + response.id())).body(response);
     }
 
+    @CrossTenantReadable
     @GetMapping
     public UserPageResponse search(@RequestParam(required = false) String keyword,
                                    @RequestParam(required = false) UUID departmentId,

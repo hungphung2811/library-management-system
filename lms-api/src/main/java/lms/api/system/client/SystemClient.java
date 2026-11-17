@@ -1,6 +1,7 @@
 package lms.api.system.client;
 
 import lms.api.system.dto.MenuDtos.CreateMenuRequest;
+import lms.api.system.dto.MenuDtos.MenuAdminListView;
 import lms.api.system.dto.MenuDtos.MenuAdminNodeView;
 import lms.api.system.dto.MenuDtos.MenuNodeView;
 import lms.api.system.dto.MenuDtos.UpdateMenuRequest;
@@ -12,7 +13,9 @@ public interface SystemClient {
 
     List<MenuNodeView> myMenu();
 
-    List<MenuAdminNodeView> listMenus();
+    MenuAdminListView listMenus();
+
+    MenuAdminListView initializeDefaultMenus();
 
     MenuAdminNodeView createMenu(CreateMenuRequest request);
 

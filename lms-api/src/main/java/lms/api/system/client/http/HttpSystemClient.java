@@ -2,6 +2,7 @@ package lms.api.system.client.http;
 
 import lms.api.system.client.SystemClient;
 import lms.api.system.dto.MenuDtos.CreateMenuRequest;
+import lms.api.system.dto.MenuDtos.MenuAdminListView;
 import lms.api.system.dto.MenuDtos.MenuAdminNodeView;
 import lms.api.system.dto.MenuDtos.MenuNodeView;
 import lms.api.system.dto.MenuDtos.UpdateMenuRequest;
@@ -27,10 +28,14 @@ public class HttpSystemClient implements SystemClient {
     }
 
     @Override
-    public List<MenuAdminNodeView> listMenus() {
-        List<MenuAdminNodeView> result = client.get().uri("/internal/menus").retrieve()
-                .body(new ParameterizedTypeReference<List<MenuAdminNodeView>>() { });
-        return result == null ? List.of() : result;
+    public MenuAdminListView listMenus() {
+        MenuAdminListView result = client.get().uri("/internal/menus").retrieve().body(MenuAdminListView.class);
+        return result == null ? new MenuAdminListView(false, List.of()) : result;
+    }
+
+    @Override
+    public MenuAdminListView initializeDefaultMenus() {
+        return client.post().uri("/internal/menus/defaults").retrieve().body(MenuAdminListView.class);
     }
 
     @Override

@@ -37,9 +37,10 @@ public class AccessControlPersistenceAdapter implements RoleRepository, Permissi
 
     @Override
     public Role save(Role role) {
-        roleJpa.save(new RoleJpaEntity(role.id().value(), role.name(), role.description(), role.isAdmin(),
-                role.permissionCodes()));
-        return role;
+        RoleJpaEntity saved = roleJpa.save(new RoleJpaEntity(role.id().value(), role.name(), role.description(),
+                role.isAdmin(), role.permissionCodes(), role.isSignupDefault()));
+        return Role.restore(role.id(), role.name(), role.description(), role.isAdmin(), role.permissionCodes(),
+                saved.getTenantId(), saved.isSignupDefault());
     }
 
     @Override
@@ -126,6 +127,6 @@ public class AccessControlPersistenceAdapter implements RoleRepository, Permissi
 
     private static Role toDomain(RoleJpaEntity e) {
         return Role.restore(new RoleId(e.getId()), e.getName(), e.getDescription(), e.isAdmin(),
-                e.getPermissionCodes());
+                e.getPermissionCodes(), e.getTenantId(), e.isSignupDefault());
     }
 }

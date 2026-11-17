@@ -56,6 +56,15 @@ final class MenuRules {
         }
     }
 
+    /** Tập module khớp {@code TenantModule} của security-common (domain không phụ thuộc thư viện đó). */
+    static final java.util.Set<String> MODULES = java.util.Set.of("LENDING", "SALES");
+
+    static void validateModule(String module) {
+        if (module != null && !MODULES.contains(module)) {
+            throw new MenuException(MenuErrorCode.MENU_MODULE_INVALID, "Module menu không hợp lệ: " + module);
+        }
+    }
+
     static void validatePermissionKey(String key) {
         if (key == null) {
             return;

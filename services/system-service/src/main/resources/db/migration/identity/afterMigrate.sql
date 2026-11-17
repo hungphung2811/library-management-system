@@ -13,6 +13,15 @@ BEGIN
         ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO identity_app;
         -- Sổ cái migration chỉ system-service được ghi
         REVOKE ALL ON flyway_schema_history FROM identity_app;
+        -- ADR-0012: thanh toán và lịch sử hợp đồng chỉ thêm. PHẢI nằm sau GRANT ... ON ALL TABLES ở trên (callback chạy
+        -- lại mỗi lần migrate, đặt trước thì quyền UPDATE/DELETE quay lại). Chưa có bảng (DB cũ chưa tới V19) thì bỏ qua.
+        IF to_regclass('public.tenant_contract_payments') IS NOT NULL THEN
+            REVOKE UPDATE, DELETE ON tenant_contract_payments, tenant_contract_history FROM identity_app;
+        END IF;
+        -- ADR-0013: lịch sử origin storefront chỉ thêm (cũng sau GRANT ở trên). Chưa có bảng (DB cũ chưa tới V21) thì bỏ qua.
+        IF to_regclass('public.tenant_storefront_origin_history') IS NOT NULL THEN
+            REVOKE UPDATE, DELETE ON tenant_storefront_origin_history FROM identity_app;
+        END IF;
     ELSE
         RAISE WARNING 'Vai trò identity_app chưa tồn tại: bỏ qua cấp quyền (tạo vai trò rồi chạy lại migration)';
     END IF;

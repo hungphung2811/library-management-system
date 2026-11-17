@@ -1,0 +1,20 @@
+- generic [active] [ref=f2e1]:
+  - generic [ref=f2e2]:
+    - main [ref=f2e3]:
+      - generic [ref=f2e4]:
+        - heading "Đăng nhập" [level=1] [ref=f2e5]
+        - paragraph [ref=f2e6]: Nhập tài khoản được cấp để vào hệ thống quản lý thư viện.
+        - generic [ref=f2e7]:
+          - textbox "Tên đăng nhập" [ref=f2e18]
+          - generic [ref=f2e24]:
+            - textbox "Mật khẩu" [ref=f2e29]
+            - button "Hiển thị" [ref=f2e31] [cursor=pointer]:
+              - img "eye-invisible" [ref=f2e32]
+          - button "Đăng nhập" [ref=f2e36] [cursor=pointer]
+    - complementary [ref=f2e38]:
+      - generic [ref=f2e48]:
+        - generic [ref=f2e49]: Thư viện
+        - generic [ref=f2e50]: Quản lý mượn trả
+      - paragraph [ref=f2e51]: Mượn, trả và quản lý sách tại một nơi.
+      - paragraph [ref=f2e52]: Dành cho thủ thư và quản trị viên. Quyền thao tác của mỗi tài khoản do vai trò quyết định.
+  - button "Open Next.js Dev Tools" [ref=f2e73] [cursor=pointer]

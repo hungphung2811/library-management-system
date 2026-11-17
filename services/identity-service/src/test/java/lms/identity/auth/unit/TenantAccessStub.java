@@ -38,6 +38,14 @@ class TenantAccessStub implements TenantAccessPort {
         return choice();
     }
 
+    /** Module đang bật của mọi tenant trong stub (mặc định LENDING). */
+    List<String> modules = List.of("LENDING");
+
+    @Override
+    public List<String> modules(UUID tenantId) {
+        return modules;
+    }
+
     @Override
     public List<TenantSummary> available(UUID userId) {
         return List.of(SUMMARY);

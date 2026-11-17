@@ -138,7 +138,8 @@ class CirculationControllerTest {
         return new BorrowingView(ID, USER, "RETURNED", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 15), 0,
                 List.of(new BorrowingView.Item(COPY, LocalDate.of(2026, 1, 20), "DAMAGED")),
                 List.of(new FineView(ID, USER, ID, COPY, "DAMAGED", new BigDecimal("50000"), "UNPAID",
-                        Instant.parse("2026-01-20T00:00:00Z"), null)));
+                        Instant.parse("2026-01-20T00:00:00Z"), null, null)),
+                null);
     }
 
     @Test
@@ -167,7 +168,7 @@ class CirculationControllerTest {
     @Test
     void phieuMuonCuaToiKhongBiNhamVoiId() throws Exception {
         when(circulation.myBorrowings()).thenReturn(List.of(returned()));
-        when(circulation.borrowingsOfReader(USER)).thenReturn(List.of(returned()));
+        when(circulation.borrowingsOfReader(USER, null)).thenReturn(List.of(returned()));
         mvc.perform(get("/api/borrowings/mine").with(jwt()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].status").value("RETURNED"));
         mvc.perform(get("/api/borrowings").param("readerId", USER.toString()).with(jwt()))
@@ -177,11 +178,36 @@ class CirculationControllerTest {
     }
 
     @Test
+    void timPhieuMuonPhanTrangChuyenDungQuery() throws Exception {
+        when(circulation.searchBorrowings(new lms.api.circulation.dto.BorrowingSearchQuery("ACTIVE", true, USER, 1, 5,
+                null))).thenReturn(new lms.api.circulation.dto.BorrowingPageView(List.of(returned()), 11, 1, 5));
+        mvc.perform(get("/api/borrowings/search").param("status", "ACTIVE").param("overdue", "true")
+                        .param("readerId", USER.toString()).param("page", "1").param("size", "5").with(jwt()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(11))
+                .andExpect(jsonPath("$.page").value(1)).andExpect(jsonPath("$.size").value(5))
+                .andExpect(jsonPath("$.items[0].userId").value(USER.toString()));
+        when(circulation.searchBorrowings(new lms.api.circulation.dto.BorrowingSearchQuery(null, null, null, null,
+                null, null))).thenReturn(new lms.api.circulation.dto.BorrowingPageView(List.of(), 0, 0, 20));
+        mvc.perform(get("/api/borrowings/search").with(jwt()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items").isEmpty());
+        verify(circulation, never()).getBorrowing(any());
+        mvc.perform(get("/api/borrowings/search")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void timPhieuMuonChuyenNguyenLoi400() throws Exception {
+        when(circulation.searchBorrowings(any())).thenThrow(loi(HttpStatus.BAD_REQUEST,
+                "{\"code\":\"VALIDATION_FAILED\",\"message\":\"size phải trong khoảng 1-100\"}"));
+        mvc.perform(get("/api/borrowings/search").param("size", "500").with(jwt()))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
     void phiPhatXemVaThu() throws Exception {
         FineView fine = returned().fines().get(0);
         ReaderFinesView fines = new ReaderFinesView(USER, new BigDecimal("50000"), List.of(fine));
         when(circulation.myFines()).thenReturn(fines);
-        when(circulation.finesOfReader(USER)).thenReturn(fines);
+        when(circulation.finesOfReader(USER, null)).thenReturn(fines);
         when(circulation.collectFines(USER)).thenReturn(new CollectFinesResult(USER, 1, new BigDecimal("50000"),
                 List.of(fine)));
         mvc.perform(get("/api/fines/mine").with(jwt()))
@@ -209,6 +235,26 @@ class CirculationControllerTest {
                         .content("{}"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("INVALID_BORROWING"));
+    }
+
+    @Test
+    void xemPhieuCuaToiVaPhieuBatKyDiHaiDuongKhacNhau() throws Exception {
+        when(circulation.getBorrowing(ID)).thenReturn(returned());
+        when(circulation.getBorrowingDetail(ID)).thenReturn(returned());
+        mvc.perform(get("/api/borrowings/" + ID).with(jwt())).andExpect(status().isOk());
+        verify(circulation).getBorrowing(ID);
+        verify(circulation, never()).getBorrowingDetail(any());
+        mvc.perform(get("/api/borrowings/" + ID + "/detail").with(jwt())).andExpect(status().isOk());
+        verify(circulation).getBorrowingDetail(ID);
+        mvc.perform(get("/api/borrowings/" + ID + "/detail")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void phieuCuaNguoiKhacChuyenNguyen404() throws Exception {
+        when(circulation.getBorrowing(ID)).thenThrow(loi(HttpStatus.NOT_FOUND,
+                "{\"code\":\"BORROWING_NOT_FOUND\",\"message\":\"x\"}"));
+        mvc.perform(get("/api/borrowings/" + ID).with(jwt()))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("BORROWING_NOT_FOUND"));
     }
 
     @Test

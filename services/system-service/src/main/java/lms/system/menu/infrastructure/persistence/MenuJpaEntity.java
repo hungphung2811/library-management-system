@@ -50,6 +50,9 @@ class MenuJpaEntity {
     @Column(name = "permission_key", length = 255)
     private String permissionKey;
 
+    @Column(length = 20)
+    private String module;
+
     @Version
     @Column(nullable = false)
     private Long version;
@@ -83,12 +86,13 @@ class MenuJpaEntity {
         this.sortOrder = item.sortOrder();
         this.enabled = item.enabled();
         this.permissionKey = item.permissionKey();
+        this.module = item.module();
         this.updatedAt = item.updatedAt();
     }
 
     MenuItem toDomain() {
         return new MenuItem(id, tenantId, parentId, code, label, path, icon, sortOrder, enabled, permissionKey,
-                version == null ? 0L : version, createdAt, updatedAt);
+                version == null ? 0L : version, createdAt, updatedAt, module);
     }
 
     UUID getId() { return id; }

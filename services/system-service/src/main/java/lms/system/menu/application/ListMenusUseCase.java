@@ -15,8 +15,17 @@ public class ListMenusUseCase {
         this.repository = repository;
     }
 
+    /** {@code usingDefaults}: tenant chưa có dòng nào nên {@code /me} đang dùng {@link DefaultMenus} ({@code items} rỗng). */
+    public record Result(List<MenuItem> items, boolean usingDefaults) {}
+
     @Transactional(readOnly = true)
     public List<MenuItem> execute(UUID tenantId) {
-        return new MenuTree(tenantId, repository.findAll(tenantId)).ordered();
+        return result(tenantId).items();
+    }
+
+    @Transactional(readOnly = true)
+    public Result result(UUID tenantId) {
+        List<MenuItem> ordered = new MenuTree(tenantId, repository.findAll(tenantId)).ordered();
+        return new Result(ordered, ordered.isEmpty());
     }
 }

@@ -72,6 +72,11 @@ public class UserBeanConfiguration {
     }
 
     @Bean
+    lms.identity.user.application.SelfRegisterUserUseCase selfRegisterUserUseCase(CreateUserUseCase createUser) {
+        return new lms.identity.user.application.SelfRegisterUserUseCase(createUser);
+    }
+
+    @Bean
     CreateUserUseCase createUserUseCase(UserRepository repository, DepartmentLookupPort departments,
                                         AccountCredentialPort credentials, TenantMembershipPort memberships) {
         return new CreateUserUseCase(repository, departments, credentials, memberships);

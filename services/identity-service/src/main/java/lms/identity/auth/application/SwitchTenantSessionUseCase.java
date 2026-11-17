@@ -4,6 +4,7 @@ import lms.identity.auth.application.AuthDtos.TokenResponse;
 import lms.identity.auth.domain.InvalidCredentialsException;
 import lms.identity.auth.domain.InvalidRefreshTokenException;
 import lms.identity.auth.domain.RefreshToken;
+import lms.identity.auth.domain.TokenChannel;
 import lms.identity.auth.domain.RefreshTokenRepository;
 import lms.identity.auth.domain.UserCredential;
 import lms.identity.auth.domain.UserCredentialRepository;
@@ -50,6 +51,10 @@ public class SwitchTenantSessionUseCase {
                 .filter(t -> t.userId().equals(userId))
                 .orElseThrow(() -> new InvalidRefreshTokenException("Refresh token không hợp lệ"));
         current.ensureUsable(now);
+        // Đổi tenant chỉ dành cho phiên nhân viên: phiên storefront gắn với đúng một tenant (cửa hàng)
+        if (current.channel() != TokenChannel.STAFF) {
+            throw new InvalidRefreshTokenException("Refresh token không hợp lệ");
+        }
 
         UserCredential credential = credentials.findByUserId(userId).orElseThrow(InvalidCredentialsException::new);
         credential.ensureCanLogin(now);

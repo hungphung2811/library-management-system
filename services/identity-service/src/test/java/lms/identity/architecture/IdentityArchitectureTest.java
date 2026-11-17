@@ -41,13 +41,35 @@ class IdentityArchitectureTest {
             .should().dependOnClassesThat().resideInAnyPackage(
                     "lms.identity.tenant.domain..", "lms.identity.tenant.infrastructure..");
 
-    /** tenant là context nền: không biết auth, accesscontrol, user hay department. */
+    /** tenant là context nền: không biết auth, accesscontrol, user, department hay contract. */
     @ArchTest
     static final ArchRule tenantKhongBietCacContextKhac = noClasses()
             .that().resideInAPackage("lms.identity.tenant..")
             .should().dependOnClassesThat().resideInAnyPackage(
                     "lms.identity.auth..", "lms.identity.accesscontrol..", "lms.identity.user..",
+                    "lms.identity.department..", "lms.identity.contract..");
+
+    /** contract (ADR-0012) chỉ được dùng API (tầng application) của tenant, không đụng domain hay infrastructure. */
+    @ArchTest
+    static final ArchRule contractChiDungTangApplicationCuaTenant = noClasses()
+            .that().resideInAPackage("lms.identity.contract..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "lms.identity.tenant.domain..", "lms.identity.tenant.infrastructure..");
+
+    /** contract không biết auth, accesscontrol, user hay department. */
+    @ArchTest
+    static final ArchRule contractKhongBietCacContextKhac = noClasses()
+            .that().resideInAPackage("lms.identity.contract..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "lms.identity.auth..", "lms.identity.accesscontrol..", "lms.identity.user..",
                     "lms.identity.department..");
+
+    /** Không context nào khác phụ thuộc vào contract (job/recorder nối vào qua cổng của tenant). */
+    @ArchTest
+    static final ArchRule khongContextNaoPhuThuocContract = noClasses()
+            .that().resideInAnyPackage("lms.identity.auth..", "lms.identity.accesscontrol..", "lms.identity.user..",
+                    "lms.identity.department..")
+            .should().dependOnClassesThat().resideInAPackage("lms.identity.contract..");
 
     /** department là context độc lập: không biết auth, accesscontrol hay user. */
     @ArchTest

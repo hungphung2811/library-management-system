@@ -63,6 +63,9 @@ class HttpCirculationClientTest {
         server.expect(requestTo("http://circulation/internal/borrowings/" + id))
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess(borrowing, MediaType.APPLICATION_JSON));
+        server.expect(requestTo("http://circulation/internal/borrowings/" + id + "/detail"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess(borrowing, MediaType.APPLICATION_JSON));
 
         String reservation = "{\"id\":\"" + id + "\",\"titleId\":\"" + title + "\",\"status\":\"WAITING\","
                 + "\"queuePosition\":1,\"reservedAt\":\"2026-01-01T00:00:00Z\",\"copyId\":null,\"holdUntil\":null}";
@@ -119,6 +122,7 @@ class HttpCirculationClientTest {
         assertEquals("BORROWING", client.returnBook(id, copy).status());
         assertEquals(0, client.renew(id).renewCount());
         assertEquals(id, client.getBorrowing(id).id());
+        assertEquals(id, client.getBorrowingDetail(id).id());
         assertEquals("WAITING", client.reserve(title).status());
         assertEquals(1, client.myReservations().get(0).queuePosition());
         assertEquals(title, client.cancelReservation(id).titleId());
@@ -128,10 +132,40 @@ class HttpCirculationClientTest {
         assertEquals("LOST", lost.fines().get(0).reason());
         assertEquals(1, client.reportLost(new lms.api.circulation.dto.ReportLostRequest(copy, null)).fines().size());
         assertEquals(1, client.myBorrowings().size());
-        assertEquals(1, client.borrowingsOfReader(user).size());
+        assertEquals(1, client.borrowingsOfReader(user, null).size());
         assertEquals(0, new java.math.BigDecimal("120000").compareTo(client.myFines().totalUnpaid()));
-        assertEquals(1, client.finesOfReader(user).fines().size());
+        assertEquals(1, client.finesOfReader(user, null).fines().size());
         assertEquals(1, client.collectFines(user).collectedCount());
+        server.verify();
+    }
+
+    @Test
+    void timPhieuMuonChuyenTiepQueryVaAnhXaTrang() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://circulation");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        HttpCirculationClient client = new HttpCirculationClient(builder.build());
+        UUID user = UUID.randomUUID();
+        UUID tenant = UUID.randomUUID();
+        String page = "{\"items\":[{\"id\":\"" + UUID.randomUUID() + "\",\"userId\":\"" + user
+                + "\",\"status\":\"BORROWING\",\"borrowDate\":\"2026-01-01\",\"dueDate\":\"2026-01-15\","
+                + "\"renewCount\":0,\"items\":[],\"fines\":[],\"tenantId\":\"" + tenant + "\"}],"
+                + "\"total\":7,\"page\":1,\"size\":5}";
+        server.expect(requestTo("http://circulation/internal/borrowings/search?status=ACTIVE&overdue=true&readerId="
+                        + user + "&page=1&size=5&tenantId=" + tenant))
+                .andExpect(method(HttpMethod.GET)).andRespond(withSuccess(page, MediaType.APPLICATION_JSON));
+        server.expect(requestTo("http://circulation/internal/borrowings/search"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("{\"items\":[],\"total\":0,\"page\":0,\"size\":20}", MediaType.APPLICATION_JSON));
+
+        lms.api.circulation.dto.BorrowingPageView r = client.searchBorrowings(
+                new lms.api.circulation.dto.BorrowingSearchQuery("ACTIVE", true, user, 1, 5, tenant.toString()));
+        assertEquals(7, r.total());
+        assertEquals(1, r.page());
+        assertEquals(5, r.size());
+        assertEquals(user, r.items().get(0).userId());
+        assertEquals(tenant, r.items().get(0).tenantId());
+        assertEquals(0, client.searchBorrowings(
+                new lms.api.circulation.dto.BorrowingSearchQuery(null, null, null, null, null, " ")).items().size());
         server.verify();
     }
 }

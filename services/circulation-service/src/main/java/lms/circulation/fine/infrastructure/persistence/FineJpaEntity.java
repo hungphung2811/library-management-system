@@ -75,6 +75,7 @@ class FineJpaEntity {
     }
 
     UUID getId() { return id; }
+    UUID getTenantId() { return tenantId; }
     UUID getReaderId() { return readerId; }
     UUID getBorrowingId() { return borrowingId; }
     UUID getBookCopyId() { return bookCopyId; }

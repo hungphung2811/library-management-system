@@ -21,6 +21,7 @@ app:
     circulation-url: ${CIRCULATION_SERVICE_URL:http://localhost:8083}
     support-url: ${SUPPORT_SERVICE_URL:http://localhost:8084}
     system-url: ${SYSTEM_SERVICE_URL:http://localhost:8086}
+    sales-url: ${SALES_SERVICE_URL:http://localhost:8087}
     connect-timeout: 2s
     read-timeout: 5s
 

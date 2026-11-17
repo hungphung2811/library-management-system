@@ -412,4 +412,100 @@ class MenuTreeTest {
         assertThat(viewer.canSee("A/b")).isTrue();
         assertThat(viewer.permissions()).hasSize(1);
     }
+    // ---------- module (ADR-0009) ----------
+
+    private MenuItem moduleItem(String code, UUID parent, String path, String module, String key) {
+        return tree.add(UUID.randomUUID(), code, new MenuDetails("Nhãn " + code, path, null, parent, 0, true, key,
+                module), NOW);
+    }
+
+    @Test
+    void mucLoiModuleNullLuonHienKeCaKhiViewerKhongCoModuleNao() {
+        leaf("home", null);
+        assertThat(codes(tree.visibleFor(new MenuViewer(false, Set.of(), Set.of())))).containsExactly("home");
+        assertThat(codes(tree.visibleFor(new MenuViewer(false, Set.of())))).containsExactly("home");
+    }
+
+    @Test
+    void mucCoModuleChiHienKhiViewerCoModuleDo() {
+        leaf("home", null);
+        moduleItem("loans", null, "/loans", "LENDING", null);
+        moduleItem("shop", null, "/shop", "SALES", null);
+
+        assertThat(codes(tree.visibleFor(new MenuViewer(false, Set.of(), Set.of("LENDING")))))
+                .containsExactlyInAnyOrder("home", "loans");
+        assertThat(codes(tree.visibleFor(new MenuViewer(false, Set.of(), Set.of("SALES")))))
+                .containsExactlyInAnyOrder("home", "shop");
+        assertThat(codes(tree.visibleFor(new MenuViewer(false, Set.of(), Set.of("LENDING", "SALES")))))
+                .containsExactlyInAnyOrder("home", "loans", "shop");
+    }
+
+    @Test
+    void adminCungBiLocTheoModule() {
+        moduleItem("loans", null, "/loans", "LENDING", null);
+        moduleItem("shop", null, "/shop", "SALES", "Sales/x");
+
+        assertThat(codes(tree.visibleFor(new MenuViewer(true, Set.of(), Set.of("LENDING"))))).containsExactly("loans");
+        assertThat(tree.visibleFor(new MenuViewer(true, Set.of(), Set.of()))).isEmpty();
+    }
+
+    @Test
+    void nhanhModuleTatAnCaConKeCaConKhongGanModule() {
+        MenuItem sales = moduleItem("sales", null, null, "SALES", null);
+        leaf("kid-core", sales.id());
+        moduleItem("kid-sales", sales.id(), "/k", "SALES", null);
+
+        assertThat(tree.visibleFor(new MenuViewer(true, Set.of(), Set.of("LENDING")))).isEmpty();
+        List<MenuNode> on = tree.visibleFor(new MenuViewer(false, Set.of(), Set.of("SALES")));
+        assertThat(codes(on)).containsExactly("sales");
+        assertThat(codes(on.get(0).children())).containsExactlyInAnyOrder("kid-core", "kid-sales");
+    }
+
+    @Test
+    void conThuocModuleTatThiNhomRongBiCatNhungMucLoiCungCapVanHien() {
+        MenuItem group = group("grp", null);
+        moduleItem("only-sales", group.id(), "/s", "SALES", null);
+        MenuViewer lendingOnly = new MenuViewer(false, Set.of(), Set.of("LENDING"));
+        assertThat(tree.visibleFor(lendingOnly)).isEmpty();
+        leaf("core", group.id());
+        assertThat(codes(tree.visibleFor(lendingOnly).get(0).children())).containsExactly("core");
+    }
+
+    @Test
+    void khongDoiModuleKhongPhaCayDeLocTheoClaimMoiLanXem() {
+        moduleItem("shop", null, "/shop", "SALES", null);
+        assertThat(tree.visibleFor(new MenuViewer(false, Set.of(), Set.of()))).isEmpty();
+        assertThat(tree.visibleFor(new MenuViewer(false, Set.of(), Set.of("SALES")))).hasSize(1);
+    }
+
+    @Test
+    void moduleSaiMaBiMenuModuleInvalidKhiTaoVaSua() {
+        assertThat(codeOf(() -> moduleItem("x", null, "/x", "HR", null))).isEqualTo(MenuErrorCode.MENU_MODULE_INVALID);
+        assertThat(codeOf(() -> moduleItem("y", null, "/y", "lending", null)))
+                .isEqualTo(MenuErrorCode.MENU_MODULE_INVALID);
+        MenuItem ok = leaf("ok", null);
+        assertThat(codeOf(() -> tree.update(ok.id(),
+                new MenuDetails("X", "/x", null, null, 0, true, null, "BAD"), 0, NOW)))
+                .isEqualTo(MenuErrorCode.MENU_MODULE_INVALID);
+    }
+
+    @Test
+    void suaDatVaXoaModule() {
+        MenuItem item = leaf("m", null);
+        assertThat(item.module()).isNull();
+        MenuItem set = tree.update(item.id(), new MenuDetails("M", "/m", null, null, 0, true, null, "SALES"), 0, NOW);
+        assertThat(set.module()).isEqualTo("SALES");
+        MenuItem cleared = tree.update(item.id(), new MenuDetails("M", "/m", null, null, 0, true, null, null), 0, NOW);
+        assertThat(cleared.module()).isNull();
+    }
+
+    @Test
+    void viewerSaoChepTapModule() {
+        Set<String> mutable = new java.util.HashSet<>(Set.of("SALES"));
+        MenuViewer viewer = new MenuViewer(false, Set.of(), mutable);
+        mutable.clear();
+        assertThat(viewer.hasModule("SALES")).isTrue();
+        assertThat(viewer.hasModule(null)).isTrue();
+        assertThat(viewer.hasModule("LENDING")).isFalse();
+    }
 }

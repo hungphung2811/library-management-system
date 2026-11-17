@@ -1,0 +1,38 @@
+- generic [active] [ref=f1e1]:
+  - alert [ref=f1e2]
+  - generic [ref=f1e3]:
+    - generic [ref=f1e7]:
+      - heading "Sign in to Metronic" [level=1] [ref=f1e9]
+      - alert [ref=f1e10]:
+        - generic [ref=f1e14]: Use demo@kt.com username and demo123 for demo access.
+      - button "Sign in with Google" [ref=f1e16] [cursor=pointer]
+      - generic [ref=f1e22]: or
+      - generic [ref=f1e27]:
+        - generic [ref=f1e28]: Email
+        - textbox "Email" [ref=f1e29]:
+          - /placeholder: Your email
+          - text: demo@kt.com
+      - generic [ref=f1e30]:
+        - generic [ref=f1e31]:
+          - generic [ref=f1e32]: Password
+          - link "Forgot Password?" [ref=f1e33] [cursor=pointer]:
+            - /url: /metronic/tailwind/nextjs/demo1/reset-password
+        - generic [ref=f1e34]:
+          - textbox "Your password" [ref=f1e35]: demo123
+          - button "Show password" [ref=f1e36] [cursor=pointer]
+      - generic [ref=f1e40]:
+        - checkbox "Remember me" [ref=f1e41]
+        - checkbox [aria-hidden]
+        - generic [ref=f1e42]: Remember me
+      - button "Continue" [ref=f1e44] [cursor=pointer]
+      - paragraph [ref=f1e45]:
+        - text: Don't have an account?
+        - link "Sign Up" [ref=f1e46] [cursor=pointer]:
+          - /url: /metronic/tailwind/nextjs/demo1/signup
+    - generic [ref=f1e48]:
+      - link [ref=f1e49] [cursor=pointer]:
+        - /url: /metronic/tailwind/nextjs/demo1
+      - generic [ref=f1e50]:
+        - heading "Secure Dashboard Access" [level=3] [ref=f1e51]
+        - generic [ref=f1e52]: A robust authentication gateway ensuring secure efficient user access to the Metronic Dashboard interface.
+  - region "Notifications alt+T"

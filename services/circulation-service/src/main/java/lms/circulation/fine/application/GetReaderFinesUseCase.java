@@ -15,6 +15,11 @@ public class GetReaderFinesUseCase {
         this.repository = repository;
     }
 
+    /**
+     * Ở phạm vi đọc xuyên tenant (platform admin không chọn tenant, ADR-0008) {@code totalUnpaid} là tổng chưa thanh
+     * toán của độc giả qua mọi tenant; mỗi {@link FineResponse} có tenantId để phân biệt. Hai truy vấn không dùng
+     * tenant tường minh nên không ném lỗi ở phạm vi ALL.
+     */
     @Transactional(readOnly = true)
     public ReaderFinesResponse execute(UUID readerId) {
         List<FineResponse> fines = repository.findByReader(readerId).stream().map(FineResponse::from).toList();

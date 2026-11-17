@@ -58,8 +58,19 @@ public final class AuthDtos {
         }
     }
 
-    /** Tenant người dùng truy cập được (TenantSummary của identity). */
-    public record TenantView(UUID id, String code, String name) {
+    /**
+     * Tenant người dùng truy cập được (TenantSummary của identity). modules: module đang bật (ADR-0009), chỉ để hiển
+     * thị; thiếu thì rỗng (identity cũ chưa trả).
+     */
+    public record TenantView(UUID id, String code, String name, List<String> modules) {
+
+        public TenantView {
+            modules = modules == null ? List.of() : List.copyOf(modules);
+        }
+
+        public TenantView(UUID id, String code, String name) {
+            this(id, code, name, List.of());
+        }
     }
 
     public record CredentialCreated(UUID userId) {

@@ -1,0 +1,105 @@
+- generic [ref=f6e1]:
+  - generic [ref=f6e12]:
+    - complementary [ref=f6e13]:
+      - navigation "Điều hướng chính" [ref=f6e14]:
+        - generic [ref=f6e15]:
+          - link "Thư viện, về trang chủ" [ref=f6e16] [cursor=pointer]:
+            - /url: /
+            - generic [ref=f6e26]:
+              - generic [ref=f6e27]: Thư viện
+              - generic [ref=f6e28]: Quản lý mượn trả
+          - button "Thu gọn menu" [expanded] [ref=f6e29] [cursor=pointer]
+        - list [ref=f6e33]:
+          - listitem [ref=f6e34]:
+            - link "Trang chủ" [ref=f6e35] [cursor=pointer]:
+              - /url: /
+          - listitem [aria-hidden] [ref=f6e42]: Nghiệp vụ
+          - listitem [ref=f6e43]:
+            - button "Sách" [expanded] [ref=f6e44] [cursor=pointer]
+            - list [ref=f6e51]:
+              - listitem [ref=f6e52]:
+                - link "Danh sách sách" [ref=f6e53] [cursor=pointer]:
+                  - /url: /catalog
+              - listitem [ref=f6e54]:
+                - link "Tra mã vạch" [ref=f6e55] [cursor=pointer]:
+                  - /url: /catalog/barcode
+              - listitem [ref=f6e56]:
+                - link "Thêm sách" [ref=f6e57] [cursor=pointer]:
+                  - /url: /catalog/books/new
+          - listitem [ref=f6e58]:
+            - button "Mượn trả" [expanded] [ref=f6e59] [cursor=pointer]
+            - list [ref=f6e67]:
+              - listitem [ref=f6e68]:
+                - link "Lập phiếu mượn" [ref=f6e69] [cursor=pointer]:
+                  - /url: /circulation/borrow
+              - listitem [ref=f6e70]:
+                - link "Nhận trả sách" [ref=f6e71] [cursor=pointer]:
+                  - /url: /circulation/return
+              - listitem [ref=f6e72]:
+                - link "Tra phiếu mượn" [ref=f6e73] [cursor=pointer]:
+                  - /url: /circulation/borrowings
+              - listitem [ref=f6e74]:
+                - link "Đặt trước" [ref=f6e75] [cursor=pointer]:
+                  - /url: /circulation/reservations
+              - listitem [ref=f6e76]:
+                - link "Phạt" [ref=f6e77] [cursor=pointer]:
+                  - /url: /circulation/fines
+          - listitem [aria-hidden] [ref=f6e78]: Hệ thống
+          - listitem [ref=f6e79]:
+            - button "Quản trị" [expanded] [ref=f6e80] [cursor=pointer]
+            - list [ref=f6e88]:
+              - listitem [ref=f6e89]:
+                - link "Người dùng" [ref=f6e90] [cursor=pointer]:
+                  - /url: /admin/users
+              - listitem [ref=f6e91]:
+                - link "Vai trò và quyền" [ref=f6e92] [cursor=pointer]:
+                  - /url: /admin/roles
+              - listitem [ref=f6e93]:
+                - link "Phòng ban" [ref=f6e94] [cursor=pointer]:
+                  - /url: /admin/departments
+              - listitem [ref=f6e95]:
+                - link "Nhật ký hoạt động" [ref=f6e96] [cursor=pointer]:
+                  - /url: /admin/audit-logs
+    - generic [ref=f6e97]:
+      - banner [ref=f6e98]:
+        - list [ref=f6e99]:
+          - listitem [ref=f6e100]:
+            - link "Trang chủ" [ref=f6e101] [cursor=pointer]:
+              - /url: /
+          - listitem [aria-hidden] [ref=f6e102]
+          - listitem [ref=f6e105]: Mượn trả
+          - listitem [aria-hidden] [ref=f6e106]
+          - listitem [ref=f6e109]: Phạt
+        - generic [ref=f6e110]:
+          - 'button "Đơn vị làm việc: Thư viện mặc định" [ref=f6e111] [cursor=pointer]':
+            - generic [ref=f6e116]: Thư viện mặc định
+          - button "Thông báo, 0 chưa đọc" [ref=f6e119] [cursor=pointer]
+          - button "Tài khoản của tôi" [ref=f6e124] [cursor=pointer]:
+            - generic [aria-hidden] [ref=f6e125]: A
+            - generic [ref=f6e126]:
+              - generic [ref=f6e127]: admin
+              - generic [ref=f6e128]: SUPER_ADMIN
+      - main [ref=f6e131]:
+        - generic [ref=f6e132]:
+          - generic [ref=f6e134]:
+            - heading "Phạt" [level=1] [ref=f6e135]
+            - paragraph [ref=f6e136]: Tra cứu và thu phí phạt của độc giả.
+          - generic [ref=f6e137]:
+            - generic [ref=f6e140]:
+              - generic: Tìm độc giả theo tên, tài khoản hoặc email
+              - combobox [expanded] [active] [ref=f6e141]:
+                - listbox:
+                  - option "Hoàng Văn Long · hoang.van.long · long.hv@example.edu.vn": f50e1164-9020-4c34-8d2d-58e3bcba2429
+                  - option "Lê Thị Hoa · le.thi.hoa · hoa.lt@example.edu.vn": beff1e07-0430-46f6-a55e-7f4ba2acd479
+            - paragraph [ref=f6e146]: Chọn một độc giả để xem các khoản phạt.
+  - generic [ref=f6e149]:
+    - generic [ref=f6e152]:
+      - generic "Hoàng Văn Long · hoang.van.long · long.hv@example.edu.vn" [ref=f6e153] [cursor=pointer]
+      - generic "Lê Thị Hoa · le.thi.hoa · hoa.lt@example.edu.vn" [ref=f6e155] [cursor=pointer]
+      - generic "Nguyễn Thị Lan · nguyen.thi.lan · lan.nt@example.edu.vn" [ref=f6e157] [cursor=pointer]
+      - generic "Pgtest Người 01 · pgtest01 · pgtest01@example.edu.vn" [ref=f6e159] [cursor=pointer]
+      - generic "Pgtest Người 02 · pgtest02 · pgtest02@example.edu.vn" [ref=f6e161] [cursor=pointer]
+      - generic "Pgtest Người 03 · pgtest03 · pgtest03@example.edu.vn" [ref=f6e163] [cursor=pointer]
+      - generic "Pgtest Người 04 · pgtest04 · pgtest04@example.edu.vn" [ref=f6e165] [cursor=pointer]
+      - generic "Pgtest Người 05 · pgtest05 · pgtest05@example.edu.vn" [ref=f6e167] [cursor=pointer]
+    - generic [ref=f6e169] [cursor=pointer]

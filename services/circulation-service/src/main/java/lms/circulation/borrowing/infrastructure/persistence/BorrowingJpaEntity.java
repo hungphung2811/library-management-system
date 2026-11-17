@@ -12,6 +12,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.TenantId;
 import lms.tenant.TenantContext;
 
@@ -47,6 +48,8 @@ class BorrowingJpaEntity {
     @Column(name = "loan_days", nullable = false)
     private int loanDays;
 
+    /** BatchSize: danh sách phiếu (search) nạp items của cả trang bằng vài truy vấn IN thay vì mỗi phiếu một truy vấn. */
+    @BatchSize(size = 100)
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "borrowing_items", joinColumns = @JoinColumn(name = "borrowing_id"))
     private List<BorrowingItemEmbeddable> items = new ArrayList<>();
@@ -69,6 +72,7 @@ class BorrowingJpaEntity {
     }
 
     UUID getId() { return id; }
+    UUID getTenantId() { return tenantId; }
     UUID getUserId() { return userId; }
     LocalDate getBorrowDate() { return borrowDate; }
     LocalDate getDueDate() { return dueDate; }

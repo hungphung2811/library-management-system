@@ -2,15 +2,17 @@ package lms.api.circulation.web;
 
 import lms.api.circulation.client.CirculationClient;
 import lms.api.circulation.dto.BorrowBookRequest;
+import lms.api.circulation.dto.BorrowingPageView;
+import lms.api.circulation.dto.BorrowingSearchQuery;
 import lms.api.circulation.dto.BorrowingView;
 import lms.api.circulation.dto.ReportLostRequest;
 import lms.api.circulation.dto.ReturnBookRequest;
 import lms.api.circulation.dto.ReturnCopyRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import java.net.URI;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,6 +25,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/borrowings")
 public class BorrowingController {
+
+    /** tenantId chỉ có tác dụng với platform admin không tenant (ADR-0008); chuyển nguyên xuống service. */
+    public record ByReaderQuery(@NotNull UUID readerId, String tenantId) {
+    }
 
     private final CirculationClient circulation;
 
@@ -55,8 +61,14 @@ public class BorrowingController {
 
     /** Thủ thư xem phiếu mượn của một độc giả. */
     @GetMapping
-    public List<BorrowingView> byReader(@RequestParam UUID readerId) {
-        return circulation.borrowingsOfReader(readerId);
+    public List<BorrowingView> byReader(@Valid ByReaderQuery query) {
+        return circulation.borrowingsOfReader(query.readerId(), query.tenantId());
+    }
+
+    /** Danh sách phiếu mượn có phân trang cho màn hình quản lý; mọi query tùy chọn, chuyển nguyên xuống service. */
+    @GetMapping("/search")
+    public BorrowingPageView search(BorrowingSearchQuery query) {
+        return circulation.searchBorrowings(query);
     }
 
     @PostMapping("/{id}/returns")
@@ -69,8 +81,15 @@ public class BorrowingController {
         return circulation.renew(id);
     }
 
+    /** Phiếu của chính người đăng nhập; phiếu của người khác trả 404 BORROWING_NOT_FOUND. */
     @GetMapping("/{id}")
     public BorrowingView get(@PathVariable UUID id) {
         return circulation.getBorrowing(id);
+    }
+
+    /** Nhân viên xem phiếu bất kỳ trong tenant (khóa BorrowingController/getAny do circulation-service kiểm). */
+    @GetMapping("/{id}/detail")
+    public BorrowingView detail(@PathVariable UUID id) {
+        return circulation.getBorrowingDetail(id);
     }
 }

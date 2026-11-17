@@ -22,9 +22,9 @@ public class MenuExceptionHandler {
     static HttpStatus statusOf(MenuErrorCode code) {
         return switch (code) {
             case MENU_NOT_FOUND, MENU_PARENT_NOT_FOUND -> HttpStatus.NOT_FOUND;
-            case MENU_CODE_DUPLICATED, MENU_HAS_CHILDREN, MENU_VERSION_CONFLICT -> HttpStatus.CONFLICT;
+            case MENU_CODE_DUPLICATED, MENU_HAS_CHILDREN, MENU_VERSION_CONFLICT, MENU_ALREADY_INITIALIZED -> HttpStatus.CONFLICT;
             case MENU_CYCLE, MENU_TOO_DEEP, MENU_PATH_INVALID, MENU_PERMISSION_KEY_INVALID, MENU_LIMIT_EXCEEDED,
-                 MENU_INVALID -> HttpStatus.BAD_REQUEST;
+                 MENU_MODULE_INVALID, MENU_INVALID -> HttpStatus.BAD_REQUEST;
         };
     }
 

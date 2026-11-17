@@ -1,5 +1,6 @@
 package lms.identity.tenant.application;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -10,8 +11,18 @@ import java.util.UUID;
  */
 public interface TenantRoleProvisioningPort {
 
-    /** Sao chép bộ role_templates thành role của tenant hiện tại (mẫu có cờ admin thành role isAdmin); trả số role tạo. */
-    int seedFromTemplates();
+    /**
+     * Sao chép role_templates thành role của tenant hiện tại: mẫu lõi (module NULL) cộng mẫu của các module trong
+     * {@code modules} (mã như LENDING); mẫu có cờ admin thành role isAdmin; bỏ qua mẫu mà tenant đã có role cùng tên.
+     * Trả số role tạo.
+     */
+    int seedFromTemplates(Collection<String> modules);
+
+    /**
+     * Bật module (ADR-0009): chỉ sao chép mẫu của đúng module đó (không đụng mẫu lõi), bỏ qua mẫu mà tenant đã có role
+     * cùng tên để idempotent và không ghi đè chỉnh sửa của quản trị tenant. Trả số role tạo.
+     */
+    int seedModuleTemplates(String module);
 
     /** Gán role quản trị (isAdmin) của tenant hiện tại cho người dùng; idempotent. */
     void grantTenantAdmin(UUID userId);

@@ -20,9 +20,11 @@ public class RefreshToken {
     private final Instant expiresAt;
     private boolean revoked;
     private final Instant createdAt;
+    /** Kênh của phiên; refresh giữ kênh của token gốc (token phát hành trước V18 là STAFF). */
+    private final TokenChannel channel;
 
     private RefreshToken(UUID id, UUID userId, UUID tenantId, boolean platformSession, String tokenHash,
-                         Instant expiresAt, boolean revoked, Instant createdAt) {
+                         Instant expiresAt, boolean revoked, Instant createdAt, TokenChannel channel) {
         this.id = id;
         this.userId = userId;
         this.tenantId = tenantId;
@@ -31,21 +33,30 @@ public class RefreshToken {
         this.expiresAt = expiresAt;
         this.revoked = revoked;
         this.createdAt = createdAt;
+        this.channel = channel == null ? TokenChannel.STAFF : channel;
     }
 
     /** Token không gắn tenant, như token phát hành trước khi có đa tenant (không làm mới được). */
     public static RefreshToken issue(UUID userId, String tokenHash, Instant now, Duration ttl) {
-        return new RefreshToken(UUID.randomUUID(), userId, null, false, tokenHash, now.plus(ttl), false, now);
+        return new RefreshToken(UUID.randomUUID(), userId, null, false, tokenHash, now.plus(ttl), false, now,
+                TokenChannel.STAFF);
     }
 
     public static RefreshToken issueForTenant(UUID userId, UUID tenantId, String tokenHash, Instant now, Duration ttl) {
+        return issueForTenant(userId, tenantId, tokenHash, now, ttl, TokenChannel.STAFF);
+    }
+
+    public static RefreshToken issueForTenant(UUID userId, UUID tenantId, String tokenHash, Instant now, Duration ttl,
+                                              TokenChannel channel) {
         if (tenantId == null) throw new IllegalArgumentException("tenantId không được null");
-        return new RefreshToken(UUID.randomUUID(), userId, tenantId, false, tokenHash, now.plus(ttl), false, now);
+        return new RefreshToken(UUID.randomUUID(), userId, tenantId, false, tokenHash, now.plus(ttl), false, now,
+                channel);
     }
 
     /** Phiên nền tảng của platform admin không thuộc tenant nào. */
     public static RefreshToken issueForPlatform(UUID userId, String tokenHash, Instant now, Duration ttl) {
-        return new RefreshToken(UUID.randomUUID(), userId, null, true, tokenHash, now.plus(ttl), false, now);
+        return new RefreshToken(UUID.randomUUID(), userId, null, true, tokenHash, now.plus(ttl), false, now,
+                TokenChannel.STAFF);
     }
 
     public static RefreshToken restore(UUID id, UUID userId, String tokenHash, Instant expiresAt,
@@ -55,7 +66,14 @@ public class RefreshToken {
 
     public static RefreshToken restore(UUID id, UUID userId, UUID tenantId, boolean platformSession, String tokenHash,
                                        Instant expiresAt, boolean revoked, Instant createdAt) {
-        return new RefreshToken(id, userId, tenantId, platformSession, tokenHash, expiresAt, revoked, createdAt);
+        return restore(id, userId, tenantId, platformSession, tokenHash, expiresAt, revoked, createdAt,
+                TokenChannel.STAFF);
+    }
+
+    public static RefreshToken restore(UUID id, UUID userId, UUID tenantId, boolean platformSession, String tokenHash,
+                                       Instant expiresAt, boolean revoked, Instant createdAt, TokenChannel channel) {
+        return new RefreshToken(id, userId, tenantId, platformSession, tokenHash, expiresAt, revoked, createdAt,
+                channel);
     }
 
     public void revoke() {
@@ -79,4 +97,5 @@ public class RefreshToken {
     public Instant expiresAt() { return expiresAt; }
     public boolean isRevoked() { return revoked; }
     public Instant createdAt() { return createdAt; }
+    public TokenChannel channel() { return channel; }
 }

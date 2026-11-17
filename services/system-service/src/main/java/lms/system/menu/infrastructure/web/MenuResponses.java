@@ -24,11 +24,15 @@ public final class MenuResponses {
 
     /** Một mục đầy đủ cho màn quản trị (danh phẳng, cha trước con; dựng cây theo {@code parentId}). */
     public record AdminNode(UUID id, String code, String label, String path, String icon, UUID parentId,
-                            int sortOrder, boolean enabled, String permissionKey, long version, Instant updatedAt) {
+                            int sortOrder, boolean enabled, String permissionKey, long version, Instant updatedAt,
+                            String module) {
 
         static AdminNode from(MenuItem i) {
             return new AdminNode(i.id(), i.code(), i.label(), i.path(), i.icon(), i.parentId(), i.sortOrder(),
-                    i.enabled(), i.permissionKey(), i.version(), i.updatedAt());
+                    i.enabled(), i.permissionKey(), i.version(), i.updatedAt(), i.module());
         }
     }
+
+    /** Danh sách quản trị kèm cờ: usingDefaults = true khi tenant chưa có dữ liệu (items rỗng, /me dùng bộ mặc định). */
+    public record AdminList(boolean usingDefaults, List<AdminNode> items) {}
 }

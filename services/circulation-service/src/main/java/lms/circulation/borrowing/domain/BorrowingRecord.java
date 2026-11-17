@@ -25,6 +25,8 @@ public class BorrowingRecord {
     private final int loanDays;
     private LocalDate dueDate;
     private int renewCount;
+    /** Tenant sở hữu, chỉ có khi dựng lại từ persistence (đọc); phiếu mới lập chưa có (null). Không tham gia nghiệp vụ. */
+    private UUID tenantId;
     private final List<DomainEvent> events = new ArrayList<>();
 
     private BorrowingRecord(BorrowingId id, UUID userId, List<BorrowingItem> items, LocalDate borrowDate,
@@ -62,6 +64,15 @@ public class BorrowingRecord {
     public static BorrowingRecord restore(BorrowingId id, UUID userId, List<BorrowingItem> items,
                                           LocalDate borrowDate, LocalDate dueDate, int renewCount, int loanDays) {
         return new BorrowingRecord(id, userId, items, borrowDate, dueDate, renewCount, loanDays);
+    }
+
+    /** Như {@link #restore} kèm tenant sở hữu (đọc xuyên tenant, ADR-0008). */
+    public static BorrowingRecord restore(BorrowingId id, UUID userId, List<BorrowingItem> items,
+                                          LocalDate borrowDate, LocalDate dueDate, int renewCount, int loanDays,
+                                          UUID tenantId) {
+        BorrowingRecord record = new BorrowingRecord(id, userId, items, borrowDate, dueDate, renewCount, loanDays);
+        record.tenantId = tenantId;
+        return record;
     }
 
     /** UC07: nhận trả một bản sao với tình trạng nguyên vẹn hoặc hỏng. */
@@ -130,4 +141,6 @@ public class BorrowingRecord {
     public LocalDate dueDate() { return dueDate; }
     public int renewCount() { return renewCount; }
     public int loanDays() { return loanDays; }
+    /** Null với phiếu mới lập chưa qua persistence. */
+    public UUID tenantId() { return tenantId; }
 }

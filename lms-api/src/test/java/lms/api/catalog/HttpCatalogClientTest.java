@@ -53,7 +53,7 @@ class HttpCatalogClientTest {
                 .andRespond(withSuccess("{\"id\":\"" + UUID.randomUUID() + "\",\"titleId\":\"" + title
                         + "\",\"barcode\":\"CC-1\",\"status\":\"AVAILABLE\"}", MediaType.APPLICATION_JSON));
 
-        var titles = client.searchTitles("clean", true);
+        var titles = client.searchTitles("clean", true, null);
         assertEquals(1, titles.size());
         assertEquals(3, titles.get(0).availableCopies());
         assertEquals("AVAILABLE", client.addCopy(new AddCopyRequest(title, "CC-1")).status());
@@ -79,6 +79,33 @@ class HttpCatalogClientTest {
                 "Clean Code 2", "Martin", "978", new java.math.BigDecimal("300000")));
         assertEquals("Clean Code 2", view.name());
         assertEquals(2, view.availableCopies());
+        server.verify();
+    }
+
+    @Test
+    void previewGoiGetVaPutNoiBoVaAnhXaDto() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://catalog")
+                .requestInterceptor(new TokenRelayInterceptor());
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        HttpCatalogClient client = new HttpCatalogClient(builder.build());
+
+        UUID title = UUID.randomUUID();
+        server.expect(requestTo("http://catalog/internal/books/" + title + "/preview"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("{\"id\":\"" + title + "\",\"name\":\"A\",\"description\":\"d\","
+                        + "\"previewText\":null,\"isbn\":\"978\"}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo("http://catalog/internal/books/" + title + "/preview"))
+                .andExpect(method(HttpMethod.PUT))
+                .andExpect(jsonPath("$.description").value("d2"))
+                .andExpect(jsonPath("$.previewText").value("p2"))
+                .andRespond(withSuccess("{\"id\":\"" + title + "\",\"name\":\"A\",\"description\":\"d2\","
+                        + "\"previewText\":\"p2\"}", MediaType.APPLICATION_JSON));
+
+        var got = client.getPreview(title);
+        assertEquals("d", got.description());
+        assertEquals(null, got.previewText());
+        assertEquals("p2", client.updatePreview(title,
+                new lms.api.catalog.dto.UpdateTitlePreviewRequest("d2", "p2")).previewText());
         server.verify();
     }
 

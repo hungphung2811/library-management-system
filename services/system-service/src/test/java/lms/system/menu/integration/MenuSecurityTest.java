@@ -23,6 +23,7 @@ import lms.system.config.SecurityConfiguration;
 import lms.system.menu.application.CreateMenuUseCase;
 import lms.system.menu.application.DeleteMenuUseCase;
 import lms.system.menu.application.GetMyMenuUseCase;
+import lms.system.menu.application.InitializeDefaultMenusUseCase;
 import lms.system.menu.application.ListMenusUseCase;
 import lms.system.menu.application.UpdateMenuUseCase;
 import lms.system.menu.domain.MenuErrorCode;
@@ -67,6 +68,7 @@ class MenuSecurityTest {
     @MockitoBean CreateMenuUseCase createMenu;
     @MockitoBean UpdateMenuUseCase updateMenu;
     @MockitoBean DeleteMenuUseCase deleteMenu;
+    @MockitoBean InitializeDefaultMenusUseCase initializeDefaults;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean PermissionKeyRegistrar permissionKeyRegistrar;
 
@@ -168,12 +170,12 @@ class MenuSecurityTest {
                 .andExpect(status().isForbidden());
         mvc.perform(delete("/internal/menus/" + id).with(user())).andExpect(status().isForbidden());
 
-        verifyNoInteractions(listMenus, createMenu, updateMenu, deleteMenu);
+        verifyNoInteractions(listMenus, createMenu, updateMenu, deleteMenu, initializeDefaults);
     }
 
     @Test
     void khoaQuyenDongLaTenControllerSlashTenMethod() throws Exception {
-        when(listMenus.execute(TENANT)).thenReturn(List.of());
+        when(listMenus.result(TENANT)).thenReturn(new ListMenusUseCase.Result(List.of(), true));
 
         mvc.perform(get("/internal/menus").with(user("MenuAdminController/listMenus")))
                 .andExpect(status().isOk());
@@ -194,18 +196,20 @@ class MenuSecurityTest {
     @Test
     void adminListTraDanhPhangDayDuTruong() throws Exception {
         MenuItem a = item("a", "/a");
-        when(listMenus.execute(TENANT)).thenReturn(List.of(a));
+        when(listMenus.result(TENANT)).thenReturn(new ListMenusUseCase.Result(List.of(a), false));
 
         mvc.perform(get("/internal/menus").with(admin()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(a.id().toString()))
-                .andExpect(jsonPath("$[0].code").value("a"))
-                .andExpect(jsonPath("$[0].parentId").doesNotExist())
-                .andExpect(jsonPath("$[0].sortOrder").value(10))
-                .andExpect(jsonPath("$[0].enabled").value(true))
-                .andExpect(jsonPath("$[0].permissionKey").value("Khoa/secret"))
-                .andExpect(jsonPath("$[0].version").value(3))
-                .andExpect(jsonPath("$[0].updatedAt").exists());
+                .andExpect(jsonPath("$.usingDefaults").value(false))
+                .andExpect(jsonPath("$.items[0].id").value(a.id().toString()))
+                .andExpect(jsonPath("$.items[0].code").value("a"))
+                .andExpect(jsonPath("$.items[0].parentId").doesNotExist())
+                .andExpect(jsonPath("$.items[0].sortOrder").value(10))
+                .andExpect(jsonPath("$.items[0].enabled").value(true))
+                .andExpect(jsonPath("$.items[0].permissionKey").value("Khoa/secret"))
+                .andExpect(jsonPath("$.items[0].module").doesNotExist())
+                .andExpect(jsonPath("$.items[0].version").value(3))
+                .andExpect(jsonPath("$.items[0].updatedAt").exists());
     }
 
     @Test

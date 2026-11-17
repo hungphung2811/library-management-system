@@ -77,7 +77,9 @@ class AccessControlSecurityTest {
         mvc.perform(get("/internal/roles").with(jwt().jwt(j -> j.claim("admin", true))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("TENANT_REQUIRED"));
-        mvc.perform(get("/internal/roles").with(jwt().jwt(j -> j.claim("platformAdmin", true))))
+        // ADR-0008: GET /internal/roles là @CrossTenantReadable nên platform admin không tenant được qua; endpoint
+        // không gắn annotation (GET theo id) vẫn bị chặn TENANT_REQUIRED
+        mvc.perform(get("/internal/roles/" + UUID.randomUUID()).with(jwt().jwt(j -> j.claim("platformAdmin", true))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("TENANT_REQUIRED"));
         org.mockito.Mockito.verifyNoInteractions(roles);

@@ -97,3 +97,21 @@ lms:
   # tenant-common: TenantContext theo claim tenantId, Hibernate @TenantId và RLS (app.tenant_id)
   tenant:
     enabled: true
+  # Storefront công khai (ADR-0011): bí mật riêng của customer-api (KHÔNG dùng INTERNAL_API_KEY), bỏ trống = từ chối mọi lời gọi
+  identity:
+    storefront:
+      client-secret: ${STOREFRONT_CLIENT_SECRET:}
+      token-ttl: PT5M
+      # ADR-0013: origin storefront theo tenant. http chỉ cho localhost/127.0.0.1 trừ khi bật cờ (staging không TLS)
+      max-origins-per-tenant: 10
+      allow-http-origins: ${STOREFRONT_ALLOW_HTTP_ORIGINS:false}
+
+  # Hợp đồng thuê dịch vụ theo tenant (ADR-0012): múi giờ nghiệp vụ, ân hạn sau ngày kết thúc, mốc nhắc hạn (ngày),
+  # job vòng đời mỗi giờ (phút 7). Tắt job: lms.contract.job.enabled=false.
+  contract:
+    zone: Asia/Ho_Chi_Minh
+    grace-period: P7D
+    reminder-days: [30, 7, 1]
+    job:
+      enabled: true
+      cron: "0 7 * * * *"

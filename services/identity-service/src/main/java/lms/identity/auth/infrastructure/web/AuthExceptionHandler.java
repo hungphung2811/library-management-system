@@ -7,6 +7,8 @@ import lms.identity.auth.domain.DuplicateUsernameException;
 import lms.identity.auth.domain.ExternalAuthException;
 import lms.identity.auth.domain.InvalidCredentialsException;
 import lms.identity.auth.domain.InvalidRefreshTokenException;
+import lms.identity.auth.domain.InvalidSignupException;
+import lms.identity.auth.domain.SignupNotAvailableException;
 import lms.identity.auth.domain.WrongCurrentPasswordException;
 import lms.common.kernel.ErrorResponse;
 import java.util.List;
@@ -62,6 +64,17 @@ public class AuthExceptionHandler {
     @ExceptionHandler(DuplicateUsernameException.class)
     ResponseEntity<ErrorResponse> handleDuplicate(DuplicateUsernameException ex) {
         return build(HttpStatus.CONFLICT, "DUPLICATE_USERNAME", ex.getMessage());
+    }
+
+    /** Một mã chung cho mọi lý do không đăng ký được (ADR-0011 2.5): không lộ tenant nào có/không có tự đăng ký. */
+    @ExceptionHandler(SignupNotAvailableException.class)
+    ResponseEntity<ErrorResponse> handleSignupNotAvailable(SignupNotAvailableException ex) {
+        return build(HttpStatus.FORBIDDEN, "SIGNUP_NOT_AVAILABLE", SignupNotAvailableException.MESSAGE);
+    }
+
+    @ExceptionHandler(InvalidSignupException.class)
+    ResponseEntity<ErrorResponse> handleInvalidSignup(InvalidSignupException ex) {
+        return build(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", ex.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

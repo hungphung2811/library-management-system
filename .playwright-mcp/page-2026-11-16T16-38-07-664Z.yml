@@ -1,0 +1,112 @@
+- generic [ref=f6e12]:
+  - complementary [ref=f6e13]:
+    - navigation "Điều hướng chính" [ref=f6e14]:
+      - generic [ref=f6e15]:
+        - link "Thư viện, về trang chủ" [ref=f6e16] [cursor=pointer]:
+          - /url: /
+          - generic [ref=f6e26]:
+            - generic [ref=f6e27]: Thư viện
+            - generic [ref=f6e28]: Quản lý mượn trả
+        - button "Thu gọn menu" [expanded] [ref=f6e29] [cursor=pointer]
+      - list [ref=f6e33]:
+        - listitem [ref=f6e34]:
+          - link "Trang chủ" [ref=f6e35] [cursor=pointer]:
+            - /url: /
+        - listitem [aria-hidden] [ref=f6e42]: Nghiệp vụ
+        - listitem [ref=f6e43]:
+          - button "Sách" [expanded] [ref=f6e44] [cursor=pointer]
+          - list [ref=f6e51]:
+            - listitem [ref=f6e52]:
+              - link "Danh sách sách" [ref=f6e53] [cursor=pointer]:
+                - /url: /catalog
+            - listitem [ref=f6e54]:
+              - link "Tra mã vạch" [ref=f6e55] [cursor=pointer]:
+                - /url: /catalog/barcode
+            - listitem [ref=f6e56]:
+              - link "Thêm sách" [ref=f6e57] [cursor=pointer]:
+                - /url: /catalog/books/new
+        - listitem [ref=f6e58]:
+          - button "Mượn trả" [expanded] [ref=f6e59] [cursor=pointer]
+          - list [ref=f6e67]:
+            - listitem [ref=f6e68]:
+              - link "Lập phiếu mượn" [ref=f6e69] [cursor=pointer]:
+                - /url: /circulation/borrow
+            - listitem [ref=f6e70]:
+              - link "Nhận trả sách" [ref=f6e71] [cursor=pointer]:
+                - /url: /circulation/return
+            - listitem [ref=f6e72]:
+              - link "Tra phiếu mượn" [ref=f6e73] [cursor=pointer]:
+                - /url: /circulation/borrowings
+            - listitem [ref=f6e74]:
+              - link "Đặt trước" [ref=f6e75] [cursor=pointer]:
+                - /url: /circulation/reservations
+            - listitem [ref=f6e76]:
+              - link "Phạt" [ref=f6e77] [cursor=pointer]:
+                - /url: /circulation/fines
+        - listitem [aria-hidden] [ref=f6e78]: Hệ thống
+        - listitem [ref=f6e79]:
+          - button "Quản trị" [expanded] [ref=f6e80] [cursor=pointer]
+          - list [ref=f6e88]:
+            - listitem [ref=f6e89]:
+              - link "Người dùng" [ref=f6e90] [cursor=pointer]:
+                - /url: /admin/users
+            - listitem [ref=f6e91]:
+              - link "Vai trò và quyền" [ref=f6e92] [cursor=pointer]:
+                - /url: /admin/roles
+            - listitem [ref=f6e93]:
+              - link "Phòng ban" [ref=f6e94] [cursor=pointer]:
+                - /url: /admin/departments
+            - listitem [ref=f6e95]:
+              - link "Nhật ký hoạt động" [ref=f6e96] [cursor=pointer]:
+                - /url: /admin/audit-logs
+  - generic [ref=f6e97]:
+    - banner [ref=f6e98]:
+      - list [ref=f6e99]:
+        - listitem [ref=f6e100]:
+          - link "Trang chủ" [ref=f6e101] [cursor=pointer]:
+            - /url: /
+        - listitem [aria-hidden] [ref=f6e102]
+        - listitem [ref=f6e105]: Mượn trả
+        - listitem [aria-hidden] [ref=f6e106]
+        - listitem [ref=f6e109]: Phạt
+      - generic [ref=f6e110]:
+        - 'button "Đơn vị làm việc: Thư viện mặc định" [ref=f6e111] [cursor=pointer]':
+          - generic [ref=f6e116]: Thư viện mặc định
+        - button "Thông báo, 0 chưa đọc" [ref=f6e119] [cursor=pointer]
+        - button "Tài khoản của tôi" [ref=f6e124] [cursor=pointer]:
+          - generic [aria-hidden] [ref=f6e125]: A
+          - generic [ref=f6e126]:
+            - generic [ref=f6e127]: admin
+            - generic [ref=f6e128]: SUPER_ADMIN
+    - main [ref=f6e131]:
+      - generic [ref=f6e132]:
+        - generic [ref=f6e134]:
+          - heading "Phạt" [level=1] [ref=f6e135]
+          - paragraph [ref=f6e136]: Tra cứu và thu phí phạt của độc giả.
+        - generic [ref=f6e137]:
+          - generic [ref=f6e138]:
+            - generic: Nguyễn Thị Lan · nguyen.thi.lan · lan.nt@example.edu.vn
+            - generic [ref=f6e139]:
+              - generic "Nguyễn Thị Lan · nguyen.thi.lan · lan.nt@example.edu.vn" [ref=f6e171]:
+                - text: Nguyễn Thị Lan · nguyen.thi.lan · lan.nt@example.edu.vn
+                - combobox [active] [ref=f6e141]
+              - button "Clear" [ref=f6e172] [cursor=pointer]:
+                - img "close-circle" [ref=f6e173]
+          - generic [ref=f6e177]:
+            - generic [ref=f6e178]: Tổng chưa thanh toán
+            - generic [ref=f6e179]: 0 ₫
+          - table [ref=f6e188]:
+            - rowgroup [ref=f6e189]:
+              - row [ref=f6e190]:
+                - columnheader "Ngày phát sinh" [ref=f6e191]
+                - columnheader "Lý do" [ref=f6e192]
+                - columnheader "Phiếu mượn" [ref=f6e193]
+                - columnheader "Số tiền" [ref=f6e194]
+                - columnheader "Trạng thái" [ref=f6e195]
+                - columnheader "Ngày thanh toán" [ref=f6e196]
+            - rowgroup [ref=f6e197]:
+              - row [ref=f6e198]:
+                - cell "Trống Độc giả không có khoản phạt nào." [ref=f6e199]:
+                  - generic [ref=f6e201]:
+                    - img "Trống" [ref=f6e203]
+                    - generic [ref=f6e209]: Độc giả không có khoản phạt nào.

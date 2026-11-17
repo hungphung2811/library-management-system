@@ -12,6 +12,10 @@ public enum MenuErrorCode {
     MENU_PATH_INVALID,
     MENU_PERMISSION_KEY_INVALID,
     MENU_LIMIT_EXCEEDED,
+    /** Mã module không thuộc tập LENDING/SALES. */
+    MENU_MODULE_INVALID,
+    /** Tenant đã có dữ liệu menu nên không chép bộ mặc định nữa. */
+    MENU_ALREADY_INITIALIZED,
     /** Mã, nhãn, icon rỗng hoặc quá dài (lỗi dữ liệu đầu vào chung). */
     MENU_INVALID
 }

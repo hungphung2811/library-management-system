@@ -13,6 +13,8 @@ import lms.identity.auth.application.LoginUseCase;
 import lms.identity.auth.application.LogoutUseCase;
 import lms.identity.auth.application.RefreshTokenUseCase;
 import lms.identity.auth.application.RegisterCredentialUseCase;
+import lms.identity.auth.application.SignupUseCase;
+import lms.identity.auth.domain.TokenChannel;
 import lms.identity.auth.application.SwitchTenantSessionUseCase;
 import lms.identity.tenant.application.TenantSummary;
 import lms.identity.tenant.domain.NoTenantAccessException;
@@ -51,6 +53,7 @@ class AuthSecurityTest {
     @MockitoBean RegisterCredentialUseCase register;
     @MockitoBean lms.identity.auth.application.ChangePasswordUseCase changePassword;
     @MockitoBean SwitchTenantSessionUseCase switchTenant;
+    @MockitoBean SignupUseCase signup;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean PermissionKeyRegistrar permissionKeyRegistrar;
 
@@ -68,7 +71,7 @@ class AuthSecurityTest {
 
     @Test
     void dangNhapLaCongKhaiVaTraToken() throws Exception {
-        when(login.execute("alice", "secret123", null)).thenReturn(TokenResponse.bearer("a", "r", 900));
+        when(login.execute("alice", "secret123", null, TokenChannel.STAFF)).thenReturn(TokenResponse.bearer("a", "r", 900));
 
         mvc.perform(post("/internal/auth/login").contentType(MediaType.APPLICATION_JSON).content(LOGIN_BODY))
                 .andExpect(status().isOk())
@@ -78,7 +81,7 @@ class AuthSecurityTest {
 
     @Test
     void saiThongTinTra401KhongLoChiTiet() throws Exception {
-        when(login.execute(any(), any(), any())).thenThrow(new InvalidCredentialsException());
+        when(login.execute(any(), any(), any(), any())).thenThrow(new InvalidCredentialsException());
 
         mvc.perform(post("/internal/auth/login").contentType(MediaType.APPLICATION_JSON).content(LOGIN_BODY))
                 .andExpect(status().isUnauthorized())
@@ -87,7 +90,7 @@ class AuthSecurityTest {
 
     @Test
     void taiKhoanBiKhoaTra423() throws Exception {
-        when(login.execute(any(), any(), any())).thenThrow(new AccountLockedException(Instant.now()));
+        when(login.execute(any(), any(), any(), any())).thenThrow(new AccountLockedException(Instant.now()));
 
         mvc.perform(post("/internal/auth/login").contentType(MediaType.APPLICATION_JSON).content(LOGIN_BODY))
                 .andExpect(status().isLocked());
@@ -124,7 +127,7 @@ class AuthSecurityTest {
 
     @Test
     void endpointCongKhaiVaChiCanDangNhapKhongDoiTenantId() throws Exception {
-        when(login.execute("alice", "secret123", null)).thenReturn(TokenResponse.bearer("a", "r", 900));
+        when(login.execute("alice", "secret123", null, TokenChannel.STAFF)).thenReturn(TokenResponse.bearer("a", "r", 900));
 
         mvc.perform(post("/internal/auth/login").contentType(MediaType.APPLICATION_JSON).content(LOGIN_BODY))
                 .andExpect(status().isOk());
@@ -137,7 +140,7 @@ class AuthSecurityTest {
     @Test
     void dangNhapTheoMaTenantTraTenantIdVaDanhSachTenant() throws Exception {
         UUID tenant = UUID.randomUUID();
-        when(login.execute("alice", "secret123", "lib-a")).thenReturn(TokenResponse.bearer("a", "r", 900, false, tenant,
+        when(login.execute("alice", "secret123", "lib-a", TokenChannel.STAFF)).thenReturn(TokenResponse.bearer("a", "r", 900, false, tenant,
                 List.of(new TenantSummary(tenant, "lib-a", "Thư viện A"))));
 
         mvc.perform(post("/internal/auth/login").contentType(MediaType.APPLICATION_JSON)
@@ -151,7 +154,7 @@ class AuthSecurityTest {
 
     @Test
     void khongTruyCapDuocTenantTra403NoTenantAccess() throws Exception {
-        when(login.execute(any(), any(), any())).thenThrow(new NoTenantAccessException());
+        when(login.execute(any(), any(), any(), any())).thenThrow(new NoTenantAccessException());
 
         mvc.perform(post("/internal/auth/login").contentType(MediaType.APPLICATION_JSON).content(LOGIN_BODY))
                 .andExpect(status().isForbidden())

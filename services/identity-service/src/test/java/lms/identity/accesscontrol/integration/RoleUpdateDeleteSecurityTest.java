@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -16,6 +17,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import lms.identity.accesscontrol.application.AccessCommands.DeleteRole;
+import lms.identity.accesscontrol.application.AccessCommands.GrantPermission;
+import lms.identity.accesscontrol.domain.AccessControlForbiddenException;
 import lms.identity.accesscontrol.application.AccessCommands.UpdateRole;
 import lms.identity.accesscontrol.application.AccessDtos.RoleResponse;
 import lms.identity.accesscontrol.application.GetUserAccessUseCase;
@@ -134,5 +137,29 @@ class RoleUpdateDeleteSecurityTest {
         doThrow(new AccessControlNotFoundException("Không tìm thấy role")).when(roles).delete(any());
         mvc.perform(delete("/internal/roles/" + id).with(admin()))
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("NOT_FOUND"));
+    }
+
+    @Test
+    void themKhoaChuyenCoQuanTriChoUseCaseVaRoleDangKyBiTuChoiThanh403() throws Exception {
+        UUID id = UUID.randomUUID();
+        String body = "{\"permissionCode\":\"ShopController/placeOrder\"}";
+        when(roles.grantPermission(any())).thenReturn(new RoleResponse(id, "CUSTOMER", "Khách", false, List.of()));
+
+        mvc.perform(post("/internal/roles/" + id + "/permissions").with(with("AccessControlController/grantPermission"))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk());
+        mvc.perform(post("/internal/roles/" + id + "/permissions").with(admin())
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk());
+        ArgumentCaptor<GrantPermission> cmd = ArgumentCaptor.forClass(GrantPermission.class);
+        verify(roles, org.mockito.Mockito.times(2)).grantPermission(cmd.capture());
+        assertThat(cmd.getAllValues().get(0).requestedByAdmin()).isFalse();
+        assertThat(cmd.getAllValues().get(1).requestedByAdmin()).isTrue();
+
+        // use case từ chối role signup_default với người không admin: 403 FORBIDDEN theo khuôn exception hiện có
+        when(roles.grantPermission(any())).thenThrow(new AccessControlForbiddenException("role đăng ký mặc định"));
+        mvc.perform(post("/internal/roles/" + id + "/permissions").with(with("AccessControlController/grantPermission"))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isForbidden());
     }
 }

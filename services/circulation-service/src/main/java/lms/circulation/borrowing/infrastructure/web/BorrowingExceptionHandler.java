@@ -6,6 +6,7 @@ import lms.circulation.borrowing.domain.BorrowingNotFoundException;
 import lms.circulation.borrowing.domain.BorrowingRejectedException;
 import lms.circulation.borrowing.domain.NotFoundException;
 import lms.circulation.borrowing.domain.InvalidBorrowingException;
+import lms.circulation.borrowing.domain.InvalidBorrowingQueryException;
 import lms.common.kernel.ErrorResponse;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -45,6 +46,11 @@ public class BorrowingExceptionHandler {
     @ExceptionHandler({InvalidBorrowingException.class, IllegalArgumentException.class})
     ResponseEntity<ErrorResponse> handleInvalid(RuntimeException ex) {
         return build(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_BORROWING", ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidBorrowingQueryException.class)
+    ResponseEntity<ErrorResponse> handleInvalidQuery(InvalidBorrowingQueryException ex) {
+        return build(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

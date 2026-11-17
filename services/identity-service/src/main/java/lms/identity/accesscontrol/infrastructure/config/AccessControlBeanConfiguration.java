@@ -77,6 +77,13 @@ public class AccessControlBeanConfiguration {
         return new UserRoleUseCase(persistence, persistence, persistence, publisher, clock);
     }
 
+    /** Role tự đăng ký của tenant (cờ signup_default), cho luồng đăng ký công khai của context auth. */
+    @Bean
+    lms.identity.accesscontrol.application.SignupRoleUseCase signupRoleUseCase(
+            AccessControlPersistenceAdapter persistence, UserRoleUseCase userRoleUseCase) {
+        return new lms.identity.accesscontrol.application.SignupRoleUseCase(persistence, userRoleUseCase);
+    }
+
     /** Role của tenant mới từ role_templates, gán/gỡ quản trị viên tenant cho thao tác nền tảng (context tenant). */
     @Bean
     lms.identity.tenant.application.TenantRoleProvisioningPort tenantRoleProvisioningPort(

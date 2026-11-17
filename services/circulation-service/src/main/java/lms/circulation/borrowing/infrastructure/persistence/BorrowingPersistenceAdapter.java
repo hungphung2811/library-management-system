@@ -5,11 +5,16 @@ import lms.circulation.borrowing.domain.BorrowingId;
 import lms.circulation.borrowing.domain.BorrowingRecord;
 import lms.circulation.borrowing.domain.BorrowingRejectedException;
 import lms.circulation.borrowing.domain.BorrowingRepository;
+import lms.circulation.borrowing.domain.BorrowingSearchCriteria;
+import lms.circulation.borrowing.domain.BorrowingSearchResult;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 public class BorrowingPersistenceAdapter implements SaveBorrowingPort, BorrowingRepository {
 
@@ -37,6 +42,11 @@ public class BorrowingPersistenceAdapter implements SaveBorrowingPort, Borrowing
     }
 
     @Override
+    public Optional<BorrowingRecord> findByIdAndUserId(BorrowingId id, UUID userId) {
+        return jpa.findInTenantByIdAndUserId(id.value(), userId).map(BorrowingPersistenceMapper::toDomain);
+    }
+
+    @Override
     public Optional<BorrowingRecord> findByIdForUpdate(BorrowingId id) {
         return jpa.findByIdForUpdate(id.value()).map(BorrowingPersistenceMapper::toDomain);
     }
@@ -59,5 +69,15 @@ public class BorrowingPersistenceAdapter implements SaveBorrowingPort, Borrowing
     @Override
     public long countOverdueItemsByUserId(UUID userId, LocalDate today) {
         return jpa.countOverdueItemsByUserId(userId, today);
+    }
+
+    @Override
+    public BorrowingSearchResult search(BorrowingSearchCriteria criteria) {
+        // Phân trang ở DB trên bảng borrowings (không join fetch collection); items nạp sau theo lô nhờ @BatchSize
+        Page<BorrowingJpaEntity> page = jpa.findAll(BorrowingSpecifications.matching(criteria),
+                PageRequest.of(criteria.page(), criteria.size(),
+                        Sort.by(Sort.Order.desc("borrowDate"), Sort.Order.asc("id"))));
+        return new BorrowingSearchResult(
+                page.getContent().stream().map(BorrowingPersistenceMapper::toDomain).toList(), page.getTotalElements());
     }
 }

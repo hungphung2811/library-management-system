@@ -88,16 +88,16 @@ public class RedisMenuCacheAdapter implements MenuCachePort {
     /** Dạng lưu trong Redis, tách khỏi domain để domain không phụ thuộc Jackson. */
     record CachedMenu(UUID id, UUID tenantId, UUID parentId, String code, String label, String path, String icon,
                       int sortOrder, boolean enabled, String permissionKey, long version, Instant createdAt,
-                      Instant updatedAt) {
+                      Instant updatedAt, String module) {
 
         static CachedMenu from(MenuItem i) {
             return new CachedMenu(i.id(), i.tenantId(), i.parentId(), i.code(), i.label(), i.path(), i.icon(),
-                    i.sortOrder(), i.enabled(), i.permissionKey(), i.version(), i.createdAt(), i.updatedAt());
+                    i.sortOrder(), i.enabled(), i.permissionKey(), i.version(), i.createdAt(), i.updatedAt(), i.module());
         }
 
         MenuItem toDomain() {
             return new MenuItem(id, tenantId, parentId, code, label, path, icon, sortOrder, enabled, permissionKey,
-                    version, createdAt, updatedAt);
+                    version, createdAt, updatedAt, module);
         }
     }
 }

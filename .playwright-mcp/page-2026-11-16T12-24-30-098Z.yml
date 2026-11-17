@@ -1,0 +1,81 @@
+- generic [active] [ref=f2e1]:
+  - generic [ref=f2e2]:
+    - complementary [ref=f2e3]:
+      - navigation "Điều hướng chính" [ref=f2e4]:
+        - generic [ref=f2e5]:
+          - link "Thư viện, về trang chủ" [ref=f2e6] [cursor=pointer]:
+            - /url: /
+            - generic [ref=f2e16]:
+              - generic [ref=f2e17]: Thư viện
+              - generic [ref=f2e18]: Quản lý mượn trả
+          - button "Thu gọn menu" [expanded] [ref=f2e19] [cursor=pointer]
+        - list [ref=f2e23]:
+          - listitem [ref=f2e24]:
+            - link "Trang chủ" [ref=f2e25] [cursor=pointer]:
+              - /url: /
+          - listitem [aria-hidden] [ref=f2e32]: Nghiệp vụ
+          - listitem [ref=f2e33]:
+            - button "Sách" [expanded] [ref=f2e34] [cursor=pointer]
+            - list [ref=f2e41]:
+              - listitem [ref=f2e42]:
+                - link "Danh sách sách" [ref=f2e43] [cursor=pointer]:
+                  - /url: /catalog
+              - listitem [ref=f2e44]:
+                - link "Tra mã vạch" [ref=f2e45] [cursor=pointer]:
+                  - /url: /catalog/barcode
+              - listitem [ref=f2e46]:
+                - link "Thêm sách" [ref=f2e47] [cursor=pointer]:
+                  - /url: /catalog/books/new
+          - listitem [ref=f2e48]:
+            - button "Mượn trả" [ref=f2e49] [cursor=pointer]
+          - listitem [aria-hidden] [ref=f2e57]: Hệ thống
+          - listitem [ref=f2e58]:
+            - button "Quản trị" [ref=f2e59] [cursor=pointer]
+        - generic [ref=f2e68]:
+          - generic [ref=f2e69]:
+            - generic [aria-hidden] [ref=f2e70]: A
+            - generic [ref=f2e71]:
+              - generic "00000000-0000-0000-0000-000000000001" [ref=f2e72]: admin
+              - generic [ref=f2e73]: SUPER_ADMIN
+          - button "Đăng xuất" [ref=f2e74] [cursor=pointer]
+    - generic [ref=f2e78]:
+      - banner [ref=f2e79]:
+        - list [ref=f2e80]:
+          - listitem [ref=f2e81]:
+            - link "Trang chủ" [ref=f2e82] [cursor=pointer]:
+              - /url: /
+          - listitem [aria-hidden] [ref=f2e83]
+          - listitem [ref=f2e86]: Sách
+          - listitem [aria-hidden] [ref=f2e87]
+          - listitem [ref=f2e90]: Danh sách sách
+        - generic [ref=f2e91]:
+          - button "Thông báo, 0 chưa đọc" [ref=f2e92] [cursor=pointer]
+          - button "Tài khoản của tôi" [ref=f2e97] [cursor=pointer]:
+            - generic [aria-hidden] [ref=f2e98]: A
+      - main [ref=f2e99]:
+        - generic [ref=f2e101]:
+          - heading "Sách" [level=1] [ref=f2e102]
+          - paragraph [ref=f2e103]: Tìm đầu sách và xem số bản sẵn có.
+        - generic [ref=f2e104]:
+          - generic [ref=f2e105]:
+            - searchbox "Tìm theo tên sách, tác giả hoặc ISBN" [ref=f2e111]
+            - generic [ref=f2e113]:
+              - switch "Chỉ hiện sách còn bản sẵn sàng" [ref=f2e114] [cursor=pointer]
+              - generic [ref=f2e117]: Chỉ hiện sách còn bản sẵn sàng
+          - table [ref=f2e126]:
+            - rowgroup [ref=f2e127]:
+              - row [ref=f2e128]:
+                - columnheader "Tên sách" [ref=f2e129]
+                - columnheader "Tác giả" [ref=f2e130]
+                - columnheader "ISBN" [ref=f2e131]
+                - columnheader "Giá bìa" [ref=f2e132]
+                - columnheader "Còn sẵn" [ref=f2e133]
+            - rowgroup [ref=f2e134]:
+              - row [ref=f2e135]:
+                - cell "Trống Chưa có đầu sách nào. Thêm sách đầu tiên" [ref=f2e136]:
+                  - generic [ref=f2e137]:
+                    - img "Trống" [ref=f2e139]
+                    - generic [ref=f2e145]: Chưa có đầu sách nào.
+                    - link "Thêm sách đầu tiên" [ref=f2e149] [cursor=pointer]:
+                      - /url: /catalog/books/new
+  - button "Open Next.js Dev Tools" [ref=f2e156] [cursor=pointer]

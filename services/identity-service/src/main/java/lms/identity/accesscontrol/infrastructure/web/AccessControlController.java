@@ -14,6 +14,7 @@ import lms.identity.accesscontrol.application.PermissionManagementUseCase;
 import lms.identity.accesscontrol.application.RoleManagementUseCase;
 import lms.identity.accesscontrol.application.UserRoleUseCase;
 import lms.security.JwtClaims;
+import lms.security.permission.CrossTenantReadable;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
@@ -58,6 +59,7 @@ public class AccessControlController {
         return ResponseEntity.created(URI.create("/internal/permissions/" + response.code())).body(response);
     }
 
+    @CrossTenantReadable
     @GetMapping("/permissions")
     public List<PermissionResponse> listPermissions() {
         return permissions.list();
@@ -72,6 +74,7 @@ public class AccessControlController {
         return ResponseEntity.created(URI.create("/internal/roles/" + response.id())).body(response);
     }
 
+    @CrossTenantReadable
     @GetMapping("/roles")
     public List<RoleResponse> listRoles() {
         return roles.list();
@@ -82,12 +85,12 @@ public class AccessControlController {
         return roles.get(roleId);
     }
 
-    /** Chỉ đổi tên/mô tả. Role isAdmin chỉ quản trị viên được sửa; cờ isAdmin không đổi được. */
+    /** Đổi tên/mô tả và (tùy chọn) cờ signupDefault. Role isAdmin chỉ quản trị viên được sửa; cờ isAdmin không đổi được. */
     @PutMapping("/roles/{roleId}")
     public RoleResponse updateRole(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID roleId,
                                    @Valid @RequestBody UpdateRoleRequest request) {
         return roles.update(new AccessCommands.UpdateRole(roleId, request.name(), request.description(),
-                callerIsAdmin(jwt)));
+                callerIsAdmin(jwt), request.signupDefault()));
     }
 
     /** Xóa cứng; 409 ROLE_IN_USE khi còn người dùng được gán, LAST_ADMIN_ROLE khi là role quản trị duy nhất. */
@@ -98,8 +101,10 @@ public class AccessControlController {
     }
 
     @PostMapping("/roles/{roleId}/permissions")
-    public RoleResponse grantPermission(@PathVariable UUID roleId, @Valid @RequestBody GrantPermissionRequest request) {
-        return roles.grantPermission(new AccessCommands.GrantPermission(roleId, request.permissionCode()));
+    public RoleResponse grantPermission(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID roleId,
+                                        @Valid @RequestBody GrantPermissionRequest request) {
+        return roles.grantPermission(new AccessCommands.GrantPermission(roleId, request.permissionCode(),
+                callerIsAdmin(jwt)));
     }
 
     /** permissionCode có thể chứa dấu "/" (khóa Controller/method) nên dùng pattern bắt phần còn lại của đường dẫn. */

@@ -3,6 +3,7 @@ package lms.catalog.catalog.infrastructure.web;
 import lms.catalog.catalog.domain.DuplicateIsbnException;
 import lms.catalog.catalog.domain.InvalidTitleException;
 import lms.catalog.catalog.domain.TitleNotFoundException;
+import lms.catalog.catalog.domain.TitlePreviewTooLongException;
 import lms.common.kernel.ErrorResponse;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -22,6 +23,11 @@ public class CatalogExceptionHandler {
     @ExceptionHandler(DuplicateIsbnException.class)
     ResponseEntity<ErrorResponse> handleDuplicate(DuplicateIsbnException ex) {
         return build(HttpStatus.CONFLICT, "DUPLICATE_ISBN", ex.getMessage());
+    }
+
+    @ExceptionHandler(TitlePreviewTooLongException.class)
+    ResponseEntity<ErrorResponse> handlePreviewTooLong(TitlePreviewTooLongException ex) {
+        return build(HttpStatus.BAD_REQUEST, "TITLE_PREVIEW_TOO_LONG", ex.getMessage());
     }
 
     @ExceptionHandler(InvalidTitleException.class)

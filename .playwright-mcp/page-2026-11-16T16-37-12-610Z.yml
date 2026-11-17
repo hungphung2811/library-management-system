@@ -1,0 +1,154 @@
+- generic [active] [ref=f4e1]:
+  - generic [ref=f4e12]:
+    - complementary [ref=f4e13]:
+      - navigation "Điều hướng chính" [ref=f4e14]:
+        - generic [ref=f4e15]:
+          - link "Thư viện, về trang chủ" [ref=f4e16] [cursor=pointer]:
+            - /url: /
+            - generic [ref=f4e26]:
+              - generic [ref=f4e27]: Thư viện
+              - generic [ref=f4e28]: Quản lý mượn trả
+          - button "Thu gọn menu" [expanded] [ref=f4e29] [cursor=pointer]
+        - list [ref=f4e33]:
+          - listitem [ref=f4e34]:
+            - link "Trang chủ" [ref=f4e35] [cursor=pointer]:
+              - /url: /
+          - listitem [aria-hidden] [ref=f4e42]: Nghiệp vụ
+          - listitem [ref=f4e43]:
+            - button "Sách" [expanded] [ref=f4e44] [cursor=pointer]
+            - list [ref=f4e51]:
+              - listitem [ref=f4e52]:
+                - link "Danh sách sách" [ref=f4e53] [cursor=pointer]:
+                  - /url: /catalog
+              - listitem [ref=f4e54]:
+                - link "Tra mã vạch" [ref=f4e55] [cursor=pointer]:
+                  - /url: /catalog/barcode
+              - listitem [ref=f4e56]:
+                - link "Thêm sách" [ref=f4e57] [cursor=pointer]:
+                  - /url: /catalog/books/new
+          - listitem [ref=f4e58]:
+            - button "Mượn trả" [expanded] [ref=f4e59] [cursor=pointer]
+            - list [ref=f4e67]:
+              - listitem [ref=f4e68]:
+                - link "Lập phiếu mượn" [ref=f4e69] [cursor=pointer]:
+                  - /url: /circulation/borrow
+              - listitem [ref=f4e70]:
+                - link "Nhận trả sách" [ref=f4e71] [cursor=pointer]:
+                  - /url: /circulation/return
+              - listitem [ref=f4e72]:
+                - link "Tra phiếu mượn" [ref=f4e73] [cursor=pointer]:
+                  - /url: /circulation/borrowings
+              - listitem [ref=f4e74]:
+                - link "Đặt trước" [ref=f4e75] [cursor=pointer]:
+                  - /url: /circulation/reservations
+              - listitem [ref=f4e76]:
+                - link "Phạt" [ref=f4e77] [cursor=pointer]:
+                  - /url: /circulation/fines
+          - listitem [aria-hidden] [ref=f4e78]: Hệ thống
+          - listitem [ref=f4e79]:
+            - button "Quản trị" [expanded] [ref=f4e80] [cursor=pointer]
+            - list [ref=f4e88]:
+              - listitem [ref=f4e89]:
+                - link "Người dùng" [ref=f4e90] [cursor=pointer]:
+                  - /url: /admin/users
+              - listitem [ref=f4e91]:
+                - link "Vai trò và quyền" [ref=f4e92] [cursor=pointer]:
+                  - /url: /admin/roles
+              - listitem [ref=f4e93]:
+                - link "Phòng ban" [ref=f4e94] [cursor=pointer]:
+                  - /url: /admin/departments
+              - listitem [ref=f4e95]:
+                - link "Nhật ký hoạt động" [ref=f4e96] [cursor=pointer]:
+                  - /url: /admin/audit-logs
+    - generic [ref=f4e97]:
+      - banner [ref=f4e98]:
+        - list [ref=f4e99]:
+          - listitem [ref=f4e100]:
+            - link "Trang chủ" [ref=f4e101] [cursor=pointer]:
+              - /url: /
+          - listitem [aria-hidden] [ref=f4e102]
+          - listitem [ref=f4e105]: Mượn trả
+          - listitem [aria-hidden] [ref=f4e106]
+          - listitem [ref=f4e109]: Nhận trả sách
+        - generic [ref=f4e110]:
+          - 'button "Đơn vị làm việc: Thư viện mặc định" [ref=f4e111] [cursor=pointer]':
+            - generic [ref=f4e116]: Thư viện mặc định
+          - button "Thông báo, 0 chưa đọc" [ref=f4e119] [cursor=pointer]
+          - button "Tài khoản của tôi" [ref=f4e124] [cursor=pointer]:
+            - generic [aria-hidden] [ref=f4e125]: A
+            - generic [ref=f4e126]:
+              - generic [ref=f4e127]: admin
+              - generic [ref=f4e128]: SUPER_ADMIN
+      - main [ref=f4e131]:
+        - generic [ref=f4e132]:
+          - generic [ref=f4e134]:
+            - heading "Nhận trả sách" [level=1] [ref=f4e135]
+            - paragraph [ref=f4e136]: Nhập mã phiếu mượn rồi quét sách để nhận trả.
+          - generic [ref=f4e137]:
+            - generic [ref=f4e138]:
+              - generic [ref=f4e139]: 1. Mã phiếu mượn
+              - generic [ref=f4e142]:
+                - generic [ref=f4e143]: Mã phiếu mượn (UUID, dán từ phiếu in)
+                - generic [ref=f4e144]:
+                  - textbox "Mã phiếu mượn (UUID, dán từ phiếu in)" [ref=f4e145]: cd806ac3-f3a1-476e-950b-185973e9f2dd
+                  - button "Tải phiếu" [ref=f4e247] [cursor=pointer]
+                - paragraph [ref=f4e148]: Trả sách theo mã vạch (không cần mã phiếu) và báo hư hỏng khi trả đang chờ hệ thống hỗ trợ.
+            - generic [ref=f4e149]:
+              - alert [ref=f4e283]:
+                - img "check-circle" [ref=f4e285]
+                - generic [ref=f4e288]: Phiếu đã trả hết.
+              - generic [ref=f4e150]:
+                - generic [ref=f4e151]: Thông tin phiếu
+                - table [ref=f4e161]:
+                  - rowgroup [ref=f4e162]:
+                    - row [ref=f4e163]:
+                      - 'cell "Mã phiếu : cd806ac3-f3a1-476e-950b-185973e9f2dd Sao chép" [ref=f4e164]':
+                        - generic [ref=f4e165]:
+                          - generic [ref=f4e166]: "Mã phiếu :"
+                          - generic [ref=f4e169]:
+                            - text: cd806ac3-f3a1-476e-950b-185973e9f2dd
+                            - button "Sao chép" [ref=f4e171] [cursor=pointer]:
+                              - img "copy" [ref=f4e172]
+                      - 'cell "Độc giả (mã người dùng) : 4506f4df-82aa-4400-824e-48f9092e7d2c" [ref=f4e175]':
+                        - generic [ref=f4e176]:
+                          - generic [ref=f4e177]: "Độc giả (mã người dùng) :"
+                          - generic [ref=f4e178]: 4506f4df-82aa-4400-824e-48f9092e7d2c
+                    - row [ref=f4e272]:
+                      - 'cell "Ngày mượn : 16/11/2026" [ref=f4e181]':
+                        - generic [ref=f4e182]:
+                          - generic [ref=f4e183]: "Ngày mượn :"
+                          - generic [ref=f4e184]: 16/11/2026
+                      - 'cell "Hạn trả : 14/12/2026" [ref=f4e273]':
+                        - generic [ref=f4e186]:
+                          - generic [ref=f4e187]: "Hạn trả :"
+                          - generic [ref=f4e188]: 14/12/2026
+                    - row [ref=f4e290]:
+                      - 'cell "Trạng thái : Đã trả hết" [ref=f4e291]':
+                        - generic [ref=f4e192]:
+                          - generic [ref=f4e193]: "Trạng thái :"
+                          - generic [ref=f4e194]: Đã trả hết
+                      - 'cell "Đã gia hạn : 1/2 lần" [ref=f4e275]':
+                        - generic [ref=f4e198]:
+                          - generic [ref=f4e199]: "Đã gia hạn :"
+                          - generic [ref=f4e200]: 1/2 lần
+              - generic [ref=f4e216]:
+                - generic [ref=f4e217]: Sách trong phiếu
+                - table [ref=f4e229]:
+                  - rowgroup [ref=f4e230]:
+                    - row [ref=f4e231]:
+                      - columnheader "Tên sách" [ref=f4e232]
+                      - columnheader "Mã vạch" [ref=f4e233]
+                      - columnheader "Ngày trả" [ref=f4e234]
+                      - columnheader "Trạng thái" [ref=f4e235]
+                      - columnheader "Thao tác" [ref=f4e236]
+                  - rowgroup [ref=f4e237]:
+                    - row [ref=f4e292]:
+                      - cell "Toán rời rạc" [ref=f4e239]
+                      - cell "BC-TRR-002" [ref=f4e240]
+                      - cell "16/11/2026" [ref=f4e293]
+                      - cell "Đã trả" [ref=f4e294]
+                      - cell [ref=f4e295]
+  - alert [ref=f4e296]:
+    - generic [ref=f4e297]:
+      - img "check-circle" [ref=f4e299]
+      - generic [ref=f4e302]: Đã nhận trả «Toán rời rạc».

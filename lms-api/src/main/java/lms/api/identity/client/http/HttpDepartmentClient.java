@@ -26,17 +26,22 @@ public class HttpDepartmentClient implements DepartmentClient {
     }
 
     @Override
-    public List<DepartmentView> list(String status) {
-        var spec = (status == null || status.isBlank())
-                ? client.get().uri("/internal/departments")
-                : client.get().uri("/internal/departments?status={s}", status);
-        return spec.retrieve().body(new ParameterizedTypeReference<List<DepartmentView>>() { });
+    public List<DepartmentView> list(String status, String tenantId) {
+        return client.get().uri(b -> {
+            b.path("/internal/departments");
+            if (status != null && !status.isBlank()) b.queryParam("status", status);
+            if (tenantId != null && !tenantId.isBlank()) b.queryParam("tenantId", tenantId);
+            return b.build();
+        }).retrieve().body(new ParameterizedTypeReference<List<DepartmentView>>() { });
     }
 
     @Override
-    public List<DepartmentNodeView> tree(boolean includeInactive) {
-        return client.get().uri("/internal/departments/tree?includeInactive={i}", includeInactive).retrieve()
-                .body(new ParameterizedTypeReference<List<DepartmentNodeView>>() { });
+    public List<DepartmentNodeView> tree(boolean includeInactive, String tenantId) {
+        return client.get().uri(b -> {
+            b.path("/internal/departments/tree").queryParam("includeInactive", includeInactive);
+            if (tenantId != null && !tenantId.isBlank()) b.queryParam("tenantId", tenantId);
+            return b.build();
+        }).retrieve().body(new ParameterizedTypeReference<List<DepartmentNodeView>>() { });
     }
 
     @Override

@@ -9,6 +9,7 @@ import lms.api.catalog.dto.CreateTitleRequest;
 import lms.api.catalog.dto.TitleView;
 import lms.api.catalog.dto.UpdateTitleRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import java.net.URI;
 import java.util.List;
 import java.util.UUID;
@@ -19,7 +20,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /** API cho FE: tìm sách (UC02), quản lý đầu sách và bản sao (UC11). Quyền BOOK_VIEW/BOOK_CREATE do catalog-service kiểm. */
@@ -33,10 +33,16 @@ public class CatalogController {
         this.catalog = catalog;
     }
 
+    /** tenantId chỉ có tác dụng với platform admin không tenant (ADR-0008); chuyển nguyên xuống service. */
+    public record SearchBooksQuery(String keyword, Boolean available, String tenantId) {
+    }
+
+    public record CopiesQuery(@NotNull UUID titleId, String tenantId) {
+    }
+
     @GetMapping("/books")
-    public List<TitleView> search(@RequestParam(required = false) String keyword,
-                                  @RequestParam(defaultValue = "false") boolean available) {
-        return catalog.searchTitles(keyword, available);
+    public List<TitleView> search(SearchBooksQuery query) {
+        return catalog.searchTitles(query.keyword(), Boolean.TRUE.equals(query.available()), query.tenantId());
     }
 
     @GetMapping("/books/{id}")
@@ -56,9 +62,22 @@ public class CatalogController {
         return catalog.updateTitle(id, request);
     }
 
+    /** Đọc mô tả và preview (văn bản thuần). Khóa TitleController/preview do catalog kiểm. */
+    @GetMapping("/books/{id}/preview")
+    public lms.api.catalog.dto.TitlePreviewView preview(@PathVariable UUID id) {
+        return catalog.getPreview(id);
+    }
+
+    /** Thay mô tả và preview; null/rỗng = xóa. Độ dài do catalog kiểm (400 TITLE_PREVIEW_TOO_LONG). */
+    @PutMapping("/books/{id}/preview")
+    public lms.api.catalog.dto.TitlePreviewView updatePreview(
+            @PathVariable UUID id, @Valid @RequestBody lms.api.catalog.dto.UpdateTitlePreviewRequest request) {
+        return catalog.updatePreview(id, request);
+    }
+
     @GetMapping("/book-copies")
-    public List<CopyView> copies(@RequestParam UUID titleId) {
-        return catalog.listCopies(titleId);
+    public List<CopyView> copies(@Valid CopiesQuery query) {
+        return catalog.listCopies(query.titleId(), query.tenantId());
     }
 
     @PostMapping("/book-copies")

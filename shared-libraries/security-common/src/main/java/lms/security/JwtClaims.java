@@ -21,4 +21,24 @@ public final class JwtClaims {
     public static final String TENANT_ID = "tenantId";
     /** True khi người dùng là người vận hành nền tảng (platform admin); chỉ mở các endpoint {@code @PlatformAdminOnly}. */
     public static final String PLATFORM_ADMIN = "platformAdmin";
+    /** Mảng mã module đang bật của tenant trong token (ví dụ {@code ["LENDING","SALES"]}, ADR-0009). Phiên nền tảng không có. */
+    public static final String MODULES = "modules";
+    /**
+     * Có mặt chỉ ở token dịch vụ (không phải người dùng); giá trị là tên dịch vụ được cấp, ví dụ
+     * {@link #SERVICE_CUSTOMER_API}. Token có claim này chỉ dùng được ở endpoint {@code @StorefrontAccessible} (ADR-0011).
+     */
+    public static final String SERVICE = "svc";
+    /** Giá trị {@link #SERVICE} của token storefront do identity cấp cho customer-api. */
+    public static final String SERVICE_CUSTOMER_API = "customer-api";
+    /**
+     * Claim chuẩn {@code aud} (mảng chuỗi) tách KÊNH token (customer-api-data-authorization 5.3). Token đăng nhập qua
+     * customer-api mang {@link #AUDIENCE_STOREFRONT}: không admin/platformAdmin, bị lms-api từ chối, customer-api bắt
+     * buộc. Token đăng nhập qua lms-api (nhân viên) không có {@code aud} trong giai đoạn chuyển tiếp, hoặc mang
+     * {@link #AUDIENCE_STAFF} khi identity bật {@code lms.identity.token.staff-audience}.
+     */
+    public static final String AUDIENCE = "aud";
+    /** aud của token kênh storefront (website khách do customer-api phục vụ). */
+    public static final String AUDIENCE_STOREFRONT = "lms-storefront";
+    /** aud của token kênh nhân viên (lms-api), chỉ ghi khi bật cờ cấu hình ở identity. */
+    public static final String AUDIENCE_STAFF = "lms-staff";
 }

@@ -29,7 +29,8 @@ public class AuditLogPersistenceAdapter implements AuditLogRepository, SaveAudit
                 log.recordedAt(), log.payload()) == 1;
     }
 
-    /** Tìm kiếm: Hibernate (@TenantId) tự lọc theo TenantContext, RLS lọc thêm ở DB; không có tenant thì không có dòng nào. */
+    /** Tìm kiếm: Hibernate (@TenantId) tự lọc theo TenantContext, RLS lọc thêm ở DB; không có tenant thì không có dòng nào.
+     * Phạm vi ALL của platform admin (ADR-0008): resolver trả root nên Hibernate bỏ điều kiện, RLS cho đọc qua platform_read_all. */
     @Override
     public AuditLogPage search(AuditLogCriteria criteria) {
         Specification<AuditLogJpaEntity> spec = (root, query, cb) -> {
@@ -50,6 +51,6 @@ public class AuditLogPersistenceAdapter implements AuditLogRepository, SaveAudit
 
     private static AuditLog toDomain(AuditLogJpaEntity e) {
         return new AuditLog(e.getId(), e.getEventId(), e.getEventType(), e.getAggregateId(), e.getOccurredAt(),
-                e.getRecordedAt(), e.getPayload());
+                e.getRecordedAt(), e.getPayload(), e.getTenantId());
     }
 }

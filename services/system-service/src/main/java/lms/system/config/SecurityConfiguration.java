@@ -4,6 +4,7 @@ import lms.security.PermissionJwtConverter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -30,6 +31,11 @@ public class SecurityConfiguration {
                 .authorizeHttpRequests(a -> a
                         .requestMatchers("/actuator/health/**", "/actuator/info", "/v3/api-docs/**", "/swagger-ui/**",
                                 "/swagger-ui.html").permitAll()
+                        // ADR-0011: customer-api đọc trang đã xuất bản và gửi form liên hệ, không có JWT. permitAll
+                        // đúng ba (method, đường dẫn); CmsPublicController thêm @PublicEndpoint. Đặt trước /internal/**
+                        .requestMatchers(HttpMethod.GET, "/internal/cms/public/pages",
+                                "/internal/cms/public/pages/*").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/internal/cms/public/contact-requests").permitAll()
                         // Chỉ xác thực ở đây; quyền theo endpoint (Controller/method) do PermissionInterceptor kiểm
                         .requestMatchers("/internal/**").authenticated()
                         .anyRequest().denyAll())

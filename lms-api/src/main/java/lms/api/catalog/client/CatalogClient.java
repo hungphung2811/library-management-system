@@ -13,7 +13,7 @@ import java.util.UUID;
 /** Cổng sang catalog-service (API nội bộ). Lỗi 4xx của service được ném dưới dạng RestClientResponseException. */
 public interface CatalogClient {
 
-    List<TitleView> searchTitles(String keyword, boolean onlyAvailable);
+    List<TitleView> searchTitles(String keyword, boolean onlyAvailable, String tenantId);
 
     TitleView getTitle(UUID id);
 
@@ -21,7 +21,11 @@ public interface CatalogClient {
 
     TitleView updateTitle(UUID id, UpdateTitleRequest request);
 
-    List<CopyView> listCopies(UUID titleId);
+    lms.api.catalog.dto.TitlePreviewView getPreview(UUID id);
+
+    lms.api.catalog.dto.TitlePreviewView updatePreview(UUID id, lms.api.catalog.dto.UpdateTitlePreviewRequest request);
+
+    List<CopyView> listCopies(UUID titleId, String tenantId);
 
     CopyView addCopy(AddCopyRequest request);
 

@@ -1,5 +1,6 @@
 package lms.support.audit.infrastructure.web;
 
+import lms.security.permission.CrossTenantReadable;
 import lms.support.audit.application.AuditLogResponse;
 import lms.support.audit.application.PageResponse;
 import lms.support.audit.application.QueryAuditLogsUseCase;
@@ -20,6 +21,7 @@ public class AuditLogController {
     }
 
     @GetMapping
+    @CrossTenantReadable
     public PageResponse<AuditLogResponse> search(@RequestParam(required = false) String aggregateId,
                                                  @RequestParam(required = false) String eventType,
                                                  @RequestParam(defaultValue = "0") int page,

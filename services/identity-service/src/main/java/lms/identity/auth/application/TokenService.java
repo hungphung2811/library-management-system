@@ -2,15 +2,19 @@ package lms.identity.auth.application;
 
 import lms.identity.auth.application.AuthDtos.TokenResponse;
 import lms.identity.auth.domain.AccountDisabledException;
+import lms.identity.auth.domain.InvalidCredentialsException;
 import lms.identity.auth.domain.RefreshToken;
+import lms.identity.auth.domain.TokenChannel;
 import lms.identity.auth.domain.UserCredential;
 import lms.identity.tenant.application.TenantChoice;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
+import lms.security.JwtClaims;
 import lms.tenant.TenantContext;
 
 /**
@@ -38,6 +42,15 @@ public class TokenService {
     private final Duration refreshTokenTtl;
     private final UserDirectoryPort userDirectory;
     private final TenantAccessPort tenantAccess;
+    private final List<String> storefrontPermissions;
+
+    /**
+     * Allowlist mặc định của token kênh STOREFRONT (A19/A5 mở rộng): chỉ khóa "của tôi" của khách và tra cứu catalog.
+     * Mục kết thúc bằng {@code /*} khớp mọi khóa cùng controller; mục khác khớp chính xác. Cấu hình bằng
+     * {@code lms.identity.token.storefront-permissions}.
+     */
+    public static final List<String> DEFAULT_STOREFRONT_PERMISSIONS =
+            List.of("ShopController/*", "TitleController/lookup");
 
     public TokenService(UserAccessPort userAccessPort, TokenIssuerPort tokenIssuer, RefreshTokenCodecPort codec,
                         SaveRefreshTokenPort refreshTokens, Clock clock, Duration refreshTokenTtl,
@@ -49,6 +62,16 @@ public class TokenService {
     public TokenService(UserAccessPort userAccessPort, TokenIssuerPort tokenIssuer, RefreshTokenCodecPort codec,
                         SaveRefreshTokenPort refreshTokens, Clock clock, Duration refreshTokenTtl,
                         UserDirectoryPort userDirectory, TenantAccessPort tenantAccess) {
+        this(userAccessPort, tokenIssuer, codec, refreshTokens, clock, refreshTokenTtl, userDirectory, tenantAccess,
+                DEFAULT_STOREFRONT_PERMISSIONS);
+    }
+
+    public TokenService(UserAccessPort userAccessPort, TokenIssuerPort tokenIssuer, RefreshTokenCodecPort codec,
+                        SaveRefreshTokenPort refreshTokens, Clock clock, Duration refreshTokenTtl,
+                        UserDirectoryPort userDirectory, TenantAccessPort tenantAccess,
+                        Collection<String> storefrontPermissions) {
+        this.storefrontPermissions = storefrontPermissions == null ? DEFAULT_STOREFRONT_PERMISSIONS
+                : storefrontPermissions.stream().map(String::trim).filter(x -> !x.isEmpty()).toList();
         this.userAccessPort = userAccessPort;
         this.tokenIssuer = tokenIssuer;
         this.codec = codec;
@@ -71,6 +94,17 @@ public class TokenService {
     }
 
     /**
+     * Đăng nhập mật khẩu theo kênh. Kênh STOREFRONT (customer-api): token mang {@code aud = lms-storefront} và KHÔNG
+     * mang admin/platformAdmin dù tài khoản có role admin (nhân viên đăng nhập ở storefront nhận token hạn chế); phiên
+     * storefront bắt buộc có tenant. Refresh token lưu kênh để làm mới giữ kênh.
+     */
+    public TokenResponse issueFor(UserCredential credential, String tenantCodeOrNull, TokenChannel channel) {
+        return issue(credential, credential.mustChangePassword(),
+                () -> tenantAccess.selectForLogin(credential.userId(), tenantCodeOrNull, credential.platformAdmin()),
+                null, channel);
+    }
+
+    /**
      * Đăng nhập ngoài không dùng mật khẩu nội bộ nên không bị ràng buộc "phải đổi mật khẩu" (mật khẩu tạm có thể
      * người dùng chưa từng biết). Tenant chọn như đăng nhập không có mã.
      */
@@ -89,15 +123,17 @@ public class TokenService {
      * (replacedOrNull) trong cùng giao dịch lưu refresh token mới. Lỗi trước bước lưu thì token hiện tại giữ nguyên.
      */
     public TokenResponse issueForTenant(UserCredential credential, TenantChoice choice, RefreshToken replacedOrNull) {
-        return issue(credential, credential.mustChangePassword(), () -> choice, replacedOrNull);
+        // Làm mới giữ kênh của refresh token gốc (token cũ không có kênh là STAFF)
+        TokenChannel channel = replacedOrNull == null ? TokenChannel.STAFF : replacedOrNull.channel();
+        return issue(credential, credential.mustChangePassword(), () -> choice, replacedOrNull, channel);
     }
 
     private TokenResponse issue(UserCredential credential, boolean mustChange, Supplier<TenantChoice> tenantChoice) {
-        return issue(credential, mustChange, tenantChoice, null);
+        return issue(credential, mustChange, tenantChoice, null, TokenChannel.STAFF);
     }
 
     private TokenResponse issue(UserCredential credential, boolean mustChange, Supplier<TenantChoice> tenantChoice,
-                                RefreshToken replacedOrNull) {
+                                RefreshToken replacedOrNull, TokenChannel channel) {
         // Người dùng bị vô hiệu hóa ở context user thì không được cấp token mới (cả đăng nhập, làm mới và đăng nhập ngoài)
         Optional<UserDirectoryPort.UserInfo> directory = userDirectory.find(credential.userId());
         if (directory.isPresent() && directory.get().disabled()) {
@@ -106,6 +142,11 @@ public class TokenService {
         // Chọn tenant sau khi biết tài khoản còn dùng được; không có tenant nào thì từ chối ở đây (trước khi phát hành)
         TenantChoice choice = tenantChoice.get();
         UUID tenantId = choice.tenantId();
+        boolean storefront = channel == TokenChannel.STOREFRONT;
+        // Phiên storefront luôn thuộc một tenant cụ thể (platform admin không tenant không có phiên storefront)
+        if (storefront && tenantId == null) {
+            throw new InvalidCredentialsException();
+        }
         if (tenantId == null && !credential.platformAdmin()) {
             throw new IllegalStateException("Chỉ platform admin mới có phiên không thuộc tenant nào");
         }
@@ -117,19 +158,43 @@ public class TokenService {
                 : new UserAccessPort.UserAccess(credential.userId(), List.of(), List.of(), false);
         // Phải đổi mật khẩu trước: token không mang permission nào nên mọi endpoint kiểm quyền (ở mọi service) đều
         // từ chối, chỉ còn các endpoint chỉ cần đăng nhập, như đổi mật khẩu. Vẫn mang tenantId.
+        // Module của tenant đã chọn (ADR-0009): đọc ở mọi đường cấp token (đăng nhập, làm mới, đổi tenant); phiên nền
+        // tảng không có tenant thì không có claim. Bảng toàn cục, đọc bằng transaction ngắn của riêng nó (R20).
+        List<String> modules = tenantId != null ? tenantAccess.modules(tenantId) : null;
         TokenIssuerPort.IssuedToken accessToken = tokenIssuer.issue(new TokenIssuerPort.Claims(
                 credential.userId(), credential.username(), departmentId,
-                access.roles(), mustChange ? List.of() : access.permissions(), mustChange,
-                !mustChange && access.admin(), tenantId, !mustChange && credential.platformAdmin()));
+                access.roles(), mustChange ? List.of() : permissionsFor(access.permissions(), storefront), mustChange,
+                !storefront && !mustChange && access.admin(), tenantId,
+                !storefront && !mustChange && credential.platformAdmin(), modules,
+                storefront ? JwtClaims.AUDIENCE_STOREFRONT : null));
 
         String rawRefresh = codec.generate();
         String hash = codec.hash(rawRefresh);
         RefreshToken refresh = tenantId != null
-                ? RefreshToken.issueForTenant(credential.userId(), tenantId, hash, clock.instant(), refreshTokenTtl)
+                ? RefreshToken.issueForTenant(credential.userId(), tenantId, hash, clock.instant(), refreshTokenTtl,
+                        channel)
                 : RefreshToken.issueForPlatform(credential.userId(), hash, clock.instant(), refreshTokenTtl);
         if (replacedOrNull != null) replacedOrNull.revoke();
         refreshTokens.rotate(replacedOrNull, refresh);
         return TokenResponse.bearer(accessToken.value(), rawRefresh, accessToken.expiresInSeconds(), mustChange,
                 tenantId, choice.available());
+    }
+
+    /**
+     * Kênh STOREFRONT chỉ mang khóa thuộc allowlist: token chạy trong trình duyệt của website tenant kiểm soát, nên dù
+     * tài khoản (nhân viên đăng nhập ở storefront, hoặc role khách bị gán thêm khóa) có khóa khác thì cũng không vào token.
+     */
+    private List<String> permissionsFor(List<String> permissions, boolean storefront) {
+        if (!storefront) return permissions;
+        return permissions.stream().filter(this::allowedOnStorefront).toList();
+    }
+
+    private boolean allowedOnStorefront(String key) {
+        for (String rule : storefrontPermissions) {
+            if (rule.endsWith("/*") ? key.startsWith(rule.substring(0, rule.length() - 1)) : key.equals(rule)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

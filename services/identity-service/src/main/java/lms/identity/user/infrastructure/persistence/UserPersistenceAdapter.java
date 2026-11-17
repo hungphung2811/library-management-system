@@ -7,13 +7,10 @@ import lms.identity.user.domain.UserCriteria;
 import lms.identity.user.domain.UserPage;
 import lms.identity.user.domain.UserRepository;
 import jakarta.persistence.criteria.Predicate;
-import jakarta.persistence.criteria.Root;
-import jakarta.persistence.criteria.Subquery;
+import jakarta.persistence.criteria.Join;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -90,35 +87,32 @@ class UserPersistenceAdapter implements UserRepository {
 
     @Override
     public UserPage search(UserCriteria c) {
-        Specification<UserJpaEntity> spec = (root, query, cb) -> {
+        // Truy vấn theo dòng membership (tenant_memberships join users): tenantId có giá trị thì một tenant (mỗi người một
+        // dòng), null thì mọi tenant (phạm vi ALL của platform admin, ADR-0008): mỗi dòng là một cặp (user, tenant) và
+        // người không có membership không xuất hiện. users và tenant_memberships là bảng toàn cục, không phụ thuộc RLS.
+        Specification<UserMembershipJpaEntity> spec = (root, query, cb) -> {
+            boolean count = query.getResultType() == Long.class || query.getResultType() == long.class;
+            // truy vấn dữ liệu nạp luôn hồ sơ (tránh N+1); truy vấn đếm chỉ join
+            @SuppressWarnings("unchecked")
+            Join<UserMembershipJpaEntity, UserJpaEntity> user = count ? root.join("user")
+                    : (Join<UserMembershipJpaEntity, UserJpaEntity>) (Object) root.fetch("user");
             List<Predicate> predicates = new ArrayList<>();
-            // chỉ người có membership ở tenant (và phòng ban trong tenant đó nếu lọc)
-            Subquery<UUID> members = query.subquery(UUID.class);
-            Root<UserMembershipJpaEntity> m = members.from(UserMembershipJpaEntity.class);
-            List<Predicate> memberPredicates = new ArrayList<>();
-            memberPredicates.add(cb.equal(m.get("tenantId"), c.tenantId()));
-            if (c.departmentId() != null) memberPredicates.add(cb.equal(m.get("departmentId"), c.departmentId()));
-            members.select(m.get("userId")).where(memberPredicates.toArray(new Predicate[0]));
-            predicates.add(root.get("id").in(members));
+            if (c.tenantId() != null) predicates.add(cb.equal(root.get("tenantId"), c.tenantId()));
+            if (c.departmentId() != null) predicates.add(cb.equal(root.get("departmentId"), c.departmentId()));
             if (c.keyword() != null) {
                 String like = "%" + c.keyword().toLowerCase().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
                 predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("username")), like, '\\'),
-                        cb.like(cb.lower(root.get("fullName")), like, '\\'),
-                        cb.like(cb.lower(root.get("email")), like, '\\')));
+                        cb.like(cb.lower(user.get("username")), like, '\\'),
+                        cb.like(cb.lower(user.get("fullName")), like, '\\'),
+                        cb.like(cb.lower(user.get("email")), like, '\\')));
             }
-            if (c.status() != null) predicates.add(cb.equal(root.get("status"), c.status()));
+            if (c.status() != null) predicates.add(cb.equal(user.get("status"), c.status()));
             return cb.and(predicates.toArray(new Predicate[0]));
         };
-        Page<UserJpaEntity> page = jpa.findAll(spec, PageRequest.of(c.page(), c.size(), Sort.by("username")));
-        List<UUID> ids = page.getContent().stream().map(UserJpaEntity::getId).toList();
-        Map<UUID, UUID> departmentOf = new HashMap<>();
-        if (!ids.isEmpty()) {
-            memberships.findByTenantIdAndUserIdIn(c.tenantId(), ids)
-                    .forEach(mb -> departmentOf.put(mb.getUserId(), mb.getDepartmentId()));
-        }
+        Page<UserMembershipJpaEntity> page = memberships.findAll(spec,
+                PageRequest.of(c.page(), c.size(), Sort.by("user.username", "tenantId")));
         return new UserPage(page.getContent().stream()
-                .map(e -> new TenantUser(toDomain(e), c.tenantId(), departmentOf.get(e.getId()))).toList(),
+                .map(m -> new TenantUser(toDomain(m.getUser()), m.getTenantId(), m.getDepartmentId())).toList(),
                 page.getTotalElements(), c.page(), c.size());
     }
 

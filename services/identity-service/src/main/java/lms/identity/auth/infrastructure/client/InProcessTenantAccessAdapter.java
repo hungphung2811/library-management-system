@@ -6,6 +6,7 @@ import java.util.UUID;
 import lms.identity.auth.application.TenantAccessPort;
 import lms.identity.tenant.application.AddMembershipUseCase;
 import lms.identity.tenant.application.ListMyTenantsUseCase;
+import lms.identity.tenant.application.ListTenantModulesUseCase;
 import lms.identity.tenant.application.MembershipLookupUseCase;
 import lms.identity.tenant.application.ResolveLoginTenantUseCase;
 import lms.identity.tenant.application.SwitchTenantUseCase;
@@ -25,16 +26,19 @@ public class InProcessTenantAccessAdapter implements TenantAccessPort {
     private final ListMyTenantsUseCase listMine;
     private final AddMembershipUseCase addMembership;
     private final MembershipLookupUseCase lookup;
+    private final ListTenantModulesUseCase moduleLookup;
 
     public InProcessTenantAccessAdapter(ResolveLoginTenantUseCase resolve, SwitchTenantUseCase switchTenant,
                                         VerifyTenantAccessUseCase verify, ListMyTenantsUseCase listMine,
-                                        AddMembershipUseCase addMembership, MembershipLookupUseCase lookup) {
+                                        AddMembershipUseCase addMembership, MembershipLookupUseCase lookup,
+                                        ListTenantModulesUseCase moduleLookup) {
         this.resolve = resolve;
         this.switchTenant = switchTenant;
         this.verify = verify;
         this.listMine = listMine;
         this.addMembership = addMembership;
         this.lookup = lookup;
+        this.moduleLookup = moduleLookup;
     }
 
     @Override
@@ -50,6 +54,11 @@ public class InProcessTenantAccessAdapter implements TenantAccessPort {
     @Override
     public TenantChoice verify(UUID userId, UUID tenantId) {
         return verify.execute(userId, tenantId);
+    }
+
+    @Override
+    public List<String> modules(UUID tenantId) {
+        return moduleLookup.enabledCodes(tenantId);
     }
 
     @Override

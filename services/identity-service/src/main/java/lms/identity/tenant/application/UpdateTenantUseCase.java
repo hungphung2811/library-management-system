@@ -6,6 +6,7 @@ import lms.identity.tenant.domain.OrganizationRepository;
 import lms.identity.tenant.domain.PlatformOperationEvent;
 import lms.identity.tenant.domain.Tenant;
 import lms.identity.tenant.domain.TenantNotFoundException;
+import lms.identity.tenant.domain.TenantModuleRepository;
 import lms.identity.tenant.domain.TenantQueryRepository;
 import lms.identity.tenant.domain.TenantRepository;
 import lms.tenant.TenantContext;
@@ -18,14 +19,17 @@ public class UpdateTenantUseCase {
     private final TenantQueryRepository queries;
     private final PublishPlatformEventPort events;
     private final TransactionalRunner tx;
+    private final TenantModuleRepository modules;
 
     public UpdateTenantUseCase(TenantRepository tenants, OrganizationRepository organizations,
-                               TenantQueryRepository queries, PublishPlatformEventPort events, TransactionalRunner tx) {
+                               TenantQueryRepository queries, PublishPlatformEventPort events, TransactionalRunner tx,
+                               TenantModuleRepository modules) {
         this.tenants = tenants;
         this.organizations = organizations;
         this.queries = queries;
         this.events = events;
         this.tx = tx;
+        this.modules = modules;
     }
 
     public TenantResponse execute(UUID tenantId, UpdateTenantRequest request, UUID actorId) {
@@ -43,7 +47,8 @@ public class UpdateTenantUseCase {
             });
             events.publish(PlatformOperationEvent.of("TENANT_UPDATED", actorId, tenantId, tenantId,
                     "name=" + tenant.name() + ", organizationId=" + tenant.organizationId()));
-            return TenantResponse.from(tenant, queries.countActiveMembers(List.of(tenantId)).getOrDefault(tenantId, 0L));
+            return TenantResponse.from(tenant, queries.countActiveMembers(List.of(tenantId)).getOrDefault(tenantId, 0L),
+                    modules.findByTenant(tenantId).enabled());
         });
     }
 }

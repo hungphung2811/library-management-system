@@ -73,6 +73,11 @@
             <scope>runtime</scope>
         </dependency>
         <dependency>
+            <!-- Render Markdown trang CMS (ADR-0011), chỉ dùng ở cms.infrastructure -->
+            <groupId>org.commonmark</groupId>
+            <artifactId>commonmark</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
         </dependency>

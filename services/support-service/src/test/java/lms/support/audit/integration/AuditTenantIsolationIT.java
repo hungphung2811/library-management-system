@@ -236,4 +236,23 @@ class AuditTenantIsolationIT {
         assertThat(superuserJdbc().queryForObject("SELECT COUNT(*) FROM audit_logs WHERE event_id = ?", Integer.class,
                 eventId)).isEqualTo(1);
     }
+
+    @Test
+    void salesEventsGhiAuditTheoTenantVaIdempotent() {
+        String aggregate = "order-" + UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        String message = "{\"eventId\":\"" + eventId + "\",\"eventType\":\"OrderCompleted\",\"aggregateId\":\""
+                + aggregate + "\",\"occurredAt\":\"2026-01-01T00:00:00Z\",\"version\":1,\"payload\":{\"action\":"
+                + "\"ORDER_CREATED\",\"aggregateType\":\"ORDER\",\"actorId\":\"" + UUID.randomUUID()
+                + "\",\"data\":{\"total\":150000}},\"tenantId\":\"" + TENANT_A + "\"}";
+
+        consumer.onEvent(message, "sales.events");
+        consumer.onEvent(message, "sales.events");
+
+        assertThat(items(TENANT_A, aggregate)).singleElement().satisfies(log -> {
+            assertThat(log.eventType()).isEqualTo("OrderCompleted");
+            assertThat(log.payload()).contains("ORDER_CREATED", "actorId");
+        });
+        assertThat(items(TENANT_B, aggregate)).isEmpty();
+    }
 }

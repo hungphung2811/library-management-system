@@ -137,6 +137,26 @@ class CatalogTenantIsolationIT {
     }
 
     @Test
+    void lookupChiTraDauSachCuaTenantTrongTokenVaBoIdTenantKhac() throws Exception {
+        RequestPostProcessor a = token(tenantA);
+        RequestPostProcessor b = token(tenantB);
+        String titleA = createTitle(a, "Lookup A " + suffix(), "978-LKA-" + suffix(), 201);
+        String titleB = createTitle(b, "Lookup B " + suffix(), "978-LKB-" + suffix(), 201);
+        String missing = UUID.randomUUID().toString();
+        String body = "{\"ids\":[\"" + titleB + "\",\"" + titleA + "\",\"" + missing + "\"]}";
+
+        mvc.perform(post("/internal/books/lookup").with(a).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(titleA))
+                .andExpect(jsonPath("$[0].coverPrice").value(100000));
+        mvc.perform(post("/internal/books/lookup").with(b).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(titleB));
+    }
+
+    @Test
     void tokenKhongCoTenantIdBi403TenantRequired() throws Exception {
         RequestPostProcessor noTenant = jwt().jwt(j -> j.claim("admin", true));
         mvc.perform(get("/internal/books").with(noTenant).param("keyword", "x"))

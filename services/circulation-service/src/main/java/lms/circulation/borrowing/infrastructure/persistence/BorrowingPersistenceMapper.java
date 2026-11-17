@@ -24,6 +24,7 @@ final class BorrowingPersistenceMapper {
                 .map(i -> new BorrowingItem(i.getBookCopyId(), i.getReturnDate(), i.getCondition()))
                 .toList();
         return BorrowingRecord.restore(new BorrowingId(entity.getId()), entity.getUserId(), items,
-                entity.getBorrowDate(), entity.getDueDate(), entity.getRenewCount(), entity.getLoanDays());
+                entity.getBorrowDate(), entity.getDueDate(), entity.getRenewCount(), entity.getLoanDays(),
+                entity.getTenantId());
     }
 }

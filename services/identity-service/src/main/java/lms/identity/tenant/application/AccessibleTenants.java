@@ -2,11 +2,14 @@ package lms.identity.tenant.application;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lms.identity.tenant.domain.Membership;
 import lms.identity.tenant.domain.MembershipRepository;
+import lms.identity.tenant.domain.ModuleCode;
 import lms.identity.tenant.domain.Tenant;
+import lms.identity.tenant.domain.TenantModuleRepository;
 import lms.identity.tenant.domain.TenantRepository;
 
 /**
@@ -38,7 +41,9 @@ final class AccessibleTenants {
         return memberships.find(userId, tenantId).map(Membership::departmentId).orElse(null);
     }
 
-    static List<TenantSummary> summaries(List<Tenant> accessible) {
-        return accessible.stream().map(TenantSummary::of).toList();
+    static List<TenantSummary> summaries(List<Tenant> accessible, TenantModuleRepository modules) {
+        Map<UUID, List<ModuleCode>> enabled = modules.enabledOf(accessible.stream().map(Tenant::id).toList());
+        return accessible.stream().map(t -> TenantSummary.of(t,
+                enabled.getOrDefault(t.id(), List.of()).stream().map(ModuleCode::name).toList())).toList();
     }
 }

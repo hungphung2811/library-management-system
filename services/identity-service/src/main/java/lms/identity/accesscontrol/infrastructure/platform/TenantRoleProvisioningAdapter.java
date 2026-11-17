@@ -1,6 +1,9 @@
 package lms.identity.accesscontrol.infrastructure.platform;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -40,25 +43,54 @@ public class TenantRoleProvisioningAdapter implements TenantRoleProvisioningPort
         this.jdbc = jdbc;
     }
 
-    private record Template(String name, String description, boolean admin, Set<String> permissions) {
+    private record Template(String name, String description, boolean admin, boolean signupDefault,
+                            Set<String> permissions) {
     }
 
     @Override
-    public int seedFromTemplates() {
+    public int seedFromTemplates(Collection<String> modules) {
         TenantContext.require();
+        List<String> wanted = List.copyOf(modules);
+        String marks = String.join(",", Collections.nCopies(wanted.size(), "?"));
+        String where = wanted.isEmpty() ? "module IS NULL" : "module IS NULL OR module IN (" + marks + ")";
+        return seed(where, wanted.toArray());
+    }
+
+    @Override
+    public int seedModuleTemplates(String module) {
+        TenantContext.require();
+        return seed("module = ?", new Object[] {module});
+    }
+
+    private int seed(String templateFilter, Object[] args) {
         Map<UUID, Template> templates = new LinkedHashMap<>();
-        jdbc.query("SELECT id, name, description, is_admin FROM role_templates ORDER BY name", rs -> {
+        jdbc.query("SELECT id, name, description, is_admin, signup_default FROM role_templates WHERE " + templateFilter
+                + " ORDER BY name", rs -> {
             templates.put(rs.getObject("id", UUID.class), new Template(rs.getString("name"),
-                    rs.getString("description"), rs.getBoolean("is_admin"), new LinkedHashSet<>()));
-        });
+                    rs.getString("description"), rs.getBoolean("is_admin"), rs.getBoolean("signup_default"),
+                    new LinkedHashSet<>()));
+        }, args);
+        if (templates.isEmpty()) return 0;
         jdbc.query("SELECT template_id, permission_code FROM role_template_permissions ORDER BY permission_code", rs -> {
             Template t = templates.get(rs.getObject("template_id", UUID.class));
             if (t != null) t.permissions().add(rs.getString("permission_code"));
         });
+        Set<String> existing = new HashSet<>();
+        List<Role> current = roles.findAll();
+        current.forEach(r -> existing.add(r.name()));
+        // Mỗi tenant tối đa một role signup_default (chỉ mục duy nhất): chỉ mẫu đầu tiên được mang cờ, và role admin
+        // không bao giờ mang cờ dù mẫu có đánh dấu nhầm (CHECK ở DB cũng cấm)
+        boolean signupTaken = current.stream().anyMatch(Role::isSignupDefault);
+        int created = 0;
         for (Template t : templates.values()) {
-            saveRole.save(Role.restore(RoleId.newId(), t.name(), t.description(), t.admin(), t.permissions()));
+            if (existing.contains(t.name())) continue;
+            boolean signup = t.signupDefault() && !t.admin() && !signupTaken;
+            saveRole.save(Role.restore(RoleId.newId(), t.name(), t.description(), t.admin(), t.permissions(), null,
+                    signup));
+            signupTaken |= signup;
+            created++;
         }
-        return templates.size();
+        return created;
     }
 
     @Override

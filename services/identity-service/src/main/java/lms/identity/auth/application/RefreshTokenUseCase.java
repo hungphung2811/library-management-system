@@ -4,6 +4,7 @@ import lms.identity.auth.application.AuthDtos.TokenResponse;
 import lms.identity.auth.domain.InvalidRefreshTokenException;
 import lms.identity.auth.domain.UserCredential;
 import lms.identity.auth.domain.RefreshToken;
+import lms.identity.auth.domain.TokenChannel;
 import lms.identity.auth.domain.RefreshTokenRepository;
 import lms.identity.auth.domain.UserCredentialRepository;
 import lms.identity.tenant.application.TenantChoice;
@@ -43,6 +44,25 @@ public class RefreshTokenUseCase {
     }
 
     public TokenResponse execute(String rawRefreshToken) {
+        return execute(rawRefreshToken, TokenChannel.STAFF);
+    }
+
+    /**
+     * Làm mới theo kênh người gọi (A18): refresh token chỉ làm mới được ở đúng kênh đã phát hành (STAFF qua lms-api,
+     * STOREFRONT qua customer-api); lệch kênh thì 401 như token không hợp lệ và token KHÔNG bị thu hồi/xoay vòng (để
+     * kênh đúng vẫn dùng được). Phiên mới giữ kênh của token gốc.
+     */
+    public TokenResponse execute(String rawRefreshToken, TokenChannel channel) {
+        return execute(rawRefreshToken, channel, null);
+    }
+
+    /**
+     * Như trên, thêm kiểm tenant (ADR-0013 2.4): {@code expectedTenantId} khác null mà khác {@code refresh_tokens.tenant_id}
+     * (kể cả token phiên nền tảng có tenant NULL) thì 401 như token không hợp lệ. Kiểm SAU bước phát hiện dùng lại token đã
+     * thu hồi (giữ nguyên bảo vệ đó) và TRƯỚC khi xoay vòng: token đúng nhưng gọi nhầm tenant không bị thu hồi.
+     */
+    public TokenResponse execute(String rawRefreshToken, TokenChannel channel, java.util.UUID expectedTenantId) {
+        TokenChannel expected = channel == null ? TokenChannel.STAFF : channel;
         Instant now = clock.instant();
         RefreshToken token = refreshRepository.findByTokenHash(codec.hash(rawRefreshToken))
                 .orElseThrow(() -> new InvalidRefreshTokenException("Refresh token không hợp lệ"));
@@ -52,6 +72,12 @@ public class RefreshTokenUseCase {
             throw new InvalidRefreshTokenException("Refresh token đã được dùng, mọi phiên của người dùng bị thu hồi");
         }
         token.ensureUsable(now);
+        if (token.channel() != expected) {
+            throw new InvalidRefreshTokenException("Refresh token không hợp lệ");
+        }
+        if (expectedTenantId != null && !expectedTenantId.equals(token.tenantId())) {
+            throw new InvalidRefreshTokenException("Refresh token không hợp lệ");
+        }
 
         UserCredential credential = credentialRepository.findByUserId(token.userId())
                 .orElseThrow(() -> new InvalidRefreshTokenException("Tài khoản không còn tồn tại"));

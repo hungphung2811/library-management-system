@@ -7,6 +7,7 @@ import java.util.UUID;
 import lms.identity.tenant.domain.MembershipRepository;
 import lms.identity.tenant.domain.NoTenantAccessException;
 import lms.identity.tenant.domain.Tenant;
+import lms.identity.tenant.domain.TenantModuleRepository;
 import lms.identity.tenant.domain.TenantRepository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,10 +21,13 @@ public class ResolveLoginTenantUseCase {
 
     private final TenantRepository tenants;
     private final MembershipRepository memberships;
+    private final TenantModuleRepository modules;
 
-    public ResolveLoginTenantUseCase(TenantRepository tenants, MembershipRepository memberships) {
+    public ResolveLoginTenantUseCase(TenantRepository tenants, MembershipRepository memberships,
+                                     TenantModuleRepository modules) {
         this.tenants = tenants;
         this.memberships = memberships;
+        this.modules = modules;
     }
 
     public TenantChoice execute(UUID userId, String tenantCodeOrNull) {
@@ -37,7 +41,7 @@ public class ResolveLoginTenantUseCase {
     @Transactional
     public TenantChoice execute(UUID userId, String tenantCodeOrNull, boolean platformAdmin) {
         List<Tenant> accessible = AccessibleTenants.of(userId, tenants, memberships);
-        List<TenantSummary> available = AccessibleTenants.summaries(accessible);
+        List<TenantSummary> available = AccessibleTenants.summaries(accessible, modules);
         String code = tenantCodeOrNull == null ? "" : tenantCodeOrNull.trim().toLowerCase(Locale.ROOT);
         Optional<UUID> last = memberships.findLastTenant(userId);
 

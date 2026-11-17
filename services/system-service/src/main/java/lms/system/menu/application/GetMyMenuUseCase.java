@@ -26,7 +26,12 @@ public class GetMyMenuUseCase {
         if (tenantId == null) {
             return List.of();
         }
-        return new MenuTree(tenantId, load(tenantId)).visibleFor(viewer);
+        List<MenuItem> items = load(tenantId);
+        if (items.isEmpty()) {
+            // Tenant chưa có dữ liệu riêng: dùng bộ mặc định trong code (không trộn với dữ liệu tenant)
+            items = DefaultMenus.itemsFor(tenantId);
+        }
+        return new MenuTree(tenantId, items).visibleFor(viewer);
     }
 
     private List<MenuItem> load(UUID tenantId) {

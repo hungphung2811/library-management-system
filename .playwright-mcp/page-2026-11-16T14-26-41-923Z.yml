@@ -1,0 +1,94 @@
+- generic [active] [ref=f3e1]:
+  - generic [ref=f3e2]:
+    - complementary [ref=f3e3]:
+      - navigation "Điều hướng chính" [ref=f3e4]:
+        - generic [ref=f3e5]:
+          - link "Thư viện, về trang chủ" [ref=f3e6] [cursor=pointer]:
+            - /url: /
+            - generic [ref=f3e16]:
+              - generic [ref=f3e17]: Thư viện
+              - generic [ref=f3e18]: Quản lý mượn trả
+          - button "Thu gọn menu" [expanded] [ref=f3e19] [cursor=pointer]
+        - list [ref=f3e23]:
+          - listitem [ref=f3e24]:
+            - link "Trang chủ" [ref=f3e25] [cursor=pointer]:
+              - /url: /
+          - listitem [aria-hidden] [ref=f3e32]: Nghiệp vụ
+          - listitem [ref=f3e33]:
+            - button "Sách" [expanded] [ref=f3e34] [cursor=pointer]
+            - list [ref=f3e41]:
+              - listitem [ref=f3e42]:
+                - link "Danh sách sách" [ref=f3e43] [cursor=pointer]:
+                  - /url: /catalog
+              - listitem [ref=f3e44]:
+                - link "Tra mã vạch" [ref=f3e45] [cursor=pointer]:
+                  - /url: /catalog/barcode
+              - listitem [ref=f3e46]:
+                - link "Thêm sách" [ref=f3e47] [cursor=pointer]:
+                  - /url: /catalog/books/new
+          - listitem [ref=f3e48]:
+            - button "Mượn trả" [expanded] [ref=f3e49] [cursor=pointer]
+            - list [ref=f3e57]:
+              - listitem [ref=f3e58]:
+                - link "Lập phiếu mượn" [ref=f3e59] [cursor=pointer]:
+                  - /url: /circulation/borrow
+              - listitem [ref=f3e60]:
+                - link "Nhận trả sách" [ref=f3e61] [cursor=pointer]:
+                  - /url: /circulation/return
+              - listitem [ref=f3e62]:
+                - link "Tra phiếu mượn" [ref=f3e63] [cursor=pointer]:
+                  - /url: /circulation/borrowings
+              - listitem [ref=f3e64]:
+                - link "Đặt trước" [ref=f3e65] [cursor=pointer]:
+                  - /url: /circulation/reservations
+              - listitem [ref=f3e66]:
+                - link "Phạt" [ref=f3e67] [cursor=pointer]:
+                  - /url: /circulation/fines
+          - listitem [aria-hidden] [ref=f3e68]: Hệ thống
+          - listitem [ref=f3e69]:
+            - button "Quản trị" [expanded] [ref=f3e70] [cursor=pointer]
+            - list [ref=f3e78]:
+              - listitem [ref=f3e79]:
+                - link "Người dùng" [ref=f3e80] [cursor=pointer]:
+                  - /url: /admin/users
+              - listitem [ref=f3e81]:
+                - link "Vai trò và quyền" [ref=f3e82] [cursor=pointer]:
+                  - /url: /admin/roles
+              - listitem [ref=f3e83]:
+                - link "Phòng ban" [ref=f3e84] [cursor=pointer]:
+                  - /url: /admin/departments
+              - listitem [ref=f3e85]:
+                - link "Nhật ký hoạt động" [ref=f3e86] [cursor=pointer]:
+                  - /url: /admin/audit-logs
+        - generic [ref=f3e88]:
+          - generic [ref=f3e89]:
+            - generic [aria-hidden] [ref=f3e90]: A
+            - generic [ref=f3e91]:
+              - generic "00000000-0000-0000-0000-000000000001" [ref=f3e92]: admin
+              - generic [ref=f3e93]: SUPER_ADMIN
+          - button "Đăng xuất" [ref=f3e94] [cursor=pointer]
+    - generic [ref=f3e98]:
+      - banner [ref=f3e99]:
+        - list [ref=f3e100]:
+          - listitem [ref=f3e101]:
+            - link "Trang chủ" [ref=f3e102] [cursor=pointer]:
+              - /url: /
+          - listitem [aria-hidden] [ref=f3e103]
+          - listitem [ref=f3e106]: Mượn trả
+          - listitem [aria-hidden] [ref=f3e107]
+          - listitem [ref=f3e110]: Phạt
+        - generic [ref=f3e111]:
+          - button "Thông báo, 0 chưa đọc" [ref=f3e112] [cursor=pointer]
+          - button "Tài khoản của tôi" [ref=f3e117] [cursor=pointer]:
+            - generic [aria-hidden] [ref=f3e118]: A
+      - main [ref=f3e119]:
+        - generic [ref=f3e120]:
+          - generic [ref=f3e122]:
+            - heading "Phạt" [level=1] [ref=f3e123]
+            - paragraph [ref=f3e124]: Tra cứu và thu phí phạt của độc giả.
+          - generic [ref=f3e125]:
+            - generic [ref=f3e128]:
+              - generic: Tìm độc giả theo tên, tài khoản hoặc email
+              - combobox [ref=f3e129]
+            - paragraph [ref=f3e134]: Chọn một độc giả để xem các khoản phạt.
+  - button "Open Next.js Dev Tools" [ref=f3e140] [cursor=pointer]

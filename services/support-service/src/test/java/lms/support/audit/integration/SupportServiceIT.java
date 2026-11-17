@@ -168,6 +168,15 @@ class SupportServiceIT {
                 .getCollection("raw_events").find(new Document("eventId", eventId.toString())).first();
     }
 
+    private static int migrationFileCount() {
+        try {
+            return new org.springframework.core.io.support.PathMatchingResourcePatternResolver()
+                    .getResources("classpath*:db/migration/audit/V*.sql").length;
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+    }
+
     private RecordAuditEventCommand event(UUID eventId, String type, String aggregateId) {
         return new RecordAuditEventCommand(eventId, type, aggregateId, Instant.now(), "{\"k\":\"v\"}");
     }
@@ -176,10 +185,13 @@ class SupportServiceIT {
     void khoiDongMoCaHaiConnectionVaSchemaAuditDbDuocBeanTestMigrate() {
         assertThat(registry.state("AUDIT_DB")).isEqualTo(ConnectionState.UP);
         assertThat(registry.state("LOG_DB")).isEqualTo(ConnectionState.UP);
-        // V1 + V2 thành công do bean auditFlyway của test chạy (script từ jar system-service)
+        // Mọi migration V*.sql của target audit thành công do bean auditFlyway của test chạy (script từ jar system-service);
+        // đếm động theo classpath để không hỏng mỗi lần thêm migration
+        int expectedMigrations = migrationFileCount();
+        assertThat(expectedMigrations).isPositive();
         assertThat(superuserJdbc()
                 .queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE success AND version IS NOT NULL",
-                        Integer.class)).isEqualTo(2);
+                        Integer.class)).isEqualTo(expectedMigrations);
         assertThat(context.getBean("auditDbTransactionManager")).isInstanceOf(JpaTransactionManager.class)
                 .isSameAs(registry.require("AUDIT_DB", RelationalConnection.class).transactionManager());
     }
@@ -264,7 +276,7 @@ class SupportServiceIT {
         assertThat(raw.getString("raw")).isEqualTo("{\"raw\":\"nguyên văn\"}");
         assertThat(raw.getString("topic")).isEqualTo("borrowing.events");
         long copies = registry.require("LOG_DB", MongoConnection.class).mongoTemplate().getCollection("raw_events")
-                .countDocuments(new Document("_id", eventId.toString()));
+                .countDocuments(new Document("_id", TENANT_A + ":" + eventId)); // _id = tenantId:eventId
         assertThat(copies).isEqualTo(1);
     }
 

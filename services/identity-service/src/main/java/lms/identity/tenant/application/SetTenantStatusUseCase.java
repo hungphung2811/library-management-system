@@ -5,6 +5,7 @@ import java.util.UUID;
 import lms.identity.tenant.domain.PlatformOperationEvent;
 import lms.identity.tenant.domain.Tenant;
 import lms.identity.tenant.domain.TenantNotFoundException;
+import lms.identity.tenant.domain.TenantModuleRepository;
 import lms.identity.tenant.domain.TenantQueryRepository;
 import lms.identity.tenant.domain.TenantRepository;
 import lms.identity.tenant.domain.TenantStatus;
@@ -14,7 +15,8 @@ import lms.tenant.TenantContext;
 /**
  * Tạm ngưng / kích hoạt lại tenant. SUSPENDED chặn cấp và làm mới token vào tenant (đăng nhập, refresh, đổi tenant đã
  * kiểm tenant ACTIVE); access token đang sống hết hạn trong tối đa 15 phút. Dữ liệu giữ nguyên. Phát
- * {@code TenantStatusChanged} {tenantId, status} cho circulation và bản ghi audit.
+ * {@code TenantStatusChanged} {tenantId, status} cho circulation và bản ghi audit. Suspend tay luôn ghi nguyên nhân
+ * MANUAL (kể cả khi đang bị tạm ngưng do hợp đồng: từ đó không tự mở); activate tay xóa nguyên nhân (ADR-0012).
  */
 public class SetTenantStatusUseCase {
 
@@ -22,13 +24,16 @@ public class SetTenantStatusUseCase {
     private final TenantQueryRepository queries;
     private final PublishPlatformEventPort events;
     private final TransactionalRunner tx;
+    private final TenantModuleRepository modules;
 
     public SetTenantStatusUseCase(TenantRepository tenants, TenantQueryRepository queries,
-                                  PublishPlatformEventPort events, TransactionalRunner tx) {
+                                  PublishPlatformEventPort events, TransactionalRunner tx,
+                                  TenantModuleRepository modules) {
         this.tenants = tenants;
         this.queries = queries;
         this.events = events;
         this.tx = tx;
+        this.modules = modules;
     }
 
     public TenantResponse suspend(UUID tenantId, UUID actorId) {
@@ -53,8 +58,10 @@ public class SetTenantStatusUseCase {
             });
             events.publish(new TenantStatusChangedEvent(tenantId, status));
             events.publish(PlatformOperationEvent.of(status == TenantStatus.SUSPENDED ? "TENANT_SUSPENDED"
-                    : "TENANT_ACTIVATED", actorId, tenantId, tenantId, "status=" + status));
-            return TenantResponse.from(tenant, queries.countActiveMembers(List.of(tenantId)).getOrDefault(tenantId, 0L));
+                    : "TENANT_ACTIVATED", actorId, tenantId, tenantId,
+                    status == TenantStatus.SUSPENDED ? "status=" + status + ", cause=MANUAL" : "status=" + status));
+            return TenantResponse.from(tenant, queries.countActiveMembers(List.of(tenantId)).getOrDefault(tenantId, 0L),
+                    modules.findByTenant(tenantId).enabled());
         });
     }
 }

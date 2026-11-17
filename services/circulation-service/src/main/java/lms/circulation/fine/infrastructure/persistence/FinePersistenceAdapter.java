@@ -48,6 +48,6 @@ class FinePersistenceAdapter implements FineRepository {
 
     private static Fine toDomain(FineJpaEntity e) {
         return Fine.restore(e.getId(), e.getReaderId(), e.getBorrowingId(), e.getBookCopyId(), e.getReason(),
-                e.getAmount(), e.getStatus(), e.getCreatedAt(), e.getPaidAt());
+                e.getAmount(), e.getStatus(), e.getCreatedAt(), e.getPaidAt(), e.getTenantId());
     }
 }

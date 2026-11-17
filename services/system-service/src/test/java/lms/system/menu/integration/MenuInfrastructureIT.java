@@ -197,9 +197,9 @@ class MenuInfrastructureIT {
         // Danh sách quản trị: cha trước con
         mvc.perform(get("/internal/menus").with(admin(t)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[0].code").value("grp"))
-                .andExpect(jsonPath("$[1].code").value("kid"));
+                .andExpect(jsonPath("$.items.length()").value(2))
+                .andExpect(jsonPath("$.items[0].code").value("grp"))
+                .andExpect(jsonPath("$.items[1].code").value("kid"));
 
         // Sửa: version tăng, tắt mục thì ẩn khỏi /me
         String childId = child.get("id").asText();
@@ -217,7 +217,7 @@ class MenuInfrastructureIT {
         mvc.perform(delete("/internal/menus/" + childId).with(admin(t))).andExpect(status().isNoContent());
         mvc.perform(delete("/internal/menus/" + group.get("id").asText()).with(admin(t)))
                 .andExpect(status().isNoContent());
-        mvc.perform(get("/internal/menus").with(admin(t))).andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(get("/internal/menus").with(admin(t))).andExpect(jsonPath("$.items.length()").value(0));
     }
 
     @Test
@@ -244,12 +244,12 @@ class MenuInfrastructureIT {
 
         // Tầng ứng dụng: mỗi tenant chỉ thấy mục của mình
         mvc.perform(get("/internal/menus").with(admin(a)))
-                .andExpect(jsonPath("$.length()").value(1)).andExpect(jsonPath("$[0].code").value("of-a"));
+                .andExpect(jsonPath("$.items.length()").value(1)).andExpect(jsonPath("$.items[0].code").value("of-a"));
         mvc.perform(get("/internal/menus").with(admin(b)))
-                .andExpect(jsonPath("$.length()").value(1)).andExpect(jsonPath("$[0].code").value("of-b"));
+                .andExpect(jsonPath("$.items.length()").value(1)).andExpect(jsonPath("$.items[0].code").value("of-b"));
 
         // Sửa/xóa mục của tenant khác: 404 (không lộ sự tồn tại)
-        String bId = body(mvc.perform(get("/internal/menus").with(admin(b)))).get(0).get("id").asText();
+        String bId = body(mvc.perform(get("/internal/menus").with(admin(b)))).get("items").get(0).get("id").asText();
         mvc.perform(put("/internal/menus/" + bId).with(admin(a)).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"label\":\"Hack\",\"path\":\"/h\",\"sortOrder\":1,\"enabled\":true,\"version\":0}"))
                 .andExpect(status().isNotFound());
@@ -422,6 +422,123 @@ class MenuInfrastructureIT {
             });
         });
         assertThat(redisTemplate.hasKey(cacheKey(t))).as("sau commit đã evict").isFalse();
+    }
+
+    // ---------- module + menu mặc định (ADR-0009, system V2) ----------
+
+    private static RequestPostProcessor withModules(UUID tenant, boolean admin, String... modules) {
+        return jwt().jwt(j -> j.subject(UUID.randomUUID().toString()).claim("tenantId", tenant.toString())
+                .claim("admin", admin).claim("modules", List.of(modules)));
+    }
+
+    private static int countSuper(String sql) throws SQLException {
+        try (Connection c = superuser(); Statement s = c.createStatement(); ResultSet rs = s.executeQuery(sql)) {
+            rs.next();
+            return rs.getInt(1);
+        }
+    }
+
+    @Test
+    @Order(10)
+    void v2ThemCotModuleRangBuocCheckVaSeedTenantMacDinh() throws Exception {
+        assertThat(countSuper("SELECT count(*) FROM information_schema.columns "
+                + "WHERE table_name = 'menus' AND column_name = 'module'")).isEqualTo(1);
+        // Superuser bỏ qua RLS nên đếm được; kiểm số dòng để bắt trường hợp UPDATE/INSERT ghi 0 dòng vì thiếu set_config
+        assertThat(countSuper("SELECT count(*) FROM menus WHERE tenant_id = '" + DEFAULT_TENANT
+                + "' AND code = 'circulation' AND module = 'LENDING'")).isEqualTo(1);
+        assertThat(countSuper("SELECT count(*) FROM menus WHERE tenant_id = '" + DEFAULT_TENANT
+                + "' AND module = 'SALES'")).isEqualTo(6);
+        assertThat(countSuper("SELECT count(*) FROM menus WHERE tenant_id = '" + DEFAULT_TENANT
+                + "' AND module IS NULL")).isEqualTo(3);
+        assertThatThrownBy(() -> execSuper("INSERT INTO menus (id, tenant_id, code, label, module) VALUES ('"
+                + UUID.randomUUID() + "', '" + UUID.randomUUID() + "', 'bad-mod', 'B', 'HR')"))
+                .isInstanceOf(SQLException.class).hasMessageContaining("ck_menus_module");
+    }
+
+    @Test
+    @Order(11)
+    void meCuaTenantMacDinhLocTheoClaimModulesVaCacheKhongBiPha() throws Exception {
+        redisTemplate.delete(cacheKey(DEFAULT_TENANT));
+        // Chỉ LENDING: không thấy nhánh Bán hàng dù là admin
+        mvc.perform(get("/internal/menus/me").with(withModules(DEFAULT_TENANT, true, "LENDING")))
+                .andExpect(jsonPath("$.length()").value(4))
+                .andExpect(jsonPath("$[2].code").value("circulation"))
+                .andExpect(jsonPath("$[3].code").value("admin"));
+        assertThat(redisTemplate.hasKey(cacheKey(DEFAULT_TENANT))).isTrue();
+        // Cùng cache (đã có module trong JSON): đổi claim sang SALES là đổi kết quả, không cần phá cache
+        mvc.perform(get("/internal/menus/me").with(withModules(DEFAULT_TENANT, true, "SALES")))
+                .andExpect(jsonPath("$.length()").value(4))
+                .andExpect(jsonPath("$[2].code").value("admin"))
+                .andExpect(jsonPath("$[3].code").value("sales"))
+                .andExpect(jsonPath("$[3].children.length()").value(5));
+        // Người thường: nhóm Bán hàng chỉ hiện khi có khóa của một con
+        mvc.perform(get("/internal/menus/me").with(withModules(DEFAULT_TENANT, false, "SALES")))
+                .andExpect(jsonPath("$.length()").value(2));
+        // Không claim modules => [LENDING] (legacy), bán hàng vẫn ẩn
+        mvc.perform(get("/internal/menus/me").with(user(DEFAULT_TENANT, "SalesOrderController/search")))
+                .andExpect(jsonPath("$.length()").value(3));
+        // Cột module qua API quản trị
+        JsonNode list = body(mvc.perform(get("/internal/menus").with(admin(DEFAULT_TENANT)))
+                .andExpect(jsonPath("$.usingDefaults").value(false)));
+        assertThat(list.get("items")).hasSize(10);
+        assertThat(list.get("items").findValuesAsText("module")).contains("LENDING", "SALES");
+    }
+
+    @Test
+    @Order(12)
+    void tenantMoiChuaCoDongNhanMenuMacDinhRoiChepMotLanBangRlsThat() throws Exception {
+        UUID t = UUID.randomUUID();
+        mvc.perform(get("/internal/menus/me").with(withModules(t, false, "LENDING")))
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[2].code").value("circulation"));
+        mvc.perform(get("/internal/menus").with(admin(t)))
+                .andExpect(jsonPath("$.usingDefaults").value(true)).andExpect(jsonPath("$.items.length()").value(0));
+        assertThat(countSuper("SELECT count(*) FROM menus WHERE tenant_id = '" + t + "'")).isZero();
+
+        mvc.perform(post("/internal/menus/defaults").with(admin(t)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.usingDefaults").value(false))
+                .andExpect(jsonPath("$.items.length()").value(10));
+        assertThat(countSuper("SELECT count(*) FROM menus WHERE tenant_id = '" + t + "'")).isEqualTo(10);
+        assertThat(countSuper("SELECT count(*) FROM menus WHERE tenant_id = '" + t + "' AND module = 'SALES'"))
+                .isEqualTo(6);
+        assertThat(countSuper("SELECT count(*) FROM menus c JOIN menus p ON p.id = c.parent_id "
+                + "AND p.tenant_id = c.tenant_id WHERE c.tenant_id = '" + t + "' AND p.code = 'sales'")).isEqualTo(5);
+
+        mvc.perform(post("/internal/menus/defaults").with(admin(t)))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("MENU_ALREADY_INITIALIZED"));
+        assertThat(countSuper("SELECT count(*) FROM menus WHERE tenant_id = '" + t + "'")).isEqualTo(10);
+
+        // Phá cache sau commit; /me đọc dữ liệu của tenant, vẫn lọc theo module
+        assertThat(redisTemplate.hasKey(cacheKey(t))).isFalse();
+        mvc.perform(get("/internal/menus/me").with(withModules(t, true, "LENDING", "SALES")))
+                .andExpect(jsonPath("$.length()").value(5));
+        mvc.perform(get("/internal/menus/me").with(withModules(t, true, "LENDING")))
+                .andExpect(jsonPath("$.length()").value(4));
+        // Tenant khác không bị ảnh hưởng
+        mvc.perform(get("/internal/menus").with(admin(UUID.randomUUID())))
+                .andExpect(jsonPath("$.usingDefaults").value(true));
+    }
+
+    @Test
+    @Order(13)
+    void taoSuaMenuVoiModuleLuuDungVaMaLaBi400() throws Exception {
+        UUID t = UUID.randomUUID();
+        JsonNode created = body(mvc.perform(post("/internal/menus").with(admin(t))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"shop\",\"label\":\"Shop\",\"path\":\"/shop\",\"module\":\"SALES\"}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.module").value("SALES")));
+        mvc.perform(post("/internal/menus").with(admin(t)).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"bad\",\"label\":\"B\",\"path\":\"/b\",\"module\":\"HR\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("MENU_MODULE_INVALID"));
+        // PUT thay thế toàn bộ: bỏ module thì về mục lõi
+        mvc.perform(put("/internal/menus/" + created.get("id").asText()).with(admin(t))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"label\":\"Shop\",\"path\":\"/shop\",\"sortOrder\":1,\"enabled\":true,"
+                                + "\"version\":0}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.module").doesNotExist());
+        assertThat(countSuper("SELECT count(*) FROM menus WHERE tenant_id = '" + t + "' AND module IS NULL"))
+                .isEqualTo(1);
     }
 
     // ---------- Redis chết (phải chạy cuối) ----------

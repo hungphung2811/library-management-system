@@ -38,6 +38,7 @@ public class HttpUserClient implements UserClient {
         if (q.status() != null && !q.status().isBlank()) vars.put("status", q.status());
         if (q.page() != null) vars.put("page", q.page());
         if (q.size() != null) vars.put("size", q.size());
+        if (q.tenantId() != null && !q.tenantId().isBlank()) vars.put("tenantId", q.tenantId());
 
         StringBuilder template = new StringBuilder("/internal/users");
         String sep = "?";

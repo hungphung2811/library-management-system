@@ -24,8 +24,10 @@ class BookCopyPersistenceAdapter implements BookCopyRepository {
 
     @Override
     public BookCopy save(BookCopy copy) {
-        jpa.save(new BookCopyJpaEntity(copy.id(), copy.titleId(), copy.barcode(), copy.status()));
-        return copy;
+        BookCopyJpaEntity entity = new BookCopyJpaEntity(copy.id(), copy.titleId(), copy.barcode(), copy.status());
+        jpa.save(entity);
+        // Trả bản có tenantId (lấy từ entity) để phản hồi tạo mới cũng mang tenantId; trạng thái giữ nguyên đối tượng gốc.
+        return BookCopy.restore(copy.id(), copy.titleId(), copy.barcode(), copy.status(), entity.getTenantId());
     }
 
     @Override
@@ -81,6 +83,6 @@ class BookCopyPersistenceAdapter implements BookCopyRepository {
     }
 
     private static BookCopy toDomain(BookCopyJpaEntity e) {
-        return BookCopy.restore(e.getId(), e.getTitleId(), e.getBarcode(), e.getStatus());
+        return BookCopy.restore(e.getId(), e.getTitleId(), e.getBarcode(), e.getStatus(), e.getTenantId());
     }
 }

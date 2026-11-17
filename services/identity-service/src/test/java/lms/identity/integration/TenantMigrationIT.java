@@ -92,7 +92,7 @@ class TenantMigrationIT {
 
     @Test
     void roleTemplatesCo5MauVoiDungMotMauQuanTri() throws SQLException {
-        assertThat(column("SELECT name FROM role_templates"))
+        assertThat(column("SELECT name FROM role_templates WHERE module IS NULL OR module = 'LENDING'"))
                 .containsExactlyInAnyOrder("SUPER_ADMIN", "LIBRARY_ADMIN", "LIBRARIAN", "DEPARTMENT_MANAGER", "MEMBER");
         assertThat(column("SELECT name FROM role_templates WHERE is_admin")).containsExactly("SUPER_ADMIN");
     }
@@ -106,10 +106,14 @@ class TenantMigrationIT {
                 "BorrowingController/borrow", "BorrowingController/renew",
                 "ReservationController/reserve", "ReservationController/mine", "ReservationController/cancel");
 
-        // Mẫu khớp từng role seed gốc (quyền hiệu lực không đổi)
-        assertThat(column("SELECT t.name FROM role_templates t WHERE "
-                + "(SELECT count(*) FROM role_template_permissions p WHERE p.template_id = t.id) <> "
-                + "(SELECT count(*) FROM role_permissions r WHERE r.role_id = t.id)")).isEmpty();
+        // Mẫu khớp từng role seed gốc (quyền hiệu lực không đổi). Sau V18 mẫu admin (SUPER_ADMIN) có thêm
+        // khóa BorrowingController/getAny mà role admin seed không có (backfill chỉ gán role không phải admin,
+        // role admin bỏ qua kiểm khóa): loại khóa này khỏi phép so.
+        assertThat(column("SELECT t.name FROM role_templates t WHERE (t.module IS NULL OR t.module = 'LENDING') AND "
+                + "(SELECT count(*) FROM role_template_permissions p WHERE p.template_id = t.id "
+                + "AND p.permission_code <> 'BorrowingController/getAny') <> "
+                + "(SELECT count(*) FROM role_permissions r WHERE r.role_id = t.id "
+                + "AND r.permission_code <> 'BorrowingController/getAny')")).isEmpty();
         assertThat(column("SELECT count(*)::text FROM role_template_permissions p "
                 + "JOIN role_templates t ON t.id = p.template_id WHERE t.name = 'LIBRARIAN' "
                 + "AND p.permission_code IN ('AccessControlController/assignRole', 'AuditLogController/search')"))
