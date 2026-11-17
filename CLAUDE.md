@@ -13,7 +13,9 @@ mvn -pl services/identity-service -am test                  # một module (luô
 mvn -pl services/identity-service -am test -Dtest=AdminRoleAndPermissionKeyTest -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
-Chạy từng service bằng Maven (cần `docker compose up -d` trước; mọi service mặc định profile `dev`, `lms-api` thì không có profile mặc định). Thứ tự: system-service trước, các service còn lại sau (chạy mỗi lệnh trong một terminal riêng):
+Cách nhanh nhất trên máy dev (Windows): `scripts\dev-start.ps1` (Docker chỉ cho hạ tầng; mỗi service chạy bằng `java -jar` từ jar đã build, không dùng `spring-boot:run`). Cờ: `-Build` (build jar bằng `mvn -DskipTests package`, cần `mvn` trên PATH hoặc biến `MAVEN_CMD`), `-WithSupport` (bật support-service, mặc định tắt vì nặng), `-NoFe` (bỏ FE), `-Only identity,catalog` (system luôn chạy trước), `-Seq`, `-NoCds`. Log ở `.dev\*.log`, tắt bằng `scripts\dev-stop.ps1`. Script chỉ có system, identity, catalog, circulation, support, lms-api (không có sales 8087 và customer-api 8088: chạy riêng bằng `java -jar`); catalog/circulation/support chạy với `--app.security.enabled=true --lms.security.permission.enabled=true`; admin đăng nhập `admin / Admin@12345`. Lưu ý `mvn -pl <module> -am spring-boot:run` lỗi "Unable to find a suitable main class" vì chạy cả pom gốc; muốn dùng `spring-boot:run` thì `mvn -DskipTests install` trước rồi chạy `-pl <module>` không có `-am`.
+
+Hoặc chạy từng service bằng Maven (cần `docker compose up -d` trước; mọi service mặc định profile `dev`, `lms-api` thì không có profile mặc định). Thứ tự: system-service trước, các service còn lại sau (chạy mỗi lệnh trong một terminal riêng):
 
 ```bash
 mvn -pl services/system-service -am spring-boot:run       # 8086, chạy TRƯỚC: migrate 6 DB rồi mới UP; các service khác chỉ validate schema
