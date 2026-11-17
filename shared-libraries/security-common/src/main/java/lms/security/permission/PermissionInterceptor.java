@@ -28,6 +28,9 @@ public class PermissionInterceptor implements HandlerInterceptor {
 
     private static final Logger log = LoggerFactory.getLogger(PermissionInterceptor.class);
 
+    /** Header để platform admin chọn tenant đích khi đọc/ghi (ADR-0016). */
+    public static final String TENANT_HEADER = "X-Tenant-Id";
+
     private final PermissionKeyResolver resolver;
     private final PermissionKeyRegistrar registrar;
     private final String serviceName;
@@ -93,6 +96,12 @@ public class PermissionInterceptor implements HandlerInterceptor {
         if (resolved.mode() == PermissionKeyResolver.Mode.PERMISSION
                 && isCrossTenantRead(handlerMethod, request, authentication)) {
             return handleCrossTenantRead(request, response, resolved, (JwtAuthenticationToken) authentication);
+        }
+        if (isPlatformAdmin(authentication) && !hasTenant(authentication)) {
+            String raw = request.getHeader(TENANT_HEADER);
+            if (raw != null && !raw.isBlank()) {
+                return handleActAsTenant(request, response, resolved, (JwtAuthenticationToken) authentication, raw);
+            }
         }
         if ((requireTenant || module != null) && !hasTenant(authentication)) {
             reject(response, HttpServletResponse.SC_FORBIDDEN, "TENANT_REQUIRED", "Token không thuộc tenant nào");
@@ -164,6 +173,7 @@ public class PermissionInterceptor implements HandlerInterceptor {
                                           PermissionKeyResolver.Resolved resolved, JwtAuthenticationToken jwt)
             throws Exception {
         String raw = request.getParameter("tenantId");
+        if (raw == null || raw.isBlank()) raw = request.getHeader(TENANT_HEADER);
         UUID tenantId = null;
         if (raw != null && !raw.isBlank()) {
             try {
@@ -182,6 +192,30 @@ public class PermissionInterceptor implements HandlerInterceptor {
         }
         log.info("platform-audit operation=cross-tenant-read actor={} tenantId={} path={}",
                 safe(jwt.getToken().getSubject()), tenantId != null ? tenantId : "ALL", safe(pathOf(request)));
+        return true;
+    }
+
+    /**
+     * ADR-0016: platform admin (không có tenantId) gửi header {@code X-Tenant-Id} thì hành động trong tenant đó cho
+     * request này (đọc và ghi, mọi method), như admin của tenant: bỏ qua kiểm khóa quyền và module. RLS và
+     * {@code @TenantId} vẫn chạy theo tenant đã gắn. Mọi lần đều ghi log {@code platform-audit}. Người gọi khác không
+     * vào đây (header bị bỏ qua).
+     */
+    private boolean handleActAsTenant(HttpServletRequest request, HttpServletResponse response,
+                                      PermissionKeyResolver.Resolved resolved, JwtAuthenticationToken jwt, String raw)
+            throws Exception {
+        UUID tenantId;
+        try {
+            tenantId = UUID.fromString(raw.trim());
+        } catch (IllegalArgumentException e) {
+            reject(response, HttpServletResponse.SC_BAD_REQUEST, "INVALID_TENANT_ID", "X-Tenant-Id không phải UUID hợp lệ");
+            return false;
+        }
+        if (resolved.mode() == PermissionKeyResolver.Mode.PERMISSION) register(request, resolved);
+        tenantScopeBinder.bindSingle(tenantId);
+        request.setAttribute(ActAsTenant.ATTRIBUTE, tenantId.toString());
+        log.info("platform-audit operation=act-as-tenant actor={} tenantId={} method={} path={}",
+                safe(jwt.getToken().getSubject()), tenantId, safe(request.getMethod()), safe(pathOf(request)));
         return true;
     }
 
