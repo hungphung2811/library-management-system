@@ -40,6 +40,15 @@ public interface StockPort {
 
     PageResult<StockItem> list(UUID tenantId, boolean lowStockOnly, int tenantThreshold, int page, int size);
 
+    /**
+     * Như {@link #list} (cùng định nghĩa tồn thấp) nhưng sắp theo available tăng dần rồi titleId, ổn định để phân
+     * trang báo cáo (ADR-0018). Mặc định chuyển sang {@link #list} cho bản giả test.
+     */
+    default PageResult<StockItem> listForReport(UUID tenantId, boolean lowStockOnly, int tenantThreshold, int page,
+                                                int size) {
+        return list(tenantId, lowStockOnly, tenantThreshold, page, size);
+    }
+
     /** Mặt hàng đang bán (active), mới nhất trước: danh mục công khai (storefront). */
     PageResult<StockItem> listActive(UUID tenantId, int page, int size);
 

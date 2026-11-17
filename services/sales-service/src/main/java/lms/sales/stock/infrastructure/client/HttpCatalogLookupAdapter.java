@@ -100,6 +100,7 @@ public class HttpCatalogLookupAdapter implements CatalogLookupPort {
 
     private static void addHeaders(RestClient.RequestHeadersSpec<?> spec) {
         bearerToken().ifPresent(t -> spec.header(HttpHeaders.AUTHORIZATION, "Bearer " + t));
+        lms.security.permission.ActAsTenant.current().ifPresent(tid -> spec.header(lms.security.permission.ActAsTenant.HEADER, tid));
         String correlationId = MDC.get("correlationId");
         if (correlationId != null) {
             spec.header("X-Correlation-Id", correlationId);

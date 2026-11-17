@@ -13,4 +13,12 @@
     <artifactId>common-kernel</artifactId>
     <name>common-kernel</name>
     <description>Contract kỹ thuật dùng chung, thuần Java, không chứa business logic</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 </project>

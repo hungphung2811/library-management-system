@@ -31,6 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 class StockPersistenceAdapter implements StockPort {
 
+    private static final int REPORT_TIMEOUT_MS = 20_000;
+
     @PersistenceContext
     private EntityManager em;
 
@@ -154,6 +156,26 @@ class StockPersistenceAdapter implements StockPort {
         var count = em.createQuery("select count(s) " + where, Long.class).setParameter("t", tenantId);
         var items = em.createQuery("select s " + where + " order by s.createdAt desc, s.id", StockItemJpaEntity.class)
                 .setParameter("t", tenantId);
+        if (lowStockOnly) {
+            count.setParameter("thr", tenantThreshold);
+            items.setParameter("thr", tenantThreshold);
+        }
+        List<StockItem> rows = items.setFirstResult(page * size).setMaxResults(size).getResultList().stream()
+                .map(StockPersistenceAdapter::toDomain).toList();
+        return new PageResult<>(rows, count.getSingleResult(), page, size);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResult<StockItem> listForReport(UUID tenantId, boolean lowStockOnly, int tenantThreshold, int page,
+                                               int size) {
+        String where = "from StockItemJpaEntity s where s.tenantId = :t"
+                + (lowStockOnly ? " and (s.onHand - s.reserved) <= coalesce(s.lowStockThreshold, :thr)" : "");
+        var count = em.createQuery("select count(s) " + where, Long.class).setParameter("t", tenantId)
+                .setHint("jakarta.persistence.query.timeout", REPORT_TIMEOUT_MS);
+        var items = em.createQuery("select s " + where + " order by (s.onHand - s.reserved), s.titleId",
+                StockItemJpaEntity.class).setParameter("t", tenantId)
+                .setHint("jakarta.persistence.query.timeout", REPORT_TIMEOUT_MS);
         if (lowStockOnly) {
             count.setParameter("thr", tenantThreshold);
             items.setParameter("thr", tenantThreshold);

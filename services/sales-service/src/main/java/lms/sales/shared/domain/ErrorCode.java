@@ -33,6 +33,8 @@ public enum ErrorCode {
     INVALID_QUANTITY(400),
     INVALID_PRICE(400),
     INVALID_REQUEST(400),
+    INVALID_RANGE(400),
+    RANGE_TOO_LARGE(400),
     CATALOG_UNAVAILABLE(503);
 
     private final int httpStatus;

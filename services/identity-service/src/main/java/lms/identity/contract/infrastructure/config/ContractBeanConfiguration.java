@@ -61,6 +61,12 @@ public class ContractBeanConfiguration {
     }
 
     @Bean
+    lms.identity.contract.application.PlatformOverviewUseCase platformOverviewUseCase(
+            lms.identity.tenant.application.TenantOverviewQuery tenantOverview, ContractQueryUseCase contractQuery) {
+        return new lms.identity.contract.application.PlatformOverviewUseCase(tenantOverview, contractQuery);
+    }
+
+    @Bean
     GetMyContractsUseCase getMyContractsUseCase(ContractRepository contracts, ContractPaymentRepository payments,
                                                 ContractPolicy policy, Clock clock) {
         return new GetMyContractsUseCase(contracts, payments, policy, clock);

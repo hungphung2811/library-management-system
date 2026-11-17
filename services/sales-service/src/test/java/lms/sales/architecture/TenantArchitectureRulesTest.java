@@ -19,5 +19,7 @@ class TenantArchitectureRulesTest {
 
     @ArchTest
     static final ArchRule khongCoNativeQueryChuaRa =
-            TenantArchitectureRules.noUnreviewedNativeQueries().allowEmptyShould(true);
+            TenantArchitectureRules.noUnreviewedNativeQueries(
+                    // ADR-0018: thống kê/báo cáo, native có tenant_id tường minh + RLS + timeout truy vấn
+                    "SalesStatsQueryAdapter", "SalesOrderReportQueryAdapter").allowEmptyShould(true);
 }
