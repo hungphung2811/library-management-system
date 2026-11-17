@@ -1,0 +1,24 @@
+# Profile demo-seed (ADR-0018): chạy MỘT lần rồi thoát, nạp dữ liệu mẫu cho tenant demo. Dùng cùng profile nền (dev) để
+# có datasource, ví dụ:
+#   java -jar sales-service.jar --spring.profiles.active=dev,demo-seed --lms.demo-seed.enabled=true
+#       --lms.demo-seed.tenant-id=<uuid tenant demo> --lms.demo-seed.password=<mật khẩu demo>
+# Không chạy khi profile prod bật (DemoSeedGuard từ chối, mã thoát 2). Không có khối nào dùng ở chế độ phục vụ bình thường.
+
+spring:
+  main:
+    # Không mở cổng web: tiến trình một lần không tranh cổng 8087 với service đang chạy
+    web-application-type: none
+  kafka:
+    admin:
+      # Không tạo topic (không cần broker); seed không phát event
+      auto-create: false
+
+lms:
+  sales:
+    anonymize:
+      # Tắt AnonymizeWalkInJob và ShopContactAnonymizationJob (ConditionalOnProperty): không ẩn danh dữ liệu vừa seed,
+      # và tiến trình một lần không có lịch @Scheduled nào chạy
+      enabled: false
+    events:
+      # Không phát sales.events lên Kafka
+      enabled: false

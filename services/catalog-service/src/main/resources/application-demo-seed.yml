@@ -1,0 +1,21 @@
+# Profile demo-seed (ADR-0018): tiến trình chạy MỘT LẦN rồi thoát, ghi dữ liệu demo của catalog cho tenant demo.
+# Chạy: java -jar catalog-service.jar --spring.profiles.active=dev,demo-seed --lms.demo-seed.enabled=true
+#         --lms.demo-seed.tenant-id=<uuid tenant demo> --lms.demo-seed.password=<mật khẩu demo>
+# (catalog không tạo tenant nên creates-tenant=false; tenant-id bắt buộc, không có mặc định).
+spring:
+  main:
+    # Không mở cổng web: không xung đột với catalog-service đang chạy, không có đường HTTP để seed
+    web-application-type: none
+  kafka:
+    listener:
+      # ReservationEventConsumer (@KafkaListener) không được tranh partition/offset của service đang chạy
+      auto-startup: false
+    admin:
+      # Không tạo topic inventory.events/reservation.events lúc khởi động (không cần broker để seed)
+      auto-create: false
+  lifecycle:
+    timeout-per-shutdown-phase: 5s
+
+lms:
+  demo-seed:
+    creates-tenant: false

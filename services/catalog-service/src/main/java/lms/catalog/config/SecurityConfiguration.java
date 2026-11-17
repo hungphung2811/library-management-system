@@ -2,6 +2,7 @@ package lms.catalog.config;
 
 import lms.security.PermissionJwtConverter;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -12,8 +13,10 @@ import org.springframework.security.web.SecurityFilterChain;
 /**
  * Chỉ lo xác thực JWT. Phân quyền theo endpoint do PermissionInterceptor (security-common) kiểm theo khóa
  * Controller/method. Tắt bằng app.security.enabled=false và lms.security.permission.enabled=false (chỉ profile dev).
+ * Chỉ có khi chạy web: tiến trình seed demo (web-application-type=none, ADR-0018) không có HttpSecurity.
  */
 @Configuration
+@ConditionalOnWebApplication
 public class SecurityConfiguration {
 
     @Bean

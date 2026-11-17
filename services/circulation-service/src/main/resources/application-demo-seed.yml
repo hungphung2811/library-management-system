@@ -1,0 +1,27 @@
+# Profile demo-seed (ADR-0018): tiến trình chạy MỘT LẦN để seed dữ liệu demo rồi thoát. Dùng cùng profile dev (datasource):
+#   java -jar circulation-service.jar --spring.profiles.active=dev,demo-seed --lms.demo-seed.enabled=true
+#        --lms.demo-seed.tenant-id=<uuid> --lms.demo-seed.password=<mật khẩu>
+spring:
+  main:
+    # Không web: không mở cổng 8083 (không xung đột service đang chạy), không có đường HTTP nào gọi seed
+    web-application-type: none
+  kafka:
+    listener:
+      # TenantEventConsumer và InventoryEventConsumer không khởi động: không tranh partition, không xử lý event
+      auto-startup: false
+    admin:
+      # Không tạo topic (NewTopic) lúc khởi động
+      auto-create: false
+
+app:
+  reservation:
+    # "-" là giá trị tắt của Spring @Scheduled: ExpireReservationsJob (UC14) không chạy trong tiến trình seed
+    expire-cron: "-"
+
+lms:
+  security:
+    permission:
+      enabled: false
+  demo-seed:
+    # circulation không tự tạo tenant: tenant-id do identity tạo, truyền vào (DEMO_TENANT_ID)
+    creates-tenant: false

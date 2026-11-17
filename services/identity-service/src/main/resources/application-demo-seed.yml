@@ -1,0 +1,43 @@
+# Profile demo-seed (ADR-0018): tiến trình seed dữ liệu demo chạy MỘT LẦN rồi thoát. Không dùng cho khởi động bình thường.
+#
+#   java -jar identity-service.jar --spring.profiles.active=dev,demo-seed --lms.demo-seed.enabled=true \
+#        --lms.demo-seed.password=<mật khẩu demo>
+#
+# Hoặc đặt biến môi trường DEMO_SEED_PASSWORD thay cho --lms.demo-seed.password. Cờ enabled KHÔNG đặt ở đây (phải truyền
+# tường minh); guard từ chối khi profile prod/production bật, thiếu enabled hoặc thiếu mật khẩu (mã thoát 2).
+#
+# Id tất định của tenant demo (identity tự tạo tenant, nên creates-tenant=true và không cần tenant-id): lấy từ
+# DemoIds.tenant() = UUID.nameUUIDFromBytes("lms-demo:tenant:0"). Các service khác truyền id này làm
+# lms.demo-seed.tenant-id (identity in dòng DEMO_TENANT_ID=<uuid> khi xong).
+
+spring:
+  main:
+    # Không mở cổng: không xung đột với identity-service đang chạy, không có đường HTTP vào tiến trình seed
+    web-application-type: none
+  kafka:
+    listener:
+      # AccessEventConsumer (@KafkaListener) không khởi động: tiến trình một lần không nhận partition của group
+      # identity-service đang dùng. Producer vẫn hoạt động: event do use case phát (TenantCreated...) là event thật.
+      auto-startup: false
+
+auth:
+  bootstrap-admin:
+    # Bỏ tạo tài khoản admin khởi tạo (dev bật nó) để seed không phụ thuộc vào/không đụng tới nó
+    password: ""
+  bootstrap:
+    platform-admin-username: ""
+    platform-admin-password: ""
+
+# Khối cấp cao ở cuối file; chỉ một khối `lms:`
+lms:
+  contract:
+    job:
+      # ContractLifecycleJob (@Scheduled mỗi giờ phút 7) không đăng ký: tránh áp dụng/hết hạn/nhắc hợp đồng giữa lúc seed
+      enabled: false
+  auth:
+    refresh-cleanup:
+      # RefreshTokenCleanupJob (@Scheduled 03:30): "-" là cron vô hiệu hóa của Spring
+      cron: "-"
+  demo-seed:
+    creates-tenant: true
+    password: ${DEMO_SEED_PASSWORD:}

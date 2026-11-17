@@ -23,6 +23,7 @@
         <module>shared-libraries/messaging-common</module>
         <module>shared-libraries/observability-common</module>
         <module>shared-libraries/database-common</module>
+        <module>shared-libraries/demo-seed</module>
         <module>lms-api</module>
         <module>customer-api</module>
         <module>services/identity-service</module>
@@ -78,6 +79,12 @@
             <dependency>
                 <groupId>com.company</groupId>
                 <artifactId>database-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <!-- ADR-0018: kế hoạch dữ liệu demo + runner profile demo-seed -->
+                <groupId>com.company</groupId>
+                <artifactId>demo-seed</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

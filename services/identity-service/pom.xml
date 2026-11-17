@@ -35,6 +35,11 @@
             <artifactId>observability-common</artifactId>
         </dependency>
         <dependency>
+            <!-- ADR-0018: DemoSeedStep chạy khi bật profile demo-seed -->
+            <groupId>com.company</groupId>
+            <artifactId>demo-seed</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>

@@ -2,6 +2,7 @@ package lms.sales.config;
 
 import lms.security.PermissionJwtConverter;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -14,6 +15,8 @@ import org.springframework.security.web.SecurityFilterChain;
  * Controller/method. Tắt bằng app.security.enabled=false và lms.security.permission.enabled=false (chỉ profile dev).
  */
 @Configuration
+// Không có chuỗi lọc khi tiến trình chạy không web (profile demo-seed, ADR-0018): HttpSecurity chỉ có ở ứng dụng servlet
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class SecurityConfiguration {
 
     @Bean

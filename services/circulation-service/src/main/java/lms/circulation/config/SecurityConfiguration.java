@@ -4,6 +4,7 @@ import lms.security.PermissionJwtConverter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -15,6 +16,8 @@ import org.springframework.security.web.SecurityFilterChain;
  * và lms.security.permission.enabled=false (chỉ dùng cho profile dev).
  */
 @Configuration
+// Profile demo-seed chạy không web (ADR-0018) nên không có HttpSecurity; cấu hình xác thực chỉ cần khi có web
+@Profile("!demo-seed")
 public class SecurityConfiguration {
 
     @Bean
