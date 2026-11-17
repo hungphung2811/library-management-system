@@ -11,3 +11,4 @@ target/
 .superpowers/
 
 .dev/
+.playwright-mcp/
