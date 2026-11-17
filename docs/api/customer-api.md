@@ -29,6 +29,10 @@ customer-api viết, không chép thông điệp nội bộ.
 | GET | `/public/t/{code}/orders/{orderId}` | Một đơn của tôi (cần đăng nhập) | `no-store` |
 | POST | `/public/t/{code}/orders/{orderId}/cancellation` | Hủy đơn đang chờ xác nhận (cần đăng nhập) | `no-store` |
 
+⚠️ Đề xuất, chưa có code (ADR-0019, hợp đồng ở `storefront-kham-pha.md`): thêm `sort`, `inStock` cho `GET .../books`,
+`GET /public/t/{code}/books/suggestions` (`max-age=15`) và `GET /public/t/{code}/banners` (`max-age=60`). Khi có code thì
+chuyển các dòng này vào bảng trên.
+
 Tập đường dẫn là DANH SÁCH ĐÓNG: mọi `/public/**` ngoài bảng trên (kể cả `/public/t/{code}/anything`) bị chặn (401 khi
 chưa đăng nhập). Chỉ 4 route `orders` cần đăng nhập; các route còn lại công khai và BỎ QUA header `Authorization`.
 

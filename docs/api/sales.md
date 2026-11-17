@@ -172,6 +172,8 @@ Không có `ShopController/listItems` (thiết kế gốc 5.3): danh mục sách
 
 Chỉ mặt hàng `active`; `price` = `sellingPrice` hoặc giá bìa làm tròn đồng; `inStock = available > 0`. KHÔNG bao giờ trả `onHand`, `reserved`, `available`, giá nhập, ngưỡng tồn, `tenant_id`, ISBN. Mặt hàng không có/không active: `404 STOCK_ITEM_NOT_FOUND`. `keyword` lọc theo tên/tác giả bằng `GET /internal/books/lookup?keyword=` của catalog (tối đa 200 đầu sách) rồi giao với mặt hàng đang bán. Lỗi catalog: `503 CATALOG_UNAVAILABLE`. Không có endpoint BFF `lms-api` cho nhóm này: `customer-api` gọi thẳng.
 
+⚠️ Đề xuất, chưa có code (ADR-0019, hợp đồng ở `storefront-kham-pha.md`): `items` thêm `sort` (`newest|price_asc|price_desc`) và `inStock`; thêm `GET /internal/sales/storefront/suggestions` (`StorefrontController/suggestions`), `GET /internal/sales/storefront/banners` (`StorefrontBannerController/list`) và nhóm quản trị banner `/internal/sales/banners/**` ↔ `/api/sales/banners/**` (`SalesBannerController/{list,get,create,update,delete}`, không `@StorefrontAccessible`). Migration sales `V6` (snapshot giá bìa để sắp theo giá), `V7` (`storefront_banners`), identity `V26` (seed khóa).
+
 ### Trả hàng, đổi hàng, hoàn tiền
 
 | Method, đường dẫn (BFF) | Khóa quyền | Body / query | Kết quả, lỗi |

@@ -76,6 +76,7 @@ token người dùng: luồng cũ giữ nguyên (endpoint @StorefrontAccessible 
   | catalog | `TitleController/lookupByKeyword` (`GET /internal/books/lookup?keyword=`, tối đa 200; `be-dev` đã chốt tên, B-C6) | lọc danh sách |
   | catalog | `TitleController/preview` (mới, 2.12) | preview |
   | sales | `StorefrontController/list`, `/get`, `/preview` (mới) | danh sách, chi tiết, preview |
+  | sales | `StorefrontController/suggestions`, `StorefrontBannerController/list` (đề xuất, ADR-0019 2.8; chưa có code) | gợi ý tìm kiếm, banner trang chủ |
 
   Không bao giờ gắn lên endpoint ghi, đơn hàng (`ShopController/*`), liên hệ đọc giả, signup, hay API nhân viên (`TitleController/updatePreview`). Hệ quả: khách vãng lai **không có đường ghi dữ liệu tenant nào**; ghi công khai duy nhất là form SaaS (bảng nền tảng, 2.3). Đặt hàng và liên hệ cửa hàng dùng token người dùng (2.4).
 - Tác động phân quyền: với **token người dùng**, `@StorefrontAccessible` không đổi gì (vẫn đăng ký và kiểm khóa `Controller/method`). Vì vậy `TitleController/lookup` vẫn phải nằm trong role nhân viên bán và mẫu Khách hàng (sales gọi catalog bằng token khách khi đặt hàng, ADR-0010 B2.3); `TitleController/preview`, `TitleController/updatePreview` cần gán cho role nhân viên được nhập preview (2.12). Đổi tên `TitleController` hay các method này làm role đã gán mất quyền (ADR-0003) và làm danh sách trên lệch: phải sửa ADR cùng lúc.
