@@ -18,3 +18,9 @@ app:
 logging:
   level:
     lms.identity: DEBUG
+
+lms:
+  identity:
+    password-reset:
+      # Chưa có dịch vụ gửi thư: ghi token đặt lại mật khẩu ra log INFO (chỉ dev; mặc định tắt)
+      log-token: true

@@ -19,7 +19,7 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
  * lms-api chỉ xác thực (JWT hợp lệ, chưa hết hạn). Phân quyền theo permission do service nội bộ kiểm, vì lms-api
  * chuyển tiếp token của người dùng. CORS do nginx xử lý.
  *
- * <p>Đường dẫn công khai (trình duyệt chưa có token): đăng nhập, làm mới, đăng xuất và các bước đăng nhập ngoài. Với các
+ * <p>Đường dẫn công khai (trình duyệt chưa có token): đăng nhập, làm mới, đăng xuất, quên mật khẩu (yêu cầu/xác nhận) và các bước đăng nhập ngoài. Với các
  * đường dẫn này lms-api bỏ qua header Authorization, để FE gửi kèm access token đã hết hạn khi làm mới vẫn không bị 401.
  *
  * <p>Kênh token: token mang aud=lms-storefront (đăng nhập qua customer-api) bị {@link ChannelAudienceFilter} từ chối 401.
@@ -31,6 +31,8 @@ public class SecurityConfiguration {
             AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/api/auth/login"),
             AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/api/auth/refresh"),
             AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/api/auth/logout"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/api/auth/password-reset-requests"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/api/auth/password-reset-confirmations"),
             AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/api/auth/external/providers"),
             AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/api/auth/external/*/start"),
             AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/api/auth/external/*/callback"),
