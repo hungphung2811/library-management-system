@@ -77,6 +77,9 @@ class UserManagementTest {
             if (!hasMembership(id, tenantId)) return Optional.empty();
             return findById(id).map(u -> new TenantUser(u, tenantId, memberships.get(id).get(tenantId)));
         }
+        public List<User> findAllInTenant(java.util.Collection<UUID> ids, UUID tenantId) {
+            return store.stream().filter(u -> ids.contains(u.id()) && hasMembership(u.id(), tenantId)).toList();
+        }
         public boolean existsById(UUID id) { return store.stream().anyMatch(u -> u.id().equals(id)); }
         public boolean existsByUsername(String n) { return store.stream().anyMatch(u -> u.username().equals(n)); }
         public boolean existsByEmail(String e, UUID exclude) {

@@ -130,6 +130,16 @@ public class UserCredential {
         this.lockedUntil = null;
     }
 
+    /**
+     * Quản trị viên mở khóa: xóa số lần sai và thời điểm khóa. Phát AccountUnlockedEvent (audit) kể cả khi tài khoản không
+     * đang bị khóa (idempotent, vẫn có dấu vết thao tác).
+     */
+    public void unlock(UUID actorId, Instant now) {
+        this.failedAttempts = 0;
+        this.lockedUntil = null;
+        events.add(new AccountUnlockedEvent(UUID.randomUUID(), userId, username, actorId, now));
+    }
+
     public void deactivate() {
         active = false;
     }

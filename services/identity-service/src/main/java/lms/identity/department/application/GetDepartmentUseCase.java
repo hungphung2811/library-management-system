@@ -22,4 +22,9 @@ public class GetDepartmentUseCase {
     public Optional<DepartmentResponse> find(UUID id) {
         return repository.findById(id).map(DepartmentResponse::from);
     }
+
+    /** Mọi phòng ban của tenant hiện tại (số lượng nhỏ), cho context khác tra mã theo lô. */
+    public java.util.List<DepartmentResponse> findAll() {
+        return repository.findAll().stream().map(DepartmentResponse::from).toList();
+    }
 }

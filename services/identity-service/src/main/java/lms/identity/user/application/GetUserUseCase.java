@@ -10,14 +10,25 @@ import lms.tenant.TenantContext;
 public class GetUserUseCase {
 
     private final UserRepository repository;
+    private final UserLockStatus lockStatus;
 
     public GetUserUseCase(UserRepository repository) {
+        this(repository, null);
+    }
+
+    /** lockStatus null: không điền trạng thái khóa (locked=false). */
+    public GetUserUseCase(UserRepository repository, UserLockStatus lockStatus) {
         this.repository = repository;
+        this.lockStatus = lockStatus;
+    }
+
+    private UserResponse withLock(UserResponse r) {
+        return lockStatus == null ? r : lockStatus.apply(r);
     }
 
     public UserResponse execute(UUID id) {
         UUID tenantId = TenantContext.require();
-        return repository.findInTenant(id, tenantId).map(UserResponse::from)
+        return repository.findInTenant(id, tenantId).map(UserResponse::from).map(this::withLock)
                 .orElseThrow(() -> new UserNotFoundException(id));
     }
 
@@ -25,7 +36,7 @@ public class GetUserUseCase {
     public UserResponse me(UUID userId) {
         Optional<UUID> tenantId = TenantContext.current();
         if (tenantId.isPresent()) {
-            return repository.findInTenant(userId, tenantId.get()).map(UserResponse::from)
+            return repository.findInTenant(userId, tenantId.get()).map(UserResponse::from).map(this::withLock)
                     .orElseThrow(() -> new UserNotFoundException(userId));
         }
         return repository.findById(userId).map(u -> UserResponse.from(u, null))

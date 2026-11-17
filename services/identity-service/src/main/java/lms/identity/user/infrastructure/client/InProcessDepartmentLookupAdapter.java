@@ -18,4 +18,19 @@ public class InProcessDepartmentLookupAdapter implements DepartmentLookupPort {
     public boolean existsActive(UUID departmentId) {
         return getDepartment.find(departmentId).map(DepartmentResponse::active).orElse(false);
     }
+
+    @Override
+    public java.util.Map<String, UUID> activeIdsByCode() {
+        java.util.Map<String, UUID> result = new java.util.HashMap<>();
+        getDepartment.findAll().stream().filter(DepartmentResponse::active)
+                .forEach(d -> result.put(d.code().toUpperCase(java.util.Locale.ROOT), d.id()));
+        return result;
+    }
+
+    @Override
+    public java.util.Map<UUID, String> codesById() {
+        java.util.Map<UUID, String> result = new java.util.HashMap<>();
+        getDepartment.findAll().forEach(d -> result.put(d.id(), d.code()));
+        return result;
+    }
 }

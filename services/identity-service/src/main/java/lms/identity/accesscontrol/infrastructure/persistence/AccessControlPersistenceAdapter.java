@@ -118,6 +118,18 @@ public class AccessControlPersistenceAdapter implements RoleRepository, Permissi
     }
 
     @Override
+    public java.util.Map<UUID, java.util.Set<lms.identity.accesscontrol.domain.RoleId>> findRoleIdsByUserIds(
+            java.util.Collection<UUID> userIds) {
+        java.util.Map<UUID, java.util.Set<lms.identity.accesscontrol.domain.RoleId>> result = new java.util.HashMap<>();
+        if (userIds.isEmpty()) return result;
+        for (UserRoleJpaEntity row : userRoleJpa.findByUserIdIn(userIds)) {
+            result.computeIfAbsent(row.getUserId(), k -> new java.util.LinkedHashSet<>())
+                    .add(new lms.identity.accesscontrol.domain.RoleId(row.getRoleId()));
+        }
+        return result;
+    }
+
+    @Override
     public Optional<UserRoleAssignment> findByUserId(UUID userId) {
         List<UserRoleJpaEntity> rows = userRoleJpa.findByUserId(userId);
         if (rows.isEmpty()) return Optional.empty();

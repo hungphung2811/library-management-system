@@ -51,11 +51,18 @@ public class CreateTenantUseCase {
      * @throws PlatformAccountException nếu tài khoản quản trị trùng/không tồn tại
      */
     public TenantResponse execute(CreateTenantRequest request, UUID actorId) {
+        return execute(request, actorId, TenantCreationOptions.STANDARD);
+    }
+
+    /** Như trên nhưng với id tenant/quản trị viên cố định và cờ buộc đổi mật khẩu (chỉ dữ liệu demo, ADR-0018). */
+    public TenantResponse execute(CreateTenantRequest request, UUID actorId, TenantCreationOptions options) {
         TenantAdminAssignment.requireExactlyOne(request.newAdmin(), request.existingUserId());
         // module hợp lệ (không rỗng, mã đúng) kiểm trước mọi thao tác ghi: rỗng -> 400, mã lạ -> 400
         TenantModules initial = TenantModules.initial(request.modules(), Instant.now(), actorId);
-        Tenant tenant = Tenant.create(request.code() == null ? null : request.code().trim(), request.name(),
-                request.organizationId());
+        String code = request.code() == null ? null : request.code().trim();
+        Tenant tenant = options.tenantId() == null
+                ? Tenant.create(code, request.name(), request.organizationId())
+                : Tenant.create(options.tenantId(), code, request.name(), request.organizationId());
         if (tenants.findByCode(tenant.code()).isPresent()) {
             throw new DuplicateTenantException("Mã tenant đã tồn tại: " + tenant.code());
         }
@@ -68,7 +75,7 @@ public class CreateTenantUseCase {
                 if (roles.seedFromTemplates(initial.enabled().stream().map(ModuleCode::name).toList()) == 0) {
                     throw new IllegalStateException("Chưa có role mẫu (role_templates), không tạo được tenant");
                 }
-                UUID admin = admins.ensureMember(tenant.id(), request.newAdmin(), request.existingUserId());
+                UUID admin = admins.ensureMember(tenant.id(), request.newAdmin(), request.existingUserId(), options);
                 roles.grantTenantAdmin(admin);
                 return admin;
             });

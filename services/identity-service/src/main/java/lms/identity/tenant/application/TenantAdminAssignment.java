@@ -28,7 +28,15 @@ final class TenantAdminAssignment {
 
     /** Trả userId của tài khoản đã là thành viên ACTIVE của tenantId. */
     UUID ensureMember(UUID tenantId, NewAdmin newAdmin, UUID existingUserId) {
-        if (newAdmin != null) return accounts.createAccount(newAdmin);
+        return ensureMember(tenantId, newAdmin, existingUserId, TenantCreationOptions.STANDARD);
+    }
+
+    UUID ensureMember(UUID tenantId, NewAdmin newAdmin, UUID existingUserId, TenantCreationOptions options) {
+        if (newAdmin != null) {
+            return options == TenantCreationOptions.STANDARD
+                    ? accounts.createAccount(newAdmin)
+                    : accounts.createAccount(newAdmin, options.adminUserId(), options.adminMustChangePassword());
+        }
         attachExisting(tenantId, existingUserId);
         return existingUserId;
     }

@@ -27,9 +27,14 @@ public class PlatformTenantAccountAdapter implements TenantAccountPort {
 
     @Override
     public UUID createAccount(NewAdmin account) {
+        return createAccount(account, null, true);
+    }
+
+    @Override
+    public UUID createAccount(NewAdmin account, UUID userId, boolean mustChangePassword) {
         try {
-            return createUser.execute(new CreateUserRequest(null, account.username(), account.fullName(),
-                    account.email(), null, account.temporaryPassword(), true)).id();
+            return createUser.execute(new CreateUserRequest(userId, account.username(), account.fullName(),
+                    account.email(), null, account.temporaryPassword(), mustChangePassword)).id();
         } catch (DuplicateUserException e) {
             throw new PlatformAccountException(PlatformAccountException.Reason.DUPLICATE, e.getMessage());
         } catch (InvalidUserException e) {

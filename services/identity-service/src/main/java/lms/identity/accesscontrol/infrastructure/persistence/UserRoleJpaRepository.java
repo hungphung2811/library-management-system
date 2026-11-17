@@ -8,5 +8,7 @@ public interface UserRoleJpaRepository extends JpaRepository<UserRoleJpaEntity, 
 
     List<UserRoleJpaEntity> findByUserId(UUID userId);
 
+    List<UserRoleJpaEntity> findByUserIdIn(java.util.Collection<UUID> userIds);
+
     boolean existsByRoleId(UUID roleId);
 }

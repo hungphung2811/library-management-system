@@ -21,10 +21,17 @@ public class ChangeUserStatusUseCase {
 
     private final UserRepository repository;
     private final UserAccountGuard guard;
+    private final UserLockStatus lockStatus;
 
     public ChangeUserStatusUseCase(UserRepository repository, AccountCredentialPort credentials) {
+        this(repository, credentials, null);
+    }
+
+    public ChangeUserStatusUseCase(UserRepository repository, AccountCredentialPort credentials,
+                                   UserLockStatus lockStatus) {
         this.repository = repository;
         this.guard = new UserAccountGuard(repository, credentials);
+        this.lockStatus = lockStatus;
     }
 
     @Transactional
@@ -42,6 +49,7 @@ public class ChangeUserStatusUseCase {
             if (!id.equals(actorId)) guard.requireAccountManageable(id);
             user.enable();
         }
-        return UserResponse.from(repository.save(user), current.departmentId());
+        UserResponse response = UserResponse.from(repository.save(user), current.departmentId());
+        return lockStatus == null ? response : lockStatus.apply(response);
     }
 }

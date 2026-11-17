@@ -47,6 +47,11 @@ public class Tenant {
                 null);
     }
 
+    /** Tạo với id cho trước (dữ liệu demo cần id tất định để các service khác khớp; ADR-0018). */
+    public static Tenant create(UUID id, String code, String name, UUID organizationId) {
+        return new Tenant(id, code, name, organizationId, TenantStatus.ACTIVE, Instant.now(), null, null);
+    }
+
     public static Tenant restore(UUID id, String code, String name, UUID organizationId, TenantStatus status,
                                  Instant createdAt) {
         return new Tenant(id, code, name, organizationId, status, createdAt, null, null);

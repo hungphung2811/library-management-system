@@ -142,6 +142,12 @@ public class TenantBeanConfiguration {
     }
 
     @Bean
+    lms.identity.tenant.application.TenantOverviewQuery tenantOverviewQuery(TenantRepository tenants,
+                                                                            TenantModuleRepository modules) {
+        return new lms.identity.tenant.application.TenantOverviewQuery(tenants, modules);
+    }
+
+    @Bean
     AddMembershipUseCase addMembershipUseCase(TenantRepository tenants, MembershipRepository memberships) {
         return new AddMembershipUseCase(tenants, memberships);
     }

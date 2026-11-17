@@ -22,9 +22,17 @@ public class UpdateUserUseCase {
     private final DepartmentLookupPort departments;
     private final TenantMembershipPort memberships;
     private final UserAccountGuard guard;
+    private final UserLockStatus lockStatus;
 
     public UpdateUserUseCase(UserRepository repository, DepartmentLookupPort departments,
                              AccountCredentialPort credentials, TenantMembershipPort memberships) {
+        this(repository, departments, credentials, memberships, null);
+    }
+
+    public UpdateUserUseCase(UserRepository repository, DepartmentLookupPort departments,
+                             AccountCredentialPort credentials, TenantMembershipPort memberships,
+                             UserLockStatus lockStatus) {
+        this.lockStatus = lockStatus;
         this.repository = repository;
         this.departments = departments;
         this.memberships = memberships;
@@ -55,6 +63,7 @@ public class UpdateUserUseCase {
         if (departmentChanged) {
             memberships.changeDepartment(id, tenantId, after);
         }
-        return UserResponse.from(user, after);
+        UserResponse response = UserResponse.from(user, after);
+        return lockStatus == null ? response : lockStatus.apply(response);
     }
 }

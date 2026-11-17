@@ -18,6 +18,9 @@ public interface UserRepository {
     /** Người dùng có membership ở tenantId, kèm phòng ban trong tenant đó; không có membership thì rỗng. */
     Optional<TenantUser> findInTenant(UUID id, UUID tenantId);
 
+    /** Chỉ những người có membership (mọi trạng thái) ở tenantId trong số ids; id khác bị bỏ qua. Không có dữ liệu liên hệ cần dùng. */
+    java.util.List<User> findAllInTenant(java.util.Collection<UUID> ids, UUID tenantId);
+
     boolean existsById(UUID id);
 
     /** Toàn cục (mọi tenant). */

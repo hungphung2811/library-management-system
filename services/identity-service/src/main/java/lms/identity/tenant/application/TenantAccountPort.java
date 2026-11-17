@@ -14,6 +14,17 @@ public interface TenantAccountPort {
      */
     UUID createAccount(NewAdmin account);
 
+    /**
+     * Như {@link #createAccount(NewAdmin)} nhưng với id người dùng cho trước (null = tự sinh) và cờ buộc đổi mật khẩu
+     * tùy chọn. Chỉ dùng cho dữ liệu demo (ADR-0018). Mặc định chỉ hỗ trợ cấu hình thường (id tự sinh, buộc đổi).
+     */
+    default UUID createAccount(NewAdmin account, UUID userId, boolean mustChangePassword) {
+        if (userId != null || !mustChangePassword) {
+            throw new UnsupportedOperationException("createAccount với id/mustChangePassword tùy chọn");
+        }
+        return createAccount(account);
+    }
+
     /** Tài khoản có credential (đăng nhập được). */
     boolean exists(UUID userId);
 }
