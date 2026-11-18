@@ -143,6 +143,87 @@ class DemoPlanTest {
     }
 
     @Test
+    void dauSachCoThongTinBoSungHopLe() {
+        assertThat(plan.titles()).hasSize(64);
+        assertThat(plan.titles().stream().map(DemoPlan.TitlePlan::publisher)).doesNotContainNull();
+        for (DemoPlan.TitlePlan t : plan.titles()) {
+            assertThat(t.publishYear()).isBetween(2005, 2024);
+            assertThat(t.pageCount()).isBetween(120, 700);
+            assertThat(t.language()).isIn("vi", "en");
+            assertThat(t.format()).isIn("PAPERBACK", "HARDCOVER", "EBOOK");
+            assertThat(t.tags()).isNotEmpty().hasSizeLessThanOrEqualTo(10).doesNotHaveDuplicates();
+            t.tags().forEach(tag -> assertThat(tag).isNotBlank().hasSizeLessThanOrEqualTo(50));
+            assertThat(t.seriesNumber() == null || t.series() != null).isTrue();
+            assertThat(t.coverImageUrl() == null || t.coverImageUrl().startsWith("https://")).isTrue();
+            assertThat(t.name().length()).isLessThanOrEqualTo(255);
+        }
+        // nhóm theo chủ đề: mỗi chủ đề 8 sách liên tiếp
+        for (int i = 0; i < 64; i += 8) {
+            String category = plan.titles().get(i).category();
+            for (int j = i; j < i + 8; j++) assertThat(plan.titles().get(j).category()).isEqualTo(category);
+        }
+        // sách cùng bộ có số tập khác nhau
+        var bySeries = plan.titles().stream().filter(t -> t.series() != null)
+                .collect(Collectors.groupingBy(DemoPlan.TitlePlan::series));
+        assertThat(bySeries).isNotEmpty();
+        bySeries.values().forEach(group -> {
+            assertThat(group.stream().map(DemoPlan.TitlePlan::seriesNumber)).doesNotContainNull().doesNotHaveDuplicates();
+        });
+    }
+
+    @Test
+    void banSaoCoThongTinNhapKhoHopLe() {
+        assertThat(plan.copies()).hasSize(160);
+        java.util.Set<String> sources = new HashSet<>();
+        java.util.Set<String> grades = new HashSet<>();
+        for (DemoPlan.CopyPlan c : plan.copies()) {
+            assertThat(c.acquiredDate()).isNotNull().isBefore(TODAY);
+            assertThat(c.lastInventoryDate()).isNotNull().isAfterOrEqualTo(c.acquiredDate()).isBeforeOrEqualTo(TODAY);
+            assertThat(c.acquisitionSource()).isIn("PURCHASE", "DONATION", "EXCHANGE", "OTHER");
+            sources.add(c.acquisitionSource());
+            if (c.conditionGrade() != null) {
+                assertThat(c.conditionGrade()).isIn("NEW", "GOOD", "FAIR", "WORN");
+                grades.add(c.conditionGrade());
+            }
+            if (c.acquisitionSource().equals("PURCHASE")) {
+                assertThat(c.purchasePrice()).isNotNull().isPositive();
+            } else {
+                assertThat(c.purchasePrice()).isNull();
+            }
+            assertThat(c.conditionNote() == null || c.conditionNote().length() <= 300).isTrue();
+            assertThat(c.shelfIndex()).isBetween(0, plan.shelves().size() - 1);
+        }
+        assertThat(sources).hasSize(4);
+        assertThat(grades).hasSize(4);
+    }
+
+    @Test
+    void tacGiaNhaXuatBanVaKeKhopDauSach() {
+        Set<String> authorNames = plan.authors().stream().map(DemoPlan.AuthorPlan::name).collect(Collectors.toSet());
+        Set<String> publisherNames = plan.publishers().stream().map(DemoPlan.PublisherPlan::name)
+                .collect(Collectors.toSet());
+        assertThat(authorNames).hasSameSizeAs(plan.authors());
+        assertThat(publisherNames).hasSameSizeAs(plan.publishers());
+        for (DemoPlan.TitlePlan t : plan.titles()) {
+            assertThat(authorNames).contains(t.author());
+            assertThat(publisherNames).contains(t.publisher());
+        }
+        for (DemoPlan.AuthorPlan a : plan.authors()) {
+            assertThat(a.birthYear() == null || a.birthYear() >= 1).isTrue();
+            assertThat(a.deathYear() == null || a.birthYear() == null || a.deathYear() >= a.birthYear()).isTrue();
+            assertThat(a.website() == null || a.website().startsWith("http")).isTrue();
+        }
+        for (DemoPlan.PublisherPlan p : plan.publishers()) {
+            assertThat(p.foundedYear() == null || p.foundedYear() >= 1400).isTrue();
+            assertThat(p.website() == null || p.website().startsWith("http")).isTrue();
+            assertThat(p.country()).isNotBlank();
+        }
+        assertThat(plan.shelves()).hasSize(16);
+        assertThat(plan.shelves().stream().map(DemoPlan.ShelfPlan::code)).doesNotHaveDuplicates();
+        plan.shelves().forEach(s -> assertThat(s.capacity()).isBetween(1, 100000));
+    }
+
+    @Test
     void isbnCoChuSoKiemTraDung() {
         for (DemoPlan.TitlePlan t : plan.titles()) {
             assertThat(t.isbn()).hasSize(13).containsOnlyDigits();

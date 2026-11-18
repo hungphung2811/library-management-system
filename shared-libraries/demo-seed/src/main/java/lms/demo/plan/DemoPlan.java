@@ -30,7 +30,10 @@ public record DemoPlan(
         List<StockItemPlan> stockItems,
         List<OrderPlan> orders,
         List<SalesReturnPlan> salesReturns,
-        List<RefundPlan> refunds) {
+        List<RefundPlan> refunds,
+        List<AuthorPlan> authors,
+        List<PublisherPlan> publishers,
+        List<ShelfPlan> shelves) {
 
     public static final long DEFAULT_SEED = 20261117L;
 
@@ -116,10 +119,43 @@ public record DemoPlan(
     public record ReaderPlan(UUID id, int index, String username, String fullName, String email, String cardNo) {
     }
 
-    public record TitlePlan(UUID id, int index, String name, String author, String isbn, String category, int publishYear) {
+    /**
+     * Đầu sách demo. {@code publishYear} là năm xuất bản; {@code publisher} là tên nhà xuất bản (tạo thành danh mục chuẩn);
+     * từ {@code subtitle} trở đi là thông tin bổ sung tùy chọn (format: PAPERBACK|HARDCOVER|EBOOK; tags có thể rỗng).
+     */
+    public record TitlePlan(UUID id, int index, String name, String author, String isbn, String category, int publishYear,
+                            String publisher, String subtitle, String edition, String language, Integer pageCount,
+                            String format, String translator, String series, Integer seriesNumber,
+                            String coverImageUrl, List<String> tags) {
+        public TitlePlan(UUID id, int index, String name, String author, String isbn, String category, int publishYear) {
+            this(id, index, name, author, isbn, category, publishYear, null, null, null, null, null, null, null, null,
+                    null, null, List.of());
+        }
     }
 
-    public record CopyPlan(UUID id, int index, UUID titleId, String barcode, CopyStatus status) {
+    /**
+     * Bản sao demo. Từ {@code acquiredDate} trở đi là thông tin nhập kho tùy chọn (acquisitionSource: PURCHASE|DONATION|
+     * EXCHANGE|OTHER; conditionGrade: NEW|GOOD|FAIR|WORN; purchasePrice chỉ có khi PURCHASE); {@code shelfIndex} là chỉ
+     * số trong {@link DemoPlan#shelves()}.
+     */
+    public record CopyPlan(UUID id, int index, UUID titleId, String barcode, CopyStatus status, LocalDate acquiredDate,
+                           String acquisitionSource, Long purchasePrice, String conditionGrade, String conditionNote,
+                           LocalDate lastInventoryDate, Integer shelfIndex) {
+        public CopyPlan(UUID id, int index, UUID titleId, String barcode, CopyStatus status) {
+            this(id, index, titleId, barcode, status, null, null, null, null, null, null, null);
+        }
+    }
+
+    /** Tác giả thật của các đầu sách demo (khớp {@code TitlePlan.author}); trường bổ sung tùy chọn. */
+    public record AuthorPlan(String name, Integer birthYear, Integer deathYear, String nationality, String website) {
+    }
+
+    /** Nhà xuất bản thật của các đầu sách demo (khớp {@code TitlePlan.publisher}); trường bổ sung tùy chọn. */
+    public record PublisherPlan(String name, String country, Integer foundedYear, String website, String address) {
+    }
+
+    /** Kệ demo: mã, tầng, khu (theo chủ đề), sức chứa (số bản sao tối đa). */
+    public record ShelfPlan(UUID id, int index, String code, String floor, String zone, int capacity) {
     }
 
     /** {@code returnedDaysAgo == null}: chưa trả. */
@@ -170,11 +206,15 @@ public record DemoPlan(
 
     /**
      * Mặt hàng tồn kho. Sổ cái: {@code +receivedQuantity (nhập) - soldQuantity (bán) + returnedQuantity (khách trả)}
-     * và tổng phải bằng {@code onHand}.
+     * và tổng phải bằng {@code onHand}. Từ {@code sku} trở đi là chi tiết quản lý tùy chọn của mặt hàng (tất định theo
+     * chỉ số): {@code sku} dạng {@code LMS-<năm xuất bản>-<số thứ tự>} (duy nhất), {@code supplierName} nhà cung cấp/nhà phát
+     * hành, {@code costPrice} giá nhập (55-70% giá bán), {@code binLocation} vị trí kho dạng {@code K1-A3},
+     * {@code reorderQuantity} số lượng đặt lại gợi ý, {@code note} ghi chú nội bộ (có thể null).
      */
     public record StockItemPlan(UUID titleId, int index, int onHand, int reserved, Integer lowStockThreshold,
                                 long unitPrice, int receivedQuantity, int soldQuantity, int returnedQuantity,
-                                int receiptIndex) {
+                                int receiptIndex, String sku, String supplierName, long costPrice,
+                                String binLocation, int reorderQuantity, String note) {
         public int available() {
             return onHand - reserved;
         }
@@ -198,11 +238,15 @@ public record DemoPlan(
     /**
      * Đơn hàng. {@code orderNo} có tiền tố {@code DEMO-}. {@code paidDaysAgo == null}: chưa thanh toán.
      * {@code minuteOfDay} (0..1439, giờ VN) là giờ trong ngày; người ghi phải kẹp không vượt quá hiện tại với đơn hôm nay.
+     * {@code customerNote}/{@code staffNote} là ghi chú của khách/nội bộ (null nếu không có);
+     * {@code expectedDeliveryDays} là số ngày từ ngày tạo đến ngày giao/nhận dự kiến (chỉ đơn online không bị hủy, null nếu
+     * không có).
      */
     public record OrderPlan(UUID id, int index, String orderNo, Channel channel, OrderStatus status,
                             PaymentStatus paymentStatus, int createdDaysAgo, int minuteOfDay, Integer paidDaysAgo,
                             long subtotal, long discount, long vat, long shippingFee, long total,
-                            List<OrderLinePlan> lines) {
+                            List<OrderLinePlan> lines, String customerNote, String staffNote,
+                            Integer expectedDeliveryDays) {
         public OrderPlan {
             lines = List.copyOf(lines);
         }

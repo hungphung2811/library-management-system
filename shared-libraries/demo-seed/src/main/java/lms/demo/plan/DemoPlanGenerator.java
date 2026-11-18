@@ -23,6 +23,7 @@ import static lms.demo.plan.DemoPlan.StaffPlan;
 import static lms.demo.plan.DemoPlan.StaffRole;
 import static lms.demo.plan.DemoPlan.StockItemPlan;
 import static lms.demo.plan.DemoPlan.SupplierPlan;
+import static lms.demo.plan.DemoPlan.ShelfPlan;
 import static lms.demo.plan.DemoPlan.TitlePlan;
 
 import java.time.DayOfWeek;
@@ -66,12 +67,12 @@ final class DemoPlanGenerator {
             "Tâm lý học", "Nghệ thuật"};
     private static final String[] FORMS = {"Nhập môn", "Cẩm nang", "Những câu chuyện về", "Chuyên đề", "Tuyển tập",
             "Góc nhìn mới về", "Hành trình khám phá", "Bài giảng"};
-    private static final String[] AUTHORS = {"Nguyễn Văn An", "Trần Thị Bình", "Lê Hoàng Cường", "Phạm Minh Đức",
-            "Hoàng Thu Hà", "Vũ Quang Huy", "Đặng Khánh Linh", "Bùi Ngọc Mai", "Đỗ Thanh Nam", "Ngô Phương Oanh",
-            "Dương Hải Phong", "Lý Gia Quân", "Phan Thảo Quyên", "Trịnh Anh Sơn", "Võ Thùy Trang", "Mai Xuân Vinh"};
-    private static final String[] LAST_NAMES = {"Nguyễn", "Trần", "Lê", "Phạm", "Hoàng", "Vũ"};
-    private static final String[] MIDDLE_NAMES = {"Văn", "Thị", "Minh", "Ngọc"};
-    private static final String[] FIRST_NAMES = {"An", "Bình", "Chi", "Dũng", "Giang", "Hạnh", "Khoa", "Lan"};
+    /** Họ tên độc giả demo; chỉ số chẵn là nam, lẻ là nữ (identity seed dựa vào quy ước này để đặt giới tính). */
+    private static final String[] READER_NAMES = {"Nguyễn Văn Minh", "Trần Thị Thu Hà", "Lê Hoàng Long",
+            "Phạm Ngọc Anh", "Hoàng Đức Thịnh", "Vũ Thị Lan Hương", "Đặng Quốc Bảo", "Bùi Thanh Trúc",
+            "Đỗ Gia Huy", "Ngô Phương Thảo", "Dương Tuấn Kiệt", "Lý Thị Mai Anh", "Phan Công Danh",
+            "Trịnh Khánh Linh", "Võ Minh Quân", "Mai Hồng Nhung", "Đinh Xuân Trường", "Lương Thu Hiền",
+            "Huỳnh Bảo Long", "Cao Thị Ngọc Diệp", "Tạ Hữu Phước", "Châu Mỹ Duyên", "Lâm Nhật Nam", "Hà Thu Trang"};
 
     private DemoPlanGenerator() {
     }
@@ -185,32 +186,180 @@ final class DemoPlanGenerator {
             Integer threshold = stockTargets[i][2] < 0 ? null : stockTargets[i][2];
             int received = onHand + sold[i] - returned[i];
             int receiptIndex = i % 2;
+            // Chi tiết quản lý: tất định theo chỉ số, KHÔNG rút từ rnd (không làm lệch các phần kế hoạch khác)
+            long cost = costPrice(prices[i], i);
             stockItems.add(new StockItemPlan(DemoIds.title(i), i, onHand, reserved, threshold, prices[i], received,
-                    sold[i], returned[i], receiptIndex));
-            receiptLines.get(receiptIndex).add(new ReceiptLinePlan(DemoIds.title(i), received, prices[i] * 60 / 100));
+                    sold[i], returned[i], receiptIndex,
+                    String.format("LMS-%d-%04d", titles.get(i).publishYear(), i + 1),
+                    STOCK_SUPPLIERS[i % STOCK_SUPPLIERS.length], cost, binLocation(i), 10 * (1 + i % 4),
+                    stockNote(i)));
+            receiptLines.get(receiptIndex).add(new ReceiptLinePlan(DemoIds.title(i), received, cost));
         }
         List<ReceiptPlan> receipts = List.of(
                 new ReceiptPlan(DemoIds.receipt(0), 0, 0, 50, receiptLines.get(0)),
                 new ReceiptPlan(DemoIds.receipt(1), 1, 1, 45, receiptLines.get(1)));
 
-        return new DemoPlan(today, seed, staff, readers, titles, copies, borrowings, reservations, fines, suppliers,
-                receipts, stockItems, orders, returns, refunds);
+        List<ShelfPlan> shelves = shelves();
+        List<CopyPlan> finalCopies = withAcquisition(copies, prices, seed);
+        return new DemoPlan(today, seed, staff, readers, titles, finalCopies, borrowings, reservations, fines, suppliers,
+                receipts, stockItems, orders, returns, refunds, DemoReferenceData.authors(),
+                DemoReferenceData.publishers(), shelves);
+    }
+
+    // ---- Kệ và thông tin nhập kho của bản sao (tất định, KHÔNG rút từ rnd chính) ----
+
+    private static final String[] SHELF_ABBR = {"LT", "LS", "VH", "KT", "KH", "TN", "TL", "NT"};
+
+    /** 16 kệ: mỗi chủ đề 2 kệ; 4 chủ đề đầu ở Tầng 1, 4 chủ đề sau ở Tầng 2; khu đặt theo tên chủ đề. */
+    static List<ShelfPlan> shelves() {
+        List<ShelfPlan> list = new ArrayList<>();
+        for (int t = 0; t < TOPICS.length; t++) {
+            for (int n = 1; n <= 2; n++) {
+                int index = list.size();
+                list.add(new ShelfPlan(DemoIds.of("shelf", index), index, String.format("%s-%02d", SHELF_ABBR[t], n),
+                        t < 4 ? "Tầng 1" : "Tầng 2", "Khu " + TOPICS[t], n == 1 ? 60 : 40));
+            }
+        }
+        return list;
+    }
+
+    /** Giá bìa dự phòng của đầu sách không có mặt hàng bán (cùng công thức CatalogDemoSeedStep). */
+    private static long coverPriceOf(int titleIndex, long[] prices) {
+        return titleIndex < prices.length ? prices[titleIndex] : 90_000L + (titleIndex % 7) * 10_000L;
+    }
+
+    /**
+     * Mốc cố định cho ngày nhập/kiểm kê của bản sao: KHÔNG theo ngày chạy để kế hoạch bản sao giữ nguyên khi đổi ngày
+     * (bất biến của DemoPlan) và để chạy lại không đổi dữ liệu đã seed. Phải nằm trong quá khứ so với ngày seed.
+     */
+    static final LocalDate ACQUISITION_ANCHOR = LocalDate.of(2026, 11, 1);
+
+    private static List<CopyPlan> withAcquisition(List<CopyPlan> copies, long[] prices, long seed) {
+        List<CopyPlan> out = new ArrayList<>(copies.size());
+        for (CopyPlan c : copies) {
+            Random r = new Random(seed * 31 + 0xA5C0DEL + c.index());
+            int titleIndex = c.index() % TITLES;
+            int slot = c.index() % 10;
+            String source = slot <= 5 ? "PURCHASE" : slot <= 7 ? "DONATION" : slot == 8 ? "EXCHANGE" : "OTHER";
+            int acquiredDaysAgo = 120 + r.nextInt(1700);
+            LocalDate acquired = ACQUISITION_ANCHOR.minusDays(acquiredDaysAgo);
+            LocalDate inventory = ACQUISITION_ANCHOR.minusDays(1 + r.nextInt(90));
+            Long price = source.equals("PURCHASE") ? costPrice(coverPriceOf(titleIndex, prices), c.index()) : null;
+            int roll = r.nextInt(100);
+            String grade = acquiredDaysAgo < 365 ? (roll < 60 ? "NEW" : "GOOD")
+                    : roll < 20 ? "NEW" : roll < 65 ? "GOOD" : roll < 88 ? "FAIR" : "WORN";
+            String note = null;
+            if (c.status() == CopyStatus.DAMAGED) {
+                grade = "WORN";
+                note = "Gáy sách bong, cần đóng lại";
+            } else if (c.status() == CopyStatus.LOST) {
+                grade = null;
+                note = "Đã báo mất, chờ xử lý theo quy định";
+            } else if (grade.equals("FAIR")) {
+                note = roll % 2 == 0 ? "Góc bìa mòn nhẹ" : "Có vết ố ở vài trang";
+            } else if (grade.equals("WORN")) {
+                note = "Bìa trầy xước, ruột còn tốt";
+            }
+            int shelf = (titleIndex / 8) * 2 + c.index() % 2;
+            out.add(new CopyPlan(c.id(), c.index(), c.titleId(), c.barcode(), c.status(), acquired, source, price,
+                    grade, note, inventory, shelf));
+        }
+        return out;
+    }
+
+    // ---- Chi tiết quản lý mặt hàng (tất định theo chỉ số) ----
+
+    /** Nhà cung cấp/nhà phát hành thật, xoay vòng theo chỉ số mặt hàng. */
+    static final String[] STOCK_SUPPLIERS = {"Fahasa", "Nhà sách Phương Nam", "Nhã Nam", "First News - Trí Việt",
+            "Alpha Books", "NXB Trẻ", "Thái Hà Books", "NXB Kim Đồng"};
+
+    /** Giá nhập = 55%..70% giá bán (bước 1%), làm tròn 500 đồng; luôn nhỏ hơn giá bán. */
+    static long costPrice(long price, int index) {
+        int percent = 55 + (index * 7) % 16;
+        long cost = Math.round(price * percent / 100.0 / 500.0) * 500L;
+        return Math.min(cost, price - 500L);
+    }
+
+    /** Vị trí kho "K{kệ}-{hàng}{ô}": mỗi kệ 16 mặt hàng, hàng A..D, ô 1..4; duy nhất theo chỉ số (đến 64). */
+    static String binLocation(int index) {
+        return "K" + (index / 16 + 1) + "-" + (char) ('A' + (index % 16) / 4) + (1 + index % 4);
+    }
+
+    private static String stockNote(int index) {
+        if (index % 9 == 0) return "Bán chạy, ưu tiên đặt lại khi tồn thấp.";
+        if (index % 13 == 4) return "Bìa dễ trầy, kiểm tra kỹ khi nhận hàng.";
+        if (index % 11 == 6) return "Hàng đặt trước từ nhà phát hành, giao theo đợt.";
+        return null;
+    }
+
+    // ---- Ghi chú đơn hàng (tất định theo chỉ số và trạng thái) ----
+
+    private static final String[] ONLINE_CUSTOMER_NOTES = {
+            "Giao giờ hành chính, gọi trước khi đến giúp mình.",
+            "Gói quà giúp mình, kèm thiệp chúc mừng sinh nhật.",
+            "Nếu mình không có nhà thì gửi bảo vệ tòa nhà nhé.",
+            "Nếu hết bản này, cho mình xin bản tái bản mới nhất.",
+            "Cần xuất hóa đơn công ty, thông tin mình gửi qua email.",
+            "Giao sau 18h các ngày trong tuần."};
+
+    private static String customerNote(int index, Channel channel) {
+        if (channel == Channel.ONLINE) {
+            return index % 5 == 2 ? null : ONLINE_CUSTOMER_NOTES[index % ONLINE_CUSTOMER_NOTES.length];
+        }
+        return index % 7 == 3 ? "Khách xin bọc bìa sách giúp." : null;
+    }
+
+    private static String staffNote(int index, Channel channel, OrderStatus status, PaymentStatus payment,
+                                    long discount) {
+        if (payment == PaymentStatus.PARTIALLY_REFUNDED) {
+            return "Khách trả 1 cuốn lỗi in, đã lập phiếu trả và hoàn tiền phần tương ứng.";
+        }
+        switch (status) {
+            case PENDING_CONFIRMATION:
+                return index % 2 == 0 ? "Chờ xác nhận tồn kho với thủ kho."
+                        : "Khách mới, gọi xác nhận địa chỉ trước khi giao.";
+            case CONFIRMED:
+                return "Đã gọi khách xác nhận, chờ chuyển khoản.";
+            case SHIPPING:
+                return "Đã bàn giao đơn vị vận chuyển, mã vận đơn ghi trên phiếu giao.";
+            case READY_FOR_PICKUP:
+                return "Đã đóng gói, để ở quầy số 2, giữ trong 3 ngày.";
+            case CANCELLED:
+                return payment == PaymentStatus.REFUNDED ? "Khách đổi ý, đã hoàn tiền và nhập lại kho."
+                        : "Khách không nghe máy 2 lần, hủy theo quy định.";
+            default:
+                break;
+        }
+        if (discount > 0) {
+            return "Giảm 5% theo chương trình khuyến mãi, quản lý đã duyệt.";
+        }
+        if (channel == Channel.ONLINE && index % 4 == 0) {
+            return "Khách quen, ưu tiên giao nhanh các lần sau.";
+        }
+        return null;
+    }
+
+    /** Số ngày từ ngày tạo đến ngày giao/nhận dự kiến: chỉ đơn online không bị hủy. */
+    private static Integer expectedDeliveryDays(int index, Channel channel, OrderStatus status) {
+        if (channel != Channel.ONLINE || status == OrderStatus.CANCELLED) {
+            return null;
+        }
+        return status == OrderStatus.READY_FOR_PICKUP ? 1 : 2 + index % 3;
     }
 
     // ---- Con người, danh mục ----
 
     private static List<StaffPlan> staff() {
         return List.of(
-                new StaffPlan(DemoIds.staff(0), 0, StaffRole.TENANT_ADMIN, "demo.admin", "Quản trị Demo", "demo.admin@" + DemoPlan.EMAIL_DOMAIN),
-                new StaffPlan(DemoIds.staff(1), 1, StaffRole.LIBRARIAN, "demo.thuthu", "Thủ thư Demo", "demo.thuthu@" + DemoPlan.EMAIL_DOMAIN),
-                new StaffPlan(DemoIds.staff(2), 2, StaffRole.STORE_MANAGER, "demo.cuahang", "Quản lý cửa hàng Demo", "demo.cuahang@" + DemoPlan.EMAIL_DOMAIN));
+                new StaffPlan(DemoIds.staff(0), 0, StaffRole.TENANT_ADMIN, "demo.admin", "Nguyễn Quốc Hưng", "demo.admin@" + DemoPlan.EMAIL_DOMAIN),
+                new StaffPlan(DemoIds.staff(1), 1, StaffRole.LIBRARIAN, "demo.thuthu", "Lê Thị Hồng Nhung", "demo.thuthu@" + DemoPlan.EMAIL_DOMAIN),
+                new StaffPlan(DemoIds.staff(2), 2, StaffRole.STORE_MANAGER, "demo.cuahang", "Trần Minh Tuấn", "demo.cuahang@" + DemoPlan.EMAIL_DOMAIN));
     }
 
     private static List<ReaderPlan> readers() {
         List<ReaderPlan> list = new ArrayList<>();
         for (int i = 0; i < READERS; i++) {
-            String name = LAST_NAMES[i % LAST_NAMES.length] + " " + MIDDLE_NAMES[(i / LAST_NAMES.length) % MIDDLE_NAMES.length]
-                    + " " + FIRST_NAMES[(i * 3) % FIRST_NAMES.length];
+            String name = READER_NAMES[i % READER_NAMES.length];
             String username = String.format("demo.docgia%02d", i + 1);
             list.add(new ReaderPlan(DemoIds.reader(i), i, username, name, username + "@" + DemoPlan.EMAIL_DOMAIN,
                     String.format("DEMO-R%03d", i + 1)));
@@ -219,12 +368,20 @@ final class DemoPlanGenerator {
     }
 
     private static List<TitlePlan> titles(Random rnd) {
+        List<DemoTitleData.Row> rows = DemoTitleData.rows();
+        if (rows.size() != TITLES) {
+            throw new IllegalStateException("Dữ liệu sách demo phải có đúng " + TITLES + " dòng, hiện có " + rows.size());
+        }
         List<TitlePlan> list = new ArrayList<>();
         for (int i = 0; i < TITLES; i++) {
-            String category = TOPICS[i / FORMS.length];
-            String name = FORMS[i % FORMS.length] + " " + category;
-            int year = 1990 + rnd.nextInt(35);
-            list.add(new TitlePlan(DemoIds.title(i), i, name, AUTHORS[(i * 5) % AUTHORS.length], isbn(i), category, year));
+            DemoTitleData.Row r = rows.get(i);
+            // Giữ nguyên số lần rút từ rnd như trước (năm ngẫu nhiên cũ) để các phần kế hoạch sinh sau không đổi.
+            rnd.nextInt(35);
+            // Ảnh bìa giữ chỗ ổn định theo index; cứ 5 sách có 1 sách không có ảnh để demo trường hợp thiếu.
+            String cover = i % 5 == 4 ? null : "https://picsum.photos/seed/lms-demo-" + i + "/300/450";
+            list.add(new TitlePlan(DemoIds.title(i), i, r.name(), r.author(), isbn(i), TOPICS[i / FORMS.length],
+                    r.year(), r.publisher(), r.subtitle(), r.edition(), r.language(), r.pageCount(), r.format(),
+                    r.translator(), r.series(), r.seriesNumber(), cover, r.tags()));
         }
         return list;
     }
@@ -408,7 +565,9 @@ final class DemoPlanGenerator {
         long total = subtotal - discount + vat + shippingFee;
         Integer paidDaysAgo = paid ? daysAgo : null;
         orders.add(new OrderPlan(DemoIds.order(i), i, DemoPlan.ORDER_PREFIX + String.format("%04d", i + 1), channel,
-                status, payment, daysAgo, minute, paidDaysAgo, subtotal, discount, vat, shippingFee, total, lines));
+                status, payment, daysAgo, minute, paidDaysAgo, subtotal, discount, vat, shippingFee, total, lines,
+                customerNote(i, channel), staffNote(i, channel, status, payment, discount),
+                expectedDeliveryDays(i, channel, status)));
 
         if (i >= 2 && i <= 4) {
             OrderLinePlan first = lines.get(0);

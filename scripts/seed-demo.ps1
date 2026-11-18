@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Nạp dữ liệu mẫu cho tenant demo (ADR-0018): chạy lần lượt identity -> catalog -> circulation -> sales, mỗi service một tiến trình java -jar
   riêng (profile demo-seed, không web) rồi thoát. Chỉ dùng ở máy dev/demo; mỗi service tự từ chối khi bật profile prod.
