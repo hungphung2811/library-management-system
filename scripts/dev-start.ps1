@@ -27,13 +27,16 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $logs = Join-Path $root '.dev'; New-Item -ItemType Directory -Force $logs | Out-Null
 $java = if ($env:JAVA_HOME) { Join-Path $env:JAVA_HOME 'bin\java.exe' } else { 'java' }
 if (-not $env:INTERNAL_API_KEY) { $env:INTERNAL_API_KEY = 'dev-internal-key' }
+# Dev/demo: tắt cache Redis của wrapper RequestCache (cache-common) để số liệu luôn mới; muốn thử cache thì đặt LMS_CACHE_ENABLED=true trước khi chạy.
+if (-not $env:LMS_CACHE_ENABLED) { $env:LMS_CACHE_ENABLED = 'false' }
 # Bật C1 + SerialGC cho khởi động nhanh hơn (dev, không dùng cho prod).
 $jvm = @('-XX:TieredStopAtLevel=1', '-XX:+UseSerialGC', '-Xshare:auto')
 $secure = @('--app.security.enabled=true', '--lms.security.permission.enabled=true')
 
 $services = [ordered]@{
-  system      = @{ port = 8086; jar = 'services\system-service\target\system-service-0.1.0-SNAPSHOT-exec.jar'; args = @() }
-  identity    = @{ port = 8081; jar = 'services\identity-service\target\identity-service-0.1.0-SNAPSHOT.jar'; args = @() }
+  # system/identity phải bật kiểm quyền: tắt thì GET /api/menus/me luôn rỗng (không có JWT) và ADR-0016 (platform admin hành động thay tenant qua X-Tenant-Id) không có tác dụng
+  system      = @{ port = 8086; jar = 'services\system-service\target\system-service-0.1.0-SNAPSHOT-exec.jar'; args = $secure }
+  identity    = @{ port = 8081; jar = 'services\identity-service\target\identity-service-0.1.0-SNAPSHOT.jar'; args = $secure }
   catalog     = @{ port = 8082; jar = 'services\catalog-service\target\catalog-service-0.1.0-SNAPSHOT.jar'; args = $secure }
   circulation = @{ port = 8083; jar = 'services\circulation-service\target\circulation-service-0.1.0-SNAPSHOT.jar'; args = $secure }
   support     = @{ port = 8084; jar = 'services\support-service\target\support-service-0.1.0-SNAPSHOT.jar'; args = $secure }

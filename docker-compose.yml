@@ -127,6 +127,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      LMS_CACHE_ENABLED: ${LMS_CACHE_ENABLED:-true}
       IDENTITY_SERVICE_URL: http://identity-service:8081
       JWT_JWK_SET_URI: http://identity-service:8081/.well-known/jwks.json
     healthcheck:
@@ -169,6 +170,8 @@ services:
       AUTH_JWT_PRIVATE_KEY: ${AUTH_JWT_PRIVATE_KEY:-}
       AUTH_JWT_PUBLIC_KEY: ${AUTH_JWT_PUBLIC_KEY:-}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      REDIS_HOST: redis
+      LMS_CACHE_ENABLED: ${LMS_CACHE_ENABLED:-true}
       # Bí mật riêng của customer-api khi xin token storefront (ADR-0011 2.1); production phải ghi đè.
       STOREFRONT_CLIENT_SECRET: ${STOREFRONT_CLIENT_SECRET:-dev-storefront-secret}
     expose:
@@ -201,6 +204,8 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       JWT_JWK_SET_URI: http://identity-service:8081/.well-known/jwks.json
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      REDIS_HOST: redis
+      LMS_CACHE_ENABLED: ${LMS_CACHE_ENABLED:-true}
       CATALOG_SERVICE_URL: http://catalog-service:8082
       IDENTITY_SERVICE_URL: http://identity-service:8081
     expose:
@@ -231,6 +236,8 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       JWT_JWK_SET_URI: http://identity-service:8081/.well-known/jwks.json
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      REDIS_HOST: redis
+      LMS_CACHE_ENABLED: ${LMS_CACHE_ENABLED:-true}
       IDENTITY_SERVICE_URL: http://identity-service:8081
     expose:
       - "8082"
@@ -297,6 +304,8 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       JWT_JWK_SET_URI: http://identity-service:8081/.well-known/jwks.json
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
+      REDIS_HOST: redis
+      LMS_CACHE_ENABLED: ${LMS_CACHE_ENABLED:-true}
       IDENTITY_SERVICE_URL: http://identity-service:8081
       CATALOG_SERVICE_URL: http://catalog-service:8082
     expose:

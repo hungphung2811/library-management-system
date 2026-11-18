@@ -2,6 +2,7 @@ package lms.system.cms.infrastructure.config;
 
 import java.time.Clock;
 import java.time.Duration;
+import lms.cache.RequestCache;
 import lms.system.cms.application.AnonymizeExpiredContactRequestsUseCase;
 import lms.system.cms.application.CmsPageRepositoryPort;
 import lms.system.cms.application.ContactRequestRepositoryPort;
@@ -10,6 +11,8 @@ import lms.system.cms.application.ManageContactRequestsUseCase;
 import lms.system.cms.application.MarkdownRendererPort;
 import lms.system.cms.application.PublishedCmsPagesUseCase;
 import lms.system.cms.application.SubmitContactRequestUseCase;
+import lms.system.cms.infrastructure.cache.CachedPublishedCmsPagesUseCase;
+import lms.system.cms.infrastructure.cache.EvictingManageCmsPagesUseCase;
 import lms.system.cms.infrastructure.markdown.CommonmarkMarkdownRenderer;
 import lms.system.cms.infrastructure.scheduling.ContactAnonymizationJob;
 import org.springframework.beans.factory.annotation.Value;
@@ -39,13 +42,14 @@ public class CmsBeanConfiguration {
     }
 
     @Bean
-    ManageCmsPagesUseCase manageCmsPagesUseCase(CmsPageRepositoryPort repository, Clock clock) {
-        return new ManageCmsPagesUseCase(repository, clock);
+    ManageCmsPagesUseCase manageCmsPagesUseCase(CmsPageRepositoryPort repository, Clock clock, RequestCache cache) {
+        return new EvictingManageCmsPagesUseCase(repository, clock, cache);
     }
 
     @Bean
-    PublishedCmsPagesUseCase publishedCmsPagesUseCase(CmsPageRepositoryPort repository, MarkdownRendererPort renderer) {
-        return new PublishedCmsPagesUseCase(repository, renderer);
+    PublishedCmsPagesUseCase publishedCmsPagesUseCase(CmsPageRepositoryPort repository, MarkdownRendererPort renderer,
+                                                      RequestCache cache) {
+        return new CachedPublishedCmsPagesUseCase(repository, renderer, cache);
     }
 
     @Bean

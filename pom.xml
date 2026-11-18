@@ -24,6 +24,7 @@
         <module>shared-libraries/observability-common</module>
         <module>shared-libraries/database-common</module>
         <module>shared-libraries/demo-seed</module>
+        <module>shared-libraries/cache-common</module>
         <module>lms-api</module>
         <module>customer-api</module>
         <module>services/identity-service</module>
@@ -85,6 +86,12 @@
                 <!-- ADR-0018: kế hoạch dữ liệu demo + runner profile demo-seed -->
                 <groupId>com.company</groupId>
                 <artifactId>demo-seed</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <!-- Wrapper cache theo request lưu Redis, khóa theo tenant, tắt bằng LMS_CACHE_ENABLED=false -->
+                <groupId>com.company</groupId>
+                <artifactId>cache-common</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

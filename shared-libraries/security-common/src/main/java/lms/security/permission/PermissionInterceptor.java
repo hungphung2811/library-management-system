@@ -87,7 +87,12 @@ public class PermissionInterceptor implements HandlerInterceptor {
             return handleServiceToken(response, resolved, authentication);
         }
         // Endpoint chung không thuộc module nào: chỉ cần đăng nhập
-        if (resolved.mode() == PermissionKeyResolver.Mode.AUTHENTICATED && module == null) return true;
+        if (resolved.mode() == PermissionKeyResolver.Mode.AUTHENTICATED && module == null) {
+            // ADR-0016: platform admin gửi X-Tenant-Id thì endpoint chung (vd GET /menus/me) cũng chạy theo tenant đích;
+            // không có header thì giữ nguyên (chỉ cần đăng nhập, không bind tenant).
+            Boolean acted = tryActAsTenant(request, response, resolved, authentication);
+            return acted == null || acted;
+        }
         if (resolved.mode() == PermissionKeyResolver.Mode.PLATFORM_ADMIN) {
             if (isPlatformAdmin(authentication)) return true;
             reject(response, HttpServletResponse.SC_FORBIDDEN, "FORBIDDEN", "Chỉ dành cho quản trị nền tảng");
@@ -97,12 +102,8 @@ public class PermissionInterceptor implements HandlerInterceptor {
                 && isCrossTenantRead(handlerMethod, request, authentication)) {
             return handleCrossTenantRead(request, response, resolved, (JwtAuthenticationToken) authentication);
         }
-        if (isPlatformAdmin(authentication) && !hasTenant(authentication)) {
-            String raw = request.getHeader(TENANT_HEADER);
-            if (raw != null && !raw.isBlank()) {
-                return handleActAsTenant(request, response, resolved, (JwtAuthenticationToken) authentication, raw);
-            }
-        }
+        Boolean acted = tryActAsTenant(request, response, resolved, authentication);
+        if (acted != null) return acted;
         if ((requireTenant || module != null) && !hasTenant(authentication)) {
             reject(response, HttpServletResponse.SC_FORBIDDEN, "TENANT_REQUIRED", "Token không thuộc tenant nào");
             return false;
@@ -193,6 +194,21 @@ public class PermissionInterceptor implements HandlerInterceptor {
         log.info("platform-audit operation=cross-tenant-read actor={} tenantId={} path={}",
                 safe(jwt.getToken().getSubject()), tenantId != null ? tenantId : "ALL", safe(pathOf(request)));
         return true;
+    }
+
+    /**
+     * Platform admin không có tenantId mà gửi {@code X-Tenant-Id} thì hành động thay tenant đó (ADR-0016).
+     *
+     * @return {@code null} nếu không áp dụng (người gọi khác hoặc không có header); ngược lại kết quả của interceptor
+     *         ({@code true} đã bind tenant, {@code false} đã từ chối vì header sai)
+     */
+    private Boolean tryActAsTenant(HttpServletRequest request, HttpServletResponse response,
+                                   PermissionKeyResolver.Resolved resolved, Authentication authentication)
+            throws Exception {
+        if (!isPlatformAdmin(authentication) || hasTenant(authentication)) return null;
+        String raw = request.getHeader(TENANT_HEADER);
+        if (raw == null || raw.isBlank()) return null;
+        return handleActAsTenant(request, response, resolved, (JwtAuthenticationToken) authentication, raw);
     }
 
     /**

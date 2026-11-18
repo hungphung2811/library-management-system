@@ -52,6 +52,11 @@ class ActAsTenantInterceptorTest {
         @PlatformAdminOnly
         @PostMapping("/platform/tenants")
         public String platform() { return "ok"; }
+
+        /** Endpoint chung chỉ cần đăng nhập, không thuộc module nào (như GET /menus/me). */
+        @AuthenticatedOnly
+        @GetMapping("/me")
+        public String me() { return "ok"; }
     }
 
 
@@ -182,6 +187,48 @@ class ActAsTenantInterceptorTest {
 
         mvc.perform(post("/platform/tenants").header(PermissionInterceptor.TENANT_HEADER, OTHER.toString()))
                 .andExpect(status().isOk());
+
+        assertThat(binder.calls).isEmpty();
+    }
+
+    @Test
+    void endpointChiCanDangNhapBindTenantKhiPlatformAdminGuiHeaderVaDatThuocTinh() throws Exception {
+        login(platformAdmin());
+
+        var request = mvc.perform(get("/me").header(PermissionInterceptor.TENANT_HEADER, TENANT.toString()))
+                .andExpect(status().isOk()).andReturn().getRequest();
+
+        assertThat(binder.calls).containsExactly("SINGLE:" + TENANT);
+        assertThat(request.getAttribute(ActAsTenant.ATTRIBUTE)).isEqualTo(TENANT.toString());
+    }
+
+    @Test
+    void endpointChiCanDangNhapKhongHeaderKhongBindTenant() throws Exception {
+        login(platformAdmin());
+
+        var request = mvc.perform(get("/me")).andExpect(status().isOk()).andReturn().getRequest();
+
+        assertThat(binder.calls).isEmpty();
+        assertThat(request.getAttribute(ActAsTenant.ATTRIBUTE)).isNull();
+    }
+
+    @Test
+    void endpointChiCanDangNhapAdminTenantGuiHeaderBiBoQua() throws Exception {
+        login(Map.of(JwtClaims.ADMIN, true, JwtClaims.TENANT_ID, TENANT.toString()));
+
+        var request = mvc.perform(get("/me").header(PermissionInterceptor.TENANT_HEADER, OTHER.toString()))
+                .andExpect(status().isOk()).andReturn().getRequest();
+
+        assertThat(binder.calls).isEmpty();
+        assertThat(request.getAttribute(ActAsTenant.ATTRIBUTE)).isNull();
+    }
+
+    @Test
+    void endpointChiCanDangNhapHeaderSaiDinhDangTuPlatformAdminBi400() throws Exception {
+        login(platformAdmin());
+
+        mvc.perform(get("/me").header(PermissionInterceptor.TENANT_HEADER, "khong-phai-uuid"))
+                .andExpect(status().isBadRequest());
 
         assertThat(binder.calls).isEmpty();
     }
