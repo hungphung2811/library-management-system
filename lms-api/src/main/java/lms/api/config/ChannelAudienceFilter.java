@@ -16,7 +16,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 /**
  * Ranh giới kênh token ở lms-api (customer-api-data-authorization A1, 5.3 phương án C): token kênh storefront (claim
  * {@code aud} chứa {@code lms-storefront}, phát cho website khách qua customer-api) KHÔNG dùng được ở lms-api, trả 401
- * như token không hợp lệ (cùng cơ chế với token hết hạn, không lộ lý do). Chạy sau BearerTokenAuthenticationFilter.
+ * như token không hợp lệ (cùng cơ chế với token hết hạn, không lộ lý do). Token tích hợp ({@code aud} chứa
+ * {@code lms-integration}) cũng bị từ chối tương tự. Chạy sau BearerTokenAuthenticationFilter.
  *
  * <p>Tương thích ngược: token không có {@code aud} (mọi token phát hành trước thay đổi này) vẫn hợp lệ. Khi hết giai
  * đoạn chuyển tiếp bật {@code requireStaffAudience} (cấu hình {@code lms.api.security.require-staff-audience}, cùng
@@ -27,6 +28,8 @@ public class ChannelAudienceFilter extends OncePerRequestFilter {
     /** Trùng AUDIENCE_STOREFRONT/AUDIENCE_STAFF của security-common (lms-api không phụ thuộc thư viện đó). */
     static final String AUDIENCE_STOREFRONT = "lms-storefront";
     static final String AUDIENCE_STAFF = "lms-staff";
+    /** Trùng AUDIENCE_INTEGRATION của security-common: token máy-với-máy chỉ đi qua integration-api, không qua BFF nhân viên. */
+    static final String AUDIENCE_INTEGRATION = "lms-integration";
 
     private final boolean requireStaffAudience;
     private final BearerTokenAuthenticationEntryPoint entryPoint = new BearerTokenAuthenticationEntryPoint();
@@ -49,7 +52,7 @@ public class ChannelAudienceFilter extends OncePerRequestFilter {
 
     private boolean acceptable(List<String> audience) {
         List<String> aud = audience == null ? List.of() : audience;
-        if (aud.contains(AUDIENCE_STOREFRONT)) return false;
+        if (aud.contains(AUDIENCE_STOREFRONT) || aud.contains(AUDIENCE_INTEGRATION)) return false;
         return !requireStaffAudience || aud.contains(AUDIENCE_STAFF);
     }
 }

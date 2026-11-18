@@ -38,6 +38,11 @@ class StorefrontJwtConfigurationTest {
     }
 
     @Test
+    void tokenIntegrationAudLmsIntegrationBiTuChoi() {
+        assertThat(validator.validate(token(List.of("lms-integration"), null)).hasErrors()).isTrue();
+    }
+
+    @Test
     void tokenHetHanBiTuChoiBoiValidatorMacDinh() {
         Jwt expired = Jwt.withTokenValue("t").header("alg", "RS256").subject("u").audience(List.of("lms-storefront"))
                 .issuedAt(Instant.now().minusSeconds(900)).expiresAt(Instant.now().minusSeconds(600)).build();

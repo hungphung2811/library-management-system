@@ -72,6 +72,16 @@ class ChannelAudienceFilterTest {
     }
 
     @Test
+    void tokenIntegrationBiTuChoi401KeCaKhiBatYeuCauAudStaff() throws Exception {
+        FilterChain chain = mock(FilterChain.class);
+        assertThat(run(new ChannelAudienceFilter(false), List.of("lms-integration"), chain)).isEqualTo(401);
+        assertThat(run(new ChannelAudienceFilter(true), List.of("lms-integration"), chain)).isEqualTo(401);
+        // aud chứa cả lms-staff vẫn bị từ chối: lms-integration thắng
+        assertThat(run(new ChannelAudienceFilter(false), List.of("lms-staff", "lms-integration"), chain)).isEqualTo(401);
+        verifyNoInteractions(chain);
+    }
+
+    @Test
     void tokenKhongAudVanDuocQuaTrongGiaiDoanChuyenTiep() throws Exception {
         FilterChain chain = mock(FilterChain.class);
         int status = run(new ChannelAudienceFilter(false), null, chain);
@@ -125,6 +135,8 @@ class ChannelAudienceFilterTest {
                     .andExpect(status().isOk());
             mvc.perform(get("/api/users/me").with(jwt().jwt(j -> j.audience(List.of("lms-staff")))))
                     .andExpect(status().isOk());
+            mvc.perform(get("/api/users/me").with(jwt().jwt(j -> j.audience(List.of("lms-integration")))))
+                    .andExpect(status().isUnauthorized());
         }
     }
 
