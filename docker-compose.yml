@@ -169,6 +169,9 @@ services:
       AUTH_BOOTSTRAP_ADMIN_PASSWORD: ${AUTH_BOOTSTRAP_ADMIN_PASSWORD:-}
       AUTH_JWT_PRIVATE_KEY: ${AUTH_JWT_PRIVATE_KEY:-}
       AUTH_JWT_PUBLIC_KEY: ${AUTH_JWT_PUBLIC_KEY:-}
+      AUTH_JWT_PREVIOUS_PUBLIC_KEY: ${AUTH_JWT_PREVIOUS_PUBLIC_KEY:-}
+      # Thu hồi token integration tức thời (ghi dấu Redis; bật cùng INTEGRATION_REVOCATION_ENABLED ở integration-api).
+      INTEGRATION_REVOCATION_ENABLED: ${INTEGRATION_REVOCATION_ENABLED:-false}
       # Compose demo chạy profile prod nên khóa trống chỉ được phép khi cờ này true (khóa tạm, token mất hiệu lực khi
       # khởi động lại). PRODUCTION: đặt AUTH_JWT_PRIVATE_KEY/PUBLIC_KEY và đặt AUTH_JWT_ALLOW_EPHEMERAL_KEY=false.
       AUTH_JWT_ALLOW_EPHEMERAL_KEY: ${AUTH_JWT_ALLOW_EPHEMERAL_KEY:-true}
@@ -412,6 +415,7 @@ services:
       REDIS_PORT: "6379"
       INTEGRATION_RATE_LIMIT_ENABLED: ${INTEGRATION_RATE_LIMIT_ENABLED:-true}
       INTEGRATION_RATE_LIMIT_PER_MINUTE: ${INTEGRATION_RATE_LIMIT_PER_MINUTE:-600}
+      INTEGRATION_REVOCATION_ENABLED: ${INTEGRATION_REVOCATION_ENABLED:-false}
       JWT_JWK_SET_URI: http://identity-service:8081/.well-known/jwks.json
       # iss bắt buộc khớp identity (auth.jwt.issuer, mặc định library-auth-service).
       JWT_ISSUER: ${JWT_ISSUER:-library-auth-service}
