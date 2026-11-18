@@ -28,6 +28,7 @@
         <module>shared-libraries/import-common</module>
         <module>lms-api</module>
         <module>customer-api</module>
+        <module>integration-api</module>
         <module>services/identity-service</module>
         <module>services/catalog-service</module>
         <module>services/circulation-service</module>

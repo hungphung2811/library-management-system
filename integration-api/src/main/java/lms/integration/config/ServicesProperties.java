@@ -1,0 +1,32 @@
+package lms.integration.config;
+
+import java.time.Duration;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
+
+/**
+ * Địa chỉ và thời gian chờ khi gọi service nội bộ (app.services.*). Timeout luôn hữu hạn: thiếu, 0 hoặc âm thì dùng
+ * mặc định (connect 2s, read 5s); giá trị quá lớn bị chặn ở 30 giây, để một service phía sau treo không giữ thread vô hạn.
+ */
+@ConfigurationProperties(prefix = "app.services")
+public record ServicesProperties(String identityUrl, Duration connectTimeout, Duration readTimeout) {
+
+    public static final String DEFAULT_IDENTITY_URL = "http://localhost:8081";
+    public static final Duration DEFAULT_CONNECT_TIMEOUT = Duration.ofSeconds(2);
+    public static final Duration DEFAULT_READ_TIMEOUT = Duration.ofSeconds(5);
+    static final Duration MAX_TIMEOUT = Duration.ofSeconds(30);
+
+    @ConstructorBinding
+    public ServicesProperties {
+        identityUrl = identityUrl == null || identityUrl.isBlank() ? DEFAULT_IDENTITY_URL : identityUrl;
+        connectTimeout = sanitize(connectTimeout, DEFAULT_CONNECT_TIMEOUT);
+        readTimeout = sanitize(readTimeout, DEFAULT_READ_TIMEOUT);
+    }
+
+    private static Duration sanitize(Duration value, Duration fallback) {
+        if (value == null || value.isZero() || value.isNegative()) {
+            return fallback;
+        }
+        return value.compareTo(MAX_TIMEOUT) > 0 ? MAX_TIMEOUT : value;
+    }
+}

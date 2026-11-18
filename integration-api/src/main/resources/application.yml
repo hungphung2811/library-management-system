@@ -1,0 +1,58 @@
+server:
+  port: 8089
+  shutdown: graceful
+  # Không bao giờ lộ stack trace/thông điệp nội bộ ra ngoài.
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-exception: false
+    include-binding-errors: never
+  tomcat:
+    # /oauth/token chỉ nhận form nhỏ (grant_type, scope, client_id, client_secret): lớp chặn thứ hai sau nginx.
+    max-http-form-post-size: 8KB
+
+spring:
+  application:
+    name: integration-api
+  profiles:
+    # Như các service khác (CLAUDE.md): mặc định dev. Ngoài dev (profile prod) cấu hình không an toàn là fail-fast,
+    # xem StartupConfigurationCheck. docker-compose chọn profile bằng INTEGRATION_API_PROFILE.
+    default: dev
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Khóa công khai của identity-service. integration-api chỉ xác thực (chữ ký, exp, iss, aud=lms-integration).
+          jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8081/.well-known/jwks.json}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  pattern:
+    level: "%5p [%X{correlationId:-}]"
+
+# Khối cấp cao mới đặt ở cuối file; chỉ có một khối `app:`.
+app:
+  services:
+    identity-url: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+    # Luôn hữu hạn: thiếu/0/âm thì dùng mặc định (2s/5s), tối đa 30s (ServicesProperties).
+    connect-timeout: 2s
+    read-timeout: 5s
+  integration:
+    jwt:
+      # iss bắt buộc khớp với identity (auth.jwt.issuer, mặc định library-auth-service). Rỗng ngoài dev là lỗi khởi động.
+      issuer: ${JWT_ISSUER:library-auth-service}
+    # Khung cho pha I3 (giới hạn tốc độ theo application bằng Redis, D6): CHƯA có tác dụng ở pha I2, chưa cần Redis.
+    rate-limit:
+      enabled: false
+      default-per-minute: 600
