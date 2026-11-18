@@ -64,6 +64,9 @@ auth:
     # PEM PKCS#8 / X.509. Bỏ trống thì sinh khóa tạm mỗi lần chạy (chỉ dùng cho dev).
     private-key-pem: ${AUTH_JWT_PRIVATE_KEY:}
     public-key-pem: ${AUTH_JWT_PUBLIC_KEY:}
+    # Bỏ trống PEM ngoài profile dev/test/demo-seed thì identity KHÔNG khởi động, trừ khi bật cờ này (chỉ demo:
+    # khóa tạm mất hiệu lực mỗi lần khởi động lại). Production phải đặt AUTH_JWT_PRIVATE_KEY/PUBLIC_KEY và để cờ tắt.
+    allow-ephemeral-key: ${AUTH_JWT_ALLOW_EPHEMERAL_KEY:false}
   refresh-token-ttl: P7D
   # ADR-0017: token đã xoay dùng lại trong cửa sổ này (race nhiều tab) chỉ nhận 401 REFRESH_TOKEN_SUPERSEDED, không phát
   # token và không thu hồi gì. PT0S = tắt (luôn thu hồi phiên); tối đa PT2M (khởi động từ chối giá trị lớn hơn).

@@ -7,6 +7,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
@@ -48,6 +49,7 @@ public class JwtTokenIssuer implements TokenIssuerPort, ServiceTokenIssuerPort {
         JwtClaimsSet.Builder builder = JwtClaimsSet.builder()
                 .issuer(issuer)
                 .subject(claims.userId().toString())
+                .id(UUID.randomUUID().toString())
                 .issuedAt(now)
                 .expiresAt(now.plus(ttl))
                 .claim(JwtClaims.USERNAME, claims.username())
@@ -96,6 +98,7 @@ public class JwtTokenIssuer implements TokenIssuerPort, ServiceTokenIssuerPort {
         JwtClaimsSet set = JwtClaimsSet.builder()
                 .issuer(issuer)
                 .subject(claims.subject().toString())
+                .id(UUID.randomUUID().toString())
                 .issuedAt(now)
                 .expiresAt(now.plus(claims.ttl()))
                 .claim(JwtClaims.SERVICE, claims.service())

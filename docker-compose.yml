@@ -169,6 +169,9 @@ services:
       AUTH_BOOTSTRAP_ADMIN_PASSWORD: ${AUTH_BOOTSTRAP_ADMIN_PASSWORD:-}
       AUTH_JWT_PRIVATE_KEY: ${AUTH_JWT_PRIVATE_KEY:-}
       AUTH_JWT_PUBLIC_KEY: ${AUTH_JWT_PUBLIC_KEY:-}
+      # Compose demo chạy profile prod nên khóa trống chỉ được phép khi cờ này true (khóa tạm, token mất hiệu lực khi
+      # khởi động lại). PRODUCTION: đặt AUTH_JWT_PRIVATE_KEY/PUBLIC_KEY và đặt AUTH_JWT_ALLOW_EPHEMERAL_KEY=false.
+      AUTH_JWT_ALLOW_EPHEMERAL_KEY: ${AUTH_JWT_ALLOW_EPHEMERAL_KEY:-true}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dev-internal-key}
       REDIS_HOST: redis
       LMS_CACHE_ENABLED: ${LMS_CACHE_ENABLED:-true}
