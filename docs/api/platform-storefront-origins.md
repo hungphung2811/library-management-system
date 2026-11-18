@@ -93,3 +93,7 @@ Body như refresh; nhận nhưng BỎ QUA `tenantId` (thu hồi token nào cũng
 ## Migration
 
 `V21__tenant_storefront_origins.sql` (identity): bảng `tenant_storefront_origins` (UNIQUE `origin`, CHECK dạng chuẩn hóa), `tenant_storefront_origin_history`, trigger chặn sửa/xóa lịch sử; `afterMigrate.sql` thêm `REVOKE UPDATE, DELETE` lịch sử cho `identity_app`. Cả hai bảng là bảng toàn cục (không RLS, nằm trong `TENANT_EXEMPT_TABLES`, ADR-0006 mục 7).
+
+### `POST /internal/storefront/access-tokens` thêm `modules` (ADR-0023 B-R1)
+
+Tenant khả dụng nay là ACTIVE và có `SALES` hoặc `LENDING` (trước đây chỉ `SALES`). Phản hồi 200 thêm `modules`: mã module đang bật (`["LENDING","SALES"]`, thứ tự không bảo đảm). Các trường cũ giữ nguyên. Mọi trường hợp không khả dụng vẫn `404 SHOP_NOT_AVAILABLE`. Tự đăng ký (`SignupUseCase`) tự kiểm `SALES`: tenant chỉ `LENDING` nhận `SIGNUP_NOT_AVAILABLE`.

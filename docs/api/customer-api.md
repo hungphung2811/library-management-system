@@ -14,7 +14,7 @@ customer-api viết, không chép thông điệp nội bộ.
 | GET | `/public/site/pages` | Danh sách trang đã xuất bản `[{slug, title, sortOrder}]` | `max-age=60, public` |
 | GET | `/public/site/pages/{slug}` | Trang đã xuất bản `{slug, title, bodyHtml, publishedAt}` (`bodyHtml` đã được system-service render an toàn) | `max-age=60, public` |
 | POST | `/public/site/contact-requests` | Gửi form liên hệ/dùng thử, trả 201 không thân | `no-store` |
-| GET | `/public/t/{code}` | Thông tin storefront `{code, name}` | `max-age=30, public` |
+| GET | `/public/t/{code}` | Thông tin cửa hàng/thư viện `{code, name, shopEnabled, libraryEnabled}` | `max-age=30, public` |
 | GET | `/public/t/{code}/books` | Danh mục sách đang bán (query `keyword?, page?, size?`, size tối đa 50) | `max-age=30, public` |
 | GET | `/public/t/{code}/books/{bookRef}` | Chi tiết sách | `max-age=30, public` |
 | GET | `/public/t/{code}/books/{bookRef}/preview` | Đoạn đọc thử | `max-age=60, public` |
@@ -28,13 +28,19 @@ customer-api viết, không chép thông điệp nội bộ.
 | GET | `/public/t/{code}/orders` | Đơn của tôi (cần đăng nhập, `page?`, `size?` tối đa 50) | `no-store` |
 | GET | `/public/t/{code}/orders/{orderId}` | Một đơn của tôi (cần đăng nhập) | `no-store` |
 | POST | `/public/t/{code}/orders/{orderId}/cancellation` | Hủy đơn đang chờ xác nhận (cần đăng nhập) | `no-store` |
+| GET | `/public/t/{code}/me/borrowings` | Phiếu mượn của tôi (cần đăng nhập, module LENDING) | `no-store` |
+| GET | `/public/t/{code}/me/borrowings/{borrowingId}` | Một phiếu mượn của tôi | `no-store` |
+| GET | `/public/t/{code}/me/fines` | Phạt của tôi | `no-store` |
+| GET | `/public/t/{code}/me/reservations` | Đặt trước của tôi (kèm tên sách) | `no-store` |
+| POST | `/public/t/{code}/me/reservations/{reservationId}/cancellation` | Hủy đặt trước của tôi | `no-store` |
+| GET | `/public/t/{code}/me/reader-profile` | Thẻ độc giả của tôi | `no-store` |
 
 ⚠️ Đề xuất, chưa có code (ADR-0019, hợp đồng ở `storefront-kham-pha.md`): thêm `sort`, `inStock` cho `GET .../books`,
 `GET /public/t/{code}/books/suggestions` (`max-age=15`) và `GET /public/t/{code}/banners` (`max-age=60`). Khi có code thì
 chuyển các dòng này vào bảng trên.
 
 Tập đường dẫn là DANH SÁCH ĐÓNG: mọi `/public/**` ngoài bảng trên (kể cả `/public/t/{code}/anything`) bị chặn (401 khi
-chưa đăng nhập). Chỉ 4 route `orders` cần đăng nhập; các route còn lại công khai và BỎ QUA header `Authorization`.
+chưa đăng nhập). Các route `orders`, `contact-requests` và `me/**` cần đăng nhập; các route còn lại công khai và BỎ QUA header `Authorization`.
 
 `HEAD` đi cùng đường `GET` công khai (`/public/site/**`, `/public/t/{code}`): trả cùng status và header, không thân, không
 còn 401 (crawler, giám sát, CDN dùng HEAD).
@@ -133,6 +139,52 @@ unitPrice, lineTotal}], cancellable}`. `cancellable = (status == PENDING_CONFIRM
 Mã lỗi nghiệp vụ thêm: `409 INSUFFICIENT_STOCK` (`details` chỉ có `titleId=<uuid>`, không có số tồn), `409 CLIENT_REQUEST_CONFLICT`,
 `409 TITLE_NOT_AVAILABLE`, `404 ORDER_NOT_FOUND`, `409 ORDER_STATE_CONFLICT`, `404 BOOK_NOT_FOUND`. `403 FORBIDDEN` có thông điệp cố định (không lộ tên khóa).
 
+### Cổng độc giả `/public/t/{code}/me/**` (cần đăng nhập, ADR-0023)
+
+Cổng tự phục vụ của độc giả thư viện (phiếu mượn, phạt, đặt trước, thẻ). Dùng lại phiên STOREFRONT của
+`POST /public/t/{code}/auth/login` (cùng token như `orders`, `aud = lms-storefront`). Không có tham số `userId`/`readerId`:
+người gọi luôn là chủ của token (`sub`). Mọi phản hồi (kể cả lỗi) `Cache-Control: no-store`.
+
+**Module theo nhóm route** (customer-api tự kiểm, không gọi service phía sau nếu không đạt; không đạt thì `404 SHOP_NOT_AVAILABLE`,
+cùng một thân với mọi lý do không khả dụng, KHÔNG có mã `LIBRARY_NOT_AVAILABLE`):
+
+| Nhóm route | Tenant cần |
+|---|---|
+| `books/**`, `banners`, `orders/**`, `contact-requests`, `auth/signup` | module SALES |
+| `me/**` | module LENDING |
+| `GET /public/t/{code}`, `auth/login`, `auth/refresh`, `auth/logout` | SALES hoặc LENDING |
+
+`GET /public/t/{code}` trả thêm `shopEnabled` (có SALES) và `libraryEnabled` (có LENDING) để FE biết hiện phần nào; không trả
+danh sách module thô. Tenant chỉ có LENDING trước đây `404` ở `GET /public/t/{code}` và login, nay `200`. Tenant chỉ có LENDING
+không đăng ký tự do được (`auth/signup` cần SALES; thẻ độc giả do thủ thư cấp).
+
+Thứ tự kiểm: không token/token hỏng/thiếu `aud`/token dịch vụ `401` (do bộ lọc bảo mật, trước controller); `{code}` không khả dụng
+hoặc thiếu LENDING `404 SHOP_NOT_AVAILABLE`; token cửa hàng khác `403 SHOP_SESSION_MISMATCH`; rồi mới gọi circulation/identity
+bằng token độc giả (các service tự kiểm module, quyền, sở hữu và tenant).
+
+| Route | Phản hồi (chỉ các trường này, test so tập tên trường) | Lỗi nghiệp vụ |
+|---|---|---|
+| `GET .../me/borrowings` | mảng `[{id, status, borrowDate, dueDate, renewCount, items[{returnDate, condition}]}]` | |
+| `GET .../me/borrowings/{borrowingId}` | một phiếu như trên | `404 BORROWING_NOT_FOUND` (không phải UUID, của người khác, không tồn tại: cùng thân) |
+| `GET .../me/fines` | `{totalUnpaid, fines[{id, borrowingId, reason, amount, status, createdAt, paidAt}]}` | |
+| `GET .../me/reservations` | mảng `[{id, bookRef, title, status, queuePosition, reservedAt, holdUntil}]` | `403 FORBIDDEN` (role thiếu khóa `ReservationController/mine`, thông điệp cố định) |
+| `POST .../me/reservations/{reservationId}/cancellation` | một đặt trước như trên (thân request rỗng) | `404 RESERVATION_NOT_FOUND` (cả của người khác, id sai định dạng), `422 INVALID_RESERVATION` (không còn hiệu lực), `403 FORBIDDEN` |
+| `GET .../me/reader-profile` | `{cardNo, fullName, email, readerType, cardExpiryDate, status, cardValid, phone, dateOfBirth, gender, address, faculty, className, memberCode, cardIssuedDate}` | `404 READER_PROFILE_NOT_FOUND` ("Bạn chưa có thẻ thư viện": chưa được cấp thẻ) |
+
+- Đã bỏ so với dữ liệu nội bộ: `userId`, `readerId`, `tenantId`, `copyId`, `bookCopyId`, `fines` lồng trong phiếu. DTO công khai
+  là record allowlist; trường nội bộ nào thêm sau này cũng không tự lộ.
+- `bookRef` là `titleId` (như `books/{bookRef}`); `title` là tên sách, `null` nếu catalog không tra được (không làm hỏng
+  danh sách). Tên được tra bằng một lời gọi lô tới catalog cho cả danh sách (không N+1). `status` đặt trước: `WAITING`, `READY`,
+  `FULFILLED`, `EXPIRED`, `CANCELLED` (theo circulation); `holdUntil` chỉ có khi `READY`.
+- `amount`, `totalUnpaid` là số (VND). Ngày `borrowDate`, `dueDate`, `holdUntil`, `cardExpiryDate`... dạng `yyyy-MM-dd`; thời điểm
+  `createdAt`, `paidAt`, `reservedAt` dạng ISO-8601 UTC.
+- Hủy đặt trước dùng `POST .../cancellation` (không `DELETE`): CORS công khai chỉ cho `GET, POST`. Danh sách đường dẫn `me/**` là
+  DANH SÁCH ĐÓNG từng mẫu; phương thức/đường dẫn khác bị chặn (401/403/404/405), không tới controller.
+- Danh sách phiếu mượn/đặt trước chưa phân trang (trả nguyên mảng như màn nhân viên cũ); phân trang là việc sau (P-R1).
+- Chưa có: tạo đặt trước (`POST .../me/reservations`), hoãn tới đợt có tra cứu sách thư viện ở cổng độc giả (ADR-0023 2.6).
+- Khóa `ReservationController/mine|cancel` phải nằm trong `permissions` của token STOREFRONT (identity thêm vào allowlist, B-R1) và
+  role độc giả có khóa này; sau khi identity đổi, khóa mới chỉ có hiệu lực sau lần đăng nhập/refresh kế tiếp.
+
 ### Liên hệ gửi cửa hàng (cần đăng nhập, ADR-0015)
 
 `POST /public/t/{code}/contact-requests`, header `Authorization: Bearer <accessToken storefront>`. Thứ tự kiểm: cửa hàng không khả dụng `404 SHOP_NOT_AVAILABLE` (trước mọi kiểm phiên của controller), rồi không token/token hỏng/thiếu `aud` lms-storefront/token dịch vụ `401`, token cửa hàng khác `403 SHOP_SESSION_MISMATCH`. Phân quyền theo khóa `ShopContactController/create` do sales kiểm (role Khách hàng có sẵn; thiếu khóa: `403 FORBIDDEN`, thông điệp cố định). Chỉ phương thức `POST`; mọi phương thức khác trên đường dẫn này bị chặn.
@@ -170,11 +222,13 @@ customer-api quyết CORS theo `Origin` và `{code}`; nginx chuyển nguyên `Or
 | 403 | `ACCOUNT_DISABLED` | Chỉ ở `POST /public/auth/refresh`: tài khoản bị vô hiệu hóa. Login không bao giờ trả mã này |
 | 403 | `FORBIDDEN` | Không có quyền (thông điệp cố định) |
 | 404 | `CMS_PAGE_NOT_FOUND` | Trang không tồn tại, chưa xuất bản hoặc slug sai định dạng |
-| 404 | `SHOP_NOT_AVAILABLE` | Tenant không tồn tại/bị khóa/chưa bật module storefront (một thân cố định cho mọi lý do, chống dò tenant) |
+| 404 | `SHOP_NOT_AVAILABLE` | Tenant không tồn tại/bị khóa/không bật module cần cho nhóm route (SALES cho bán hàng, LENDING cho `me/**`, một trong hai cho đăng nhập; một thân cố định cho mọi lý do, chống dò tenant) |
 | 404 | `NOT_FOUND` | Đường dẫn công khai không có handler |
 | 403 | `SHOP_SESSION_MISMATCH` | Token của khách thuộc cửa hàng khác với `{code}` |
 | 429 | `SHOP_CONTACT_LIMIT_EXCEEDED` | Khách gửi quá 5 yêu cầu liên hệ trong 24 giờ (thông điệp do customer-api viết; khác 429 của nginx không có `code`) |
 | 404 | `BOOK_NOT_FOUND`, `ORDER_NOT_FOUND` | Sách/đơn không có (đơn của người khác cùng thân) |
+| 404 | `BORROWING_NOT_FOUND`, `RESERVATION_NOT_FOUND`, `READER_PROFILE_NOT_FOUND` | Cổng độc giả: phiếu mượn/đặt trước không có (của người khác cùng thân), chưa có thẻ độc giả |
+| 422 | `INVALID_RESERVATION` | Hủy đặt trước không còn hiệu lực |
 | 409 | `INSUFFICIENT_STOCK`, `CLIENT_REQUEST_CONFLICT`, `TITLE_NOT_AVAILABLE`, `ORDER_STATE_CONFLICT` | Nghiệp vụ đặt/hủy đơn |
 | 403 | `SIGNUP_NOT_AVAILABLE` | Cửa hàng không mở đăng ký |
 | 409 | `DUPLICATE_USERNAME` | Tên đăng nhập/email đã dùng |
@@ -229,4 +283,5 @@ Vượt giới hạn trả 429 do nginx. Tính theo IP biên của nginx; đặt
 
 - Liên hệ cửa hàng (`/public/t/{code}/contact-requests`) chưa làm (đang nằm ngoài danh sách đóng).
 - Phía identity của ADR-0013 (bảng origin, trường `allowedOrigins`, kiểm `tenantId` khi refresh) do agent khác làm; customer-api đọc khoan dung (thiếu `allowedOrigins` = rỗng) và gửi `tenantId`/`channel` theo hợp đồng. Identity cũ chưa kiểm `tenantId` thì refresh theo cửa hàng không chặn được token tenant khác; nếu identity cũ từ chối trường lạ, đặt `app.storefront.refresh-tenant-id-enabled=false`.
+- Cổng độc giả (ADR-0023): phía identity (B-R1: nới điều kiện tenant sang SALES hoặc LENDING, trả `modules` ở `/internal/storefront/access-tokens`, thêm khóa đặt trước vào allowlist STOREFRONT, `SignupUseCase` kiểm SALES) do agent khác làm. customer-api đọc khoan dung (thiếu `modules` = chỉ SALES) nên triển khai trước identity được; cho tới khi identity mới chạy, tenant chỉ LENDING vẫn `404` và độc giả chưa gọi được `me/reservations` (token thiếu khóa, `403 FORBIDDEN`). Triển khai customer-api trước hoặc cùng identity. Cần thêm `CIRCULATION_SERVICE_URL`, `CATALOG_SERVICE_URL` (mặc định `http://localhost:8083`, `http://localhost:8082`) cho container customer-api; `docker-compose.yml` chưa được cập nhật ở đợt này. Chưa kiểm chứng với circulation/identity/catalog chạy thật (chỉ test WebMvc, `MockRestServiceServer`).
 - Hợp đồng nội bộ phía sau: system-service `/internal/cms/public/**` (xem `docs/api/cms.md`), identity `/internal/storefront/access-tokens` (header `X-Storefront-Client-Secret`, body `{tenantCode}`, phản hồi thêm `allowedOrigins`), `/internal/auth/{login,signup,refresh,logout}` (login/refresh có `channel=STOREFRONT`, refresh có `tenantId?`), sales `/internal/sales/storefront/**` (token dịch vụ) và `/internal/sales/shop/**` (token khách).
