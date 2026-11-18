@@ -5,6 +5,12 @@ server:
 spring:
   application:
     name: lms-api
+  servlet:
+    multipart:
+      # Nhập Excel (ADR-0024): file tối đa 5 MB, cả request 6 MB (khớp client_max_body_size của nginx). Vượt thì
+      # MaxUploadSizeExceededException -> 413 IMPORT_FILE_TOO_LARGE (ApiExceptionHandler).
+      max-file-size: 5MB
+      max-request-size: 6MB
   lifecycle:
     timeout-per-shutdown-phase: 30s
   security:
@@ -24,6 +30,9 @@ app:
     sales-url: ${SALES_SERVICE_URL:http://localhost:8087}
     connect-timeout: 2s
     read-timeout: 5s
+  imports:
+    # Lời gọi nhập Excel sang service (upload/xác nhận): read-timeout riêng, xem ServiceClients.createForImport
+    read-timeout: 30s
 
 management:
   endpoints:

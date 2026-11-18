@@ -45,6 +45,13 @@ public class ApiExceptionHandler {
                 .body(ErrorResponse.of("DEPENDENCY_UNAVAILABLE", "Dịch vụ nội bộ tạm thời không khả dụng"));
     }
 
+    /** File upload vượt giới hạn multipart (5 MB, ADR-0024). */
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    ResponseEntity<ErrorResponse> handleUploadTooLarge(org.springframework.web.multipart.MaxUploadSizeExceededException ex) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(ErrorResponse.of("IMPORT_FILE_TOO_LARGE", "File vượt quá 5 MB"));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
         List<String> details = ex.getBindingResult().getFieldErrors().stream()

@@ -11,9 +11,15 @@ import org.springframework.web.client.RestClient;
 public class ServiceClients {
 
     private final ServicesProperties properties;
+    private final ImportClientProperties importProperties;
 
     public ServiceClients(ServicesProperties properties) {
+        this(properties, new ImportClientProperties(null));
+    }
+
+    public ServiceClients(ServicesProperties properties, ImportClientProperties importProperties) {
         this.properties = properties;
+        this.importProperties = importProperties;
     }
 
     public ServicesProperties urls() {
@@ -24,6 +30,15 @@ public class ServiceClients {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(properties.connectTimeout());
         factory.setReadTimeout(properties.readTimeout());
+        return RestClient.builder().baseUrl(baseUrl).requestFactory(factory)
+                .requestInterceptor(new TokenRelayInterceptor()).build();
+    }
+
+    /** Như {@link #create} nhưng read-timeout riêng cho lời gọi nhập Excel (app.imports.read-timeout, mặc định 30 s). */
+    public RestClient createForImport(String baseUrl) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(properties.connectTimeout());
+        factory.setReadTimeout(importProperties.readTimeout());
         return RestClient.builder().baseUrl(baseUrl).requestFactory(factory)
                 .requestInterceptor(new TokenRelayInterceptor()).build();
     }
