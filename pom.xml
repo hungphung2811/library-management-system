@@ -25,6 +25,7 @@
         <module>shared-libraries/database-common</module>
         <module>shared-libraries/demo-seed</module>
         <module>shared-libraries/cache-common</module>
+        <module>shared-libraries/import-common</module>
         <module>lms-api</module>
         <module>customer-api</module>
         <module>services/identity-service</module>
@@ -41,6 +42,7 @@
         <springdoc.version>2.8.13</springdoc.version>
         <archunit.version>1.5.1</archunit.version>
         <commonmark.version>0.27.1</commonmark.version>
+        <poi.version>5.4.1</poi.version>
     </properties>
 
     <dependencyManagement>
@@ -93,6 +95,23 @@
                 <groupId>com.company</groupId>
                 <artifactId>cache-common</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <!-- ADR-0024: nhập master data từ Excel (preview Redis, confirm nền); mỗi service importer tự khai -->
+                <groupId>com.company</groupId>
+                <artifactId>import-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <!-- ADR-0024: Apache POI, chỉ dùng API streaming (SAX đọc, SXSSF ghi) trong import-common -->
+                <groupId>org.apache.poi</groupId>
+                <artifactId>poi</artifactId>
+                <version>${poi.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.poi</groupId>
+                <artifactId>poi-ooxml</artifactId>
+                <version>${poi.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.springdoc</groupId>
