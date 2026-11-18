@@ -110,7 +110,9 @@ class ReservationWorkMigrationIT {
                 .containsExactly(md5Work(TITLE_1).toString());
         assertThat(col("SELECT work_id FROM reservations WHERE id = '" + R_A3 + "'"))
                 .containsExactly(md5Work(TITLE_2).toString());
-        assertThat(col("SELECT count(*) FROM reservations WHERE language IS NOT NULL")).containsExactly("0");
+        // chỉ xét các dòng đã seed trước migrate: test khác trong lớp (uniqueIndex...) chèn dòng có language vào cùng DB
+        assertThat(col("SELECT count(*) FROM reservations WHERE language IS NOT NULL AND id IN ('" + R_A1 + "','" + R_A2
+                + "','" + R_A3 + "','" + R_B1 + "')")).containsExactly("0");
     }
 
     @Test

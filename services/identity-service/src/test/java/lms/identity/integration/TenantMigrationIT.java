@@ -112,10 +112,10 @@ class TenantMigrationIT {
         // Mẫu khớp từng role seed gốc (quyền hiệu lực không đổi). Sau V18 mẫu admin (SUPER_ADMIN) có thêm
         // khóa BorrowingController/getAny mà role admin seed không có (backfill chỉ gán role không phải admin,
         // role admin bỏ qua kiểm khóa): loại khóa này khỏi phép so.
-        // Các migration sau V9 (V34 sách ba tầng, V35 đền bù, V36 nhập bộ sách, V38 khóa catalog của người duyệt hoàn khoản)
+        // Các migration sau V9 (V31 nhập Excel, V34 sách ba tầng, V35 đền bù, V36 nhập bộ sách, V38 khóa catalog của người duyệt hoàn khoản)
         // chỉ thêm khóa vào mẫu, không backfill role seed gốc: loại các khóa đó khỏi phép so.
         String later = "%1$s.permission_code <> 'BorrowingController/getAny' AND %1$s.permission_code !~ '^(WorkController/.*"
-                + "|SeriesController/.*|SeriesImportController/.*|DamageLevelController/.*|CompensationPolicyController/.*"
+                + "|SeriesController/.*|[A-Za-z]+ImportController/.*|DamageLevelController/.*|CompensationPolicyController/.*"
                 + "|FineAdjustmentController/.*|FineRefundController/.*|BorrowingController/reportFound"
                 + "|TitleController/changeWork|BookCopyController/(get|changeStatus))$'";
         assertThat(column("SELECT t.name FROM role_templates t WHERE (t.module IS NULL OR t.module = 'LENDING') AND "
