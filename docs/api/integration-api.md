@@ -37,7 +37,7 @@ Phản hồi thành công `200`, header `Cache-Control: no-store`, `Pragma: no-c
 
 ### Claim của access token (RS256, khóa của identity)
 
-`iss` (`library-auth-service`), `sub` = `client_id` = id Application, `aud` = `["lms-integration"]`, `client_id`, `application_id`, `tenantId`, `scope` (chuỗi cách nhau dấu cách), `modules`, `jti`, `iat`, `exp`. **Không có** `admin`, `platformAdmin`, `roles`, `permissions`, `svc`, `sid`. Tenant của mọi lời gọi lấy từ claim `tenantId` do identity ký; client không gửi tenant ở bất kỳ đâu.
+`iss` (`library-auth-service`), `sub` = `client_id` = id Application, `aud` = `"lms-integration"` (chuỗi, vì Nimbus ghi `aud` một phần tử dạng chuỗi; decoder chấp nhận cả chuỗi lẫn mảng), `client_id`, `application_id`, `tenantId`, `scope` (chuỗi cách nhau dấu cách), `modules`, `jti`, `iat`, `exp`. **Không có** `admin`, `platformAdmin`, `roles`, `permissions`, `svc`, `sid`. Tenant của mọi lời gọi lấy từ claim `tenantId` do identity ký; client không gửi tenant ở bất kỳ đâu.
 
 ⚠️ Tên claim là `application_id` (snake_case, theo `JwtClaims.APPLICATION_ID` đã commit ở pha P0), khác `applicationId` ghi ở mục 4.3.3 của thiết kế.
 
@@ -133,8 +133,8 @@ Thêm trường là thay đổi hợp đồng phải ghi ở đây. Trường kh
 | 401 | `UNAUTHORIZED` | Không token, sai `aud`/`iss`, hết hạn, sai chữ ký, token loại khác (`WWW-Authenticate: Bearer`) |
 | 403 | `INSUFFICIENT_SCOPE` | Token hợp lệ nhưng thiếu scope của endpoint (kiểm ở integration-api, lớp đầu) |
 | 403 | `FORBIDDEN` | Service phía sau từ chối (thiếu scope/module/tenant). Thông điệp chung, **không** lộ tên khóa nội bộ |
-| 404 | `NOT_FOUND` | Không có tài nguyên hoặc thuộc tenant khác; đường dẫn không mở cho tích hợp |
-| 405 | `METHOD_NOT_ALLOWED` | Sai phương thức (không có endpoint ghi ở I3) |
+| 404 | `NOT_FOUND` | Không có tài nguyên hoặc thuộc tenant khác; đường dẫn không mở cho tích hợp, kể cả khi dùng phương thức ghi (ví dụ `POST /api/integration/v1/books`, `POST /orders`: không có handler nào cho đường dẫn đó nên là 404, không phải 405) |
+| 405 | `METHOD_NOT_ALLOWED` | Chỉ khi đường dẫn có endpoint nhưng sai phương thức (ví dụ `PUT /books/{id}`, `DELETE /inventory/{titleId}`; `GET` vào `/oauth/token`); không có endpoint ghi ở I3 |
 | 429 | `RATE_LIMITED` | Vượt hạn mức theo application (mục 9) |
 | 503 | `SERVICE_UNAVAILABLE` | catalog/sales lỗi 5xx, quá tải, mất kết nối, hết thời gian hoặc trả thân lạ. Thông điệp chung |
 

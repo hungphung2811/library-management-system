@@ -24,6 +24,10 @@ class DemoPlanTest {
 
     private final DemoPlan plan = DemoPlan.generate(TODAY, DemoPlan.DEFAULT_SEED);
 
+    /** 64 ấn bản gốc + ấn bản bổ sung của mô hình tác phẩm (ADR-0026). */
+    private static final int BASE_TITLES = 64;
+    private static final int TOTAL_TITLES = BASE_TITLES + DemoTitleData.extras().size();
+
     @Test
     void demIdVaSoLuongToiThieu() {
         assertThat(plan.titles()).hasSizeGreaterThanOrEqualTo(60);
@@ -144,7 +148,7 @@ class DemoPlanTest {
 
     @Test
     void dauSachCoThongTinBoSungHopLe() {
-        assertThat(plan.titles()).hasSize(64);
+        assertThat(plan.titles()).hasSize(TOTAL_TITLES);
         assertThat(plan.titles().stream().map(DemoPlan.TitlePlan::publisher)).doesNotContainNull();
         for (DemoPlan.TitlePlan t : plan.titles()) {
             assertThat(t.publishYear()).isBetween(2005, 2024);
@@ -158,22 +162,22 @@ class DemoPlanTest {
             assertThat(t.name().length()).isLessThanOrEqualTo(255);
         }
         // nhóm theo chủ đề: mỗi chủ đề 8 sách liên tiếp
-        for (int i = 0; i < 64; i += 8) {
+        for (int i = 0; i < BASE_TITLES; i += 8) {
             String category = plan.titles().get(i).category();
             for (int j = i; j < i + 8; j++) assertThat(plan.titles().get(j).category()).isEqualTo(category);
         }
-        // sách cùng bộ có số tập khác nhau
-        var bySeries = plan.titles().stream().filter(t -> t.series() != null)
-                .collect(Collectors.groupingBy(DemoPlan.TitlePlan::series));
+        // tác phẩm cùng bộ có số tập khác nhau (nhiều ấn bản của một tập thì cùng số tập; bộ hộp không có số tập)
+        var bySeries = plan.works().stream().filter(w -> w.seriesIndex() != null && w.kind() == DemoPlan.WorkKind.SINGLE)
+                .collect(Collectors.groupingBy(DemoPlan.WorkPlan::seriesIndex));
         assertThat(bySeries).isNotEmpty();
         bySeries.values().forEach(group -> {
-            assertThat(group.stream().map(DemoPlan.TitlePlan::seriesNumber)).doesNotContainNull().doesNotHaveDuplicates();
+            assertThat(group.stream().map(DemoPlan.WorkPlan::seriesNumber)).doesNotContainNull().doesNotHaveDuplicates();
         });
     }
 
     @Test
     void banSaoCoThongTinNhapKhoHopLe() {
-        assertThat(plan.copies()).hasSize(160);
+        assertThat(plan.copies()).hasSize(160 + DemoTitleData.extras().size());
         java.util.Set<String> sources = new HashSet<>();
         java.util.Set<String> grades = new HashSet<>();
         for (DemoPlan.CopyPlan c : plan.copies()) {
@@ -346,6 +350,149 @@ class DemoPlanTest {
     @Test
     void tenKhongRong() {
         assertThat(plan.titles()).allMatch(t -> !t.name().isBlank() && !t.author().isBlank());
-        assertThat(plan.titles().stream().map(DemoPlan.TitlePlan::name)).doesNotHaveDuplicates();
+        // ấn bản của cùng tác phẩm có thể trùng tên, nhưng phải phân biệt được (phụ đề, định dạng, ngôn ngữ, lần tái bản)
+        assertThat(plan.titles().stream().map(t -> t.name() + "|" + t.subtitle() + "|" + t.format() + "|" + t.language()
+                + "|" + t.edition())).doesNotHaveDuplicates();
+    }
+
+    // ---- Mô hình tác phẩm - ấn bản - bản sao (ADR-0026) ----
+
+    @Test
+    void sauMuoiBonAnBanGocGiuNguyenIdVaLaTacPhamMotMot() {
+        for (int i = 0; i < BASE_TITLES; i++) {
+            DemoPlan.TitlePlan t = plan.titles().get(i);
+            assertThat(t.index()).isEqualTo(i);
+            assertThat(t.id()).isEqualTo(DemoIds.title(i));
+            assertThat(t.workId()).isEqualTo(DemoIds.legacyWork(t.id()));
+        }
+        // id ấn bản gốc không đổi so với trước khi có mô hình tác phẩm: nameUUIDFromBytes("lms-demo:title:<n>")
+        assertThat(plan.titles().get(0).id()).isEqualTo(UUID.nameUUIDFromBytes("lms-demo:title:0".getBytes(
+                java.nio.charset.StandardCharsets.UTF_8)));
+    }
+
+    @Test
+    void idTacPhamMotMotKhopCongThucBackfillMd5CuaMigration() throws Exception {
+        UUID titleId = DemoIds.title(5);
+        byte[] d = java.security.MessageDigest.getInstance("MD5").digest(
+                ("lms-work:" + titleId).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        StringBuilder hex = new StringBuilder();
+        for (byte b : d) hex.append(String.format("%02x", b));
+        // md5(...)::uuid của Postgres: 32 ký tự hex chia 8-4-4-4-12, không chỉnh bit phiên bản
+        UUID expected = UUID.fromString(hex.substring(0, 8) + "-" + hex.substring(8, 12) + "-" + hex.substring(12, 16)
+                + "-" + hex.substring(16, 20) + "-" + hex.substring(20));
+        assertThat(DemoIds.legacyWork(titleId)).isEqualTo(expected);
+        assertThat(DemoIds.legacyWork(titleId)).isNotEqualTo(UUID.nameUUIDFromBytes(
+                ("lms-work:" + titleId).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+    }
+
+    @Test
+    void moiAnBanThuocDungMotTacPhamVaMoiTacPhamCoItNhatMotAnBan() {
+        Map<UUID, DemoPlan.WorkPlan> works = plan.works().stream()
+                .collect(Collectors.toMap(DemoPlan.WorkPlan::id, Function.identity()));
+        assertThat(works).hasSameSizeAs(plan.works());
+        for (DemoPlan.TitlePlan t : plan.titles()) {
+            assertThat(works).containsKey(t.workId());
+            assertThat(works.get(t.workId()).editionIds()).contains(t.id());
+        }
+        for (DemoPlan.WorkPlan w : plan.works()) {
+            assertThat(w.editionIds()).isNotEmpty().doesNotHaveDuplicates();
+            assertThat(w.title()).isNotBlank();
+            assertThat(w.author()).isNotBlank();
+            assertThat(w.originalLanguage() == null || w.originalLanguage().matches("[a-z]{2,8}")).isTrue();
+            assertThat(w.seriesNumber() == null || w.seriesIndex() != null).isTrue();
+            if (w.seriesIndex() != null) assertThat(w.seriesIndex()).isBetween(0, plan.series().size() - 1);
+        }
+        assertThat(plan.works().stream().flatMap(w -> w.editionIds().stream())).hasSameSizeAs(plan.titles());
+    }
+
+    @Test
+    void coBoSachNhieuTapNhieuAnBanTapCoPhanVaBoHop() {
+        // vài bộ nhiều tập, mỗi tập một tác phẩm riêng có số tập
+        assertThat(plan.series()).hasSizeGreaterThanOrEqualTo(3);
+        assertThat(plan.series().stream().map(DemoPlan.SeriesPlan::name)).doesNotHaveDuplicates();
+        assertThat(plan.series().stream().map(DemoPlan.SeriesPlan::id)).doesNotHaveDuplicates();
+        long multiVolume = plan.series().stream().filter(s -> plan.works().stream().filter(w ->
+                w.kind() == DemoPlan.WorkKind.SINGLE && w.seriesIndex() != null && w.seriesIndex() == s.index())
+                .count() >= 2).count();
+        assertThat(multiVolume).isGreaterThanOrEqualTo(3);
+
+        // có tác phẩm nhiều ấn bản: khác định dạng và khác ngôn ngữ
+        List<DemoPlan.WorkPlan> multiEdition = plan.works().stream().filter(w -> w.editionIds().size() >= 2).toList();
+        assertThat(multiEdition).hasSizeGreaterThanOrEqualTo(4);
+        Map<UUID, DemoPlan.TitlePlan> titleById = plan.titles().stream()
+                .collect(Collectors.toMap(DemoPlan.TitlePlan::id, Function.identity()));
+        Set<String> formats = new HashSet<>();
+        Set<String> languages = new HashSet<>();
+        for (DemoPlan.WorkPlan w : multiEdition) {
+            w.editionIds().forEach(id -> {
+                formats.add(titleById.get(id).format());
+                languages.add(titleById.get(id).language());
+            });
+        }
+        assertThat(formats).contains("PAPERBACK", "HARDCOVER", "EBOOK");
+        assertThat(languages).contains("vi", "en");
+
+        // tập chia phần
+        List<DemoPlan.TitlePlan> parts = plan.titles().stream().filter(t -> t.partNumber() != null).toList();
+        assertThat(parts).hasSizeGreaterThanOrEqualTo(2);
+        assertThat(parts.stream().map(DemoPlan.TitlePlan::partNumber)).containsExactlyInAnyOrder(1, 2);
+        assertThat(parts.stream().map(DemoPlan.TitlePlan::workId).distinct()).hasSize(1);
+        assertThat(parts).allMatch(t -> t.partLabel() != null && !t.partLabel().isBlank());
+
+        // bộ hộp
+        List<DemoPlan.WorkPlan> boxed = plan.works().stream().filter(w -> w.kind() == DemoPlan.WorkKind.COLLECTION).toList();
+        assertThat(boxed).hasSize(1);
+        assertThat(boxed.get(0).seriesIndex()).isNotNull();
+        assertThat(boxed.get(0).seriesNumber()).isNull();
+        assertThat(boxed.get(0).id()).isEqualTo(DemoIds.work(0));
+    }
+
+    @Test
+    void anBanBoSungCoBanSaoVaMatHangTonRiengKhopTacPham() {
+        Set<UUID> copyTitles = plan.copies().stream().map(DemoPlan.CopyPlan::titleId).collect(Collectors.toSet());
+        Map<UUID, DemoPlan.StockItemPlan> stock = plan.stockItems().stream()
+                .collect(Collectors.toMap(DemoPlan.StockItemPlan::titleId, Function.identity()));
+        for (DemoPlan.TitlePlan t : plan.titles().subList(BASE_TITLES, plan.titles().size())) {
+            assertThat(copyTitles).contains(t.id());
+            assertThat(stock).containsKey(t.id());
+        }
+        // snapshot work_id của sales khớp tác phẩm của ấn bản
+        Map<UUID, UUID> workOf = plan.titles().stream()
+                .collect(Collectors.toMap(DemoPlan.TitlePlan::id, DemoPlan.TitlePlan::workId));
+        plan.stockItems().forEach(s -> assertThat(s.workId()).isEqualTo(workOf.get(s.titleId())));
+        // bản sao của ấn bản bổ sung đều rảnh và không dính phiếu mượn
+        Set<UUID> borrowed = plan.borrowings().stream().flatMap(b -> b.items().stream())
+                .map(DemoPlan.LoanItemPlan::copyId).collect(Collectors.toSet());
+        plan.copies().stream().filter(c -> c.index() >= 160).forEach(c -> {
+            assertThat(c.status()).isEqualTo(CopyStatus.AVAILABLE);
+            assertThat(borrowed).doesNotContain(c.id());
+        });
+    }
+
+    @Test
+    void datTruocCoTacPhamVaNgonNguVaDatTruocTheoTacPhamHopLe() {
+        Map<UUID, DemoPlan.TitlePlan> titleById = plan.titles().stream()
+                .collect(Collectors.toMap(DemoPlan.TitlePlan::id, Function.identity()));
+        plan.reservations().forEach(r -> {
+            assertThat(r.workId()).isEqualTo(titleById.get(r.titleId()).workId());
+            assertThat(r.language()).isEqualTo(titleById.get(r.titleId()).language());
+        });
+        assertThat(plan.workReservations()).hasSizeGreaterThanOrEqualTo(3);
+        assertThat(plan.workReservations().stream().map(DemoPlan.WorkReservationPlan::language)).contains("vi", "en");
+        assertThat(plan.workReservations().stream().map(DemoPlan.WorkReservationPlan::language)).containsNull();
+        Set<UUID> readerIds = plan.readers().stream().map(DemoPlan.ReaderPlan::id).collect(Collectors.toSet());
+        Set<String> active = new HashSet<>();
+        plan.reservations().forEach(r -> assertThat(active.add(r.readerId() + "|" + r.workId())).isTrue());
+        for (DemoPlan.WorkReservationPlan w : plan.workReservations()) {
+            assertThat(readerIds).contains(w.readerId());
+            assertThat(w.workId()).isEqualTo(titleById.get(w.titleId()).workId());
+            assertThat(w.createdDaysAgo()).isBetween(0, 7);
+            // uq_reservations_active_work: một độc giả một đặt trước còn hiệu lực trên một tác phẩm
+            assertThat(active.add(w.readerId() + "|" + w.workId())).as("trùng độc giả/tác phẩm %d", w.index()).isTrue();
+        }
+        assertThat(plan.workReservations().stream().map(DemoPlan.WorkReservationPlan::id)).doesNotHaveDuplicates();
+        // có ít nhất một tác phẩm nhiều ấn bản được đặt theo cả hai ngôn ngữ
+        assertThat(plan.workReservations().stream().filter(w -> w.workId().equals(plan.titles().get(21).workId()))
+                .map(DemoPlan.WorkReservationPlan::language)).containsExactlyInAnyOrder("vi", "en");
     }
 }

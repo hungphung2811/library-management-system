@@ -80,7 +80,7 @@ class CatalogImportControllerTest {
 
     @Test
     void uploadChuyenMultipartSangDuongDanNoiBo() throws Exception {
-        for (String type : new String[] {"titles", "authors", "publishers", "categories", "shelf-locations"}) {
+        for (String type : new String[] {"titles", "authors", "publishers", "categories", "shelf-locations", "series"}) {
             when(forwarder.upload(eq("/internal/imports/" + type), any()))
                     .thenReturn(ResponseEntity.status(201).contentType(MediaType.APPLICATION_JSON)
                             .body("{\"importId\":\"x\"}".getBytes(StandardCharsets.UTF_8)));

@@ -26,14 +26,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Danh mục chuẩn cho FE: /api/authors, /api/publishers, /api/categories, /api/shelf-locations. Proxy sang catalog-service;
+ * Danh mục chuẩn cho FE: /api/authors, /api/publishers, /api/categories, /api/series (bộ sách, ADR-0026), /api/shelf-locations. Proxy sang catalog-service;
  * quyền do catalog-service kiểm (khóa AuthorController/search, PublisherController/create...).
  */
 @RestController
 @RequestMapping("/api")
 public class ReferenceCatalogController {
 
-    private static final String NAMED = "{resource:authors|publishers|categories}";
+    private static final String NAMED = "{resource:authors|publishers|categories|series}";
 
     private final ReferenceCatalogClient references;
 

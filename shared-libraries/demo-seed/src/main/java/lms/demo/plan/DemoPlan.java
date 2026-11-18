@@ -33,7 +33,10 @@ public record DemoPlan(
         List<RefundPlan> refunds,
         List<AuthorPlan> authors,
         List<PublisherPlan> publishers,
-        List<ShelfPlan> shelves) {
+        List<ShelfPlan> shelves,
+        List<SeriesPlan> series,
+        List<WorkPlan> works,
+        List<WorkReservationPlan> workReservations) {
 
     public static final long DEFAULT_SEED = 20261117L;
 
@@ -65,6 +68,9 @@ public record DemoPlan(
         orders = List.copyOf(orders);
         salesReturns = List.copyOf(salesReturns);
         refunds = List.copyOf(refunds);
+        series = List.copyOf(series);
+        works = List.copyOf(works);
+        workReservations = List.copyOf(workReservations);
     }
 
     public static DemoPlan generate(LocalDate today, long seed) {
@@ -97,6 +103,9 @@ public record DemoPlan(
 
     // ---- Kiểu dữ liệu ----
 
+    /** Loại tác phẩm (ADR-0026): SINGLE hoặc COLLECTION (bộ hộp). */
+    public enum WorkKind { SINGLE, COLLECTION }
+
     public enum StaffRole { TENANT_ADMIN, LIBRARIAN, STORE_MANAGER }
 
     public enum CopyStatus { AVAILABLE, LOANED, RESERVED, LOST, DAMAGED }
@@ -120,17 +129,54 @@ public record DemoPlan(
     }
 
     /**
-     * Đầu sách demo. {@code publishYear} là năm xuất bản; {@code publisher} là tên nhà xuất bản (tạo thành danh mục chuẩn);
+     * Ấn bản (đầu sách) demo. {@code publishYear} là năm xuất bản; {@code publisher} là tên nhà xuất bản (tạo thành danh mục chuẩn);
      * từ {@code subtitle} trở đi là thông tin bổ sung tùy chọn (format: PAPERBACK|HARDCOVER|EBOOK; tags có thể rỗng).
+     * Cuối cùng là phần cấp ấn bản của mô hình tác phẩm (ADR-0026): {@code workId} là tác phẩm chứa ấn bản (với 64 ấn bản
+     * gốc là tác phẩm 1:1 có id {@code md5('lms-work:'||id)}, khớp backfill của migration), {@code partNumber}/{@code partLabel}
+     * cho tác phẩm in thành nhiều cuốn (null nếu không chia phần). Ấn bản có chỉ số từ 64 là ấn bản bổ sung của tác phẩm có sẵn.
      */
     public record TitlePlan(UUID id, int index, String name, String author, String isbn, String category, int publishYear,
                             String publisher, String subtitle, String edition, String language, Integer pageCount,
                             String format, String translator, String series, Integer seriesNumber,
-                            String coverImageUrl, List<String> tags) {
+                            String coverImageUrl, List<String> tags, UUID workId, Integer partNumber,
+                            String partLabel) {
+        public TitlePlan(UUID id, int index, String name, String author, String isbn, String category, int publishYear,
+                         String publisher, String subtitle, String edition, String language, Integer pageCount,
+                         String format, String translator, String series, Integer seriesNumber,
+                         String coverImageUrl, List<String> tags) {
+            this(id, index, name, author, isbn, category, publishYear, publisher, subtitle, edition, language,
+                    pageCount, format, translator, series, seriesNumber, coverImageUrl, tags,
+                    DemoIds.legacyWork(id), null, null);
+        }
+
         public TitlePlan(UUID id, int index, String name, String author, String isbn, String category, int publishYear) {
             this(id, index, name, author, isbn, category, publishYear, null, null, null, null, null, null, null, null,
                     null, null, List.of());
         }
+    }
+
+    /** Bộ sách demo (nhiều tập, mỗi tập một tác phẩm). {@code id} là id gợi ý; môi trường đã backfill có thể giữ id cũ cùng tên. */
+    public record SeriesPlan(UUID id, int index, String name, String description) {
+    }
+
+    /**
+     * Tác phẩm demo. {@code seriesIndex} là chỉ số trong {@link DemoPlan#series()} (null nếu không thuộc bộ),
+     * {@code category} là tên thể loại, {@code editionIds} là các ấn bản (đầu sách) thuộc tác phẩm theo thứ tự.
+     */
+    public record WorkPlan(UUID id, int index, String title, String originalTitle, String originalLanguage,
+                           String author, String category, Integer seriesIndex, Integer seriesNumber,
+                           String seriesLabel, WorkKind kind, List<UUID> editionIds) {
+        public WorkPlan {
+            editionIds = List.copyOf(editionIds);
+        }
+    }
+
+    /**
+     * Đặt trước theo tác phẩm (WAITING, chưa giữ bản sao): {@code titleId} là ấn bản độc giả đang xem, {@code language}
+     * là ngôn ngữ ấn bản đã chọn (null = mọi ngôn ngữ).
+     */
+    public record WorkReservationPlan(UUID id, int index, UUID readerId, UUID titleId, UUID workId, String language,
+                                      int createdDaysAgo) {
     }
 
     /**
@@ -184,7 +230,7 @@ public record DemoPlan(
 
     /** Đặt trước đang giữ một bản sao {@code RESERVED}, còn hạn giữ chỗ. */
     public record ReservationPlan(UUID id, int index, UUID readerId, UUID titleId, UUID copyId,
-                                  int createdDaysAgo, int holdDays) {
+                                  int createdDaysAgo, int holdDays, UUID workId, String language) {
     }
 
     public record FinePlan(UUID id, int index, UUID borrowingId, UUID readerId, long amount, FineStatus status,
@@ -214,7 +260,7 @@ public record DemoPlan(
     public record StockItemPlan(UUID titleId, int index, int onHand, int reserved, Integer lowStockThreshold,
                                 long unitPrice, int receivedQuantity, int soldQuantity, int returnedQuantity,
                                 int receiptIndex, String sku, String supplierName, long costPrice,
-                                String binLocation, int reorderQuantity, String note) {
+                                String binLocation, int reorderQuantity, String note, UUID workId) {
         public int available() {
             return onHand - reserved;
         }

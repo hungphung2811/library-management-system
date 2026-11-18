@@ -13,11 +13,22 @@ public record BorrowingView(UUID id, UUID userId, String status, LocalDate borro
         this(id, userId, status, borrowDate, dueDate, renewCount, items, List.of(), null);
     }
 
-    /** condition: GOOD, DAMAGED, LOST; null khi còn đang mượn. */
-    public record Item(UUID bookCopyId, LocalDate returnDate, String condition) {
+    /**
+     * condition: GOOD, DAMAGED, LOST; null khi còn đang mượn. conditionAtBorrow: null = lượt mượn cũ "không có dữ liệu lúc
+     * mượn"; khác null nhưng grade null = "chưa ghi nhận".
+     */
+    public record Item(UUID bookCopyId, LocalDate returnDate, String condition, ConditionAtBorrow conditionAtBorrow) {
+
+        public Item(UUID bookCopyId, LocalDate returnDate, String condition) {
+            this(bookCopyId, returnDate, condition, null);
+        }
 
         public Item(UUID bookCopyId, LocalDate returnDate) {
-            this(bookCopyId, returnDate, null);
+            this(bookCopyId, returnDate, null, null);
         }
+    }
+
+    /** grade: NEW, GOOD, FAIR, WORN hoặc null. Bất biến sau khi lập phiếu. */
+    public record ConditionAtBorrow(String grade, String note) {
     }
 }

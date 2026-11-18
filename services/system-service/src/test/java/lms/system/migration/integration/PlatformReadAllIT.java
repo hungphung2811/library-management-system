@@ -31,7 +31,7 @@ class PlatformReadAllIT {
     private static final Map<String, List<String>> BANG = Map.of(
             "identity", List.of("roles", "departments"),
             "catalog", List.of("titles", "book_copies"),
-            "circulation", List.of("borrowings", "borrowing_items", "fines"),
+            "circulation", List.of("borrowings", "borrowing_items", "fines", "reservations"),
             "audit", List.of("audit_logs"),
             "sales", List.of("sales_settings", "stock_items", "stock_ledger", "sales_orders", "sales_audit_log"));
 

@@ -58,6 +58,7 @@ Quy tắc chọn nhanh:
 | `customer-api-contact-reader.md` | ⚠️ đề xuất, chưa có code | `/public/t/{code}/contact-requests` |
 | `cms.md` | lms-api | `/api/cms/**` |
 | `catalog-books.md`, `catalog-preview.md`, `catalog-lookup.md` | lms-api / catalog | `/api/books/**` |
+| `catalog-works-series.md` | catalog, lms-api (pha 2d) | `/api/works/**`, `/api/series/**`, `PUT /api/books/{id}/work`, trường mới của `/api/books`, `/api/book-copies/{id}` (kèm `/internal/works/**`, `/internal/series/**`) |
 | `sales.md` | lms-api | `/api/sales/**` |
 | `platform-contracts.md` | identity (qua lms-api, platform admin) | `/api/platform/tenants/{id}/contracts`, `/api/platform/contracts/**` |
 | `tenant-contracts.md` | lms-api | `/api/contracts` |

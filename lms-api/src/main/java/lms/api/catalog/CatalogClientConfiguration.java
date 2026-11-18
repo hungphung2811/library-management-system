@@ -18,4 +18,9 @@ public class CatalogClientConfiguration {
     lms.api.catalog.client.ReferenceCatalogClient referenceCatalogClient(ServiceClients clients) {
         return new lms.api.catalog.client.http.HttpReferenceCatalogClient(clients.create(clients.urls().catalogUrl()));
     }
+
+    @Bean
+    lms.api.catalog.client.WorkCatalogClient workCatalogClient(ServiceClients clients) {
+        return new lms.api.catalog.client.http.HttpWorkCatalogClient(clients.create(clients.urls().catalogUrl()));
+    }
 }

@@ -1,6 +1,9 @@
 package lms.demo.plan;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.UUID;
 
 /** UUID tất định cho dữ liệu demo: {@code UUID.nameUUIDFromBytes("lms-demo:<loại>:<n>")}. Cùng (loại, n) luôn ra cùng id ở mọi service. */
@@ -28,6 +31,31 @@ public final class DemoIds {
 
     public static UUID title(int n) {
         return of("title", n);
+    }
+
+    /** Bộ sách demo (id gợi ý; xem {@link DemoPlan.SeriesPlan}). */
+    public static UUID series(int n) {
+        return of("series", n);
+    }
+
+    /** Tác phẩm demo không phải 1:1 với một ấn bản gốc (ví dụ bộ hộp). */
+    public static UUID work(int n) {
+        return of("work", n);
+    }
+
+    /**
+     * Id tác phẩm 1:1 của một ấn bản có sẵn: {@code md5('lms-work:' || title_id)::uuid}, đúng công thức backfill của
+     * catalog V10 / circulation V13 / sales V14 (md5 hex ép sang uuid, KHÔNG phải nameUUIDFromBytes). Có test so với
+     * {@code LegacyIds} của catalog.
+     */
+    public static UUID legacyWork(UUID titleId) {
+        try {
+            byte[] d = MessageDigest.getInstance("MD5").digest(("lms-work:" + titleId).getBytes(StandardCharsets.UTF_8));
+            ByteBuffer b = ByteBuffer.wrap(d);
+            return new UUID(b.getLong(), b.getLong());
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     public static UUID copy(int n) {

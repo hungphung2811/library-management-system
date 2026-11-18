@@ -73,7 +73,14 @@ public class BorrowingController {
 
     @PostMapping("/{id}/returns")
     public BorrowingView returnBook(@PathVariable UUID id, @Valid @RequestBody ReturnBookRequest request) {
-        return circulation.returnBook(id, request.bookCopyId());
+        return circulation.returnBook(id, request);
+    }
+
+    /** Ghi nhận tìm lại sách đã báo mất: tạo đề nghị hoàn khoản chờ người khác duyệt (khóa BorrowingController/reportFound). */
+    @PostMapping("/found")
+    public ResponseEntity<lms.api.circulation.dto.CompensationViews.Refund> reportFound(
+            @Valid @RequestBody lms.api.circulation.dto.CompensationViews.ReportFound request) {
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED).body(circulation.reportFound(request));
     }
 
     @PostMapping("/{id}/renewals")

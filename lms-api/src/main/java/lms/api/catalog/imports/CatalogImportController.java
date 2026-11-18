@@ -28,7 +28,7 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/catalog/imports/{type}")
 public class CatalogImportController {
 
-    static final Set<String> TYPES = Set.of("titles", "authors", "publishers", "categories", "shelf-locations");
+    static final Set<String> TYPES = Set.of("titles", "authors", "publishers", "categories", "shelf-locations", "series");
 
     private final ImportForwarder forwarder;
 

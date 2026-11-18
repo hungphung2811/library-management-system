@@ -35,7 +35,7 @@ public class CatalogController {
 
     /** tenantId chỉ có tác dụng với platform admin không tenant (ADR-0008); chuyển nguyên xuống service. */
     public record SearchBooksQuery(String keyword, Boolean available, String tenantId, UUID categoryId,
-                                   UUID publisherId) {
+                                   UUID publisherId, UUID workId, UUID seriesId) {
     }
 
     public record CopiesQuery(@NotNull UUID titleId, String tenantId) {
@@ -44,6 +44,10 @@ public class CatalogController {
     @GetMapping("/books")
     public List<TitleView> search(SearchBooksQuery query) {
         boolean available = Boolean.TRUE.equals(query.available());
+        if (query.workId() != null || query.seriesId() != null) {
+            return catalog.searchTitles(query.keyword(), available, query.tenantId(), query.categoryId(),
+                    query.publisherId(), query.workId(), query.seriesId());
+        }
         if (query.categoryId() == null && query.publisherId() == null) {
             return catalog.searchTitles(query.keyword(), available, query.tenantId());
         }
@@ -66,6 +70,16 @@ public class CatalogController {
     @PutMapping("/books/{id}")
     public TitleView update(@PathVariable UUID id, @Valid @RequestBody UpdateTitleRequest request) {
         return catalog.updateTitle(id, request);
+    }
+
+    /**
+     * Đổi tác phẩm của ấn bản (ADR-0026): body {@code {workId}} gắn vào tác phẩm có sẵn hoặc {@code {newWork:{...}}} tách
+     * ra tác phẩm mới (đúng một trong hai). Khóa TitleController/changeWork do catalog kiểm.
+     */
+    @PutMapping("/books/{id}/work")
+    public TitleView changeWork(@PathVariable UUID id,
+                                @Valid @RequestBody lms.api.catalog.dto.WorkDtos.ChangeEditionWorkRequest request) {
+        return catalog.changeWork(id, request);
     }
 
     /** Đọc mô tả và preview (văn bản thuần). Khóa TitleController/preview do catalog kiểm. */

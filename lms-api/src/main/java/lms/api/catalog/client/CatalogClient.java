@@ -21,11 +21,20 @@ public interface CatalogClient {
         return searchTitles(keyword, onlyAvailable, tenantId);
     }
 
+    /** Như bản 5 tham số nhưng lọc thêm theo tác phẩm và/hoặc bộ sách (ADR-0026; null = không lọc). */
+    default List<TitleView> searchTitles(String keyword, boolean onlyAvailable, String tenantId, UUID categoryId,
+                                         UUID publisherId, UUID workId, UUID seriesId) {
+        return searchTitles(keyword, onlyAvailable, tenantId, categoryId, publisherId);
+    }
+
     TitleView getTitle(UUID id);
 
     TitleView createTitle(CreateTitleRequest request);
 
     TitleView updateTitle(UUID id, UpdateTitleRequest request);
+
+    /** Đổi tác phẩm của ấn bản (gắn vào tác phẩm có sẵn hoặc tách ra tác phẩm mới), ADR-0026. */
+    TitleView changeWork(UUID id, lms.api.catalog.dto.WorkDtos.ChangeEditionWorkRequest request);
 
     lms.api.catalog.dto.TitlePreviewView getPreview(UUID id);
 

@@ -33,13 +33,24 @@ public record UpdateTitleRequest(
         @Size(max = 255) String series,
         @Min(1) Integer seriesNumber,
         @Size(max = 500) @Pattern(regexp = "(?i)https?://.+", message = "chỉ chấp nhận http/https") String coverImageUrl,
-        @Size(max = 10) List<@Size(max = 50) String> tags) {
+        @Size(max = 10) List<@Size(max = 50) String> tags,
+        @Min(1) Integer partNumber,
+        @Size(max = 50) String partLabel) {
+
+    /** Dạng 18 trường (chưa có workId/nhãn phần, ADR-0026). */
+    public UpdateTitleRequest(String name, String author, String isbn, BigDecimal coverPrice, UUID publisherId, UUID categoryId,
+              List<UUID> authorIds, String subtitle, Integer publicationYear, String edition, String language,
+              Integer pageCount, String format, String translator, String series, Integer seriesNumber,
+              String coverImageUrl, List<String> tags) {
+        this(name, author, isbn, coverPrice, publisherId, categoryId, authorIds, subtitle, publicationYear, edition,
+                language, pageCount, format, translator, series, seriesNumber, coverImageUrl, tags, null, null);
+    }
 
     /** Dạng 7 trường (chưa có thông tin bổ sung). */
     public UpdateTitleRequest(String name, String author, String isbn, BigDecimal coverPrice, UUID publisherId, UUID categoryId,
                List<UUID> authorIds) {
         this(name, author, isbn, coverPrice, publisherId, categoryId, authorIds, null, null, null, null, null, null,
-                null, null, null, null, null);
+                null, null, null, null, null, null, null);
     }
 
     public UpdateTitleRequest(String name, String author, String isbn, BigDecimal coverPrice) {

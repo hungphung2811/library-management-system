@@ -25,7 +25,9 @@ public class HttpCatalogClient implements CatalogClient {
                          UUID tenantId, UUID publisherId, String publisherName, UUID categoryId, String categoryName,
                          List<AuthorRefView> authors, String subtitle, Integer publicationYear, String edition,
                          String language, Integer pageCount, String format, String translator, String series,
-                         Integer seriesNumber, String coverImageUrl, List<String> tags) {
+                         Integer seriesNumber, String coverImageUrl, List<String> tags,
+                         UUID workId, String workTitle, String originalTitle, String originalLanguage, UUID seriesId,
+                         String seriesName, Integer partNumber, String partLabel, Long workAvailableCopies) {
     }
 
     record InternalCopy(UUID id, UUID titleId, String barcode, String status, UUID tenantId, UUID shelfLocationId,
@@ -35,7 +37,8 @@ public class HttpCatalogClient implements CatalogClient {
     }
 
     record InternalCopyDetails(UUID id, UUID titleId, String titleName, String barcode, String status,
-                               BigDecimal coverPrice, UUID shelfLocationId, String shelfLocationCode) {
+                               BigDecimal coverPrice, UUID shelfLocationId, String shelfLocationCode,
+                               UUID workId) {
     }
 
     private final RestClient client;
@@ -49,7 +52,9 @@ public class HttpCatalogClient implements CatalogClient {
                 t.publisherId(), t.publisherName(), t.categoryId(), t.categoryName(),
                 t.authors() == null ? List.of() : t.authors(), t.subtitle(), t.publicationYear(), t.edition(),
                 t.language(), t.pageCount(), t.format(), t.translator(), t.series(), t.seriesNumber(),
-                t.coverImageUrl(), t.tags() == null ? List.of() : t.tags());
+                t.coverImageUrl(), t.tags() == null ? List.of() : t.tags(), t.workId(), t.workTitle(),
+                t.originalTitle(), t.originalLanguage(), t.seriesId(), t.seriesName(), t.partNumber(), t.partLabel(),
+                t.workAvailableCopies());
     }
 
     private static CopyView view(InternalCopy c) {
@@ -60,7 +65,7 @@ public class HttpCatalogClient implements CatalogClient {
 
     private static CopyDetailsView view(InternalCopyDetails c) {
         return new CopyDetailsView(c.id(), c.titleId(), c.titleName(), c.barcode(), c.status(), c.coverPrice(),
-                c.shelfLocationId(), c.shelfLocationCode());
+                c.shelfLocationId(), c.shelfLocationCode(), c.workId());
     }
 
     @Override
@@ -71,12 +76,20 @@ public class HttpCatalogClient implements CatalogClient {
     @Override
     public List<TitleView> searchTitles(String keyword, boolean onlyAvailable, String tenantId, UUID categoryId,
                                         UUID publisherId) {
+        return searchTitles(keyword, onlyAvailable, tenantId, categoryId, publisherId, null, null);
+    }
+
+    @Override
+    public List<TitleView> searchTitles(String keyword, boolean onlyAvailable, String tenantId, UUID categoryId,
+                                        UUID publisherId, UUID workId, UUID seriesId) {
         List<InternalTitle> titles = client.get().uri(b -> {
             b.path("/internal/books").queryParam("available", onlyAvailable);
             if (keyword != null && !keyword.isBlank()) b.queryParam("keyword", keyword);
             if (tenantId != null && !tenantId.isBlank()) b.queryParam("tenantId", tenantId);
             if (categoryId != null) b.queryParam("categoryId", categoryId);
             if (publisherId != null) b.queryParam("publisherId", publisherId);
+            if (workId != null) b.queryParam("workId", workId);
+            if (seriesId != null) b.queryParam("seriesId", seriesId);
             return b.build();
         }).retrieve().body(new ParameterizedTypeReference<>() { });
         return titles == null ? List.of() : titles.stream().map(HttpCatalogClient::view).toList();
@@ -95,6 +108,12 @@ public class HttpCatalogClient implements CatalogClient {
     @Override
     public TitleView updateTitle(UUID id, UpdateTitleRequest request) {
         return view(client.put().uri("/internal/books/{id}", id).body(request).retrieve().body(InternalTitle.class));
+    }
+
+    @Override
+    public TitleView changeWork(UUID id, lms.api.catalog.dto.WorkDtos.ChangeEditionWorkRequest request) {
+        return view(client.put().uri("/internal/books/{id}/work", id).body(request).retrieve()
+                .body(InternalTitle.class));
     }
 
     record InternalPreview(UUID id, String name, String description, String previewText) {

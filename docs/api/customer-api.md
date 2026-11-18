@@ -94,6 +94,11 @@ trả 423/403 riêng). Đó là việc riêng, chưa xử lý ở đây.
   Trường khác bị bỏ qua (tenant luôn lấy từ đường dẫn). `201` không thân (chưa đăng nhập; gọi login riêng). Lỗi:
   `403 SIGNUP_NOT_AVAILABLE` (cửa hàng không mở đăng ký), `409 DUPLICATE_USERNAME`, `400 VALIDATION_FAILED`,
   `404 SHOP_NOT_AVAILABLE`.
+- Xác minh email bằng OTP (audit A3, chi tiết ở `docs/api/identity-signup.md`; identity bật mặc định, tắt bằng `lms.identity.email-verification.enabled=false` thì mọi tài khoản mới coi như đã xác minh):
+  - Sau `signup` identity gửi mail chứa OTP 6 chữ số (hết hạn 10 phút theo cấu hình). Tài khoản chưa xác minh KHÔNG đăng nhập được: `POST /public/t/{code}/auth/login` trả `403 EMAIL_NOT_VERIFIED` (chỉ sau khi mật khẩu đúng; sai mật khẩu vẫn là `401 LOGIN_FAILED`). FE nên chuyển sang màn nhập mã.
+  - `POST /public/t/{code}/auth/verify-email`, body `{username? (<=100), email? (hợp lệ, <=255), otp (đúng 6 chữ số)}` (một trong `username`/`email`; trường khác bị bỏ qua). `204` không thân khi đúng. Mọi lý do sai (không có tài khoản, OTP sai/hết hạn/hết lượt thử, đã xác minh) đều là `400 EMAIL_VERIFICATION_FAILED` cùng thân; sai định dạng body là `400 VALIDATION_FAILED`; `404 SHOP_NOT_AVAILABLE`. Quá số lần thử (mặc định 5) thì OTP bị vô hiệu cho tới khi gửi lại.
+  - `POST /public/t/{code}/auth/resend-verification`, body `{username?, email?}`. LUÔN `202` không thân (không lộ tài khoản có tồn tại; giãn cách tối thiểu 60 giây giữa hai lần gửi, trần 5 lần/24 giờ): FE nên khóa nút gửi lại 60 giây, không dựa vào phản hồi để biết thư có được gửi.
+  - Cả hai `Cache-Control: no-store`.
 - Login, refresh đều do customer-api tự đặt `channel: "STOREFRONT"` gửi identity (client không gửi được). Token trả về có
   `aud = ["lms-storefront"]`, chỉ dùng được ở route `orders` của customer-api, không dùng được ở `/api/**` của nhân viên.
 - `POST /public/t/{code}/auth/refresh` và `/logout` nhận `{refreshToken}`. Refresh gửi kèm `tenantId` của `{code}`: token
@@ -112,6 +117,15 @@ Phản hồi chỉ có các trường sau (test so tập tên trường); KHÔNG
 
 `bookRef` là UUID (chính là `titleId` khi đặt hàng). `price` là số nguyên VND. `bookRef` sai định dạng hoặc sách không có/không
 đang bán: `404 BOOK_NOT_FOUND`. Văn bản thuần: hiển thị bằng `textContent`, không `innerHTML`.
+
+#### Gộp biến thể theo tác phẩm (ADR-0026, pha 2c)
+
+Chỉ THÊM, tương thích ngược; chi tiết ở `docs/api/sales.md` mục "Storefront gộp biến thể".
+- `GET .../books` thêm query `group`: vắng hoặc `EDITION` (mặc định, như cũ) | `WORK` (gộp ấn bản cùng tác phẩm thành một thẻ). Chỉ nhận đúng `EDITION|WORK`, phân biệt hoa thường; giá trị khác (rỗng, `work`, `WORK,EDITION`...) là `400 VALIDATION_FAILED`, kiểm trước khi phân giải cửa hàng và không gọi sales. Vắng thì không gửi tham số sang sales. Cache giữ `max-age=30, public`.
+- Mục của danh sách thêm `workId`, `workTitle`, `variantCount`, `priceFrom` (luôn có khóa, null khi không có; `variantCount`/`priceFrom` chỉ khác null ở `group=WORK`). Ở `WORK`, `bookRef`/`title`/`price` là của ấn bản đại diện, `inStock` là của cả nhóm, `priceFrom` là giá thấp nhất (VND) trong nhóm.
+- `GET .../books/{bookRef}` thêm `workId`, `workTitle` và `variants[{bookRef, format, language, translator, edition, publicationYear, partNumber, partLabel, coverImageUrl, price, inStock}]` (gồm cả chính ấn bản đang xem, sắp theo `partNumber`; ấn bản chưa gắn tác phẩm có `workId = null` và `variants` chỉ có chính nó).
+- Đặt hàng KHÔNG đổi: khách chọn biến thể rồi gửi `bookRef` của biến thể đó làm `lines[].titleId` như hiện có. Cổng độc giả (`me/**`, ADR-0023) không đổi.
+- Vẫn KHÔNG có số tồn, giá nhập, ngưỡng, tenantId, ISBN; test so tập tên trường đã cập nhật.
 
 ### Đơn hàng (cần đăng nhập)
 
@@ -230,6 +244,10 @@ customer-api quyết CORS theo `Origin` và `{code}`; nginx chuyển nguyên `Or
 | 404 | `BORROWING_NOT_FOUND`, `RESERVATION_NOT_FOUND`, `READER_PROFILE_NOT_FOUND` | Cổng độc giả: phiếu mượn/đặt trước không có (của người khác cùng thân), chưa có thẻ độc giả |
 | 422 | `INVALID_RESERVATION` | Hủy đặt trước không còn hiệu lực |
 | 409 | `INSUFFICIENT_STOCK`, `CLIENT_REQUEST_CONFLICT`, `TITLE_NOT_AVAILABLE`, `ORDER_STATE_CONFLICT` | Nghiệp vụ đặt/hủy đơn |
+| 422 | `IDEMPOTENCY_KEY_REUSED` | `clientRequestId` đã dùng cho một đơn của chính khách nhưng nội dung đơn khác (gửi lại đúng nội dung thì vẫn trả đơn cũ) |
+| 429 | `ORDER_LIMIT_EXCEEDED` | Vượt trần chống lạm dụng của cửa hàng: số đơn đang chờ xác nhận hoặc số đơn trong 24 giờ (thông điệp do customer-api viết) |
+| 429 | `ORDER_RATE_LIMITED` | Đặt đơn quá nhanh (giới hạn theo khách hoặc theo cả cửa hàng; khác 429 của nginx không có `code`) |
+| 400 | `INVALID_QUANTITY` | Số lượng vượt trần của cửa hàng (mỗi dòng hoặc mỗi đơn) |
 | 403 | `SIGNUP_NOT_AVAILABLE` | Cửa hàng không mở đăng ký |
 | 409 | `DUPLICATE_USERNAME` | Tên đăng nhập/email đã dùng |
 | 405 | `METHOD_NOT_ALLOWED` | Sai phương thức |
@@ -249,7 +267,9 @@ Mọi phản hồi lỗi có `Cache-Control: no-store`. Mã nghiệp vụ của 
 | Mọi `/public/**` | `public_read` | 20 yêu cầu/giây, burst 40 |
 | `POST /public/site/contact-requests` | `public_form` | 5 yêu cầu/phút, burst 3 (chỉ tính POST) |
 | `POST /public/t/{code}/auth/signup` | `public_form` | 5 yêu cầu/phút, burst 3 |
+| `POST /public/t/{code}/auth/verify-email` và `/auth/resend-verification` | chưa có vùng riêng (hiện rơi vào `public_read`) | ⚠️ Đề xuất location regex `public_form` burst 5 trong `infrastructure/nginx/nginx.conf` (chưa thêm, file đang có thay đổi của phiên khác). Trần thật nằm ở identity: lượt thử sai theo OTP, giãn cách và trần gửi lại theo tài khoản |
 | `POST /public/t/{code}/contact-requests` | `public_form` | 5 yêu cầu/phút, burst 3 (thân tối đa 16 KB; nginx không thêm CORS) |
+| `POST /public/t/{code}/orders[/...]` | `public_order` | 20 yêu cầu/phút, burst 10 (chỉ tính POST, gồm hủy đơn; thân tối đa 64 KB). Lớp ngoài cùng theo IP; giới hạn theo khách và theo cửa hàng làm ở sales-service bằng Redis (`ORDER_RATE_LIMITED`) |
 | `POST /public/t/{code}/auth/login` | `login` | 10 yêu cầu/phút, burst 5 (preflight OPTIONS cũng tính vào vùng này) |
 | Mọi `/public/t/{code}/**` | `public_tenant` | 50 yêu cầu/giây, burst 100 theo `{code}` (mọi IP cộng dồn, bảo vệ backend; mã sai dạng/chữ hoa dồn một khóa chung; số chờ đo P-O2) |
 
@@ -284,7 +304,7 @@ Vượt giới hạn trả 429 do nginx. Tính theo IP biên của nginx; đặt
 - Liên hệ cửa hàng (`/public/t/{code}/contact-requests`) chưa làm (đang nằm ngoài danh sách đóng).
 - Phía identity của ADR-0013 (bảng origin, trường `allowedOrigins`, kiểm `tenantId` khi refresh) do agent khác làm; customer-api đọc khoan dung (thiếu `allowedOrigins` = rỗng) và gửi `tenantId`/`channel` theo hợp đồng. Identity cũ chưa kiểm `tenantId` thì refresh theo cửa hàng không chặn được token tenant khác; nếu identity cũ từ chối trường lạ, đặt `app.storefront.refresh-tenant-id-enabled=false`.
 - Cổng độc giả (ADR-0023): phía identity (B-R1: nới điều kiện tenant sang SALES hoặc LENDING, trả `modules` ở `/internal/storefront/access-tokens`, thêm khóa đặt trước vào allowlist STOREFRONT, `SignupUseCase` kiểm SALES) do agent khác làm. customer-api đọc khoan dung (thiếu `modules` = chỉ SALES) nên triển khai trước identity được; cho tới khi identity mới chạy, tenant chỉ LENDING vẫn `404` và độc giả chưa gọi được `me/reservations` (token thiếu khóa, `403 FORBIDDEN`). Triển khai customer-api trước hoặc cùng identity. Cần thêm `CIRCULATION_SERVICE_URL`, `CATALOG_SERVICE_URL` (mặc định `http://localhost:8083`, `http://localhost:8082`) cho container customer-api; `docker-compose.yml` chưa được cập nhật ở đợt này. Chưa kiểm chứng với circulation/identity/catalog chạy thật (chỉ test WebMvc, `MockRestServiceServer`).
-- Hợp đồng nội bộ phía sau: system-service `/internal/cms/public/**` (xem `docs/api/cms.md`), identity `/internal/storefront/access-tokens` (header `X-Storefront-Client-Secret`, body `{tenantCode}`, phản hồi thêm `allowedOrigins`), `/internal/auth/{login,signup,refresh,logout}` (login/refresh có `channel=STOREFRONT`, refresh có `tenantId?`), sales `/internal/sales/storefront/**` (token dịch vụ) và `/internal/sales/shop/**` (token khách).
+- Hợp đồng nội bộ phía sau: system-service `/internal/cms/public/**` (xem `docs/api/cms.md`), identity `/internal/storefront/access-tokens` (header `X-Storefront-Client-Secret`, body `{tenantCode}`, phản hồi thêm `allowedOrigins`), `/internal/auth/{login,signup,refresh,logout,email-verifications/confirm,email-verifications/resend}` (login/refresh có `channel=STOREFRONT`, refresh có `tenantId?`), sales `/internal/sales/storefront/**` (token dịch vụ) và `/internal/sales/shop/**` (token khách).
 
 ## Public API v1 theo site key (pha P2, chỉ thêm)
 

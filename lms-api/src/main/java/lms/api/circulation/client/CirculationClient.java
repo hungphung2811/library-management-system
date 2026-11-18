@@ -12,6 +12,7 @@ import lms.api.circulation.dto.ReaderFinesView;
 import lms.api.circulation.dto.ReportLostRequest;
 import lms.api.circulation.dto.ReservationView;
 import lms.api.circulation.dto.ReturnCopyRequest;
+import lms.api.circulation.dto.CompensationViews;
 import java.util.List;
 import java.util.UUID;
 
@@ -20,7 +21,7 @@ public interface CirculationClient {
 
     BorrowingView borrow(BorrowBookRequest request);
 
-    BorrowingView returnBook(UUID borrowingId, UUID bookCopyId);
+    BorrowingView returnBook(UUID borrowingId, lms.api.circulation.dto.ReturnBookRequest request);
 
     BorrowingView renew(UUID borrowingId);
 
@@ -57,4 +58,32 @@ public interface CirculationClient {
     CirculationPolicyView getPolicy();
 
     CirculationPolicyView updatePolicy(UpdateCirculationPolicyRequest request);
+
+    CompensationViews.CompensationPolicy getCompensationPolicy();
+
+    CompensationViews.CompensationPolicy updateCompensationPolicy(CompensationViews.UpdateCompensationPolicy request);
+
+    CompensationViews.DamageLevelList listDamageLevels();
+
+    CompensationViews.DamageLevel createDamageLevel(CompensationViews.CreateDamageLevel request);
+
+    CompensationViews.DamageLevel updateDamageLevel(String code, CompensationViews.UpdateDamageLevel request);
+
+    void deleteDamageLevel(String code);
+
+    CompensationViews.Adjustment requestAdjustment(UUID fineId, CompensationViews.CreateAdjustment request);
+
+    CompensationViews.Page<CompensationViews.Adjustment> listAdjustments(CompensationViews.AdjustmentSearch query);
+
+    CompensationViews.Adjustment approveAdjustment(UUID requestId, CompensationViews.Decision decision);
+
+    CompensationViews.Adjustment rejectAdjustment(UUID requestId, CompensationViews.Decision decision);
+
+    CompensationViews.Refund reportFound(CompensationViews.ReportFound request);
+
+    CompensationViews.Page<CompensationViews.Refund> listRefunds(CompensationViews.RefundSearch query);
+
+    CompensationViews.Refund approveRefund(UUID id, CompensationViews.Decision decision);
+
+    CompensationViews.Refund rejectRefund(UUID id, CompensationViews.Decision decision);
 }

@@ -14,7 +14,20 @@ public record TitleView(UUID id, String name, String author, String isbn, BigDec
                         UUID tenantId, UUID publisherId, String publisherName, UUID categoryId, String categoryName,
                         List<AuthorRefView> authors, String subtitle, Integer publicationYear, String edition,
                         String language, Integer pageCount, String format, String translator, String series,
-                        Integer seriesNumber, String coverImageUrl, List<String> tags) {
+                        Integer seriesNumber, String coverImageUrl, List<String> tags,
+                        UUID workId, String workTitle, String originalTitle, String originalLanguage, UUID seriesId,
+                        String seriesName, Integer partNumber, String partLabel, Long workAvailableCopies) {
+
+    /** Dạng 23 trường (chưa có trường tác phẩm, ADR-0026). */
+    public TitleView(UUID id, String name, String author, String isbn, BigDecimal coverPrice, long availableCopies,
+                     UUID tenantId, UUID publisherId, String publisherName, UUID categoryId, String categoryName,
+                     List<AuthorRefView> authors, String subtitle, Integer publicationYear, String edition,
+                     String language, Integer pageCount, String format, String translator, String series,
+                     Integer seriesNumber, String coverImageUrl, List<String> tags) {
+        this(id, name, author, isbn, coverPrice, availableCopies, tenantId, publisherId, publisherName, categoryId,
+                categoryName, authors, subtitle, publicationYear, edition, language, pageCount, format, translator,
+                series, seriesNumber, coverImageUrl, tags, null, null, null, null, null, null, null, null, null);
+    }
 
     /** Dạng 12 trường (chưa có thông tin bổ sung): các trường bổ sung null, tags rỗng. */
     public TitleView(UUID id, String name, String author, String isbn, BigDecimal coverPrice, long availableCopies,

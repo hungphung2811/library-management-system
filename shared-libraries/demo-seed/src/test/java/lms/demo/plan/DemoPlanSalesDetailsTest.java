@@ -20,7 +20,8 @@ class DemoPlanSalesDetailsTest {
         assertThat(plan.stockItems().stream().map(DemoPlan.StockItemPlan::sku).collect(Collectors.toSet()))
                 .hasSameSizeAs(plan.stockItems());
         for (DemoPlan.StockItemPlan s : plan.stockItems()) {
-            int year = plan.titles().get(s.index()).publishYear();
+            int year = plan.titles().stream().filter(t -> t.id().equals(s.titleId())).findFirst().orElseThrow()
+                    .publishYear();
             assertThat(s.sku()).isEqualTo(String.format("LMS-%d-%04d", year, s.index() + 1));
             assertThat(s.sku().length()).isLessThanOrEqualTo(40);
         }

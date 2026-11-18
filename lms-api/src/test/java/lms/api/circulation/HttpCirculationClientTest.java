@@ -119,7 +119,7 @@ class HttpCirculationClientTest {
 
         var created = client.borrow(new BorrowBookRequest(user, List.of(copy)));
         assertEquals(copy, created.items().get(0).bookCopyId());
-        assertEquals("BORROWING", client.returnBook(id, copy).status());
+        assertEquals("BORROWING", client.returnBook(id, new lms.api.circulation.dto.ReturnBookRequest(copy)).status());
         assertEquals(0, client.renew(id).renewCount());
         assertEquals(id, client.getBorrowing(id).id());
         assertEquals(id, client.getBorrowingDetail(id).id());

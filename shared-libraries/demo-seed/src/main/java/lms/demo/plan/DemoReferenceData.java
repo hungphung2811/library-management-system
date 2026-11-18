@@ -103,6 +103,7 @@ final class DemoReferenceData {
             "NXB Âm nhạc|Việt Nam|||Hà Nội",
             "TarcherPerigee|Hoa Kỳ|||New York, Hoa Kỳ",
             "NXB Xây dựng|Việt Nam|||37 Lê Đại Hành, Hai Bà Trưng, Hà Nội",
+            "Bloomsbury|Anh|1986|https://www.bloomsbury.com|50 Bedford Square, London, Anh",
     };
 
     private DemoReferenceData() {

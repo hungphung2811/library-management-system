@@ -23,8 +23,12 @@ import static lms.demo.plan.DemoPlan.StaffPlan;
 import static lms.demo.plan.DemoPlan.StaffRole;
 import static lms.demo.plan.DemoPlan.StockItemPlan;
 import static lms.demo.plan.DemoPlan.SupplierPlan;
+import static lms.demo.plan.DemoPlan.SeriesPlan;
 import static lms.demo.plan.DemoPlan.ShelfPlan;
 import static lms.demo.plan.DemoPlan.TitlePlan;
+import static lms.demo.plan.DemoPlan.WorkKind;
+import static lms.demo.plan.DemoPlan.WorkPlan;
+import static lms.demo.plan.DemoPlan.WorkReservationPlan;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -33,9 +37,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
+import java.util.UUID;
 
 /**
  * Bộ sinh {@link DemoPlan}. Mọi quyết định ngẫu nhiên đi qua {@link Random} có hạt giống cố định; số lần rút của luồng
@@ -155,8 +163,9 @@ final class DemoPlanGenerator {
             CopyPlan c = copies.get(idx);
             int reader = rnd.nextInt(READERS);
             int createdDaysAgo = rnd.nextInt(3);
+            TitlePlan held = titles.get(c.index() % TITLES);
             reservations.add(new ReservationPlan(DemoIds.reservation(reservations.size()), reservations.size(),
-                    readers.get(reader).id(), c.titleId(), c.id(), createdDaysAgo, 3));
+                    readers.get(reader).id(), c.titleId(), c.id(), createdDaysAgo, 3, held.workId(), held.language()));
         }
 
         // ---- Bán hàng ----
@@ -192,18 +201,150 @@ final class DemoPlanGenerator {
                     sold[i], returned[i], receiptIndex,
                     String.format("LMS-%d-%04d", titles.get(i).publishYear(), i + 1),
                     STOCK_SUPPLIERS[i % STOCK_SUPPLIERS.length], cost, binLocation(i), 10 * (1 + i % 4),
-                    stockNote(i)));
+                    stockNote(i), titles.get(i).workId()));
             receiptLines.get(receiptIndex).add(new ReceiptLinePlan(DemoIds.title(i), received, cost));
+        }
+        // Ấn bản bổ sung (ADR-0026): mỗi ấn bản có một mặt hàng tồn riêng để storefront gộp biến thể theo tác phẩm.
+        // Tất định theo chỉ số, không rút từ rnd.
+        List<TitlePlan> extraTitles = extraTitles(titles);
+        List<DemoTitleData.ExtraRow> extraRows = DemoTitleData.extras();
+        for (int k = 0; k < extraTitles.size(); k++) {
+            TitlePlan t = extraTitles.get(k);
+            int stockIndex = STOCK_ITEMS + k;
+            long price = extraRows.get(k).price();
+            long cost = costPrice(price, stockIndex);
+            int receiptIndex = stockIndex % 2;
+            stockItems.add(new StockItemPlan(t.id(), stockIndex, EXTRA_ON_HAND, 0, null, price, EXTRA_ON_HAND, 0, 0,
+                    receiptIndex, String.format("LMS-%d-%04d", t.publishYear(), stockIndex + 1),
+                    STOCK_SUPPLIERS[stockIndex % STOCK_SUPPLIERS.length], cost, binLocation(stockIndex), 10, null,
+                    t.workId()));
+            receiptLines.get(receiptIndex).add(new ReceiptLinePlan(t.id(), EXTRA_ON_HAND, cost));
         }
         List<ReceiptPlan> receipts = List.of(
                 new ReceiptPlan(DemoIds.receipt(0), 0, 0, 50, receiptLines.get(0)),
                 new ReceiptPlan(DemoIds.receipt(1), 1, 1, 45, receiptLines.get(1)));
 
         List<ShelfPlan> shelves = shelves();
-        List<CopyPlan> finalCopies = withAcquisition(copies, prices, seed);
-        return new DemoPlan(today, seed, staff, readers, titles, finalCopies, borrowings, reservations, fines, suppliers,
-                receipts, stockItems, orders, returns, refunds, DemoReferenceData.authors(),
-                DemoReferenceData.publishers(), shelves);
+        List<CopyPlan> finalCopies = new ArrayList<>(withAcquisition(copies, prices, seed));
+        // Mỗi ấn bản bổ sung có một bản sao AVAILABLE (chỉ số từ COPIES), để đặt trước theo tác phẩm có bản sao thuộc nhiều ấn bản.
+        for (int k = 0; k < extraTitles.size(); k++) {
+            finalCopies.add(extraCopy(COPIES + k, extraTitles.get(k), extraRows.get(k).price(), k));
+        }
+        List<TitlePlan> allTitles = new ArrayList<>(titles);
+        allTitles.addAll(extraTitles);
+        List<SeriesPlan> series = series(titles);
+        List<WorkPlan> works = works(allTitles, series);
+        List<WorkReservationPlan> workReservations = workReservations(allTitles, readers, reservations);
+        return new DemoPlan(today, seed, staff, readers, allTitles, finalCopies, borrowings, reservations, fines,
+                suppliers, receipts, stockItems, orders, returns, refunds, DemoReferenceData.authors(),
+                DemoReferenceData.publishers(), shelves, series, works, workReservations);
+    }
+
+    // ---- Mô hình tác phẩm - ấn bản (ADR-0026): tất định, KHÔNG rút từ rnd chính ----
+
+    /** Số lượng tồn của mỗi ấn bản bổ sung. */
+    static final int EXTRA_ON_HAND = 12;
+
+    /** Tên gốc và ngôn ngữ gốc của tác phẩm (chỉ số ấn bản gốc -> {tên gốc, ngôn ngữ gốc}); phần tử null = không khai. */
+    private static final Map<Integer, String[]> ORIGINALS = Map.of(
+            17, new String[]{"O Alquimista", "pt"},
+            21, new String[]{"Harry Potter and the Philosopher's Stone", "en"},
+            22, new String[]{"Harry Potter and the Chamber of Secrets", "en"},
+            23, new String[]{"Les Misérables", "fr"},
+            24, new String[]{"How to Win Friends and Influence People", "en"},
+            33, new String[]{"Sapiens: A Brief History of Humankind", "en"},
+            55, new String[]{null, "en"});
+
+    /** Ấn bản bổ sung: id/ISBN tiếp nối 64 ấn bản gốc; tác giả, thể loại, bộ sách, số tập lấy từ ấn bản gốc. */
+    private static List<TitlePlan> extraTitles(List<TitlePlan> base) {
+        List<TitlePlan> out = new ArrayList<>();
+        List<DemoTitleData.ExtraRow> rows = DemoTitleData.extras();
+        for (int k = 0; k < rows.size(); k++) {
+            DemoTitleData.ExtraRow r = rows.get(k);
+            TitlePlan b = base.get(r.baseIndex());
+            int index = TITLES + k;
+            UUID id = DemoIds.title(index);
+            UUID workId = r.collection() ? DemoIds.work(0) : b.workId();
+            Integer seriesNumber = r.collection() ? null : b.seriesNumber();
+            String cover = "https://picsum.photos/seed/lms-demo-" + index + "/300/450";
+            out.add(new TitlePlan(id, index, r.name(), b.author(), isbn(index), b.category(), r.year(), r.publisher(),
+                    r.subtitle(), r.edition(), r.language(), r.pageCount(), r.format(), r.translator(), b.series(),
+                    seriesNumber, cover, r.tags(), workId, r.partNumber(), r.partLabel()));
+        }
+        return out;
+    }
+
+    private static CopyPlan extraCopy(int index, TitlePlan t, long price, int k) {
+        int shelf = (DemoTitleData.extras().get(k).baseIndex() / 8) * 2 + index % 2;
+        LocalDate acquired = ACQUISITION_ANCHOR.minusDays(150L + 11L * k);
+        return new CopyPlan(DemoIds.copy(index), index, t.id(), String.format("DEMO-C%04d", index + 1),
+                CopyStatus.AVAILABLE, acquired, "PURCHASE", costPrice(price, index), "NEW", null,
+                ACQUISITION_ANCHOR.minusDays(3L + k), shelf);
+    }
+
+    private static List<SeriesPlan> series(List<TitlePlan> base) {
+        Map<String, SeriesPlan> byName = new LinkedHashMap<>();
+        for (TitlePlan t : base) {
+            if (t.series() != null && !byName.containsKey(t.series())) {
+                int index = byName.size();
+                byName.put(t.series(), new SeriesPlan(DemoIds.series(index), index, t.series(), null));
+            }
+        }
+        return new ArrayList<>(byName.values());
+    }
+
+    /**
+     * Mỗi tác phẩm một dòng, theo thứ tự xuất hiện của ấn bản đầu tiên. 64 ấn bản gốc là tác phẩm 1:1 (id backfill); ấn
+     * bản bổ sung vào tác phẩm có sẵn (bìa cứng, ebook, bản dịch/bản gốc, phần 2) hoặc tạo tác phẩm bộ hộp (COLLECTION).
+     */
+    private static List<WorkPlan> works(List<TitlePlan> titles, List<SeriesPlan> series) {
+        Map<String, Integer> seriesIndex = new HashMap<>();
+        series.forEach(s -> seriesIndex.put(s.name(), s.index()));
+        Map<UUID, List<TitlePlan>> byWork = new LinkedHashMap<>();
+        for (TitlePlan t : titles) {
+            byWork.computeIfAbsent(t.workId(), x -> new ArrayList<>()).add(t);
+        }
+        List<WorkPlan> out = new ArrayList<>();
+        for (Map.Entry<UUID, List<TitlePlan>> e : byWork.entrySet()) {
+            List<TitlePlan> editions = e.getValue();
+            TitlePlan first = editions.get(0);
+            boolean collection = first.index() >= TITLES && DemoTitleData.extras().get(first.index() - TITLES).collection();
+            String[] original = collection ? null : ORIGINALS.get(first.index());
+            String originalTitle = original == null ? null : original[0];
+            String originalLanguage = original != null ? original[1]
+                    : (!collection && first.translator() == null ? first.language() : null);
+            String seriesLabel = first.series() == null ? null
+                    : collection ? "Tập 1-2" : first.seriesNumber() == null ? null : "Tập " + first.seriesNumber();
+            out.add(new WorkPlan(e.getKey(), out.size(), first.name(), originalTitle, originalLanguage, first.author(),
+                    first.category(), first.series() == null ? null : seriesIndex.get(first.series()),
+                    first.seriesNumber(), seriesLabel, collection ? WorkKind.COLLECTION : WorkKind.SINGLE,
+                    editions.stream().map(TitlePlan::id).toList()));
+        }
+        return out;
+    }
+
+    /** Đặt trước theo tác phẩm: {chỉ số ấn bản gốc, số ngày trước}; ngôn ngữ chọn ở {@link #WORK_RESERVATION_LANGS}. */
+    private static final int[][] WORK_RESERVATION_BASES = {{21, 2}, {21, 1}, {23, 3}, {55, 0}, {24, 1}};
+    private static final String[] WORK_RESERVATION_LANGS = {"vi", "en", null, "vi", null};
+
+    /** Mỗi (độc giả, tác phẩm) chỉ một đặt trước còn hiệu lực (uq_reservations_active_work), nên chọn độc giả chưa giữ tác phẩm đó. */
+    private static List<WorkReservationPlan> workReservations(List<TitlePlan> titles, List<ReaderPlan> readers,
+                                                              List<ReservationPlan> held) {
+        Set<String> taken = new HashSet<>();
+        held.forEach(r -> taken.add(r.readerId() + "|" + r.workId()));
+        List<WorkReservationPlan> out = new ArrayList<>();
+        for (int k = 0; k < WORK_RESERVATION_BASES.length; k++) {
+            TitlePlan t = titles.get(WORK_RESERVATION_BASES[k][0]);
+            ReaderPlan reader = null;
+            for (int step = 0; step < readers.size() && reader == null; step++) {
+                ReaderPlan c = readers.get(readers.size() - 1 - (k + step) % readers.size());
+                if (taken.add(c.id() + "|" + t.workId())) reader = c;
+            }
+            if (reader == null) throw new IllegalStateException("Không còn độc giả cho đặt trước theo tác phẩm " + k);
+            out.add(new WorkReservationPlan(DemoIds.of("work-reservation", k), k, reader.id(), t.id(), t.workId(),
+                    WORK_RESERVATION_LANGS[k], WORK_RESERVATION_BASES[k][1]));
+        }
+        return out;
     }
 
     // ---- Kệ và thông tin nhập kho của bản sao (tất định, KHÔNG rút từ rnd chính) ----
@@ -375,13 +516,15 @@ final class DemoPlanGenerator {
         List<TitlePlan> list = new ArrayList<>();
         for (int i = 0; i < TITLES; i++) {
             DemoTitleData.Row r = rows.get(i);
+            boolean partOne = i == DemoTitleData.PART_ONE_BASE;
             // Giữ nguyên số lần rút từ rnd như trước (năm ngẫu nhiên cũ) để các phần kế hoạch sinh sau không đổi.
             rnd.nextInt(35);
             // Ảnh bìa giữ chỗ ổn định theo index; cứ 5 sách có 1 sách không có ảnh để demo trường hợp thiếu.
             String cover = i % 5 == 4 ? null : "https://picsum.photos/seed/lms-demo-" + i + "/300/450";
             list.add(new TitlePlan(DemoIds.title(i), i, r.name(), r.author(), isbn(i), TOPICS[i / FORMS.length],
                     r.year(), r.publisher(), r.subtitle(), r.edition(), r.language(), r.pageCount(), r.format(),
-                    r.translator(), r.series(), r.seriesNumber(), cover, r.tags()));
+                    r.translator(), r.series(), r.seriesNumber(), cover, r.tags(), DemoIds.legacyWork(DemoIds.title(i)),
+                    partOne ? 1 : null, partOne ? DemoTitleData.PART_ONE_LABEL : null));
         }
         return list;
     }

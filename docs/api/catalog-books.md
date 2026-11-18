@@ -87,3 +87,19 @@ Response 200: mảng `TitleLookupView` (cùng dạng `POST /internal/books/looku
 Lỗi: `400 VALIDATION_FAILED` (rỗng, quá 5.000, phần tử rỗng/quá 20 ký tự), `401` không token, `403` thiếu khóa hoặc `TENANT_REQUIRED`, token dịch vụ storefront (`svc`) bị `403` (không có `@StorefrontAccessible`).
 
 Khóa quyền (ADR-0003): `TitleController/lookupByIsbn`. Role gọi qua sales phải được gán khóa này (hiệu lực khi đăng nhập/refresh kế tiếp); migration gán khóa vào role mẫu do việc identity (ADR-0024 1e) làm. Lưu ý: ADR-0024 mục 5 ghi tối đa 1.000 ISBN mỗi lần; endpoint nhận tới 5.000 theo yêu cầu phân việc, sales có thể chia lô nhỏ hơn.
+
+## Mô hình 3 tầng tác phẩm - ấn bản - bản sao (ADR-0026, pha 1)
+
+`/api/books` vẫn là tầng ẤN BẢN (id, khóa quyền, đường dẫn không đổi); chỉ THÊM trường. Chi tiết tác phẩm và bộ sách: `docs/api/catalog-works-series.md`.
+
+- Response `TitleView` thêm: `workId`, `workTitle`, `originalTitle`, `originalLanguage`, `seriesId`, `seriesName`, `partNumber`, `partLabel`, `workAvailableCopies` (số bản sao sẵn có của mọi ấn bản cùng tác phẩm CÙNG NGÔN NGỮ với ấn bản này; null nếu ấn bản chưa gắn tác phẩm). `series`, `seriesNumber`, `categoryId`, `authors` vẫn trả, giá trị lấy từ tác phẩm.
+- `POST /api/books` thêm tùy chọn `workId`, `partNumber`, `partLabel`. KHÔNG gửi `workId` = hành vi cũ: tự tạo tác phẩm 1:1 từ tên, tác giả, thể loại, chuỗi `series` (bộ sách tìm theo tên không phân biệt hoa thường, chưa có thì tạo). Có `workId` mà không tồn tại: `404 WORK_NOT_FOUND`.
+- `PUT /api/books/{id}` thêm `partNumber`, `partLabel` (thiếu = xóa nhãn phần). Cảnh báo hành vi: trường cấp tác phẩm gửi kèm (`categoryId`, `authorIds`, `series`, `seriesNumber`) ghi vào TÁC PHẨM nên đổi cho MỌI ấn bản cùng tác phẩm.
+- `GET /api/books` thêm lọc tùy chọn `workId`, `seriesId` (cạnh `keyword, available, categoryId, publisherId`).
+- `PUT /api/books/{id}/work` (khóa mới `TitleController/changeWork`): body `{ "workId": "..." }` (gắn vào tác phẩm có sẵn) hoặc `{ "newWork": { ...như POST /api/works } }` (tách ra tác phẩm mới); gửi cả hai hoặc không gửi gì: `400 INVALID_WORK`. Tác phẩm cũ hết ấn bản thì bị xóa. Trả `TitleView`. Phát `EditionWorkChangedEvent` (inventory.events) sau commit.
+- `POST /internal/books/lookup`, `GET /internal/books/lookup`, `POST /internal/books/lookup-by-isbn` (`TitleLookupView`) thêm `workId, workTitle, seriesId, seriesName, partNumber, partLabel`.
+- `/internal/book-copies/{id}` (CopyDetailsResponse) và lookup bản sao (CopyLookupView) thêm `workId`. (lms-api chưa chuyển `workId` của bản sao sang `/api/**` ở pha 1.)
+- `CopyAvailableEvent` (inventory.events) thêm `workId` (null nếu ấn bản chưa gắn tác phẩm); consumer cũ bỏ qua.
+- `CopyAvailableEvent` thêm `language` (ngôn ngữ của ấn bản, null nếu chưa khai), cạnh `workId`; lấy cùng lượt tra `workId` (một truy vấn cho cả lô ở đường nhập lô). Consumer cũ bỏ qua.
+- `PUT /internal/book-copies/{id}/status` nới đúng hai chuyển: `LOST -> AVAILABLE` và `LOST -> DAMAGED` (circulation duyệt hoàn khoản khi tìm lại sách đã báo mất); chuyển về `AVAILABLE` phát `CopyAvailableEvent`. Các chuyển khác giữ nguyên (còn lại từ `LOST` vẫn `409 COPY_STATUS_CONFLICT`). Không đổi khóa quyền.
+- Giai đoạn chuyển tiếp: `titles.category_id`, `titles.series`, `titles.series_number`, `title_authors` được ghi gương theo tác phẩm.

@@ -14,6 +14,7 @@ import lms.api.circulation.dto.ReaderFinesView;
 import lms.api.circulation.dto.ReportLostRequest;
 import lms.api.circulation.dto.ReservationView;
 import lms.api.circulation.dto.ReturnCopyRequest;
+import lms.api.circulation.dto.CompensationViews;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -32,11 +33,13 @@ public class HttpCirculationClient implements CirculationClient {
                              int renewCount, List<InternalItem> items, List<InternalFine> fines, UUID tenantId) {
     }
 
-    record InternalItem(UUID bookCopyId, LocalDate returnDate, String condition) {
+    record InternalItem(UUID bookCopyId, LocalDate returnDate, String condition,
+                        BorrowingView.ConditionAtBorrow conditionAtBorrow) {
     }
 
     record InternalFine(UUID id, UUID readerId, UUID borrowingId, UUID bookCopyId, String reason,
-                        BigDecimal amount, String status, Instant createdAt, Instant paidAt, UUID tenantId) {
+                        BigDecimal amount, String status, Instant createdAt, Instant paidAt, UUID tenantId,
+                        BigDecimal payableAmount, FineView.Assessment assessment) {
     }
 
     record InternalReaderFines(UUID readerId, BigDecimal totalUnpaid, List<InternalFine> fines) {
@@ -66,14 +69,15 @@ public class HttpCirculationClient implements CirculationClient {
     private static BorrowingView view(InternalBorrowing b) {
         List<BorrowingView.Item> items = b.items() == null ? List.of()
                 : b.items().stream()
-                .map(i -> new BorrowingView.Item(i.bookCopyId(), i.returnDate(), i.condition())).toList();
+                .map(i -> new BorrowingView.Item(i.bookCopyId(), i.returnDate(), i.condition(), i.conditionAtBorrow())).toList();
         return new BorrowingView(b.id(), b.userId(), b.status(), b.borrowDate(), b.dueDate(), b.renewCount(), items,
                 fines(b.fines()), b.tenantId());
     }
 
     private static FineView view(InternalFine f) {
         return new FineView(f.id(), f.readerId(), f.borrowingId(), f.bookCopyId(), f.reason(), f.amount(),
-                f.status(), f.createdAt(), f.paidAt(), f.tenantId());
+                f.status(), f.createdAt(), f.paidAt(), f.tenantId(),
+                f.payableAmount() == null ? f.amount() : f.payableAmount(), f.assessment());
     }
 
     private static List<FineView> fines(List<InternalFine> list) {
@@ -99,9 +103,9 @@ public class HttpCirculationClient implements CirculationClient {
     }
 
     @Override
-    public BorrowingView returnBook(UUID borrowingId, UUID bookCopyId) {
+    public BorrowingView returnBook(UUID borrowingId, lms.api.circulation.dto.ReturnBookRequest request) {
         return view(client.post().uri("/internal/borrowings/{id}/returns", borrowingId)
-                .body(Map.of("bookCopyId", bookCopyId)).retrieve().body(InternalBorrowing.class));
+                .body(request).retrieve().body(InternalBorrowing.class));
     }
 
     @Override
@@ -211,6 +215,105 @@ public class HttpCirculationClient implements CirculationClient {
     @Override
     public CirculationPolicyView getPolicy() {
         return client.get().uri("/internal/circulation/policy").retrieve().body(CirculationPolicyView.class);
+    }
+
+    @Override
+    public CompensationViews.CompensationPolicy getCompensationPolicy() {
+        return client.get().uri("/internal/circulation/compensation-policy").retrieve()
+                .body(CompensationViews.CompensationPolicy.class);
+    }
+
+    @Override
+    public CompensationViews.CompensationPolicy updateCompensationPolicy(CompensationViews.UpdateCompensationPolicy r) {
+        return client.put().uri("/internal/circulation/compensation-policy").body(r).retrieve()
+                .body(CompensationViews.CompensationPolicy.class);
+    }
+
+    @Override
+    public CompensationViews.DamageLevelList listDamageLevels() {
+        return client.get().uri("/internal/circulation/damage-levels").retrieve()
+                .body(CompensationViews.DamageLevelList.class);
+    }
+
+    @Override
+    public CompensationViews.DamageLevel createDamageLevel(CompensationViews.CreateDamageLevel r) {
+        return client.post().uri("/internal/circulation/damage-levels").body(r).retrieve()
+                .body(CompensationViews.DamageLevel.class);
+    }
+
+    @Override
+    public CompensationViews.DamageLevel updateDamageLevel(String code, CompensationViews.UpdateDamageLevel r) {
+        return client.put().uri("/internal/circulation/damage-levels/{code}", code).body(r).retrieve()
+                .body(CompensationViews.DamageLevel.class);
+    }
+
+    @Override
+    public void deleteDamageLevel(String code) {
+        client.delete().uri("/internal/circulation/damage-levels/{code}", code).retrieve().toBodilessEntity();
+    }
+
+    @Override
+    public CompensationViews.Adjustment requestAdjustment(UUID fineId, CompensationViews.CreateAdjustment r) {
+        return client.post().uri("/internal/fines/{id}/adjustment-requests", fineId).body(r).retrieve()
+                .body(CompensationViews.Adjustment.class);
+    }
+
+    @Override
+    public CompensationViews.Page<CompensationViews.Adjustment> listAdjustments(CompensationViews.AdjustmentSearch q) {
+        return client.get().uri(b -> {
+            b.path("/internal/fines/adjustment-requests");
+            if (q.status() != null && !q.status().isBlank()) b.queryParam("status", q.status());
+            if (q.fineId() != null) b.queryParam("fineId", q.fineId());
+            if (q.readerId() != null) b.queryParam("readerId", q.readerId());
+            if (q.page() != null) b.queryParam("page", q.page());
+            if (q.size() != null) b.queryParam("size", q.size());
+            return b.build();
+        }).retrieve().body(new ParameterizedTypeReference<CompensationViews.Page<CompensationViews.Adjustment>>() { });
+    }
+
+    private static CompensationViews.Decision decision(CompensationViews.Decision d) {
+        return d == null ? new CompensationViews.Decision(null) : d;
+    }
+
+    @Override
+    public CompensationViews.Adjustment approveAdjustment(UUID requestId, CompensationViews.Decision d) {
+        return client.post().uri("/internal/fines/adjustment-requests/{id}/approve", requestId).body(decision(d))
+                .retrieve().body(CompensationViews.Adjustment.class);
+    }
+
+    @Override
+    public CompensationViews.Adjustment rejectAdjustment(UUID requestId, CompensationViews.Decision d) {
+        return client.post().uri("/internal/fines/adjustment-requests/{id}/reject", requestId).body(decision(d))
+                .retrieve().body(CompensationViews.Adjustment.class);
+    }
+
+    @Override
+    public CompensationViews.Refund reportFound(CompensationViews.ReportFound r) {
+        return client.post().uri("/internal/borrowings/found").body(r).retrieve().body(CompensationViews.Refund.class);
+    }
+
+    @Override
+    public CompensationViews.Page<CompensationViews.Refund> listRefunds(CompensationViews.RefundSearch q) {
+        return client.get().uri(b -> {
+            b.path("/internal/fines/refund-requests");
+            if (q.status() != null && !q.status().isBlank()) b.queryParam("status", q.status());
+            if (q.readerId() != null) b.queryParam("readerId", q.readerId());
+            if (q.page() != null) b.queryParam("page", q.page());
+            if (q.size() != null) b.queryParam("size", q.size());
+            return b.build();
+        }).retrieve().body(new ParameterizedTypeReference<CompensationViews.Page<CompensationViews.Refund>>() { });
+    }
+
+    @Override
+    public CompensationViews.Refund approveRefund(UUID id, CompensationViews.Decision d) {
+        return client.post().uri("/internal/fines/refund-requests/{id}/approve", id).body(decision(d)).retrieve()
+                .body(CompensationViews.Refund.class);
+    }
+
+    @Override
+    public CompensationViews.Refund rejectRefund(UUID id, CompensationViews.Decision d) {
+        return client.post().uri("/internal/fines/refund-requests/{id}/reject", id).body(decision(d)).retrieve()
+                .body(CompensationViews.Refund.class);
     }
 
     @Override

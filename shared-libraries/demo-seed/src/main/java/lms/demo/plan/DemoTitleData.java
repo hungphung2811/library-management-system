@@ -94,6 +94,47 @@ final class DemoTitleData {
             "Kiến trúc cổ Việt Nam||Nguyễn Bá Lăng|NXB Xây dựng|2008|Tái bản lần thứ 1|vi|290|HARDCOVER|||| kiến trúc;di sản;khảo cứu",
     };
 
+    /**
+     * Ấn bản bổ sung (ADR-0026): mỗi dòng là một ấn bản mới của tác phẩm chứa ấn bản gốc {@code baseIndex} (bìa cứng, ebook,
+     * bản dịch/bản gốc khác ngôn ngữ, tập có phần), hoặc ({@code collection}) của một tác phẩm bộ hộp mới thuộc cùng bộ sách
+     * với {@code baseIndex}. Tác giả, thể loại, bộ sách, số tập lấy từ ấn bản gốc. {@code price} là giá bán (đồng).
+     */
+    record ExtraRow(int baseIndex, boolean collection, String name, String subtitle, String publisher, int year,
+                    String edition, String language, int pageCount, String format, String translator,
+                    Integer partNumber, String partLabel, long price, List<String> tags) {
+    }
+
+    /** Ấn bản gốc là phần 1 của tác phẩm in hai cuốn (chỉ số trong {@link #rows()} -> nhãn phần). */
+    static final int PART_ONE_BASE = 23;
+    static final String PART_ONE_LABEL = "Phần 1/2";
+
+    private static final List<ExtraRow> EXTRAS = List.of(
+            new ExtraRow(21, false, "Harry Potter và Hòn đá Phù thủy", "Bản bìa cứng kỷ niệm", "NXB Trẻ", 2020,
+                    "Tái bản lần thứ 1", "vi", 400, "HARDCOVER", "Lý Lan", null, null, 189_000L,
+                    List.of("giả tưởng", "phép thuật", "bìa cứng")),
+            new ExtraRow(21, false, "Harry Potter and the Philosopher's Stone", null, "Bloomsbury", 2014,
+                    "Reissue Edition", "en", 336, "PAPERBACK", null, null, null, 175_000L,
+                    List.of("giả tưởng", "phép thuật", "bản gốc")),
+            new ExtraRow(24, false, "Đắc nhân tâm", "Bản điện tử", "First News - Trí Việt", 2021, null, "vi", 320,
+                    "EBOOK", "Nguyễn Hiến Lê", null, null, 79_000L,
+                    List.of("kỹ năng sống", "giao tiếp", "ebook")),
+            new ExtraRow(55, false, "Thói quen nguyên tử", "Thay đổi tí hon, hiệu quả bất ngờ",
+                    "First News - Trí Việt", 2019, "Tái bản lần thứ 5", "vi", 336, "PAPERBACK", "Nguyễn Thu Hà", null,
+                    null, 139_000L, List.of("thói quen", "phát triển bản thân", "bản dịch")),
+            new ExtraRow(23, false, "Những người khốn khổ", "Phần 2", "NXB Văn học", 2009, "Tái bản lần thứ 3", "vi",
+                    700, "HARDCOVER", "Huỳnh Lý", 2, "Phần 2/2", 165_000L,
+                    List.of("tiểu thuyết", "kinh điển", "văn học Pháp")),
+            new ExtraRow(21, true, "Harry Potter – Bộ hộp tập 1-2", "Bộ hộp 2 cuốn", "NXB Trẻ", 2021,
+                    "Tái bản lần thứ 1", "vi", 700, "HARDCOVER", "Lý Lan", null, null, 450_000L,
+                    List.of("giả tưởng", "bộ hộp", "quà tặng")),
+            new ExtraRow(33, false, "Sapiens: A Brief History of Humankind", null, "HarperCollins", 2015,
+                    "Reprint Edition", "en", 464, "PAPERBACK", null, null, null, 215_000L,
+                    List.of("nhân loại học", "lịch sử", "bản gốc")));
+
+    static List<ExtraRow> extras() {
+        return EXTRAS;
+    }
+
     private DemoTitleData() {
     }
 

@@ -52,7 +52,7 @@ Domain: dùng lại bảng và luật origin của ADR-0013 (chuẩn hóa chữ 
 - Bộ đếm giữ 35 ngày: ngày cũ hơn trả `0` (không phân biệt được với "không có request").
 - Phản hồi `200`: `{ applicationId, from, to, totalRequests, days: [{ date, totalRequests }] }` (mỗi ngày trong khoảng đều có mặt, ngày không có dữ liệu là `0`).
 - ⚠️ Chỉ có **tổng yêu cầu mỗi ngày**. Bộ đếm hiện không tách thành công/lỗi (2xx/4xx/5xx) hay theo nhóm endpoint nên API **không** trả các số đó (chưa có, không ước lượng). Đếm cả request bị `429`; chỉ đếm khi integration-api bật giới hạn tốc độ (`INTEGRATION_RATE_LIMIT_ENABLED=true`), vì bộ đếm chạy cùng lượt Lua của bộ giới hạn.
-- Application của tenant khác (hoặc không tồn tại): `404 APPLICATION_NOT_FOUND` cùng thân. Redis lỗi: `503 USAGE_UNAVAILABLE` (không trả số `0` giả).
+- Application của tenant khác (hoặc không tồn tại): `404 APPLICATION_NOT_FOUND` cùng thân. Redis lỗi: identity trả `503 USAGE_UNAVAILABLE` (không trả số `0` giả). **Qua `lms-api` (đường FE gọi) mã này không giữ nguyên**: `ApiExceptionHandler` đổi mọi lỗi 5xx của service nội bộ thành `502 DEPENDENCY_ERROR` (thông điệp chung, không lộ chi tiết), còn không kết nối được service thì `503 DEPENDENCY_UNAVAILABLE`; chỉ 4xx được chuyển nguyên. Vì vậy FE nên coi cả `502` lẫn `503` ở endpoint `usage` là "thống kê tạm thời không khả dụng" (không hiển thị `0`), không dựa vào `USAGE_UNAVAILABLE`.
 - Thêm khóa quyền mới `ApplicationController/usage` (tự đăng ký lần đầu được gọi; role `is_admin` qua sẵn, role khác cần được gán). Không cần migration.
 
 ## Thu hồi tức thời (tùy chọn)
@@ -80,7 +80,7 @@ Platform admin không tạo Application và không cấp credential hộ tenant.
 | 404 | `APPLICATION_NOT_FOUND`, `CREDENTIAL_NOT_FOUND`, `APPLICATION_DOMAIN_NOT_FOUND` |
 | 409 | `CONTRACT_REQUIRED`, `KIND_MISMATCH`, `APPLICATION_NAME_DUPLICATED`, `APPLICATION_LIMIT_EXCEEDED`, `CREDENTIAL_LIMIT_EXCEEDED`, `CREDENTIAL_NOT_ACTIVE`, `APPLICATION_NOT_ACTIVE`, `APPLICATION_NOT_SUSPENDED`, `ORIGIN_DUPLICATED`, `ORIGIN_LIMIT_EXCEEDED` |
 | 422 | `SCOPE_NOT_GRANTABLE` |
-| 503 | `USAGE_UNAVAILABLE` (chỉ endpoint `usage`) |
+| 503 | `USAGE_UNAVAILABLE` (chỉ endpoint `usage`; qua `lms-api` thành `502 DEPENDENCY_ERROR`, xem mục "Thống kê sử dụng") |
 
 ## Ghi chú cho FE
 
