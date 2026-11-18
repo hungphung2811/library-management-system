@@ -38,11 +38,21 @@ public class ManageApplicationUseCase {
     private final TransactionalRunner tx;
     private final SecureRandom random;
     private final Clock clock;
+    private final ApplicationRevocationPort revocation;
 
     public ManageApplicationUseCase(ApplicationRepository applications, ApplicationCredentialRepository credentials,
                                     ApplicationHistoryRepository history, ManageApplicationOriginsUseCase origins,
                                     PublishPlatformEventPort events, TransactionalRunner tx, SecureRandom random,
                                     Clock clock) {
+        this(applications, credentials, history, origins, events, tx, random, clock, ApplicationRevocationPort.NONE);
+    }
+
+    /** {@code revocation}: thu hồi token tức thời khi tạm ngưng hoặc xóa Application (sau commit, best-effort). */
+    public ManageApplicationUseCase(ApplicationRepository applications, ApplicationCredentialRepository credentials,
+                                    ApplicationHistoryRepository history, ManageApplicationOriginsUseCase origins,
+                                    PublishPlatformEventPort events, TransactionalRunner tx, SecureRandom random,
+                                    Clock clock, ApplicationRevocationPort revocation) {
+        this.revocation = revocation;
         this.applications = applications;
         this.credentials = credentials;
         this.origins = origins;
@@ -124,6 +134,7 @@ public class ManageApplicationUseCase {
             return app;
         });
         auditor.announce(tenantId, deleted.id(), ApplicationHistoryAction.DELETED, null, actorId);
+        revocation.revokeTokensIssuedBefore(deleted.id(), now);
     }
 
     /** Thân thay đổi trả về chuỗi chi tiết cho lịch sử (null = không có), không bao giờ chứa secret. */
@@ -142,6 +153,7 @@ public class ManageApplicationUseCase {
             return app;
         });
         auditor.announce(tenantId, changed.id(), action, null, actorId);
+        if (action == ApplicationHistoryAction.SUSPENDED) revocation.revokeTokensIssuedBefore(changed.id(), now);
         return ApplicationViews.detail(changed, credentials.findByApplication(changed.id()), now);
     }
 

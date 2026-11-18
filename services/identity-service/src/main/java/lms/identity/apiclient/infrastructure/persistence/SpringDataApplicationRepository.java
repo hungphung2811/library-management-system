@@ -33,4 +33,7 @@ interface SpringDataApplicationRepository extends JpaRepository<ApplicationJpaEn
                        @Param("excludeId") UUID excludeId);
 
     boolean existsBySiteKey(String siteKey);
+
+    @Query("select a from ApplicationJpaEntity a where a.siteKey = :siteKey and a.status <> 'DELETED'")
+    Optional<ApplicationJpaEntity> findVisibleBySiteKey(@Param("siteKey") String siteKey);
 }

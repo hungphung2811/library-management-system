@@ -13,6 +13,12 @@ public interface StorefrontOriginRepository {
     /** Chuỗi origin ĐANG BẬT của tenant (đã chuẩn hóa), theo thứ tự tạo. */
     List<String> findEnabledOrigins(UUID tenantId);
 
+    /**
+     * Chuỗi origin ĐANG BẬT gắn đúng Application này (application_id = :applicationId, đã chuẩn hóa), theo thứ tự tạo. Origin
+     * cấp tenant (application_id IS NULL) thuộc đường {code} cũ và KHÔNG nằm trong kết quả (pha P2 site key).
+     */
+    List<String> findEnabledOriginsOfApplication(UUID tenantId, UUID applicationId);
+
     /** Tenant đang sở hữu chuỗi origin này (kể cả dòng đang tắt). */
     Optional<UUID> findOwnerTenant(String origin);
 

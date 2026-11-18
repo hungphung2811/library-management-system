@@ -29,6 +29,7 @@ public class ApplicationExceptionHandler {
             case KIND_MISMATCH, APPLICATION_NAME_DUPLICATED, APPLICATION_LIMIT_EXCEEDED, CREDENTIAL_LIMIT_EXCEEDED,
                  APPLICATION_NOT_ACTIVE, APPLICATION_NOT_SUSPENDED, CREDENTIAL_NOT_ACTIVE, CONTRACT_REQUIRED ->
                     HttpStatus.CONFLICT;
+            case USAGE_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
         };
         return ResponseEntity.status(status).body(ErrorResponse.of(ex.reason().name(), ex.getMessage()));
     }

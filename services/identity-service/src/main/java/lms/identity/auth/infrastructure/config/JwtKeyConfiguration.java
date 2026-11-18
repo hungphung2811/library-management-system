@@ -3,6 +3,9 @@ package lms.identity.auth.infrastructure.config;
 import lms.identity.auth.infrastructure.security.PemKeys;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.proc.JWSVerificationKeySelector;
+import com.nimbusds.jose.proc.SecurityContext;
+import com.nimbusds.jwt.proc.DefaultJWTProcessor;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.KeyUse;
 import com.nimbusds.jose.jwk.RSAKey;
@@ -10,6 +13,7 @@ import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
 import java.security.KeyPair;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -67,6 +71,44 @@ public class JwtKeyConfiguration {
         }
     }
 
+    /**
+     * Khóa công khai CŨ còn nằm trong JWKS trong cửa sổ xoay khóa (SAAS_API_AUTHENTICATION_DESIGN 4.5). Chỉ để XÁC MINH
+     * token đã ký bằng khóa cũ; không bao giờ dùng để ký. Bỏ trống = không có khóa cũ (hành vi như trước).
+     */
+    public record PreviousPublicKeys(List<RSAKey> keys) {
+
+        public static final PreviousPublicKeys NONE = new PreviousPublicKeys(List.of());
+    }
+
+    @Bean
+    public PreviousPublicKeys previousPublicKeys(@Value("${auth.jwt.previous-public-key-pem:}") String previousPem,
+                                          RSAKey rsaKey) {
+        if (previousPem == null || previousPem.isBlank()) return PreviousPublicKeys.NONE;
+        return new PreviousPublicKeys(List.of(parsePrevious(previousPem, rsaKey)));
+    }
+
+    /** PEM sai hoặc trùng khóa đang ký thì lỗi khởi động rõ ràng (không bỏ qua im lặng để tránh mất khóa khi xoay). */
+    public static RSAKey parsePrevious(String previousPem, RSAKey current) {
+        RSAPublicKey previous;
+        try {
+            previous = PemKeys.parsePublic(previousPem);
+        } catch (RuntimeException e) {
+            throw new IllegalStateException("auth.jwt.previous-public-key-pem (AUTH_JWT_PREVIOUS_PUBLIC_KEY) "
+                    + "không phải PEM khóa công khai X.509 RSA hợp lệ", e);
+        }
+        try {
+            RSAKey key = new RSAKey.Builder(previous).keyUse(KeyUse.SIGNATURE).algorithm(JWSAlgorithm.RS256)
+                    .keyIDFromThumbprint().build();
+            if (key.getKeyID().equals(current.getKeyID())) {
+                throw new IllegalStateException("auth.jwt.previous-public-key-pem trùng khóa đang ký: bỏ trống nó "
+                        + "hoặc đặt đúng khóa công khai CŨ");
+            }
+            return key;
+        } catch (JOSEException e) {
+            throw new IllegalStateException("Không dựng được JWK từ khóa công khai cũ", e);
+        }
+    }
+
     @Bean
     JwtEncoder jwtEncoder(RSAKey rsaKey) {
         return new NimbusJwtEncoder(new ImmutableJWKSet<>(new JWKSet(rsaKey)));
@@ -74,9 +116,20 @@ public class JwtKeyConfiguration {
 
     /** Auth-service cũng là resource server cho các endpoint cần quyền (vd. tạo credential). */
     @Bean
-    JwtDecoder jwtDecoder(RSAKey rsaKey) {
+    public JwtDecoder jwtDecoder(RSAKey rsaKey, PreviousPublicKeys previous) {
         try {
-            return NimbusJwtDecoder.withPublicKey(rsaKey.toRSAPublicKey()).build();
+            if (previous.keys().isEmpty()) {
+                return NimbusJwtDecoder.withPublicKey(rsaKey.toRSAPublicKey()).build();
+            }
+            // Cửa sổ xoay khóa: chọn khóa xác minh theo kid giữa khóa hiện tại và khóa cũ (như các resource server qua JWKS).
+            List<com.nimbusds.jose.jwk.JWK> all = new java.util.ArrayList<>();
+            all.add(rsaKey.toPublicJWK());
+            all.addAll(previous.keys());
+            DefaultJWTProcessor<SecurityContext> processor = new DefaultJWTProcessor<>();
+            processor.setJWSKeySelector(new JWSVerificationKeySelector<>(JWSAlgorithm.RS256,
+                    new ImmutableJWKSet<>(new JWKSet(all))));
+            processor.setJWTClaimsSetVerifier((claims, context) -> { });
+            return new NimbusJwtDecoder(processor);
         } catch (JOSEException e) {
             throw new IllegalStateException("Không dựng được JwtDecoder", e);
         }

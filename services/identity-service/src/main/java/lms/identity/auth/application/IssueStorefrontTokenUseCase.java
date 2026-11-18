@@ -19,21 +19,50 @@ public class IssueStorefrontTokenUseCase {
     private final StorefrontTenantPort tenants;
     private final ServiceTokenIssuerPort issuer;
     private final Duration ttl;
+    private final SiteKeyTenantPort siteKeys;
 
     public IssueStorefrontTokenUseCase(StorefrontTenantPort tenants, ServiceTokenIssuerPort issuer, Duration ttl) {
+        this(tenants, issuer, ttl, null);
+    }
+
+    /** siteKeys null = không hỗ trợ site key (executeBySiteKey luôn rỗng). */
+    public IssueStorefrontTokenUseCase(StorefrontTenantPort tenants, ServiceTokenIssuerPort issuer, Duration ttl,
+                                       SiteKeyTenantPort siteKeys) {
         this.tenants = tenants;
         this.issuer = issuer;
         this.ttl = ttl;
+        this.siteKeys = siteKeys;
     }
 
     public Optional<StorefrontAccess> execute(String tenantCode) {
         return tenants.resolve(tenantCode).map(t -> {
             TokenIssuerPort.IssuedToken token = issuer.issueService(new ServiceClaims(
                     JwtClaims.SERVICE_CUSTOMER_API, STOREFRONT_SUBJECT, t.id(), t.modules(), ttl));
-            return new StorefrontAccess(t, token.value(), token.expiresInSeconds());
+            return new StorefrontAccess(t, token.value(), token.expiresInSeconds(), null);
         });
     }
 
-    public record StorefrontAccess(StorefrontTenant tenant, String accessToken, long expiresIn) {
+    /**
+     * Cấp token dịch vụ theo site key công khai (pha P2): token mang thêm claim application_id; allowedOrigins là origin
+     * của chính Application. Mọi thất bại cùng một kết quả rỗng.
+     */
+    public Optional<StorefrontAccess> executeBySiteKey(String siteKey) {
+        if (siteKeys == null) {
+            return Optional.empty();
+        }
+        return siteKeys.resolve(siteKey).map(r -> {
+            StorefrontTenant t = r.tenant();
+            TokenIssuerPort.IssuedToken token = issuer.issueService(new ServiceClaims(
+                    JwtClaims.SERVICE_CUSTOMER_API, STOREFRONT_SUBJECT, t.id(), t.modules(), ttl, r.applicationId()));
+            return new StorefrontAccess(t, token.value(), token.expiresInSeconds(), r.applicationId());
+        });
+    }
+
+    /** applicationId null với token cấp theo mã tenant. */
+    public record StorefrontAccess(StorefrontTenant tenant, String accessToken, long expiresIn, UUID applicationId) {
+
+        public StorefrontAccess(StorefrontTenant tenant, String accessToken, long expiresIn) {
+            this(tenant, accessToken, expiresIn, null);
+        }
     }
 }

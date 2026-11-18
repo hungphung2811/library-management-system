@@ -31,6 +31,12 @@ class InMemoryStorefrontOrigins implements StorefrontOriginRepository {
     }
 
     @Override
+    public List<String> findEnabledOriginsOfApplication(UUID tenantId, UUID applicationId) {
+        return findByTenant(tenantId).stream().filter(StorefrontOriginEntry::enabled)
+                .filter(e -> applicationId.equals(e.applicationId())).map(StorefrontOriginEntry::origin).toList();
+    }
+
+    @Override
     public Optional<UUID> findOwnerTenant(String origin) {
         return rows.values().stream().filter(e -> e.origin().equals(origin)).map(StorefrontOriginEntry::tenantId)
                 .findFirst();

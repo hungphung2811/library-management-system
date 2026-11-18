@@ -54,4 +54,27 @@ public class ResolveStorefrontTenantUseCase {
         return Optional.of(new StorefrontTenant(t.id(), t.code(), t.name(),
                 enabled.stream().map(ModuleCode::name).toList(), allowedOrigins));
     }
+
+    /**
+     * Tra theo id tenant cho cấp token theo site key (pha P2). Cùng điều kiện khả dụng như {@link #execute}
+     * (ACTIVE, SALES hoặc LENDING), nhưng allowedOrigins chỉ gồm origin đang bật gắn ĐÚNG Application
+     * {@code applicationId}: origin cấp tenant (application_id IS NULL) thuộc đường {code} cũ và không hợp lệ cho site key.
+     * Luôn đúng ba truy vấn (tenant, module, origin) ở mọi nhánh; tenant/application null dùng id giả.
+     */
+    @Transactional(readOnly = true)
+    public Optional<StorefrontTenant> executeForApplication(UUID tenantId, UUID applicationId) {
+        UUID lookupId = tenantId == null ? NO_TENANT : tenantId;
+        UUID lookupApp = applicationId == null ? NO_TENANT : applicationId;
+        Optional<Tenant> found = tenants.findById(lookupId);
+        List<ModuleCode> enabled = modules.enabledOf(List.of(lookupId)).getOrDefault(lookupId, List.of());
+        List<String> allowedOrigins = origins == null ? List.of()
+                : origins.findEnabledOriginsOfApplication(lookupId, lookupApp);
+        if (tenantId == null || applicationId == null || found.isEmpty() || !found.get().isActive()
+                || !(enabled.contains(ModuleCode.SALES) || enabled.contains(ModuleCode.LENDING))) {
+            return Optional.empty();
+        }
+        Tenant t = found.get();
+        return Optional.of(new StorefrontTenant(t.id(), t.code(), t.name(),
+                enabled.stream().map(ModuleCode::name).toList(), allowedOrigins));
+    }
 }

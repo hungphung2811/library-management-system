@@ -116,6 +116,12 @@ class ApiClientFixture {
         }
 
         @Override
+        public Optional<Application> findVisibleBySiteKey(String siteKey) {
+            return rows.values().stream().filter(a -> siteKey.equals(a.siteKey()) && a.status() != ApplicationStatus.DELETED)
+                    .findFirst();
+        }
+
+        @Override
         public Optional<Application> findByIdAndTenant(UUID id, UUID tenantId) {
             return Optional.ofNullable(rows.get(id))
                     .filter(a -> a.tenantId().equals(tenantId) && a.status() != ApplicationStatus.DELETED);
@@ -221,6 +227,12 @@ class ApiClientFixture {
         public List<String> findEnabledOrigins(UUID tenantId) {
             return findByTenant(tenantId).stream().filter(StorefrontOriginEntry::enabled)
                     .map(StorefrontOriginEntry::origin).toList();
+        }
+
+        @Override
+        public List<String> findEnabledOriginsOfApplication(UUID tenantId, UUID applicationId) {
+            return findByTenant(tenantId).stream().filter(StorefrontOriginEntry::enabled)
+                    .filter(e -> applicationId.equals(e.applicationId())).map(StorefrontOriginEntry::origin).toList();
         }
 
         @Override

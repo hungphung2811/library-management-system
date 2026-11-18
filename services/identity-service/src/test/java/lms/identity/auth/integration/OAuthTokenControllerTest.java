@@ -23,6 +23,7 @@ import lms.identity.apiclient.application.CreateApplicationUseCase;
 import lms.identity.apiclient.application.ManageApplicationDomainsUseCase;
 import lms.identity.apiclient.application.ManageApplicationUseCase;
 import lms.identity.apiclient.application.ManageCredentialsUseCase;
+import lms.identity.apiclient.application.QueryApplicationUsageUseCase;
 import lms.identity.apiclient.application.QueryApplicationUseCase;
 import lms.identity.apiclient.infrastructure.web.ApplicationController;
 import lms.identity.apiclient.infrastructure.web.ApplicationExceptionHandler;
@@ -72,6 +73,7 @@ class OAuthTokenControllerTest {
     @MockitoBean IssueClientTokenUseCase issue;
     @MockitoBean CreateApplicationUseCase create;
     @MockitoBean QueryApplicationUseCase query;
+    @MockitoBean QueryApplicationUsageUseCase usage;
     @MockitoBean ManageApplicationUseCase manage;
     @MockitoBean ManageCredentialsUseCase credentials;
     @MockitoBean ManageApplicationDomainsUseCase domains;

@@ -96,7 +96,7 @@ public class JwtTokenIssuer implements TokenIssuerPort, ServiceTokenIssuerPort, 
     @Override
     public IssuedToken issueService(ServiceClaims claims) {
         Instant now = clock.instant();
-        JwtClaimsSet set = JwtClaimsSet.builder()
+        JwtClaimsSet.Builder builder = JwtClaimsSet.builder()
                 .issuer(issuer)
                 .subject(claims.subject().toString())
                 .id(UUID.randomUUID().toString())
@@ -105,8 +105,11 @@ public class JwtTokenIssuer implements TokenIssuerPort, ServiceTokenIssuerPort, 
                 .claim(JwtClaims.SERVICE, claims.service())
                 .claim(JwtClaims.TENANT_ID, claims.tenantId().toString())
                 .claim(JwtClaims.MODULES, claims.modules())
-                .claim(JwtClaims.PERMISSIONS, List.of())
-                .build();
+                .claim(JwtClaims.PERMISSIONS, List.of());
+        if (claims.applicationId() != null) {
+            builder.claim(JwtClaims.APPLICATION_ID, claims.applicationId().toString());
+        }
+        JwtClaimsSet set = builder.build();
         JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).keyId(keyId).build();
         String token = encoder.encode(JwtEncoderParameters.from(header, set)).getTokenValue();
         return new IssuedToken(token, claims.ttl().toSeconds());

@@ -37,11 +37,21 @@ public class ManageCredentialsUseCase {
     private final ApplicationPolicy policy;
     private final SecureRandom random;
     private final Clock clock;
+    private final ApplicationRevocationPort revocation;
 
     public ManageCredentialsUseCase(ApplicationRepository applications, ApplicationCredentialRepository credentials,
                                     ApplicationHistoryRepository history, PublishPlatformEventPort events,
                                     TransactionalRunner tx, ApplicationPolicy policy, SecureRandom random,
                                     Clock clock) {
+        this(applications, credentials, history, events, tx, policy, random, clock, ApplicationRevocationPort.NONE);
+    }
+
+    /** {@code revocation}: thu hồi credential với lý do COMPROMISED thì token đã cấp cũng bị từ chối ngay (best-effort). */
+    public ManageCredentialsUseCase(ApplicationRepository applications, ApplicationCredentialRepository credentials,
+                                    ApplicationHistoryRepository history, PublishPlatformEventPort events,
+                                    TransactionalRunner tx, ApplicationPolicy policy, SecureRandom random,
+                                    Clock clock, ApplicationRevocationPort revocation) {
+        this.revocation = revocation;
         this.applications = applications;
         this.credentials = credentials;
         this.auditor = new ApplicationAuditor(history, events);
@@ -93,6 +103,9 @@ public class ManageCredentialsUseCase {
         });
         auditor.announce(tenantId, applicationId, ApplicationHistoryAction.CREDENTIAL_REVOKED,
                 "credentialId=" + revoked.id() + " reason=" + why.name(), actorId);
+        // Token integration không mang credentialId nên dấu theo cả Application; chỉ dùng cho thu hồi khẩn (lộ secret).
+        // Xoay vòng thường (ROTATED/MANUAL): token đã cấp hết hạn tự nhiên sau tối đa TTL của token.
+        if (why == RevokeReason.COMPROMISED) revocation.revokeTokensIssuedBefore(applicationId, now);
         return CredentialView.of(revoked, now);
     }
 

@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.net.URI;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import lms.identity.apiclient.application.ApplicationViews.ApplicationDetail;
@@ -19,10 +20,13 @@ import lms.identity.apiclient.application.CreateApplicationUseCase;
 import lms.identity.apiclient.application.ManageApplicationDomainsUseCase;
 import lms.identity.apiclient.application.ManageApplicationUseCase;
 import lms.identity.apiclient.application.ManageCredentialsUseCase;
+import lms.identity.apiclient.application.QueryApplicationUsageUseCase;
+import lms.identity.apiclient.application.QueryApplicationUsageUseCase.UsageReport;
 import lms.identity.apiclient.application.QueryApplicationUseCase;
 import lms.identity.tenant.application.StorefrontOriginResponse;
 import lms.security.CurrentUser;
 import lms.tenant.TenantContext;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -69,15 +73,22 @@ public class ApplicationController {
     public record AddDomainRequest(@NotBlank String origin) {
     }
 
+    /** Khoảng ngày (UTC, gồm hai đầu, ISO yyyy-MM-dd) của thống kê sử dụng; thiếu thì 30 ngày gần nhất, tối đa 31 ngày. */
+    public record UsageRange(@DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+    }
+
     private final CreateApplicationUseCase create;
     private final QueryApplicationUseCase query;
     private final ManageApplicationUseCase manage;
     private final ManageCredentialsUseCase credentials;
     private final ManageApplicationDomainsUseCase domains;
+    private final QueryApplicationUsageUseCase usage;
 
     public ApplicationController(CreateApplicationUseCase create, QueryApplicationUseCase query,
                                  ManageApplicationUseCase manage, ManageCredentialsUseCase credentials,
-                                 ManageApplicationDomainsUseCase domains) {
+                                 ManageApplicationDomainsUseCase domains, QueryApplicationUsageUseCase usage) {
+        this.usage = usage;
         this.create = create;
         this.query = query;
         this.manage = manage;
@@ -166,6 +177,12 @@ public class ApplicationController {
                                              @AuthenticationPrincipal Jwt jwt) {
         domains.remove(tenant(), id, domainId, actor(jwt));
         return ResponseEntity.noContent().build();
+    }
+
+    /** Thống kê sử dụng theo ngày (khóa động ApplicationController/usage). Application của tenant khác là 404. */
+    @GetMapping("/{id}/usage")
+    public UsageReport usage(@PathVariable UUID id, UsageRange range) {
+        return usage.usage(tenant(), id, range.from(), range.to());
     }
 
     @GetMapping("/{id}/history")

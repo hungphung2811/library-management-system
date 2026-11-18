@@ -17,6 +17,11 @@ interface SpringDataStorefrontOriginRepository extends JpaRepository<TenantStore
             + "order by o.createdAt, o.id")
     List<String> findEnabledOrigins(@Param("tenantId") UUID tenantId);
 
+    @Query("select o.origin from TenantStorefrontOriginJpaEntity o where o.tenantId = :tenantId "
+            + "and o.applicationId = :applicationId and o.enabled = true order by o.createdAt, o.id")
+    List<String> findEnabledOriginsOfApplication(@Param("tenantId") UUID tenantId,
+                                                 @Param("applicationId") UUID applicationId);
+
     @Query("select o.tenantId from TenantStorefrontOriginJpaEntity o where o.origin = :origin")
     Optional<UUID> findOwnerTenant(@Param("origin") String origin);
 

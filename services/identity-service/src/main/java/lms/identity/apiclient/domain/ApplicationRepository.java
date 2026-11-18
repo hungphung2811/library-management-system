@@ -19,6 +19,12 @@ public interface ApplicationRepository {
      */
     Optional<Application> findVisibleById(UUID id);
 
+    /**
+     * Tra theo site key công khai (UNIQUE) KHÔNG biết tenant, cho cấp token storefront theo site key (pha P2); DELETED không
+     * trả về. Đúng MỘT câu truy vấn ở mọi nhánh; scope không nạp (site key chỉ thuộc Application PUBLIC_SITE, không có scope).
+     */
+    Optional<Application> findVisibleBySiteKey(String siteKey);
+
     Optional<Application> findByIdAndTenant(UUID id, UUID tenantId);
 
     /** Như {@link #findByIdAndTenant} nhưng khóa dòng (SELECT ... FOR UPDATE) tới hết transaction hiện tại. */

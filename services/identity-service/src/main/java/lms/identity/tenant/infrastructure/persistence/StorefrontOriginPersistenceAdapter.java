@@ -36,6 +36,11 @@ class StorefrontOriginPersistenceAdapter implements StorefrontOriginRepository {
     }
 
     @Override
+    public List<String> findEnabledOriginsOfApplication(UUID tenantId, UUID applicationId) {
+        return jpa.findEnabledOriginsOfApplication(tenantId, applicationId);
+    }
+
+    @Override
     public Optional<UUID> findOwnerTenant(String origin) {
         return jpa.findOwnerTenant(origin);
     }

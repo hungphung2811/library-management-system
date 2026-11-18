@@ -15,7 +15,9 @@ public class ApplicationException extends RuntimeException {
         APPLICATION_NAME_DUPLICATED, APPLICATION_LIMIT_EXCEEDED, CREDENTIAL_LIMIT_EXCEEDED,
         APPLICATION_NOT_ACTIVE, APPLICATION_NOT_SUSPENDED, CREDENTIAL_NOT_ACTIVE,
         /** Application INTEGRATION chỉ tạo được khi tenant có hợp đồng ACTIVE (Q3). */
-        CONTRACT_REQUIRED
+        CONTRACT_REQUIRED,
+        /** Kho bộ đếm sử dụng (Redis) lỗi: 503 chung, không trả số giả. */
+        USAGE_UNAVAILABLE
     }
 
     private final Reason reason;

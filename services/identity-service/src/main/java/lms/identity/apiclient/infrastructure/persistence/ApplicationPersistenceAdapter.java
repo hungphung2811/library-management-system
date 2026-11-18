@@ -81,6 +81,11 @@ class ApplicationPersistenceAdapter implements ApplicationRepository {
     }
 
     @Override
+    public Optional<Application> findVisibleBySiteKey(String siteKey) {
+        return jpa.findVisibleBySiteKey(siteKey).map(e -> toDomain(e, Map.of()));
+    }
+
+    @Override
     public Optional<Application> findByIdAndTenant(UUID id, UUID tenantId) {
         return jpa.findVisible(id, tenantId).map(e -> toDomain(e, scopesOf(List.of(e.getId()))));
     }

@@ -121,12 +121,20 @@ public class AuthBeanConfiguration {
         return new InProcessStorefrontTenantAdapter(resolve);
     }
 
+    /** Tra site key công khai (Public Site Key, pha P2): auth chỉ gọi tầng application của apiclient. */
+    @Bean
+    lms.identity.auth.infrastructure.client.InProcessSiteKeyTenantAdapter siteKeyTenantAdapter(
+            lms.identity.apiclient.application.ResolveSiteKeyUseCase resolve) {
+        return new lms.identity.auth.infrastructure.client.InProcessSiteKeyTenantAdapter(resolve);
+    }
+
     @Bean
     IssueStorefrontTokenUseCase issueStorefrontTokenUseCase(InProcessStorefrontTenantAdapter tenants,
                                                             JwtTokenIssuer issuer,
                                                             @Value("${lms.identity.storefront.token-ttl:PT5M}")
-                                                            Duration ttl) {
-        return new IssueStorefrontTokenUseCase(tenants, issuer, ttl);
+                                                            Duration ttl,
+                                                            lms.identity.auth.infrastructure.client.InProcessSiteKeyTenantAdapter siteKeys) {
+        return new IssueStorefrontTokenUseCase(tenants, issuer, ttl, siteKeys);
     }
 
     /** Token endpoint OAuth2 client_credentials (SaaS API Authentication pha I2); TTL mặc định 5 phút (Q10). */

@@ -6,6 +6,8 @@ import lms.identity.apiclient.application.ApplicationViews.ApplicationDetail;
 import lms.identity.apiclient.application.ApplicationViews.ApplicationSummary;
 import lms.identity.apiclient.application.ApplicationViews.HistoryItem;
 import lms.identity.apiclient.application.ManageApplicationUseCase;
+import lms.identity.apiclient.application.QueryApplicationUsageUseCase;
+import lms.identity.apiclient.application.QueryApplicationUsageUseCase.UsageReport;
 import lms.identity.apiclient.application.QueryApplicationUseCase;
 import lms.security.CurrentUser;
 import lms.security.permission.PlatformAdminOnly;
@@ -33,7 +35,11 @@ public class PlatformApplicationController {
     private final QueryApplicationUseCase query;
     private final ManageApplicationUseCase manage;
 
-    public PlatformApplicationController(QueryApplicationUseCase query, ManageApplicationUseCase manage) {
+    private final QueryApplicationUsageUseCase usage;
+
+    public PlatformApplicationController(QueryApplicationUseCase query, ManageApplicationUseCase manage,
+                                         QueryApplicationUsageUseCase usage) {
+        this.usage = usage;
         this.query = query;
         this.manage = manage;
     }
@@ -51,6 +57,12 @@ public class PlatformApplicationController {
     @GetMapping("/{id}/history")
     public List<HistoryItem> history(@PathVariable UUID tenantId, @PathVariable UUID id) {
         return query.history(tenantId, id);
+    }
+
+    @GetMapping("/{id}/usage")
+    public UsageReport usage(@PathVariable UUID tenantId, @PathVariable UUID id,
+                             ApplicationController.UsageRange range) {
+        return usage.usage(tenantId, id, range.from(), range.to());
     }
 
     @PostMapping("/{id}/suspension")

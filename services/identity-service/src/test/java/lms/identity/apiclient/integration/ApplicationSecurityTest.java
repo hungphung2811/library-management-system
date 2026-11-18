@@ -24,6 +24,7 @@ import lms.identity.apiclient.application.CreateApplicationUseCase;
 import lms.identity.apiclient.application.ManageApplicationDomainsUseCase;
 import lms.identity.apiclient.application.ManageApplicationUseCase;
 import lms.identity.apiclient.application.ManageCredentialsUseCase;
+import lms.identity.apiclient.application.QueryApplicationUsageUseCase;
 import lms.identity.apiclient.application.QueryApplicationUseCase;
 import lms.identity.apiclient.domain.ApplicationException;
 import lms.identity.apiclient.domain.ApplicationException.Reason;
@@ -68,6 +69,7 @@ class ApplicationSecurityTest {
     @MockitoBean ManageApplicationUseCase manage;
     @MockitoBean ManageCredentialsUseCase credentials;
     @MockitoBean ManageApplicationDomainsUseCase domains;
+    @MockitoBean QueryApplicationUsageUseCase usage;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean PermissionKeyRegistrar permissionKeyRegistrar;
 
@@ -115,7 +117,8 @@ class ApplicationSecurityTest {
                 post(BASE + "/" + APP + "/credentials/" + CRED + "/revocation"),
                 post(BASE + "/" + APP + "/site-key/rotation"), get(BASE + "/" + APP + "/domains"),
                 post(BASE + "/" + APP + "/domains").contentType(json).content("{\"origin\":\"https://a.vn\"}"),
-                delete(BASE + "/" + APP + "/domains/" + CRED), get(BASE + "/" + APP + "/history"));
+                delete(BASE + "/" + APP + "/domains/" + CRED), get(BASE + "/" + APP + "/history"),
+                get(BASE + "/" + APP + "/usage"));
     }
 
     @Test
@@ -230,7 +233,7 @@ class ApplicationSecurityTest {
     @Test
     void platformChiChoPlatformAdminKhongDungKhoa() throws Exception {
         List<MockHttpServletRequestBuilder> endpoints = List.of(get(PLATFORM), get(PLATFORM + "/" + APP),
-                get(PLATFORM + "/" + APP + "/history"), post(PLATFORM + "/" + APP + "/suspension"),
+                get(PLATFORM + "/" + APP + "/history"), get(PLATFORM + "/" + APP + "/usage"), post(PLATFORM + "/" + APP + "/suspension"),
                 post(PLATFORM + "/" + APP + "/reactivation"), delete(PLATFORM + "/" + APP));
         for (MockHttpServletRequestBuilder r : endpoints) {
             mvc.perform(r.with(tenantAdmin())).andExpect(status().isForbidden());

@@ -38,12 +38,16 @@ public class StorefrontAccessController {
         this.secret = secret.getBytes(StandardCharsets.UTF_8);
     }
 
-    public record AccessTokenRequest(String tenantCode) {
+    /** Đúng MỘT trong hai: tenantCode (đường cũ) hoặc siteKey (Public Site Key, pha P2); cả hai hoặc không cái nào là 400. */
+    public record AccessTokenRequest(String tenantCode, String siteKey) {
     }
 
-    /** allowedOrigins: origin ĐANG BẬT của tenant, đã chuẩn hóa (ADR-0013); không nằm trong claim JWT. Rỗng nếu chưa khai báo. */
+    /**
+     * allowedOrigins: origin ĐANG BẬT, đã chuẩn hóa (ADR-0013); không nằm trong claim JWT. Rỗng nếu chưa khai báo. Với
+     * {tenantCode}: origin cấp tenant; với {siteKey}: chỉ origin của chính Application. applicationId null với {tenantCode}.
+     */
     public record AccessTokenResponse(UUID tenantId, String code, String name, String accessToken, long expiresIn,
-                                      List<String> allowedOrigins, List<String> modules) {
+                                      List<String> allowedOrigins, List<String> modules, UUID applicationId) {
     }
 
     @PostMapping("/access-tokens")
@@ -54,10 +58,16 @@ public class StorefrontAccessController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(ErrorResponse.of("UNAUTHORIZED", "Thiếu hoặc sai bí mật storefront"));
         }
-        return issue.execute(body.tenantCode())
+        boolean hasCode = body.tenantCode() != null && !body.tenantCode().isBlank();
+        boolean hasSiteKey = body.siteKey() != null && !body.siteKey().isBlank();
+        if (hasCode == hasSiteKey) {
+            return ResponseEntity.badRequest()
+                    .body(ErrorResponse.of("VALIDATION_FAILED", "Cần đúng một trong tenantCode hoặc siteKey"));
+        }
+        return (hasSiteKey ? issue.executeBySiteKey(body.siteKey().trim()) : issue.execute(body.tenantCode()))
                 .<ResponseEntity<?>>map(a -> ResponseEntity.ok(new AccessTokenResponse(a.tenant().id(),
                         a.tenant().code(), a.tenant().name(), a.accessToken(), a.expiresIn(),
-                        a.tenant().allowedOrigins(), a.tenant().modules())))
+                        a.tenant().allowedOrigins(), a.tenant().modules(), a.applicationId())))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(ErrorResponse.of("SHOP_NOT_AVAILABLE", "Cửa hàng không khả dụng")));
     }

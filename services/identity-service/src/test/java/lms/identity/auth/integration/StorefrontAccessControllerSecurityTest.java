@@ -106,7 +106,7 @@ class StorefrontAccessControllerSecurityTest {
     void moiTruongHopKhongKhaDungCungTra404VoiCungThan() throws Exception {
         when(issue.execute(any())).thenReturn(Optional.empty());
         String expected = null;
-        for (String code : new String[]{"khong-co", "bi-ngung", "chi-lending", "!!sai dinh dang!!", ""}) {
+        for (String code : new String[]{"khong-co", "bi-ngung", "chi-lending", "!!sai dinh dang!!"}) {
             var result = mvc.perform(post(PATH).header("X-Storefront-Client-Secret", "shop-secret-123")
                             .contentType(MediaType.APPLICATION_JSON).content("{\"tenantCode\":\"" + code + "\"}"))
                     .andExpect(status().isNotFound())
@@ -115,11 +115,73 @@ class StorefrontAccessControllerSecurityTest {
             if (expected == null) expected = result;
             org.junit.jupiter.api.Assertions.assertEquals(stripTimestamp(expected), stripTimestamp(result));
         }
-        // thiếu tenantCode cũng là 404 chung, không phải 400
+    }
+
+    // ---- Public Site Key (pha P2): đúng MỘT trong tenantCode hoặc siteKey ----
+
+    static final String SITE_KEY = "lms_pk_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    static final UUID APPLICATION_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
+
+    @Test
+    void siteKeyHopLeTra200VoiApplicationIdVaOriginCuaApplication() throws Exception {
+        when(issue.executeBySiteKey(SITE_KEY)).thenReturn(Optional.of(new StorefrontAccess(
+                new StorefrontTenant(TENANT_ID, "shop-a", "Hiệu sách A", List.of("SALES"), List.of("https://shop.a.vn")),
+                "jwt.token.value", 300, APPLICATION_ID)));
+
         mvc.perform(post(PATH).header("X-Storefront-Client-Secret", "shop-secret-123")
-                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("SHOP_NOT_AVAILABLE"));
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"siteKey\":\"" + SITE_KEY + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tenantId").value(TENANT_ID.toString()))
+                .andExpect(jsonPath("$.applicationId").value(APPLICATION_ID.toString()))
+                .andExpect(jsonPath("$.allowedOrigins[0]").value("https://shop.a.vn"))
+                .andExpect(jsonPath("$.accessToken").value("jwt.token.value"));
+        verify(issue, never()).execute(any());
+    }
+
+    @Test
+    void tenantCodeTraApplicationIdNull() throws Exception {
+        when(issue.execute("shop-a")).thenReturn(Optional.of(new StorefrontAccess(
+                new StorefrontTenant(TENANT_ID, "shop-a", "Hiệu sách A", List.of("SALES")), "jwt", 300)));
+
+        mvc.perform(post(PATH).header("X-Storefront-Client-Secret", "shop-secret-123")
+                        .contentType(MediaType.APPLICATION_JSON).content(BODY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.applicationId").doesNotExist());
+    }
+
+    @Test
+    void caHaiHoacKhongCaiNaoTra400VaKhongPhatToken() throws Exception {
+        for (String body : new String[]{"{\"tenantCode\":\"shop-a\",\"siteKey\":\"" + SITE_KEY + "\"}", "{}",
+                "{\"tenantCode\":\"\"}", "{\"tenantCode\":\" \",\"siteKey\":\"\"}"}) {
+            mvc.perform(post(PATH).header("X-Storefront-Client-Secret", "shop-secret-123")
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        }
+        verify(issue, never()).execute(any());
+        verify(issue, never()).executeBySiteKey(any());
+    }
+
+    @Test
+    void siteKeyKhongKhaDungMoiLyDoCungTra404VoiCungThan() throws Exception {
+        when(issue.executeBySiteKey(any())).thenReturn(Optional.empty());
+        String expected = null;
+        for (String key : new String[]{SITE_KEY, "lms_pk_short", "sai-dinh-dang", "lms_sk_" + "A".repeat(32)}) {
+            var result = mvc.perform(post(PATH).header("X-Storefront-Client-Secret", "shop-secret-123")
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"siteKey\":\"" + key + "\"}"))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value("SHOP_NOT_AVAILABLE"))
+                    .andReturn().getResponse().getContentAsString();
+            if (expected == null) expected = result;
+            org.junit.jupiter.api.Assertions.assertEquals(stripTimestamp(expected), stripTimestamp(result));
+        }
+    }
+
+    @Test
+    void siteKeyCungCanBiMatStorefront() throws Exception {
+        mvc.perform(post(PATH).contentType(MediaType.APPLICATION_JSON).content("{\"siteKey\":\"" + SITE_KEY + "\"}"))
+                .andExpect(status().isUnauthorized());
+        verify(issue, never()).executeBySiteKey(any());
     }
 
     @Test
