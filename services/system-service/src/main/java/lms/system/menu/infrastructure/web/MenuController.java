@@ -1,11 +1,14 @@
 package lms.system.menu.infrastructure.web;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lms.security.JwtClaims;
+import lms.security.permission.ActAsTenant;
 import lms.security.permission.AuthenticatedOnly;
+import lms.security.permission.TenantModule;
 import lms.system.menu.application.GetMyMenuUseCase;
 import lms.system.menu.domain.MenuViewer;
 import lms.tenant.TenantContext;
@@ -31,16 +34,26 @@ public class MenuController {
         this.legacyModulesFallback = legacyModulesFallback;
     }
 
-    /** Token không có tenantId (quản trị nền tảng) hoặc không có JWT (dev) trả danh sách rỗng. */
+    /**
+     * Token không có tenantId (quản trị nền tảng) hoặc không có JWT (dev) trả danh sách rỗng, trừ khi platform admin gửi
+     * {@code X-Tenant-Id} (ADR-0016): khi đó nhận đủ menu của tenant đích như admin có mọi module (không bị hợp đồng
+     * thuê giới hạn), vì platform admin có quyền cao nhất trên mọi tenant.
+     */
     @AuthenticatedOnly
     @GetMapping("/me")
     public List<MenuResponses.Node> myMenu(@AuthenticationPrincipal Jwt jwt) {
         if (jwt == null) {
             return List.of();
         }
-        List<String> permissions = jwt.getClaimAsStringList(JwtClaims.PERMISSIONS);
-        MenuViewer viewer = new MenuViewer(Boolean.TRUE.equals(jwt.getClaim(JwtClaims.ADMIN)),
-                permissions == null ? Set.of() : Set.copyOf(permissions), modulesOf(jwt));
+        MenuViewer viewer;
+        if (Boolean.TRUE.equals(jwt.getClaim(JwtClaims.PLATFORM_ADMIN)) && ActAsTenant.current().isPresent()) {
+            viewer = new MenuViewer(true, Set.of(), Arrays.stream(TenantModule.values()).map(Enum::name)
+                    .collect(Collectors.toUnmodifiableSet()));
+        } else {
+            List<String> permissions = jwt.getClaimAsStringList(JwtClaims.PERMISSIONS);
+            viewer = new MenuViewer(Boolean.TRUE.equals(jwt.getClaim(JwtClaims.ADMIN)),
+                    permissions == null ? Set.of() : Set.copyOf(permissions), modulesOf(jwt));
+        }
         return getMyMenu.execute(TenantContext.current().orElse(null), viewer).stream()
                 .map(MenuResponses.Node::from).toList();
     }

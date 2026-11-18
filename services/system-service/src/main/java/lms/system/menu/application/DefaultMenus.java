@@ -24,8 +24,6 @@ public final class DefaultMenus {
             new Entry("catalog", null, "Sách", "/catalog", null, 20, null, null),
             new Entry("catalog-barcode", "catalog", "Tra mã vạch", "/catalog/barcode", null, 10,
                     "BookCopyController/getByBarcode", null),
-            new Entry("catalog-new", "catalog", "Thêm sách", "/catalog/books/new", null, 20,
-                    "TitleController/create", null),
             new Entry("circulation", null, "Mượn trả", "/circulation", null, 30, null, "LENDING"),
             new Entry("circulation-borrow", "circulation", "Lập phiếu mượn", "/circulation/borrow", null, 10,
                     "BorrowingController/borrow", "LENDING"),

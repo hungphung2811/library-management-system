@@ -55,7 +55,8 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
  * MenuViewer -> MenuTree.visibleFor, cách ly tenant, phá cache sau khi sửa. Không cần Docker.
  */
 @WebMvcTest({MenuController.class, MenuAdminController.class})
-@Import({SecurityConfiguration.class, PermissionAutoConfiguration.class, TenantAutoConfiguration.class,
+// TenantAutoConfiguration đứng trước để TenantScopeBinder thật (không phải NOOP) được dùng, như khi chạy thật
+@Import({SecurityConfiguration.class, TenantAutoConfiguration.class, PermissionAutoConfiguration.class,
         MenuWebVisibilityTest.Beans.class})
 @TestPropertySource(properties = {"app.security.enabled=true", "lms.security.permission.enabled=true",
         "lms.security.permission.require-tenant=true"})
@@ -164,6 +165,65 @@ class MenuWebVisibilityTest {
 
     private MenuItem seed(UUID tenant, String code, String path, int order, boolean enabled, String key) {
         return seed(tenant, UUID.randomUUID(), null, code, path, order, enabled, key);
+    }
+
+    private static RequestPostProcessor platformAdmin() {
+        return jwt().jwt(j -> j.subject("p").claim("platformAdmin", true));
+    }
+
+    private MenuItem seedWithModule(UUID tenant, String code, String path, int order, String key, String module) {
+        UUID id = UUID.randomUUID();
+        MenuItem m = new MenuItem(id, tenant, null, code, "L-" + code, path, null, order, true, key, 0, NOW, NOW,
+                module);
+        repo.items.put(id, m);
+        return m;
+    }
+
+    @Test
+    void platformAdminKhongChonTenantThayMenuRong() throws Exception {
+        seed(T1, "home", "/", 1, true, null);
+
+        mvc.perform(get("/internal/menus/me").with(platformAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void platformAdminChonTenantBangHeaderThayDuMenuKeCaMucCoKhoaVaMucModuleSales() throws Exception {
+        seed(T1, "home", "/", 1, true, null);
+        seed(T1, "secret", "/s", 2, true, "Ctl/m");
+        seedWithModule(T1, "shop", "/shop", 3, "Shop/list", "SALES");
+        seed(T1, "off", "/off", 4, false, null);
+        seed(T2, "other", "/o", 1, true, null);
+
+        mvc.perform(get("/internal/menus/me").with(platformAdmin()).header("X-Tenant-Id", T1.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[0].code").value("home"))
+                .andExpect(jsonPath("$[1].code").value("secret"))
+                .andExpect(jsonPath("$[2].code").value("shop"));
+    }
+
+    @Test
+    void platformAdminChonTenantKhacChiThayMenuCuaTenantDo() throws Exception {
+        seed(T1, "home", "/", 1, true, null);
+        seed(T2, "other", "/o", 1, true, null);
+
+        mvc.perform(get("/internal/menus/me").with(platformAdmin()).header("X-Tenant-Id", T2.toString()))
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].code").value("other"));
+    }
+
+    @Test
+    void nguoiDungThuongGuiHeaderTenantKhacBiBoQuaVaKhongLayDuocMenuTenantDo() throws Exception {
+        seed(T1, "home", "/", 1, true, null);
+        seed(T1, "secret", "/s", 2, true, "Ctl/m");
+        seed(T2, "other", "/o", 1, true, null);
+
+        mvc.perform(get("/internal/menus/me").with(user(T1, "Khac/khoa")).header("X-Tenant-Id", T2.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].code").value("home"));
     }
 
     @Test
