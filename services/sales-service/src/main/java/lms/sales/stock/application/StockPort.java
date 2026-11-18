@@ -98,6 +98,34 @@ public interface StockPort {
     /** Dòng storefront của các đầu sách cho trước; chỉ mặt hàng active (không thấy thì không có trong map). */
     Map<UUID, StorefrontRow> findStorefrontRows(UUID tenantId, Collection<UUID> titleIds);
 
+    /**
+     * Một nhóm biến thể của storefront (ADR-0026 3.6): các mặt hàng active cùng {@code COALESCE(work_id, title_id)}.
+     * {@code representative} = ấn bản đại diện (còn hàng trước, rẻ nhất, mới nhất); {@code priceFrom} = min giá hiệu lực
+     * của DB (null nếu chưa ai có giá hiệu lực); {@code inStock} = có ấn bản còn hàng; {@code listedAt} = ngày mới nhất.
+     */
+    record WorkGroup(StorefrontRow representative, int variantCount, Long priceFrom, boolean inStock,
+                     java.time.Instant listedAt) {
+    }
+
+    /**
+     * Như {@link #listStorefront} nhưng gộp theo tác phẩm: sắp/lọc theo nhóm ({@code NEWEST}: ấn bản mới nhất của nhóm;
+     * {@code PRICE_*}: priceFrom, loại nhóm không có giá hiệu lực; {@code inStockOnly}: nhóm có ít nhất một ấn bản còn
+     * hàng). Số câu SQL cố định (một câu đếm, một câu gộp trang, một câu nạp ấn bản của các nhóm trong trang).
+     */
+    default PageResult<WorkGroup> listStorefrontByWork(UUID tenantId, StorefrontSort sort, boolean inStockOnly,
+                                                       int page, int size) {
+        throw new UnsupportedOperationException("listStorefrontByWork");
+    }
+
+    /** Mặt hàng active có snapshot {@code work_id} = workId (biến thể ở trang chi tiết); một câu SQL. */
+    default List<StorefrontRow> findStorefrontRowsByWork(UUID tenantId, UUID workId) {
+        return List.of();
+    }
+
+    /** Ghi snapshot {@code work_id} theo đầu sách, chỉ cho mặt hàng có sẵn (cùng khuôn {@link #refreshCoverPrices}). */
+    default void refreshWorkIds(UUID tenantId, Map<UUID, UUID> workIdsByTitle) {
+    }
+
     /** Tối đa {@code limit} đầu sách active chưa có giá hiệu lực ở DB (không selling_price, chưa có bản sao giá bìa). */
     List<UUID> titleIdsMissingCoverPrice(UUID tenantId, int limit);
 

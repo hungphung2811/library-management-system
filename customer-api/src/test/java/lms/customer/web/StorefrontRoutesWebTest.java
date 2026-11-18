@@ -128,7 +128,7 @@ class StorefrontRoutesWebTest {
 
     @Test
     void routeCongKhaiKhongCanTokenVaBoQuaAuthorization() throws Exception {
-        when(catalog.list(anyString(), any(), any(), anyBoolean(), anyInt(), anyInt())).thenReturn(new BookPageView(List.of(), 0, 20, 0));
+        when(catalog.list(anyString(), any(), any(), anyBoolean(), any(), anyInt(), anyInt())).thenReturn(new BookPageView(List.of(), 0, 20, 0));
         when(catalog.get(anyString(), any())).thenReturn(new BookDetailView(bookId, "A", "B", 1, true, false, null));
         when(catalog.preview(anyString(), any())).thenReturn(new BookPreviewView(bookId, "A", "văn bản"));
         String withBadToken = "Bearer rac.khong.hop.le";
@@ -264,6 +264,20 @@ class StorefrontRoutesWebTest {
     }
 
     @Test
+    void demDonCuaToiCanDangNhapVaKhongBiNhamVoiMaDon() throws Exception {
+        mvc.perform(get("/public/t/shop-a/orders/count")).andExpect(status().isUnauthorized());
+        verifyNoInteractions(shop);
+        when(shop.myOrderCounts("user-token")).thenReturn(new lms.customer.shop.dto.ShopDtos.OrderCountView(7, 2));
+        mvc.perform(get("/public/t/shop-a/orders/count").with(customer(tenantA)))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.total").value(7)).andExpect(jsonPath("$.pending").value(2))
+                .andExpect(jsonPath("$.length()").value(2));
+        // token của cửa hàng khác bị chặn như các route đơn hàng khác
+        mvc.perform(get("/public/t/shop-a/orders/count").with(customer(tenantB)))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("SHOP_SESSION_MISMATCH"));
+    }
+
+    @Test
     void danhSachDonCuaToiChanSizeToiDa50() throws Exception {
         when(shop.myOrders(eq("user-token"), anyInt(), anyInt())).thenReturn(new OrderPageView(List.of(), 0, 50, 0));
         mvc.perform(get("/public/t/shop-a/orders?size=1000&page=2").with(customer(tenantA)))
@@ -365,7 +379,7 @@ class StorefrontRoutesWebTest {
 
     @Test
     void danhMucDungTokenDichVuKeCaKhiCoAuthorizationCuaKhach() throws Exception {
-        when(catalog.list(eq("svc-token-a"), any(), any(), anyBoolean(), anyInt(), anyInt())).thenReturn(new BookPageView(
+        when(catalog.list(eq("svc-token-a"), any(), any(), anyBoolean(), any(), anyInt(), anyInt())).thenReturn(new BookPageView(
                 List.of(new BookSummaryView(bookId, "Sách A", "Tác giả", 120_000, true, false)), 0, 50, 1));
         MvcResult r = mvc.perform(get("/public/t/shop-a/books?size=500").param("keyword", " java ")
                         .with(customer(tenantA)).header("Origin", "http://x.test"))
@@ -375,13 +389,13 @@ class StorefrontRoutesWebTest {
                 .andExpect(jsonPath("$.items[0].price").value(120000))
                 .andExpect(jsonPath("$.items[0].inStock").value(true))
                 .andReturn();
-        verify(catalog).list("svc-token-a", "java", null, false, 0, 50);
+        verify(catalog).list("svc-token-a", "java", null, false, null, 0, 50);
         JsonNode item = JSON.readTree(r.getResponse().getContentAsString()).get("items").get(0);
         Set<String> names = new TreeSet<>();
         item.fieldNames().forEachRemaining(names::add);
         assertThat(names).containsExactlyInAnyOrder("bookRef", "title", "author", "price", "inStock", "hasPreview",
                 "subtitle", "publicationYear", "edition", "language", "pageCount", "format", "translator", "series",
-                "seriesNumber", "coverImageUrl", "tags");
+                "seriesNumber", "coverImageUrl", "tags", "workId", "workTitle", "variantCount", "priceFrom");
         assertThat(r.getResponse().getContentAsString()).doesNotContain("onHand", "reserved", "available", "isbn",
                 "tenantId", "costPrice");
     }
@@ -394,7 +408,7 @@ class StorefrontRoutesWebTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.description").value("Mô tả"))
                 .andExpect(jsonPath("$.previewText").doesNotExist())
-                .andExpect(jsonPath("$.length()").value(18))
+                .andExpect(jsonPath("$.length()").value(21))
                 .andExpect(jsonPath("$.tags").isEmpty());
         mvc.perform(get("/public/t/shop-a/books/" + bookId + "/preview"))
                 .andExpect(status().isOk())

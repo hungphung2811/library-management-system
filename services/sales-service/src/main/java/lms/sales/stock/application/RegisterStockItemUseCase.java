@@ -32,6 +32,7 @@ public class RegisterStockItemUseCase {
         this.clock = clock;
     }
 
+    @Transactional
     public StockItemView execute(UUID tenantId, UUID userId, UUID titleId, Long sellingPrice,
                                  Integer lowStockThreshold) {
         return execute(tenantId, userId, titleId, sellingPrice, lowStockThreshold, null);
@@ -61,6 +62,10 @@ public class RegisterStockItemUseCase {
             } catch (SalesException e) {
                 // giá vượt giới hạn: không có snapshot
             }
+        }
+        var workId = titles.get(titleId).workId();
+        if (workId != null) {
+            stock.refreshWorkIds(tenantId, Map.of(titleId, workId));
         }
         Map<String, Object> data = new HashMap<>();
         data.put("titleId", titleId.toString());

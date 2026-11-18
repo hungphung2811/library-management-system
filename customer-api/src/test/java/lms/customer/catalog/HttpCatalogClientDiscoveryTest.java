@@ -31,7 +31,7 @@ class HttpCatalogClientDiscoveryTest {
         server.expect(requestTo(org.hamcrest.Matchers.startsWith("http://sales/internal/sales/storefront/items")))
                 .andExpect(queryParam("sort", "price_asc")).andExpect(queryParam("inStock", "true"))
                 .andRespond(withSuccess("{\"items\":[],\"total\":0,\"page\":0,\"size\":10}", MediaType.APPLICATION_JSON));
-        client.list("t", null, "price_asc", true, 0, 10);
+        client.list("t", null, "price_asc", true, null, 0, 10);
         server.verify();
     }
 
@@ -39,7 +39,7 @@ class HttpCatalogClientDiscoveryTest {
     void listKhongGuiSortVaInStockKhiVang() {
         server.expect(requestTo("http://sales/internal/sales/storefront/items?page=0&size=10"))
                 .andRespond(withSuccess("{\"items\":[],\"total\":0,\"page\":0,\"size\":10}", MediaType.APPLICATION_JSON));
-        client.list("t", null, null, false, 0, 10);
+        client.list("t", null, null, false, null, 0, 10);
         server.verify();
     }
 
@@ -62,7 +62,7 @@ class HttpCatalogClientDiscoveryTest {
         assertThat(Arrays.stream(BookSummaryView.class.getRecordComponents()).map(c -> c.getName()))
                 .containsExactly("bookRef", "title", "author", "price", "inStock", "hasPreview", "subtitle", "publicationYear",
                         "edition", "language", "pageCount", "format", "translator", "series", "seriesNumber",
-                        "coverImageUrl", "tags");
+                        "coverImageUrl", "tags", "workId", "workTitle", "variantCount", "priceFrom");
         assertThat(Arrays.stream(SuggestionView.class.getRecordComponents()).map(c -> c.getName()))
                 .containsExactly("bookRef", "title", "author");
     }
@@ -82,7 +82,7 @@ class HttpCatalogClientDiscoveryTest {
                 .andRespond(withSuccess("{\"titleId\":\"" + id + "\",\"name\":\"S\",\"author\":\"A\",\"price\":9,"
                         + "\"inStock\":true,\"hasPreview\":false,\"description\":\"D\",\"tenantId\":\"x\"," + extras + "}",
                         MediaType.APPLICATION_JSON));
-        var item = client.list("t", null, null, false, 0, 10).items().get(0);
+        var item = client.list("t", null, null, false, null, 0, 10).items().get(0);
         var detail = client.get("t", id);
         assertThat(item.language()).isEqualTo("vi");
         assertThat(item.tags()).containsExactly("tiểu thuyết", "kinh điển");

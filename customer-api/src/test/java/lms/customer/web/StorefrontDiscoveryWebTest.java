@@ -61,12 +61,12 @@ class StorefrontDiscoveryWebTest {
 
     @Test
     void sortVaInStockHopLeDuocGuiNguyenSangSales() throws Exception {
-        when(catalog.list(anyString(), any(), any(), anyBoolean(), anyInt(), anyInt()))
+        when(catalog.list(anyString(), any(), any(), anyBoolean(), any(), anyInt(), anyInt()))
                 .thenReturn(new BookPageView(List.of(), 0, 10, 0));
         for (String sort : List.of("newest", "price_asc", "price_desc")) {
             mvc.perform(get("/public/t/shop-a/books").param("sort", sort).param("inStock", "true").param("size", "10"))
                     .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "max-age=30, public"));
-            verify(catalog).list("svc-token-a", null, sort, true, 0, 10);
+            verify(catalog).list("svc-token-a", null, sort, true, null, 0, 10);
         }
     }
 
@@ -82,11 +82,31 @@ class StorefrontDiscoveryWebTest {
     }
 
     @Test
+    void groupHopLeDuocGuiNguyenSangSalesVaVangThiKhongGui() throws Exception {
+        when(catalog.list(anyString(), any(), any(), anyBoolean(), any(), anyInt(), anyInt()))
+                .thenReturn(new BookPageView(List.of(), 0, 10, 0));
+        mvc.perform(get("/public/t/shop-a/books?group=WORK&size=10")).andExpect(status().isOk());
+        verify(catalog).list("svc-token-a", null, null, false, "WORK", 0, 10);
+        mvc.perform(get("/public/t/shop-a/books?group=EDITION&size=10")).andExpect(status().isOk());
+        verify(catalog).list("svc-token-a", null, null, false, "EDITION", 0, 10);
+    }
+
+    @Test
+    void groupSaiLa400KhongGoiSalesKhongPhanGiaiCuaHang() throws Exception {
+        for (String query : List.of("group=work", "group=Work", "group=", "group=WORK,EDITION", "group=SERIES",
+                "group=WORK%20")) {
+            mvc.perform(get("/public/t/shop-a/books?" + query)).andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        }
+        verifyNoInteractions(catalog, storefronts);
+    }
+
+    @Test
     void sizeToiDa50() throws Exception {
-        when(catalog.list(anyString(), any(), any(), anyBoolean(), anyInt(), anyInt()))
+        when(catalog.list(anyString(), any(), any(), anyBoolean(), any(), anyInt(), anyInt()))
                 .thenReturn(new BookPageView(List.of(), 0, 50, 0));
         mvc.perform(get("/public/t/shop-a/books?size=999&sort=newest")).andExpect(status().isOk());
-        verify(catalog).list("svc-token-a", null, "newest", false, 0, 50);
+        verify(catalog).list("svc-token-a", null, "newest", false, null, 0, 50);
     }
 
     @Test

@@ -5,7 +5,9 @@ import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.PersistenceException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -307,7 +309,91 @@ class StockPersistenceAdapter implements StockPort {
 
     private static StorefrontRow toRow(StockItemJpaEntity e) {
         return new StorefrontRow(e.getTitleId(), e.getSellingPrice() == null ? null : Money.of(e.getSellingPrice()),
-                e.getCoverPriceSnapshot(), e.getOnHand() - e.getReserved() > 0, e.getCreatedAt());
+                e.getCoverPriceSnapshot(), e.getOnHand() - e.getReserved() > 0, e.getCreatedAt(), e.getWorkId());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResult<WorkGroup> listStorefrontByWork(UUID tenantId, StorefrontSort sort, boolean inStockOnly,
+                                                      int page, int size) {
+        // Mảnh JPQL là hằng chữ; order by chọn bằng switch trên enum. Khóa nhóm = COALESCE(work_id, title_id).
+        String base = "from StockItemJpaEntity s where s.tenantId = :t and s.active = true"
+                + (sort.byPrice() ? " and s.effectivePrice is not null" : "");
+        String key = "coalesce(s.workId, s.titleId)";
+        String having = inStockOnly ? " having max(case when s.onHand - s.reserved > 0 then 1 else 0 end) = 1" : "";
+        String order = switch (sort) {
+            case NEWEST -> " order by max(s.createdAt) desc, " + key;
+            case PRICE_ASC -> " order by min(s.effectivePrice) asc, " + key + " asc";
+            case PRICE_DESC -> " order by min(s.effectivePrice) desc, " + key + " desc";
+        };
+        // Nhóm có ít nhất một ấn bản còn hàng <=> có dòng còn hàng, nên đếm bằng điều kiện trên dòng thay cho HAVING.
+        long total = em.createQuery("select count(distinct " + key + ") " + base
+                        + (inStockOnly ? " and (s.onHand - s.reserved) > 0" : ""), Long.class)
+                .setParameter("t", tenantId).getSingleResult();
+        List<Object[]> groups = em.createQuery("select " + key + ", count(s), min(s.effectivePrice), "
+                        + "max(s.createdAt), max(case when s.onHand - s.reserved > 0 then 1 else 0 end) "
+                        + base + " group by " + key + having + order, Object[].class)
+                .setParameter("t", tenantId).setFirstResult(page * size).setMaxResults(size).getResultList();
+        if (groups.isEmpty()) {
+            return new PageResult<>(List.of(), total, page, size);
+        }
+        List<UUID> keys = groups.stream().map(g -> (UUID) g[0]).toList();
+        Comparator<StockItemJpaEntity> pick = Comparator
+                .comparing((StockItemJpaEntity e) -> e.getOnHand() - e.getReserved() > 0 ? 0 : 1)
+                .thenComparing(StockItemJpaEntity::getEffectivePrice, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(StockItemJpaEntity::getCreatedAt, Comparator.reverseOrder())
+                .thenComparing(StockItemJpaEntity::getId);
+        Map<UUID, StockItemJpaEntity> best = new HashMap<>();
+        for (StockItemJpaEntity e : em.createQuery("select s from StockItemJpaEntity s where s.tenantId = :t "
+                        + "and s.active = true and (s.workId in :keys or (s.workId is null and s.titleId in :keys))",
+                StockItemJpaEntity.class).setParameter("t", tenantId).setParameter("keys", keys).getResultList()) {
+            UUID k = e.getWorkId() != null ? e.getWorkId() : e.getTitleId();
+            best.merge(k, e, (a, b) -> pick.compare(a, b) <= 0 ? a : b);
+        }
+        List<WorkGroup> out = new ArrayList<>();
+        for (Object[] g : groups) {
+            StockItemJpaEntity rep = best.get((UUID) g[0]);
+            if (rep == null) {
+                continue; // nhóm vừa đổi giữa hai câu truy vấn: bỏ khỏi trang, lần sau tự đúng
+            }
+            out.add(new WorkGroup(toRow(rep), ((Number) g[1]).intValue(),
+                    g[2] == null ? null : ((Number) g[2]).longValue(), ((Number) g[4]).intValue() == 1,
+                    (Instant) g[3]));
+        }
+        return new PageResult<>(out, total, page, size);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StorefrontRow> findStorefrontRowsByWork(UUID tenantId, UUID workId) {
+        return em.createQuery("select s from StockItemJpaEntity s where s.tenantId = :t and s.active = true "
+                        + "and s.workId = :w order by s.createdAt, s.id", StockItemJpaEntity.class)
+                .setParameter("t", tenantId).setParameter("w", workId).getResultList().stream()
+                .map(StockPersistenceAdapter::toRow).toList();
+    }
+
+    @Override
+    @Transactional
+    public void refreshWorkIds(UUID tenantId, Map<UUID, UUID> workIdsByTitle) {
+        if (workIdsByTitle == null || workIdsByTitle.isEmpty()) {
+            return;
+        }
+        List<Map.Entry<UUID, UUID>> valid = workIdsByTitle.entrySet().stream()
+                .filter(e -> e.getKey() != null && e.getValue() != null).toList();
+        for (int from = 0; from < valid.size(); from += COVER_PRICE_CHUNK) {
+            List<Map.Entry<UUID, UUID>> chunk = valid.subList(from, Math.min(from + COVER_PRICE_CHUNK, valid.size()));
+            StringBuilder jpql = new StringBuilder("update StockItemJpaEntity s set s.workId = case");
+            for (int i = 0; i < chunk.size(); i++) {
+                jpql.append(" when s.titleId = :id").append(i).append(" then :v").append(i);
+            }
+            jpql.append(" else s.workId end where s.tenantId = :t and s.titleId in :ids");
+            var q = em.createQuery(jpql.toString()).setParameter("t", tenantId)
+                    .setParameter("ids", chunk.stream().map(Map.Entry::getKey).toList());
+            for (int i = 0; i < chunk.size(); i++) {
+                q.setParameter("id" + i, chunk.get(i).getKey()).setParameter("v" + i, chunk.get(i).getValue());
+            }
+            q.executeUpdate();
+        }
     }
 
     @Override

@@ -35,11 +35,12 @@ public class HttpCatalogLookupAdapter implements CatalogLookupPort {
     record TitleDto(UUID id, String name, String author, String isbn, BigDecimal coverPrice, String description,
                     boolean hasPreview, String subtitle, Integer publicationYear, String edition, String language,
                     Integer pageCount, String format, String translator, String series, Integer seriesNumber,
-                    String coverImageUrl, List<String> tags) {
+                    String coverImageUrl, List<String> tags, UUID workId, String workTitle, Integer partNumber,
+                    String partLabel) {
         CatalogTitle toTitle() {
             return new CatalogTitle(id, name, author, isbn, coverPrice, description, hasPreview, subtitle,
                     publicationYear, edition, language, pageCount, format, translator, series, seriesNumber,
-                    coverImageUrl, tags);
+                    coverImageUrl, tags, workId, workTitle, partNumber, partLabel);
         }
     }
 

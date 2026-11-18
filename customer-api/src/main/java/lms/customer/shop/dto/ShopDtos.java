@@ -89,6 +89,10 @@ public final class ShopDtos {
     public record OrderPageView(List<OrderView> items, int page, int size, long total) {
     }
 
+    /** Số đơn của khách (huy hiệu header): {@code total} mọi trạng thái, {@code pending} đang chờ xác nhận. */
+    public record OrderCountView(long total, long pending) {
+    }
+
     /** Chủ đề liên hệ (khớp ContactTopic của sales). */
     public enum ContactTopic {
         ORDER, PRODUCT, PAYMENT, OTHER

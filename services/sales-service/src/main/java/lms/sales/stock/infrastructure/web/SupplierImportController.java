@@ -6,6 +6,7 @@ import lms.imports.web.ImportActorResolver;
 import lms.sales.stock.application.imports.SupplierImportHandler;
 import lms.security.permission.RequiresModule;
 import lms.security.permission.TenantModule;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
  * {@code SupplierImportController/confirm}. KHÔNG đổi tên lớp hay method (đổi khóa, role mất quyền).
  */
 @RestController
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @RequestMapping("/internal/imports/suppliers")
 @RequiresModule(TenantModule.SALES)
 public class SupplierImportController extends AbstractImportController {

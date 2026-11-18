@@ -121,7 +121,7 @@ class PublicCorsWebTest {
     @Test
     void loi503KhiSalesChetVanMangCors() throws Exception {
         when(catalog.list(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyBoolean(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt()))
                 .thenThrow(PublicApiException.serviceUnavailable());
         mvc.perform(get("/public/t/shop-a/books").header("Origin", SHOP_A_ORIGIN))

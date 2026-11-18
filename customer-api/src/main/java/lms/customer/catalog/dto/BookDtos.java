@@ -15,15 +15,25 @@ public final class BookDtos {
     private BookDtos() {
     }
 
+    /**
+     * Một biến thể (ấn bản) của cùng tác phẩm ở trang chi tiết (ADR-0026). {@code bookRef} chính là {@code titleId}:
+     * khách chọn biến thể rồi đặt hàng bằng {@code bookRef} này (hợp đồng đặt hàng không đổi).
+     */
+    public record BookVariantView(UUID bookRef, String format, String language, String translator, String edition,
+                                  Integer publicationYear, Integer partNumber, String partLabel,
+                                  String coverImageUrl, long price, boolean inStock) {
+    }
+
     /** Một mục của danh sách. {@code price} là số nguyên VND đã tính ở sales; {@code inStock} = còn hàng. */
     public record BookSummaryView(UUID bookRef, String title, String author, long price, boolean inStock,
                                   boolean hasPreview, String subtitle, Integer publicationYear, String edition,
                                   String language, Integer pageCount, String format, String translator,
-                                  String series, Integer seriesNumber, String coverImageUrl, List<String> tags) {
+                                  String series, Integer seriesNumber, String coverImageUrl, List<String> tags,
+                                  UUID workId, String workTitle, Integer variantCount, Long priceFrom) {
         public BookSummaryView(UUID bookRef, String title, String author, long price, boolean inStock,
                                boolean hasPreview) {
             this(bookRef, title, author, price, inStock, hasPreview, null, null, null, null, null, null, null, null,
-                    null, null, List.of());
+                    null, null, List.of(), null, null, null, null);
         }
     }
 
@@ -32,11 +42,11 @@ public final class BookDtos {
                                  boolean hasPreview, String description, String subtitle, Integer publicationYear,
                                  String edition, String language, Integer pageCount, String format,
                                  String translator, String series, Integer seriesNumber, String coverImageUrl,
-                                 List<String> tags) {
+                                 List<String> tags, UUID workId, String workTitle, List<BookVariantView> variants) {
         public BookDetailView(UUID bookRef, String title, String author, long price, boolean inStock,
                               boolean hasPreview, String description) {
             this(bookRef, title, author, price, inStock, hasPreview, description, null, null, null, null, null, null,
-                    null, null, null, null, List.of());
+                    null, null, null, null, List.of(), null, null, List.of());
         }
     }
 

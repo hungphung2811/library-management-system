@@ -40,6 +40,8 @@ public class StockItemImportHandler implements ImportHandler {
     public static final String SHEET = "MatHang";
     static final String EXTRA_TITLE_ID = "titleId";
     static final String EXTRA_COVER_PRICE = "coverPrice";
+    /** Snapshot id tác phẩm của catalog (ADR-0026), ghi vào stock_items.work_id lúc confirm. */
+    static final String EXTRA_WORK_ID = "workId";
 
     public static final String TITLE_NOT_FOUND = "TITLE_NOT_FOUND";
     public static final String STOCK_ITEM_EXISTS = "STOCK_ITEM_EXISTS";
@@ -160,6 +162,9 @@ public class StockItemImportHandler implements ImportHandler {
             ImportRow r = out[i].withExtra(EXTRA_TITLE_ID, t.id().toString());
             if (t.coverPrice() != null) {
                 r = r.withExtra(EXTRA_COVER_PRICE, t.coverPrice().toPlainString());
+            }
+            if (t.workId() != null) {
+                r = r.withExtra(EXTRA_WORK_ID, t.workId().toString());
             }
             if (stocked.contains(t.id())) {
                 r = r.duplicate(RowIssue.error("isbn", STOCK_ITEM_EXISTS, "Đầu sách đã là mặt hàng"));

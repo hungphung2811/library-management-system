@@ -2,6 +2,7 @@ package lms.customer.shop.client;
 
 import java.util.UUID;
 import lms.customer.shop.dto.ShopDtos.ContactRequestBody;
+import lms.customer.shop.dto.ShopDtos.OrderCountView;
 import lms.customer.shop.dto.ShopDtos.OrderPageView;
 import lms.customer.shop.dto.ShopDtos.OrderView;
 import lms.customer.shop.dto.ShopDtos.PlaceOrderRequest;
@@ -17,6 +18,9 @@ public interface ShopClient {
 
     /** @param page tính từ 0; @param size đã chặn trong 1..50 bởi người gọi. */
     OrderPageView myOrders(String userToken, int page, int size);
+
+    /** Số đơn của chính khách ({@code GET /internal/sales/shop/orders/count}). */
+    OrderCountView myOrderCounts(String userToken);
 
     OrderView myOrder(String userToken, UUID orderId);
 

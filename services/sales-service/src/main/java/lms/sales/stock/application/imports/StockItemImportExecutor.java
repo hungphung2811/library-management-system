@@ -77,6 +77,7 @@ public class StockItemImportExecutor {
 
         List<StockItem> toInsert = new ArrayList<>();
         Map<UUID, Long> covers = new HashMap<>();
+        Map<UUID, UUID> works = new HashMap<>();
         Map<UUID, Integer> openings = new TreeMap<>(); // titleId tăng dần
         Set<UUID> seenTitles = new HashSet<>();
         Set<String> seenSkus = new HashSet<>();
@@ -99,6 +100,10 @@ public class StockItemImportExecutor {
             if (cover != null) {
                 covers.put(i.titleId(), cover);
             }
+            UUID workId = workId(i.row());
+            if (workId != null) {
+                works.put(i.titleId(), workId);
+            }
             if (i.value().openingQuantity() > 0) {
                 openings.put(i.titleId(), i.value().openingQuantity());
             }
@@ -107,6 +112,7 @@ public class StockItemImportExecutor {
 
         stock.insertAll(toInsert);
         stock.refreshCoverPrices(tenant, covers);
+        stock.refreshWorkIds(tenant, works);
         String reason = "Tồn đầu kỳ nhập từ Excel " + ctx.importId();
         for (Map.Entry<UUID, Integer> e : openings.entrySet()) {
             stockService.adjust(tenant, actor, e.getKey(), e.getValue(), reason);
@@ -127,6 +133,18 @@ public class StockItemImportExecutor {
                 "importId", String.valueOf(result.importId()), "created", result.created(),
                 "skippedDuplicate", result.skippedDuplicate(), "failed", result.failed(),
                 "completed", result.completed())));
+    }
+
+    private static UUID workId(ImportRow row) {
+        String v = row.extra().get(StockItemImportHandler.EXTRA_WORK_ID);
+        if (v == null) {
+            return null;
+        }
+        try {
+            return UUID.fromString(v);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     private static Long coverPrice(ImportRow row) {

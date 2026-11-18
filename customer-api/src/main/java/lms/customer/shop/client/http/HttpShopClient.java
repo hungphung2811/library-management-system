@@ -7,6 +7,7 @@ import java.util.UUID;
 import lms.customer.shop.client.ShopClient;
 import lms.customer.shop.dto.ShopDtos.ContactRequestBody;
 import lms.customer.shop.dto.ShopDtos.OrderLineView;
+import lms.customer.shop.dto.ShopDtos.OrderCountView;
 import lms.customer.shop.dto.ShopDtos.OrderPageView;
 import lms.customer.shop.dto.ShopDtos.OrderView;
 import lms.customer.shop.dto.ShopDtos.PlaceOrderRequest;
@@ -50,6 +51,17 @@ public class HttpShopClient implements ShopClient {
         }
         List<UpstreamOrder> items = body.items() == null ? List.of() : body.items();
         return new OrderPageView(items.stream().map(HttpShopClient::view).toList(), body.page(), body.size(), body.total());
+    }
+
+    @Override
+    public OrderCountView myOrderCounts(String userToken) {
+        UpstreamCounts body = client.get().uri("/internal/sales/shop/orders/count")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken).retrieve().body(UpstreamCounts.class);
+        if (body == null) {
+            throw PublicApiException.serviceUnavailable();
+        }
+        // chỉ lấy hai số, chặn giá trị âm bất thường
+        return new OrderCountView(Math.max(0, body.total()), Math.max(0, body.pending()));
     }
 
     @Override
@@ -133,6 +145,9 @@ public class HttpShopClient implements ShopClient {
     }
 
     // ---------- Phản hồi của sales (chỉ đọc các trường này) ----------
+
+    record UpstreamCounts(long total, long pending) {
+    }
 
     record UpstreamRecipient(String name, String phone, String address) {
     }

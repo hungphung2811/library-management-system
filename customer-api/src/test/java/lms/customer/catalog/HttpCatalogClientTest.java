@@ -45,7 +45,7 @@ class HttpCatalogClientTest {
                         + "\"price\":1000,\"inStock\":true,\"hasPreview\":false,\"onHand\":42,\"reserved\":3,"
                         + "\"available\":39,\"costPrice\":1,\"tenantId\":\"t\",\"isbn\":\"123\"}],"
                         + "\"total\":1,\"page\":1,\"size\":50,\"onHandTotal\":99}", MediaType.APPLICATION_JSON));
-        BookPageView page = client.list("svc-token", "c++ & java", null, false, 1, 50);
+        BookPageView page = client.list("svc-token", "c++ & java", null, false, null, 1, 50);
         assertEquals(1, page.items().size());
         assertEquals(id, page.items().get(0).bookRef());
         String out = json.writeValueAsString(page);
@@ -69,6 +69,42 @@ class HttpCatalogClientTest {
         assertEquals("Đoạn", preview.previewText());
         assertThat(json.writeValueAsString(detail)).doesNotContain("previewText", "KHONG", "isbn");
         assertThat(json.writeValueAsString(preview)).doesNotContain("isbn");
+    }
+
+    @Test
+    void groupWorkDuocGuiVaTruongTacPhamVaBienTheDuocChuyenTiepConTruongThuaBiLoc() throws Exception {
+        UUID work = UUID.randomUUID();
+        UUID other = UUID.randomUUID();
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith("http://sales/internal/sales/storefront/items?")))
+                .andExpect(queryParam("group", "WORK"))
+                .andRespond(withSuccess("{\"items\":[{\"titleId\":\"" + id + "\",\"name\":\"S\",\"author\":\"A\","
+                        + "\"price\":2000,\"inStock\":true,\"hasPreview\":false,\"workId\":\"" + work + "\","
+                        + "\"workTitle\":\"TP\",\"variantCount\":3,\"priceFrom\":1500,\"onHand\":9}],"
+                        + "\"total\":1,\"page\":0,\"size\":20}", MediaType.APPLICATION_JSON));
+        var item = client.list("svc-token", null, null, false, "WORK", 0, 20).items().get(0);
+        assertEquals(work, item.workId());
+        assertEquals(3, item.variantCount());
+        assertEquals(1500L, item.priceFrom());
+        assertThat(json.writeValueAsString(item)).doesNotContain("onHand");
+    }
+
+    @Test
+    void chiTietChuyenTiepVariantsVaLocTruongThua() throws Exception {
+        UUID work = UUID.randomUUID();
+        UUID other = UUID.randomUUID();
+
+        server.expect(requestTo("http://sales/internal/sales/storefront/items/" + id))
+                .andRespond(withSuccess("{\"titleId\":\"" + id + "\",\"name\":\"S\",\"author\":\"A\",\"price\":5,"
+                        + "\"inStock\":true,\"hasPreview\":false,\"workId\":\"" + work + "\",\"workTitle\":\"TP\","
+                        + "\"variants\":[{\"titleId\":\"" + other + "\",\"format\":\"HARDCOVER\",\"language\":\"en\","
+                        + "\"partNumber\":1,\"partLabel\":\"Tập 1\",\"price\":9,\"inStock\":false,\"isbn\":\"x\"}]}",
+                        MediaType.APPLICATION_JSON));
+        BookDetailView detail = client.get("svc-token", id);
+        assertEquals(work, detail.workId());
+        assertEquals(1, detail.variants().size());
+        assertEquals(other, detail.variants().get(0).bookRef());
+        assertEquals("Tập 1", detail.variants().get(0).partLabel());
+        assertThat(json.writeValueAsString(detail)).doesNotContain("isbn");
     }
 
     @Test

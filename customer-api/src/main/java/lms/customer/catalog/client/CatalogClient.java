@@ -17,9 +17,11 @@ public interface CatalogClient {
     /**
      * @param sort null hoặc đúng một trong newest|price_asc|price_desc (đã kiểm bởi người gọi, gửi nguyên sang sales)
      * @param inStock true = chỉ sách còn hàng (false = không lọc, không gửi tham số)
+     * @param group null (= EDITION, không gửi tham số) hoặc đúng EDITION|WORK (đã kiểm bởi người gọi, gửi nguyên sang sales)
      * @param page tính từ 0; @param size đã chặn trong 1..50 bởi người gọi.
      */
-    BookPageView list(String serviceToken, String keyword, String sort, boolean inStock, int page, int size);
+    BookPageView list(String serviceToken, String keyword, String sort, boolean inStock, String group, int page,
+                      int size);
 
     /** Gợi ý tìm kiếm (ADR-0019): {@code q} đã trim và kiểm 2..50 ký tự, {@code limit} đã chặn 1..8 bởi người gọi. */
     List<SuggestionView> suggestions(String serviceToken, String q, int limit);

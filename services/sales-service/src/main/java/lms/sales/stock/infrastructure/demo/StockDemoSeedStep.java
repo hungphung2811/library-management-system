@@ -3,7 +3,9 @@ package lms.sales.stock.infrastructure.demo;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lms.demo.plan.DemoIds;
 import lms.demo.plan.DemoPlan;
@@ -40,6 +42,10 @@ import org.springframework.transaction.support.TransactionOperations;
  * mặt hàng). Sổ cái dựng từ kế hoạch: RECEIPT theo dòng phiếu nhập, SALE theo từng dòng của đơn không bị hủy, RETURN
  * theo phiếu trả, RESERVE cho phần đang giữ; tổng delta bằng đúng onHand/reserved của kế hoạch (kiểm lại trước khi
  * ghi, lệch thì dừng). Chỉ dùng port và domain của context stock, không đụng ordering.
+ * <p>
+ * Mô hình tác phẩm (ADR-0026): sau khi có mặt hàng, ghi snapshot {@code stock_items.work_id} theo kế hoạch ({@code StockItemPlan.workId},
+ * 64 ấn bản gốc là tác phẩm 1:1 {@code md5('lms-work:'||title_id)} khớp backfill V14; ấn bản bổ sung cùng tác phẩm với ấn bản gốc
+ * để storefront gộp biến thể). Giá trị này là snapshot dẫn xuất, storefront tự sửa nếu catalog trả workId khác.
  * <p>
  * Lưu ý: kế hoạch coi mọi đơn chưa hủy là đã trừ kho (kể cả đơn online đang chờ xác nhận), nên các đơn đó được ghi
  * SALE thay vì RESERVE.
@@ -117,6 +123,13 @@ public class StockDemoSeedStep implements DemoSeedStep {
             tx.executeWithoutResult(status -> createItem(tenantId, plan, item, actor, context));
             created++;
         }
+        Map<UUID, UUID> workIds = new LinkedHashMap<>();
+        for (StockItemPlan item : plan.stockItems()) {
+            if (item.workId() != null) {
+                workIds.put(item.titleId(), item.workId());
+            }
+        }
+        tx.executeWithoutResult(status -> stock.refreshWorkIds(tenantId, workIds));
         return SeedResult.of(created, skipped);
     }
 

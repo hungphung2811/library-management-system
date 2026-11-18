@@ -97,6 +97,18 @@ class HttpShopClientTest {
     }
 
     @Test
+    void demDonChuyenTokenNguoiDungVaChiLayHaiSo() {
+        server.expect(requestTo("http://sales/internal/sales/shop/orders/count")).andExpect(method(HttpMethod.GET))
+                .andExpect(header("Authorization", "Bearer user-token"))
+                .andRespond(withSuccess("{\"total\":7,\"pending\":2,\"customerUserId\":\"u\",\"tenantId\":\"t\"}",
+                        MediaType.APPLICATION_JSON));
+        var counts = client.myOrderCounts("user-token");
+        assertEquals(7, counts.total());
+        assertEquals(2, counts.pending());
+        server.verify();
+    }
+
+    @Test
     void huyGuiLyDoChiKhiCoVaChuyenTokenNguoiDung() {
         server.expect(requestTo("http://sales/internal/sales/shop/orders/" + orderId + "/cancellation"))
                 .andExpect(header("Authorization", "Bearer user-token"))

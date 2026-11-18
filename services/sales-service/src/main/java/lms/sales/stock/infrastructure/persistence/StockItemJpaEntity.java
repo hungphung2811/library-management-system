@@ -49,6 +49,10 @@ class StockItemJpaEntity {
     @Column(name = "cover_price_snapshot")
     private Long coverPriceSnapshot;
 
+    /** Snapshot id tác phẩm của catalog để gộp biến thể (ADR-0026, V14); ghi bằng JPQL bulk ở adapter. NULL = chưa biết. */
+    @Column(name = "work_id")
+    private UUID workId;
+
     /** Cột sinh COALESCE(selling_price, cover_price_snapshot): chỉ đọc, DB tự tính. */
     @Column(name = "effective_price", insertable = false, updatable = false)
     private Long effectivePrice;
@@ -128,6 +132,7 @@ class StockItemJpaEntity {
     Instant getCreatedAt() { return createdAt; }
     Long getCoverPriceSnapshot() { return coverPriceSnapshot; }
     Long getEffectivePrice() { return effectivePrice; }
+    UUID getWorkId() { return workId; }
     String getSku() { return sku; }
     String getSupplier() { return supplier; }
     Long getCostPrice() { return costPrice; }

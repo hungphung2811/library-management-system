@@ -25,8 +25,9 @@ import org.springframework.web.bind.annotation.RestController;
 @StorefrontAccessible
 public class StorefrontController {
 
-    /** {@code sort}: newest | price_asc | price_desc (ngoài allowlist: 400 INVALID_REQUEST); {@code inStock=true} lọc còn hàng. */
-    public record StorefrontQuery(String keyword, String sort, Boolean inStock, Integer page, Integer size) {
+    /** {@code sort}: newest | price_asc | price_desc (ngoài allowlist: 400 INVALID_REQUEST); {@code inStock=true} lọc còn hàng; {@code group}: EDITION (mặc định) | WORK (gộp ấn bản cùng tác phẩm, ADR-0026). */
+    public record StorefrontQuery(String keyword, String sort, Boolean inStock, String group, Integer page,
+                                  Integer size) {
     }
 
     /** Gợi ý tìm kiếm: {@code q} 2..50 ký tự (use case kiểm lại), {@code limit} 1..8 (mặc định 5). */
@@ -43,7 +44,7 @@ public class StorefrontController {
     public PageResult<StorefrontQueryUseCases.ItemView> list(StorefrontQuery query) {
         int size = query.size() == null || query.size() < 1 ? StorefrontQueryUseCases.DEFAULT_PAGE_SIZE
                 : Math.min(query.size(), StorefrontQueryUseCases.MAX_PAGE_SIZE);
-        return storefront.list(RequestSupport.tenant(), query.keyword(), query.sort(), query.inStock(),
+        return storefront.list(RequestSupport.tenant(), query.keyword(), query.sort(), query.inStock(), query.group(),
                 RequestSupport.page(query.page()), size);
     }
 

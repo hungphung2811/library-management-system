@@ -5,6 +5,7 @@ import java.net.URI;
 import java.util.UUID;
 import lms.customer.shop.client.ShopClient;
 import lms.customer.shop.dto.ShopDtos.CancelOrderRequest;
+import lms.customer.shop.dto.ShopDtos.OrderCountView;
 import lms.customer.shop.dto.ShopDtos.OrderPageView;
 import lms.customer.shop.dto.ShopDtos.OrderView;
 import lms.customer.shop.dto.ShopDtos.PlaceOrderRequest;
@@ -69,6 +70,13 @@ public class OrderController {
         int page = query.page() == null || query.page() < 0 ? 0 : query.page();
         int size = query.size() == null || query.size() < 1 ? DEFAULT_SIZE : Math.min(query.size(), MAX_SIZE);
         return PublicCache.noStore(shop.myOrders(token, page, size));
+    }
+
+    /** Số đơn của khách; khai báo trước {orderId} (Spring cũng ưu tiên đường dẫn literal). */
+    @GetMapping("/count")
+    public ResponseEntity<OrderCountView> count(@PathVariable String code, Authentication authentication) {
+        String token = token(code, authentication);
+        return PublicCache.noStore(shop.myOrderCounts(token));
     }
 
     @GetMapping("/{orderId}")

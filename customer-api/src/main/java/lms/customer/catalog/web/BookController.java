@@ -40,10 +40,13 @@ public class BookController {
     static final int DEFAULT_SUGGEST_LIMIT = 5;
     static final int MAX_SUGGEST_LIMIT = 8;
     static final Set<String> SORTS = Set.of("newest", "price_asc", "price_desc");
+    /** ADR-0026: EDITION (mặc định) | WORK (gộp ấn bản cùng tác phẩm); phân biệt hoa thường. */
+    static final Set<String> GROUPS = Set.of("EDITION", "WORK");
     static final Duration PREVIEW_MAX_AGE = Duration.ofSeconds(60);
 
     /** Query gom thành một record (CLAUDE.md): Spring tự bind. */
-    public record BookQuery(String keyword, String sort, String inStock, Integer page, Integer size) {
+    public record BookQuery(String keyword, String sort, String inStock, String group, Integer page,
+                            Integer size) {
     }
 
     public record SuggestionQuery(String q, Integer limit) {
@@ -63,11 +66,12 @@ public class BookController {
         String keyword = keyword(query.keyword());
         String sort = sort(query.sort());
         boolean inStock = inStock(query.inStock());
+        String group = group(query.group());
         StorefrontAccess shop = storefronts.resolve(code).require(Feature.SHOP);
         int page = query.page() == null || query.page() < 0 ? 0 : query.page();
         int size = query.size() == null || query.size() < 1 ? DEFAULT_SIZE : Math.min(query.size(), MAX_SIZE);
         return PublicCache.publicFor(LIST_MAX_AGE,
-                catalog.list(shop.accessToken(), keyword, sort, inStock, page, size));
+                catalog.list(shop.accessToken(), keyword, sort, inStock, group, page, size));
     }
 
     /** Khai báo trước {bookRef}; Spring cũng ưu tiên đoạn literal nên không phụ thuộc thứ tự. */
@@ -102,6 +106,17 @@ public class BookController {
             return null;
         }
         if (!SORTS.contains(raw)) {
+            throw invalid();
+        }
+        return raw;
+    }
+
+    /** Vắng = null (EDITION, không gửi sang sales); chỉ nhận đúng EDITION|WORK (phân biệt hoa thường), còn lại 400. */
+    private static String group(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        if (!GROUPS.contains(raw)) {
             throw invalid();
         }
         return raw;

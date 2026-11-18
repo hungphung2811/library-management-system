@@ -46,11 +46,18 @@ public class StorefrontQueryUseCases {
     public record ItemView(UUID titleId, String name, String author, long price, boolean inStock,
                            boolean hasPreview, String subtitle, Integer publicationYear, String edition,
                            String language, Integer pageCount, String format, String translator, String series,
-                           Integer seriesNumber, String coverImageUrl, List<String> tags) {
+                           Integer seriesNumber, String coverImageUrl, List<String> tags, UUID workId,
+                           String workTitle, Integer variantCount, Long priceFrom) {
         public ItemView(UUID titleId, String name, String author, long price, boolean inStock, boolean hasPreview) {
             this(titleId, name, author, price, inStock, hasPreview, null, null, null, null, null, null, null, null,
-                    null, null, List.of());
+                    null, null, List.of(), null, null, null, null);
         }
+    }
+
+    /** Một biến thể (ấn bản) của cùng tác phẩm ở trang chi tiết; đặt hàng bằng {@code titleId} của biến thể. */
+    public record VariantView(UUID titleId, String format, String language, String translator, String edition,
+                              Integer publicationYear, Integer partNumber, String partLabel, String coverImageUrl,
+                              long price, boolean inStock) {
     }
 
     /** Chi tiết: như danh sách + mô tả (null nếu chưa nhập), không có previewText. */
@@ -58,11 +65,11 @@ public class StorefrontQueryUseCases {
                                  boolean hasPreview, String description, String subtitle, Integer publicationYear,
                                  String edition, String language, Integer pageCount, String format,
                                  String translator, String series, Integer seriesNumber, String coverImageUrl,
-                                 List<String> tags) {
+                                 List<String> tags, UUID workId, String workTitle, List<VariantView> variants) {
         public ItemDetailView(UUID titleId, String name, String author, long price, boolean inStock,
                               boolean hasPreview, String description) {
             this(titleId, name, author, price, inStock, hasPreview, description, null, null, null, null, null, null,
-                    null, null, null, null, List.of());
+                    null, null, null, null, List.of(), null, null, List.of());
         }
     }
 
@@ -88,14 +95,51 @@ public class StorefrontQueryUseCases {
      */
     public PageResult<ItemView> list(UUID tenantId, String keyword, String sortParam, Boolean inStock, int page,
                                      int size) {
+        return list(tenantId, keyword, sortParam, inStock, null, page, size);
+    }
+
+    /**
+     * @param groupParam {@code null}/{@code EDITION}: mỗi ấn bản một thẻ (như cũ); {@code WORK}: gộp ấn bản cùng tác
+     *                   phẩm (ADR-0026), thẻ mang ấn bản đại diện kèm {@code variantCount}, {@code priceFrom}; giá trị lạ
+     *                   ném INVALID_REQUEST trước khi chạm DB
+     */
+    public PageResult<ItemView> list(UUID tenantId, String keyword, String sortParam, Boolean inStock,
+                                     String groupParam, int page, int size) {
         StorefrontSort sort = StorefrontSort.parse(sortParam);
+        StorefrontGroup group = StorefrontGroup.parse(groupParam);
         boolean inStockOnly = Boolean.TRUE.equals(inStock);
         int p = Math.max(0, page);
         int s = size < 1 ? DEFAULT_PAGE_SIZE : Math.min(size, MAX_PAGE_SIZE);
         if (keyword == null || keyword.isBlank()) {
-            return listAll(tenantId, sort == null ? StorefrontSort.NEWEST : sort, inStockOnly, p, s);
+            StorefrontSort effective = sort == null ? StorefrontSort.NEWEST : sort;
+            return group == StorefrontGroup.WORK ? listAllByWork(tenantId, effective, inStockOnly, p, s)
+                    : listAll(tenantId, effective, inStockOnly, p, s);
         }
-        return listByKeyword(tenantId, keyword.trim(), sort, inStockOnly, p, s);
+        return listByKeyword(tenantId, keyword.trim(), sort, inStockOnly, group == StorefrontGroup.WORK, p, s);
+    }
+
+    /** Gộp theo tác phẩm: một truy vấn gộp + một lời gọi lô tới catalog cho các ấn bản đại diện (không N+1). */
+    private PageResult<ItemView> listAllByWork(UUID tenantId, StorefrontSort sort, boolean inStockOnly, int p,
+                                               int s) {
+        if (sort.byPrice()) {
+            syncMissingCoverPrices(tenantId);
+        }
+        PageResult<StockPort.WorkGroup> groups = stock.listStorefrontByWork(tenantId, sort, inStockOnly, p, s);
+        List<StorefrontRow> reps = groups.items().stream().map(StockPort.WorkGroup::representative).toList();
+        Map<UUID, CatalogTitle> titles = reps.isEmpty() ? Map.of()
+                : catalog.lookup(reps.stream().map(StorefrontRow::titleId).toList());
+        List<ItemView> views = new ArrayList<>();
+        for (StockPort.WorkGroup g : groups.items()) {
+            StorefrontRow r = g.representative();
+            CatalogTitle t = titles.get(r.titleId());
+            Money price = t == null ? null : priceOf(r, t);
+            if (price != null) {
+                views.add(groupView(r, t, price.amount(), g.priceFrom() == null ? price.amount() : g.priceFrom(),
+                        g.variantCount(), g.inStock()));
+            }
+        }
+        healSnapshots(tenantId, reps, titles);
+        return new PageResult<>(views, groups.total(), p, s);
     }
 
     private PageResult<ItemView> listAll(UUID tenantId, StorefrontSort sort, boolean inStockOnly, int p, int s) {
@@ -121,29 +165,33 @@ public class StorefrontQueryUseCases {
      * bộ nhớ. Theo giá thì dùng giá SỐNG của catalog (chính xác), không dùng snapshot.
      */
     private PageResult<ItemView> listByKeyword(UUID tenantId, String keyword, StorefrontSort sort,
-                                               boolean inStockOnly, int p, int s) {
+                                               boolean inStockOnly, boolean byWork, int p, int s) {
         List<CatalogTitle> matched = catalog.lookupByKeyword(keyword);
         Map<UUID, StorefrontRow> active = stock.findStorefrontRows(tenantId,
                 matched.stream().map(CatalogTitle::id).toList());
-        record Entry(StorefrontRow row, CatalogTitle title, ItemView view) {
+        record Entry(StorefrontRow row, CatalogTitle title, ItemView view, java.time.Instant listedAt) {
         }
         List<Entry> all = new ArrayList<>();
         for (CatalogTitle t : matched) {
             StorefrontRow r = active.get(t.id());
             if (r != null && priceOf(r, t) != null && (!inStockOnly || r.inStock())) {
-                all.add(new Entry(r, t, view(r, t)));
+                all.add(new Entry(r, t, view(r, t), r.listedAt()));
             }
+        }
+        if (byWork) {
+            all = collapseByWork(all.stream().map(e -> new Candidate<>(e.row(), e.title(), e)).toList(),
+                    (e, v, listedAt) -> new Entry(e.row(), e.title(), v, listedAt));
         }
         Comparator<Entry> byName = Comparator.comparing(e -> lower(e.view().name()));
         Comparator<Entry> order;
         if (sort == null) {
             order = byName;
         } else if (sort == StorefrontSort.NEWEST) {
-            Comparator<Entry> byListed = Comparator.comparing(e -> e.row().listedAt(),
+            Comparator<Entry> byListed = Comparator.comparing(e -> e.listedAt(),
                     Comparator.nullsLast(Comparator.<java.time.Instant>reverseOrder()));
             order = byListed.thenComparing(byName);
         } else {
-            Comparator<Entry> byPrice = Comparator.comparingLong(e -> e.view().price());
+            Comparator<Entry> byPrice = Comparator.comparingLong(e -> e.view().priceFrom() != null ? e.view().priceFrom() : e.view().price());
             order = (sort == StorefrontSort.PRICE_ASC ? byPrice : byPrice.reversed()).thenComparing(byName);
         }
         all.sort(order);
@@ -162,10 +210,40 @@ public class StorefrontQueryUseCases {
             throw notFound();
         }
         ItemView v = view(row, t);
-        healSnapshots(tenantId, List.of(row), Map.of(titleId, t));
+        UUID workId = t.workId() != null ? t.workId() : row.workId();
+        Map<UUID, StorefrontRow> rows = new LinkedHashMap<>();
+        Map<UUID, CatalogTitle> titles = new HashMap<>();
+        rows.put(titleId, row);
+        titles.put(titleId, t);
+        if (workId != null) {
+            // Một truy vấn lấy cả nhóm + tối đa một lời gọi lô cho các ấn bản anh em (ADR-0026 3.6).
+            List<StorefrontRow> siblings = stock.findStorefrontRowsByWork(tenantId, workId);
+            siblings.forEach(r -> rows.putIfAbsent(r.titleId(), r));
+            List<UUID> missing = rows.keySet().stream().filter(id -> !titles.containsKey(id)).toList();
+            if (!missing.isEmpty()) {
+                titles.putAll(catalog.lookup(missing));
+            }
+        }
+        List<VariantView> variants = new ArrayList<>();
+        for (StorefrontRow r : rows.values()) {
+            CatalogTitle vt = titles.get(r.titleId());
+            Money price = vt == null ? null : priceOf(r, vt);
+            if (price != null) {
+                variants.add(new VariantView(r.titleId(), vt.format(), vt.language(), vt.translator(), vt.edition(),
+                        vt.publicationYear(), vt.partNumber(), vt.partLabel(), vt.coverImageUrl(), price.amount(),
+                        r.inStock()));
+            }
+        }
+        variants.sort(Comparator
+                .comparing(VariantView::partNumber, Comparator.nullsLast(Comparator.<Integer>naturalOrder()))
+                .thenComparing(VariantView::publicationYear, Comparator.nullsLast(Comparator.<Integer>naturalOrder()))
+                .thenComparing(x -> lower(x.language())).thenComparing(x -> lower(x.format()))
+                .thenComparing(VariantView::titleId));
+        healSnapshots(tenantId, List.copyOf(rows.values()), titles);
         return new ItemDetailView(v.titleId(), v.name(), v.author(), v.price(), v.inStock(), v.hasPreview(),
                 t.description(), t.subtitle(), t.publicationYear(), t.edition(), t.language(), t.pageCount(),
-                t.format(), t.translator(), t.series(), t.seriesNumber(), t.coverImageUrl(), t.tags());
+                t.format(), t.translator(), t.series(), t.seriesNumber(), t.coverImageUrl(), t.tags(), workId,
+                t.workTitle(), variants);
     }
 
     public PreviewView preview(UUID tenantId, UUID titleId) {
@@ -249,6 +327,61 @@ public class StorefrontQueryUseCases {
         } catch (RuntimeException e) {
             log.warn("Không tự sửa được snapshot giá bìa: {}", e.toString());
         }
+        healWorkIds(tenantId, rows, titles);
+    }
+
+    /** Tự sửa snapshot work_id khi catalog trả workId khác (gộp/tách tác phẩm); catalog chưa biết tác phẩm thì giữ nguyên. */
+    private void healWorkIds(UUID tenantId, List<StorefrontRow> rows, Map<UUID, CatalogTitle> titles) {
+        try {
+            Map<UUID, UUID> stale = new LinkedHashMap<>();
+            for (StorefrontRow r : rows) {
+                CatalogTitle t = titles.get(r.titleId());
+                if (t != null && t.workId() != null && !t.workId().equals(r.workId()) && stale.size() < HEAL_MAX) {
+                    stale.put(r.titleId(), t.workId());
+                }
+            }
+            if (!stale.isEmpty()) {
+                stock.refreshWorkIds(tenantId, stale);
+            }
+        } catch (RuntimeException e) {
+            log.warn("Không tự sửa được snapshot work_id: {}", e.toString());
+        }
+    }
+
+    private record Candidate<E>(StorefrontRow row, CatalogTitle title, E source) {
+    }
+
+    @FunctionalInterface
+    private interface GroupFactory<E> {
+        E build(E representative, ItemView view, java.time.Instant listedAt);
+    }
+
+    /**
+     * Gộp trong bộ nhớ cho tìm theo từ khóa (catalog đã lọc tối đa 200 ấn bản): nhóm theo workId (catalog, rồi snapshot),
+     * ấn bản đại diện = còn hàng, rẻ nhất, mới nhất. {@code variantCount} chỉ đếm ấn bản khớp từ khóa.
+     */
+    private static <E> List<E> collapseByWork(List<Candidate<E>> candidates, GroupFactory<E> factory) {
+        Map<UUID, List<Candidate<E>>> groups = new LinkedHashMap<>();
+        for (Candidate<E> c : candidates) {
+            UUID key = c.title().workId() != null ? c.title().workId()
+                    : c.row().workId() != null ? c.row().workId() : c.title().id();
+            groups.computeIfAbsent(key, k -> new ArrayList<>()).add(c);
+        }
+        Comparator<Candidate<E>> pick = Comparator
+                .comparing((Candidate<E> c) -> c.row().inStock() ? 0 : 1)
+                .thenComparingLong(c -> priceOf(c.row(), c.title()).amount())
+                .thenComparing(c -> c.row().listedAt(), Comparator.nullsLast(Comparator.reverseOrder()));
+        List<E> out = new ArrayList<>();
+        for (List<Candidate<E>> members : groups.values()) {
+            Candidate<E> rep = members.stream().min(pick).orElseThrow();
+            long priceFrom = members.stream().mapToLong(c -> priceOf(c.row(), c.title()).amount()).min().orElseThrow();
+            boolean inStock = members.stream().anyMatch(c -> c.row().inStock());
+            java.time.Instant listedAt = members.stream().map(c -> c.row().listedAt()).filter(Objects::nonNull)
+                    .max(Comparator.naturalOrder()).orElse(null);
+            out.add(factory.build(rep.source(), groupView(rep.row(), rep.title(),
+                    priceOf(rep.row(), rep.title()).amount(), priceFrom, members.size(), inStock), listedAt));
+        }
+        return out;
     }
 
     private StorefrontRow activeRow(UUID tenantId, UUID titleId) {
@@ -274,9 +407,20 @@ public class StorefrontQueryUseCases {
         return t.coverPrice() == null ? null : Money.fromCoverPrice(t.coverPrice());
     }
 
+    /** Chế độ EDITION: không có variantCount/priceFrom (null), workId lấy từ catalog rồi snapshot. */
     private static ItemView view(StorefrontRow r, CatalogTitle t) {
         return new ItemView(r.titleId(), t.name(), t.author(), priceOf(r, t).amount(), r.inStock(), t.hasPreview(),
                 t.subtitle(), t.publicationYear(), t.edition(), t.language(), t.pageCount(), t.format(),
-                t.translator(), t.series(), t.seriesNumber(), t.coverImageUrl(), t.tags());
+                t.translator(), t.series(), t.seriesNumber(), t.coverImageUrl(), t.tags(),
+                t.workId() != null ? t.workId() : r.workId(), t.workTitle(), null, null);
+    }
+
+    /** Chế độ WORK: thẻ của ấn bản đại diện, {@code inStock} là của cả nhóm, {@code price} là giá của đại diện. */
+    private static ItemView groupView(StorefrontRow r, CatalogTitle t, long price, long priceFrom, int variantCount,
+                                      boolean inStock) {
+        return new ItemView(r.titleId(), t.name(), t.author(), price, inStock, t.hasPreview(),
+                t.subtitle(), t.publicationYear(), t.edition(), t.language(), t.pageCount(), t.format(),
+                t.translator(), t.series(), t.seriesNumber(), t.coverImageUrl(), t.tags(),
+                t.workId() != null ? t.workId() : r.workId(), t.workTitle(), variantCount, priceFrom);
     }
 }

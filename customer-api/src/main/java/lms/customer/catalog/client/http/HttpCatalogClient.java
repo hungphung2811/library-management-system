@@ -8,6 +8,7 @@ import lms.customer.catalog.dto.BookDtos.BookDetailView;
 import lms.customer.catalog.dto.BookDtos.BookPageView;
 import lms.customer.catalog.dto.BookDtos.BookPreviewView;
 import lms.customer.catalog.dto.BookDtos.BookSummaryView;
+import lms.customer.catalog.dto.BookDtos.BookVariantView;
 import lms.customer.catalog.dto.BookDtos.SuggestionView;
 import lms.customer.web.DownstreamErrorCode;
 import lms.customer.web.PublicApiException;
@@ -40,7 +41,8 @@ public class HttpCatalogClient implements CatalogClient {
     }
 
     @Override
-    public BookPageView list(String serviceToken, String keyword, String sort, boolean inStock, int page, int size) {
+    public BookPageView list(String serviceToken, String keyword, String sort, boolean inStock, String group, int page,
+                             int size) {
         UpstreamPage body = call(() -> client.get()
                 .uri(b -> {
                     b.path("/internal/sales/storefront/items").queryParam("page", page).queryParam("size", size);
@@ -49,6 +51,9 @@ public class HttpCatalogClient implements CatalogClient {
                     }
                     if (inStock) {
                         b.queryParam("inStock", "true");
+                    }
+                    if (group != null) {
+                        b.queryParam("group", group);
                     }
                     if (keyword != null) {
                         b.queryParam("keyword", "{keyword}");
@@ -61,7 +66,8 @@ public class HttpCatalogClient implements CatalogClient {
         return new BookPageView(items.stream().map(i -> new BookSummaryView(i.titleId(), i.name(), i.author(),
                 i.price(), i.inStock(), i.hasPreview(), i.subtitle(), i.publicationYear(), i.edition(), i.language(),
                 i.pageCount(), i.format(), i.translator(), i.series(), i.seriesNumber(), i.coverImageUrl(),
-                tags(i.tags()))).toList(), body.page(), body.size(), body.total());
+                tags(i.tags()), i.workId(), i.workTitle(), i.variantCount(),
+                i.priceFrom())).toList(), body.page(), body.size(), body.total());
     }
 
     @Override
@@ -80,7 +86,11 @@ public class HttpCatalogClient implements CatalogClient {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + serviceToken).retrieve().body(UpstreamDetail.class));
         return new BookDetailView(d.titleId(), d.name(), d.author(), d.price(), d.inStock(), d.hasPreview(),
                 d.description(), d.subtitle(), d.publicationYear(), d.edition(), d.language(), d.pageCount(),
-                d.format(), d.translator(), d.series(), d.seriesNumber(), d.coverImageUrl(), tags(d.tags()));
+                d.format(), d.translator(), d.series(), d.seriesNumber(), d.coverImageUrl(), tags(d.tags()), d.workId(),
+                d.workTitle(), d.variants() == null ? List.of() : d.variants().stream()
+                .map(v -> new BookVariantView(v.titleId(), v.format(), v.language(), v.translator(), v.edition(),
+                        v.publicationYear(), v.partNumber(), v.partLabel(), v.coverImageUrl(), v.price(),
+                        v.inStock())).toList());
     }
 
     @Override
@@ -115,7 +125,7 @@ public class HttpCatalogClient implements CatalogClient {
     record UpstreamItem(UUID titleId, String name, String author, long price, boolean inStock, boolean hasPreview,
                         String subtitle, Integer publicationYear, String edition, String language, Integer pageCount,
                         String format, String translator, String series, Integer seriesNumber, String coverImageUrl,
-                        List<String> tags) {
+                        List<String> tags, UUID workId, String workTitle, Integer variantCount, Long priceFrom) {
     }
 
     record UpstreamPage(List<UpstreamItem> items, long total, int page, int size) {
@@ -124,7 +134,13 @@ public class HttpCatalogClient implements CatalogClient {
     record UpstreamDetail(UUID titleId, String name, String author, long price, boolean inStock, boolean hasPreview,
                           String description, String subtitle, Integer publicationYear, String edition,
                           String language, Integer pageCount, String format, String translator, String series,
-                          Integer seriesNumber, String coverImageUrl, List<String> tags) {
+                          Integer seriesNumber, String coverImageUrl, List<String> tags, UUID workId,
+                          String workTitle, List<UpstreamVariant> variants) {
+    }
+
+    record UpstreamVariant(UUID titleId, String format, String language, String translator, String edition,
+                           Integer publicationYear, Integer partNumber, String partLabel, String coverImageUrl,
+                           long price, boolean inStock) {
     }
 
     record UpstreamSuggestion(UUID titleId, String name, String author) {

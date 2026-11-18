@@ -34,13 +34,24 @@ public interface CatalogLookupPort {
         return Optional.empty();
     }
 
-    /** Ngoài 7 trường đầu, các trường bổ sung (từ phụ đề tới tags) đều tùy chọn; format là PAPERBACK|HARDCOVER|EBOOK. */
+    /** Ngoài 7 trường đầu, các trường bổ sung (từ phụ đề tới tags, và workId/workTitle/partNumber/partLabel của ADR-0026) đều tùy chọn; format là PAPERBACK|HARDCOVER|EBOOK. */
     record CatalogTitle(UUID id, String name, String author, String isbn, BigDecimal coverPrice, String description,
                         boolean hasPreview, String subtitle, Integer publicationYear, String edition, String language,
                         Integer pageCount, String format, String translator, String series, Integer seriesNumber,
-                        String coverImageUrl, List<String> tags) {
+                        String coverImageUrl, List<String> tags, UUID workId, String workTitle, Integer partNumber,
+                        String partLabel) {
         public CatalogTitle {
             tags = tags == null ? List.of() : List.copyOf(tags);
+        }
+
+        /** Chưa có thông tin tác phẩm (catalog cũ hoặc ấn bản chưa gắn tác phẩm, ADR-0026). */
+        public CatalogTitle(UUID id, String name, String author, String isbn, BigDecimal coverPrice,
+                            String description, boolean hasPreview, String subtitle, Integer publicationYear,
+                            String edition, String language, Integer pageCount, String format, String translator,
+                            String series, Integer seriesNumber, String coverImageUrl, List<String> tags) {
+            this(id, name, author, isbn, coverPrice, description, hasPreview, subtitle, publicationYear, edition,
+                    language, pageCount, format, translator, series, seriesNumber, coverImageUrl, tags, null, null,
+                    null, null);
         }
 
         public CatalogTitle(UUID id, String name, String author, String isbn, BigDecimal coverPrice,
