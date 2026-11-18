@@ -597,9 +597,9 @@ Quy tắc chung của integration-api:
 | ✅ | Không lộ client secret ở frontend | Website chỉ có site key; secret chỉ cho `INTEGRATION`, không bao giờ trả lại sau lần tạo |
 | ✅ | Site key không là bằng chứng mạnh; Origin chỉ là lớp bổ sung | Site key chỉ mở đọc công khai qua `svc`; ghi cần phiên khách; CORS như ADR-0013 |
 | ✅ | RS256, JWKS | Khóa hiện có; service không đổi cách xác minh |
-| ⏳ | Xoay khóa ký | Pha P0: fail-fast PEM ở prod; pha I5: JWKS chứa thêm khóa công khai cũ (`auth.jwt.previous-public-key-pem`) trong cửa sổ xoay |
+| ✅ | Xoay khóa ký | Pha P0: fail-fast PEM ở prod; pha I5 (đã làm): JWKS chứa thêm khóa công khai cũ (`auth.jwt.previous-public-key-pem`) trong cửa sổ xoay |
 | ✅ | Xoay/thu hồi credential | Tối đa 2 ACTIVE; thu hồi có hiệu lực ngay với token mới; token đã cấp hết sau ≤ 5 phút |
-| ⏳ | Thu hồi tức thì (tùy chọn) | Pha I5: identity ghi `lms:app-denied:{applicationId}` vào Redis khi tạm ngưng/xóa/thu hồi khẩn; integration-api kiểm (fail-open) |
+| ✅ | Thu hồi tức thì (tùy chọn, mặc định tắt) | Pha I5 (đã làm): identity ghi `lms:revoked:v1:app:{applicationId}` (giá trị = giây epoch; token có `iat` nhỏ hơn bị từ chối) khi tạm ngưng/xóa Application hoặc thu hồi credential `COMPROMISED`; vận hành có thể ghi `lms:revoked:v1:jti:{jti}` (tồn tại là bị thu hồi). integration-api kiểm, fail-open. Dấu đặt theo cả Application chứ không theo credential, vì token không mang `credentialId` (nên thu hồi khẩn một credential làm token của mọi credential cùng Application cấp trước mốc đó bị từ chối). Tên cũ `lms:app-denied:{applicationId}` trong bản đề xuất không còn dùng |
 | ✅ | Rate limit theo tenant/application/IP/endpoint | D6; theo gói chờ Q8 |
 | ✅ | CORS allowlist, không wildcard với credentialed | `PublicCorsFilter` không gửi `Allow-Credentials`; integration-api không CORS |
 | ✅ | Idempotency key | Ánh xạ `client_request_id` có sẵn; Redis cho phần còn lại (I4) |
@@ -647,13 +647,15 @@ Quy tắc chung của integration-api:
 
 | Pha | Nội dung | Phụ thuộc | Rollback | Trạng thái |
 |---|---|---|---|---|
-| P0 | Nền bảo mật: `jti`; fail-fast khóa JWT prod; `ChannelAudienceFilter` chặn `lms-integration`; `@IntegrationScope` + nhánh interceptor + `CallerIdentity` (chưa endpoint nào dùng → không đổi hành vi) | Q9 | Revert commit; không dữ liệu | ⏳ |
-| P1 | Migration `V32` + context `apiclient` + API platform/tenant quản lý Application, scope, domain, credential (chưa có token endpoint) + lms-api route | P0 (không bắt buộc), Q3 | Bảng mới không ai đọc ngoài portal; tắt route ở lms-api; migration giữ lại (không rollback DDL) | ⏳ |
-| P2 | Public site key: identity cấp `svc` theo `siteKey`; customer-api `/api/public/v1/**`; nginx `^~ /api/public/` | P1, Q1, Q4 | Gỡ location nginx (đường cũ `{code}` không bị ảnh hưởng) | 🚫 Q1 |
-| I2 | Token endpoint identity + module `integration-api` khung (chỉ `/oauth/token`, health) + nginx + compose | P0, P1, Q2, Q10 | Không bật profile compose; gỡ location nginx | 🚫 Q2 |
-| I3 | Endpoint đọc (books, inventory, orders) + `@IntegrationScope` ở catalog/sales + rate limit Redis + log truy cập + bộ đếm | I2 | Gỡ annotation (service trả 403 cho token integration) | ⏳ |
+| P0 | Nền bảo mật: `jti`; fail-fast khóa JWT prod; `ChannelAudienceFilter` chặn `lms-integration`; `@IntegrationScope` + nhánh interceptor + `CallerIdentity` (chưa endpoint nào dùng → không đổi hành vi) | Q9 | Revert commit; không dữ liệu | ✅ |
+| P1 | Migration `V32` + context `apiclient` + API platform/tenant quản lý Application, scope, domain, credential (chưa có token endpoint) + lms-api route | P0 (không bắt buộc), Q3 | Bảng mới không ai đọc ngoài portal; tắt route ở lms-api; migration giữ lại (không rollback DDL) | ✅ |
+| P2 | Public site key: identity cấp `svc` theo `siteKey`; customer-api `/api/public/v1/**`; nginx `^~ /api/public/` | P1, Q1, Q4 | Gỡ location nginx (đường cũ `{code}` không bị ảnh hưởng) | ✅ |
+| I2 | Token endpoint identity + module `integration-api` khung (chỉ `/oauth/token`, health) + nginx + compose | P0, P1, Q2, Q10 | Không bật profile compose; gỡ location nginx | ✅ |
+| I3 | Endpoint đọc (books, inventory, orders) + `@IntegrationScope` ở catalog/sales + rate limit Redis + log truy cập + bộ đếm | I2 | Gỡ annotation (service trả 403 cho token integration) | ✅ |
 | I4 | Endpoint ghi + idempotency + (tùy chọn) `catalog/V10` | I3, Q5, Q6, Q7 | Gỡ annotation scope `:write` | 🚫 Q5-Q7 |
-| I5 | Thống kê sử dụng ở portal, OpenAPI, denylist Redis, JWKS nhiều khóa | I3 | Tắt cờ | ⏳ |
+| I5 | Thống kê sử dụng ở portal, OpenAPI, denylist Redis, JWKS nhiều khóa | I3 | Tắt cờ | ✅ một phần: đã có thống kê tổng theo ngày, thu hồi tức thời, JWKS hai khóa; chưa có OpenAPI/trang tài liệu động |
+
+Đã triển khai ngày 2026-11-18/19 (P0, P1, I2, I3, P2, một phần I5; I4 hoãn theo quyết định Q5-Q7), xem `SAAS_API_AUTHENTICATION_IMPLEMENTATION_REPORT.md`.
 
 Song song được: trong P0, phần `security-common` và `lms-api` độc lập (nhưng service phải build lại sau `security-common`); P2 và I2 song song sau P1 (khác module: customer-api vs integration-api; **cả hai cùng sửa identity** → giao một `be-dev` cho phần identity của cả hai pha để tránh ghi đè). I3: catalog và sales song song.
 

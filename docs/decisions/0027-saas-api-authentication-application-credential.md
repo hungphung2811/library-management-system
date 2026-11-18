@@ -1,6 +1,6 @@
 # ADR-0027: Xác thực API SaaS: Application, credential, scope (quyết định D1 đến D8)
 
-- Trạng thái: Chấp nhận. Triển khai pha P1 (bảng và API quản lý); token endpoint (I2), site key ở customer-api (P2) và integration-api chưa làm.
+- Trạng thái: Chấp nhận. Đã triển khai P0, P1 (bảng và API quản lý), I2 (token endpoint, integration-api), I3 (endpoint đọc), P2 (site key ở identity/customer-api, commit `a822b39`, `3424b56`) và một phần I5 (thống kê tổng theo ngày, thu hồi tức thời, JWKS hai khóa; commit `a822b39`, `76816eb`). Chưa làm: I4 (endpoint ghi, hoãn Q5-Q7), OpenAPI/trang tài liệu động.
 - Nguồn: `docs/architecture/SAAS_API_AUTHENTICATION_DESIGN.md` (mục 2), `SAAS_AUTHENTICATION_AUDIT.md`, `TENANT_ISOLATION.md`.
 - Liên quan: ADR-0003 (khóa Controller/method), 0006 (multi-tenant), 0011 (customer-api, token `svc`), 0012 (hợp đồng), 0013 (origin storefront).
 
@@ -29,3 +29,9 @@
 - Hợp đồng ACTIVE kiểm bằng `GetMyContractsUseCase` (ACTIVE và IN_EFFECT/IN_GRACE) qua cổng `TenantContractGate`.
 - Giới hạn 20 Application mỗi tenant khóa các dòng sẵn có của tenant; tenant chưa có dòng nào thì giới hạn là mềm.
 - Platform admin không tạo Application và không cấp credential hộ tenant.
+
+## Quyết định bổ sung đã triển khai (P2, I2, I5)
+
+- Token integration mang claim `application_id` (snake_case, không phải `applicationId`) cùng `client_id`; token `svc` cấp theo site key cũng thêm claim `application_id` (chỉ để truy vết, quyền vẫn do `@StorefrontAccessible` và module quyết). Claim `aud` của token integration là chuỗi `lms-integration` (Nimbus ghi `aud` một phần tử dạng chuỗi); decoder chấp nhận cả chuỗi lẫn mảng.
+- Dấu thu hồi tức thời đặt theo Application (`lms:revoked:v1:app:{applicationId}` = giây epoch, token có `iat` nhỏ hơn bị từ chối) vì token không mang `credentialId`; thêm denylist theo token `lms:revoked:v1:jti:{jti}`.
+- ⚠️ Preflight CORS của Public API v1 (chờ xác nhận của chủ sản phẩm): trình duyệt không gửi `X-Site-Key` trong preflight `OPTIONS` nên không biết Application; `PublicCorsFilter` phản chiếu `Access-Control-Allow-Origin` cho origin hợp lệ về cú pháp (không mang dữ liệu). Request chính vẫn chỉ cho origin nằm trong domain allowlist của Application (quyết theo `X-Site-Key`).
