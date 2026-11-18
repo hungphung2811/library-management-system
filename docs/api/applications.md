@@ -1,6 +1,6 @@
 # Application, scope, domain, credential (SaaS API Authentication, pha P1)
 
-Nền: `docs/architecture/SAAS_API_AUTHENTICATION_DESIGN.md` (D5, D7, D8, mục 4.3, 4.4), ADR-0027. Tenant admin tự đăng ký **Application** (website công khai hoặc backend tích hợp). Pha này CHƯA có token endpoint (pha I2) và CHƯA có site key ở customer-api (pha P2): site key và credential chỉ được tạo và quản lý, chưa dùng để xác thực ở đâu.
+Nền: `docs/architecture/SAAS_API_AUTHENTICATION_DESIGN.md` (D5, D7, D8, mục 4.3, 4.4), ADR-0027. Tenant admin tự đăng ký **Application** (website công khai hoặc backend tích hợp). Credential của Application `INTEGRATION` đã dùng được để xin token ở pha I2 (`docs/api/integration-api.md`); site key vẫn CHƯA có ở customer-api (pha P2): chỉ được tạo và quản lý.
 
 Mọi đường dẫn tương đối so với `<ORIGIN>` (nginx 8080 -> lms-api). Đường `/api/applications/**` chuyển sang identity `/internal/applications/**`; phản hồi **luôn** có `Cache-Control: no-store`. Tenant lấy từ token (claim `tenantId`), **không** nhận `tenantId` từ body/query/đường dẫn (field thừa bị bỏ qua). `id` của Application/credential/domain thuộc tenant khác trả `404` cùng thân với "không tồn tại".
 
