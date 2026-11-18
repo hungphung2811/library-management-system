@@ -62,6 +62,7 @@ class TitleControllerTest {
     @MockitoBean UpdateTitleUseCase updateTitle;
     @MockitoBean lms.catalog.catalog.application.LookupTitlesUseCase lookupTitles;
     @MockitoBean lms.catalog.catalog.application.LookupTitlesByKeywordUseCase lookupByKeyword;
+    @MockitoBean lms.catalog.catalog.application.LookupTitlesByIsbnUseCase lookupByIsbn;
     @MockitoBean lms.catalog.catalog.application.GetTitlePreviewUseCase getPreview;
     @MockitoBean lms.catalog.catalog.application.UpdateTitlePreviewUseCase updatePreview;
     @MockitoBean JwtDecoder jwtDecoder;
@@ -370,6 +371,59 @@ class TitleControllerTest {
                         .with(jwt().jwt(j -> j.claim("admin", true))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("TENANT_REQUIRED"));
+    }
+
+    // --- lookup-by-isbn (ADR-0024) ---
+
+    private static String isbnBody(int n) {
+        return "{\"isbns\":[" + java.util.stream.IntStream.range(0, n)
+                .mapToObj(i -> "\"I" + i + "\"")
+                .collect(java.util.stream.Collectors.joining(",")) + "]}";
+    }
+
+    @Test
+    void lookupByIsbnVoiKhoaTra200() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(lookupByIsbn.execute(List.of("9780132350884"))).thenReturn(List.of(
+                new lms.catalog.catalog.application.TitleLookupView(id, "Clean Code", "Robert Martin",
+                        "9780132350884", new BigDecimal("250000"), null, false)));
+        mvc.perform(post("/internal/books/lookup-by-isbn").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"isbns\":[\"9780132350884\"]}").with(withKey("TitleController/lookupByIsbn")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(id.toString()))
+                .andExpect(jsonPath("$[0].isbn").value("9780132350884"))
+                .andExpect(jsonPath("$[0].tenantId").doesNotExist());
+    }
+
+    @Test
+    void lookupByIsbnKhoaKhacBi403KhongTokenBi401TokenDichVuStorefrontBi403() throws Exception {
+        String body = isbnBody(1);
+        mvc.perform(post("/internal/books/lookup-by-isbn").contentType(MediaType.APPLICATION_JSON).content(body)
+                        .with(withKey("TitleController/lookup")))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/internal/books/lookup-by-isbn").contentType(MediaType.APPLICATION_JSON).content(body)
+                        .with(noPermission()))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/internal/books/lookup-by-isbn").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/internal/books/lookup-by-isbn").contentType(MediaType.APPLICATION_JSON).content(body)
+                        .with(svcToken()))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(lookupByIsbn);
+    }
+
+    @Test
+    void lookupByIsbnToiDa5000Va400KhiSaiRangBuoc() throws Exception {
+        when(lookupByIsbn.execute(any())).thenReturn(List.of());
+        mvc.perform(post("/internal/books/lookup-by-isbn").contentType(MediaType.APPLICATION_JSON)
+                        .content(isbnBody(5000)).with(admin()))
+                .andExpect(status().isOk());
+        for (String body : new String[] {isbnBody(5001), "{\"isbns\":[]}", "{}", "{\"isbns\":[\" \"]}",
+                "{\"isbns\":[null]}", "{\"isbns\":[\"123456789012345678901\"]}"}) {
+            mvc.perform(post("/internal/books/lookup-by-isbn").contentType(MediaType.APPLICATION_JSON).content(body)
+                            .with(admin()))
+                    .andExpect(status().isBadRequest());
+        }
     }
 
     // --- preview / mô tả (ADR-0011 2.12) ---

@@ -9,10 +9,18 @@ import java.util.Map;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.PersistenceException;
+import lms.catalog.catalog.domain.TitleBatchConflictException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 
 @Repository
 class TitlePersistenceAdapter implements TitleRepository {
+
+    @PersistenceContext
+    private EntityManager em;
 
     private final SpringDataTitleRepository jpa;
     private final SpringDataTitleAuthorRepository titleAuthors;
@@ -69,6 +77,42 @@ class TitlePersistenceAdapter implements TitleRepository {
     @Override
     public List<Title> findByIds(Collection<UUID> ids) {
         return toDomains(jpa.findAllById(ids));
+    }
+
+    @Override
+    public Map<String, UUID> findIdsByIsbns(Collection<String> isbns) {
+        List<String> keys = isbns.stream().distinct().toList();
+        Map<String, UUID> result = new HashMap<>();
+        for (int i = 0; i < keys.size(); i += 1000) {
+            jpa.findIdsByIsbnIn(keys.subList(i, Math.min(keys.size(), i + 1000)))
+                    .forEach(r -> result.put(r.getIsbn(), r.getId()));
+        }
+        return result;
+    }
+
+    /** persist theo lô (không merge, không xóa title_authors vì đầu sách mới) rồi flush: titles trước, title_authors sau. */
+    @Override
+    public void insertAll(Collection<Title> titles) {
+        try {
+            for (Title t : titles) {
+                em.persist(new TitleJpaEntity(t.id(), t.name(), t.author(), t.isbn(), t.coverPrice(), t.description(),
+                        t.previewText(), t.publisherId(), t.categoryId()).withExtras(t.extras()));
+            }
+            em.flush();
+            for (Title t : titles) {
+                for (int i = 0; i < t.authorIds().size(); i++) {
+                    em.persist(new TitleAuthorJpaEntity(t.id(), t.authorIds().get(i), i));
+                }
+            }
+            em.flush();
+        } catch (DataIntegrityViolationException | PersistenceException e) {
+            throw new TitleBatchConflictException(e);
+        }
+    }
+
+    @Override
+    public List<Title> findByIsbns(Collection<String> isbns) {
+        return isbns.isEmpty() ? List.of() : toDomains(jpa.findByIsbnIn(isbns));
     }
 
     /** Dựng domain cho cả loạt, nạp tác giả chuẩn bằng một truy vấn. */

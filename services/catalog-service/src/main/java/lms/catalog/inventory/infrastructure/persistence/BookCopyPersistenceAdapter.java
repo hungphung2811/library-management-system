@@ -13,10 +13,18 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.PersistenceException;
+import lms.catalog.inventory.domain.CopyBatchConflictException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Repository;
 
 @Repository
 class BookCopyPersistenceAdapter implements BookCopyRepository {
+
+    @PersistenceContext
+    private EntityManager em;
 
     private final SpringDataBookCopyRepository jpa;
 
@@ -79,6 +87,30 @@ class BookCopyPersistenceAdapter implements BookCopyRepository {
         if (shelfLocationIds.isEmpty()) return result;
         jpa.findShelfLocationCodes(shelfLocationIds).forEach(row -> result.put(row.getId(), row.getCode()));
         return result;
+    }
+
+    @Override
+    public Set<String> findExistingBarcodes(Collection<String> barcodes) {
+        List<String> keys = barcodes.stream().distinct().toList();
+        Set<String> result = new java.util.HashSet<>();
+        for (int i = 0; i < keys.size(); i += 1000) {
+            result.addAll(jpa.findBarcodesIn(keys.subList(i, Math.min(keys.size(), i + 1000))));
+        }
+        return result;
+    }
+
+    /** persist theo lô (không merge) rồi flush để trùng mã vạch lộ ra ngay và các INSERT đi thành batch JDBC. */
+    @Override
+    public void insertAll(Collection<BookCopy> copies) {
+        try {
+            for (BookCopy c : copies) {
+                em.persist(new BookCopyJpaEntity(c.id(), c.titleId(), c.barcode(), c.status(), c.shelfLocationId())
+                        .withAcquisition(c.acquisition()));
+            }
+            em.flush();
+        } catch (DataIntegrityViolationException | PersistenceException e) {
+            throw new CopyBatchConflictException(e);
+        }
     }
 
     @Override

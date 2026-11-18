@@ -55,6 +55,11 @@ public class CatalogBeanConfiguration {
     }
 
     @Bean
+    lms.catalog.catalog.application.LookupTitlesByIsbnUseCase lookupTitlesByIsbnUseCase(TitleRepository repository) {
+        return new lms.catalog.catalog.application.LookupTitlesByIsbnUseCase(repository);
+    }
+
+    @Bean
     GetTitlePreviewUseCase getTitlePreviewUseCase(TitleRepository repository) {
         return new GetTitlePreviewUseCase(repository);
     }

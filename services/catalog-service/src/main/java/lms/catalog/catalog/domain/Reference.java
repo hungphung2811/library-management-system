@@ -98,7 +98,10 @@ public final class Reference {
     }
 
     /** Khóa so trùng: tên đã chuẩn hóa, chữ thường. */
-    public String nameKey() { return name.toLowerCase(Locale.ROOT); }
+    public String nameKey() { return keyOf(name); }
+
+    /** Khóa so trùng của một tên thô: chuẩn hóa như {@link #normalizeName} rồi chữ thường (dùng cho tra cứu theo lô). */
+    public static String keyOf(String rawName) { return normalizeName(rawName).toLowerCase(Locale.ROOT); }
 
     public UUID id() { return id; }
     public ReferenceKind kind() { return kind; }

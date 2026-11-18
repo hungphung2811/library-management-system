@@ -34,6 +34,19 @@ class CatalogArchitectureTest {
             .should().dependOnClassesThat().resideInAnyPackage(
                     "lms.catalog.inventory.domain..", "lms.catalog.inventory.infrastructure..");
 
+    /** ADR-0024 mục 3.1: tầng application của service chỉ dùng lms.imports.core (POJO), không xlsx/redis/web/engine. */
+    @ArchTest
+    static final ArchRule applicationChiDungImportCore = noClasses()
+            .that().resideInAPackage("..application..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "lms.imports.xlsx..", "lms.imports.redis..", "lms.imports.web..", "lms.imports.engine..",
+                    "lms.imports.autoconfigure..");
+
+    @ArchTest
+    static final ArchRule domainKhongDungThuVienNhap = noClasses()
+            .that().resideInAPackage("..domain..")
+            .should().dependOnClassesThat().resideInAPackage("lms.imports..");
+
     @ArchTest
     static final ArchRule khongCoVongLapGiuaCacContext =
             slices().matching("lms.catalog.(*)..").should().beFreeOfCycles();

@@ -55,6 +55,7 @@ class ModuleBlockingTest {
     @MockitoBean SearchTitlesUseCase searchTitles;
     @MockitoBean UpdateTitleUseCase updateTitle;
     @MockitoBean lms.catalog.catalog.application.LookupTitlesByKeywordUseCase lookupByKeyword;
+    @MockitoBean lms.catalog.catalog.application.LookupTitlesByIsbnUseCase lookupByIsbn;
     @MockitoBean lms.catalog.catalog.application.GetTitlePreviewUseCase getPreview;
     @MockitoBean lms.catalog.catalog.application.UpdateTitlePreviewUseCase updatePreview;
     @MockitoBean JwtDecoder jwtDecoder;

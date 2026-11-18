@@ -1,6 +1,9 @@
 server:
   port: 8082
   shutdown: graceful
+  tomcat:
+    # Nhập Excel (ADR-0024): nuốt hết phần thân vượt giới hạn để client nhận 413 JSON thay vì đứt kết nối
+    max-swallow-size: 7MB
 
 spring:
   application:
@@ -13,6 +16,16 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+    properties:
+      hibernate:
+        # Nhập Excel ghi theo chunk 200 dòng bằng persist: gom INSERT thành batch JDBC (ADR-0024 mục 3.6)
+        jdbc.batch_size: 100
+        order_inserts: true
+  servlet:
+    multipart:
+      # Nhập Excel (ADR-0024): file tối đa 5 MB, cả request 6 MB
+      max-file-size: 5MB
+      max-request-size: 6MB
   flyway:
     # Migration do system-service chạy tập trung; service chỉ validate schema (ddl-auto: validate)
     enabled: false

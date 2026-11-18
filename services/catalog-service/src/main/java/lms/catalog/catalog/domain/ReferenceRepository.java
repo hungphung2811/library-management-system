@@ -26,6 +26,22 @@ public interface ReferenceRepository {
     /** Mục đang active theo tên, tối đa {@code limit}, để đổ ô chọn. */
     List<Reference> options(ReferenceKind kind, String keyword, int limit);
 
+    /**
+     * Mục của tenant theo khóa tên (chữ thường đã chuẩn hóa) thuộc tập đã cho, mọi trạng thái; khóa không có thì vắng.
+     * Một truy vấn (chia lô 1.000) cho cả tập, dùng cho nhập hàng loạt (ADR-0024).
+     */
+    default List<Reference> findByNameKeys(ReferenceKind kind, Collection<String> nameKeys) {
+        throw new UnsupportedOperationException("findByNameKeys");
+    }
+
+    /**
+     * Ghi mới cả loạt (không kiểm trùng: người gọi đã kiểm). Ném {@link ReferenceBatchConflictException} nếu vi phạm
+     * ràng buộc duy nhất khi ghi đồng thời; giao dịch của người gọi phải rollback.
+     */
+    default void insertAll(Collection<Reference> references) {
+        throw new UnsupportedOperationException("insertAll");
+    }
+
     record Page(List<Reference> items, long total) {
     }
 }

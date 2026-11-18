@@ -11,9 +11,27 @@ import java.util.Set;
 import java.util.UUID;
 
 /** Kiểm chung cho tạo/sửa danh mục: cây thể loại tối đa 2 cấp, không vòng cha-con. */
-final class ReferenceRules {
+public final class ReferenceRules {
 
     private ReferenceRules() {
+    }
+
+    /** Cha phải là thể loại gốc (cây tối đa 2 cấp). */
+    public static void requireRoot(Reference parent) {
+        if (parent.parentId() != null) {
+            throw new CategoryHierarchyException("CATEGORY_TOO_DEEP", "Cây thể loại chỉ tối đa 2 cấp");
+        }
+    }
+
+    /**
+     * Luật hình dạng cho một cha đã tải (nhập hàng loạt, tạo mới): cha là gốc và còn active. Cùng luật với
+     * {@link #checkParent}, dùng được mà không cần truy vấn từng dòng.
+     */
+    public static void checkParentShape(Reference parent) {
+        requireRoot(parent);
+        if (!parent.active()) {
+            throw new InactiveReferenceException(ReferenceKind.CATEGORY, parent.id());
+        }
     }
 
     /**
@@ -38,9 +56,7 @@ final class ReferenceRules {
             UUID next = cursor.parentId();
             cursor = repository.findById(ReferenceKind.CATEGORY, next).orElse(null);
         }
-        if (parent.parentId() != null) {
-            throw new CategoryHierarchyException("CATEGORY_TOO_DEEP", "Cây thể loại chỉ tối đa 2 cấp");
-        }
+        requireRoot(parent);
         if (selfId != null && repository.hasChildren(selfId)) {
             throw new CategoryHierarchyException("CATEGORY_TOO_DEEP",
                     "Thể loại đang có thể loại con nên không thể trở thành thể loại con (cây tối đa 2 cấp)");

@@ -12,5 +12,7 @@ interface ReferenceJpaRepository<E extends ReferenceJpaEntity>
 
     boolean existsByNameKey(String nameKey);
 
+    java.util.List<E> findByNameKeyIn(java.util.Collection<String> nameKeys);
+
     boolean existsByNameKeyAndIdNot(String nameKey, UUID id);
 }

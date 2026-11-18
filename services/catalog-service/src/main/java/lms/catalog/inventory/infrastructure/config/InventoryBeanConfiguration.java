@@ -3,6 +3,7 @@ package lms.catalog.inventory.infrastructure.config;
 import lms.catalog.inventory.application.AddCopyUseCase;
 import lms.catalog.inventory.application.ChangeCopyStatusUseCase;
 import lms.catalog.inventory.application.CopyAvailabilityQuery;
+import lms.catalog.inventory.application.RegisterCopiesInBatchUseCase;
 import lms.catalog.inventory.application.GetCopyUseCase;
 import lms.catalog.inventory.application.HoldCopyUseCase;
 import lms.catalog.inventory.application.ListCopiesUseCase;
@@ -60,6 +61,12 @@ public class InventoryBeanConfiguration {
     @Bean
     AddCopyUseCase addCopyUseCase(BookCopyRepository repository, KafkaInventoryEventPublisher publisher, Clock clock) {
         return new AddCopyUseCase(repository, publisher, clock);
+    }
+
+    @Bean
+    RegisterCopiesInBatchUseCase registerCopiesInBatchUseCase(BookCopyRepository repository,
+                                                              KafkaInventoryEventPublisher publisher, Clock clock) {
+        return new RegisterCopiesInBatchUseCase(repository, publisher, clock);
     }
 
     @Bean

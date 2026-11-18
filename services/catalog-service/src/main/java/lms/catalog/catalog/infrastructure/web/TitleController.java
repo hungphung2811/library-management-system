@@ -42,6 +42,7 @@ public class TitleController {
     private final UpdateTitleUseCase updateTitle;
     private final lms.catalog.catalog.application.LookupTitlesUseCase lookupTitles;
     private final LookupTitlesByKeywordUseCase lookupByKeyword;
+    private final lms.catalog.catalog.application.LookupTitlesByIsbnUseCase lookupByIsbn;
     private final GetTitlePreviewUseCase getPreview;
     private final UpdateTitlePreviewUseCase updatePreview;
 
@@ -49,7 +50,9 @@ public class TitleController {
                            UpdateTitleUseCase updateTitle,
                            lms.catalog.catalog.application.LookupTitlesUseCase lookupTitles,
                            LookupTitlesByKeywordUseCase lookupByKeyword,
-                           GetTitlePreviewUseCase getPreview, UpdateTitlePreviewUseCase updatePreview) {
+                           GetTitlePreviewUseCase getPreview, UpdateTitlePreviewUseCase updatePreview,
+                           lms.catalog.catalog.application.LookupTitlesByIsbnUseCase lookupByIsbn) {
+        this.lookupByIsbn = lookupByIsbn;
         this.lookupByKeyword = lookupByKeyword;
         this.getPreview = getPreview;
         this.updatePreview = updatePreview;
@@ -105,6 +108,16 @@ public class TitleController {
     @StorefrontAccessible
     public List<TitleLookupView> lookupByKeyword(@RequestParam(required = false) String keyword) {
         return lookupByKeyword.execute(keyword);
+    }
+
+    /**
+     * Tra nhiều đầu sách theo ISBN (tối đa 5.000, một truy vấn IN), dùng cho nhập Excel của sales (ADR-0024).
+     * Khóa TitleController/lookupByIsbn. KHÔNG @StorefrontAccessible: chỉ token người dùng được chuyển tiếp.
+     */
+    @PostMapping("/lookup-by-isbn")
+    public List<TitleLookupView> lookupByIsbn(
+            @Valid @RequestBody lms.catalog.catalog.application.LookupTitlesByIsbnRequest request) {
+        return lookupByIsbn.execute(request.isbns());
     }
 
     /** Mô tả và đoạn đọc thử (ADR-0011 2.12). Khóa TitleController/preview; token dịch vụ storefront vào được. */

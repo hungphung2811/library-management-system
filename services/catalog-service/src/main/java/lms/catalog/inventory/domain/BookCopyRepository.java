@@ -36,6 +36,18 @@ public interface BookCopyRepository {
         return List.of();
     }
 
+    /** Mã vạch (khớp đúng chuỗi) thuộc tập đã cho đã có trong tenant, một truy vấn (chia lô); dùng cho nhập hàng loạt. */
+    default Set<String> findExistingBarcodes(Collection<String> barcodes) {
+        Set<String> result = new java.util.HashSet<>();
+        for (String b : barcodes) if (existsByBarcode(b)) result.add(b);
+        return result;
+    }
+
+    /** Ghi mới cả loạt, không kiểm trùng; ném {@link CopyBatchConflictException} khi trùng mã vạch do ghi đồng thời. */
+    default void insertAll(Collection<BookCopy> copies) {
+        for (BookCopy c : copies) save(c);
+    }
+
     /** Trạng thái active của vị trí kệ cùng tenant; empty nếu không có vị trí kệ đó. */
     default Optional<Boolean> findShelfLocationActive(UUID shelfLocationId) {
         return Optional.empty();

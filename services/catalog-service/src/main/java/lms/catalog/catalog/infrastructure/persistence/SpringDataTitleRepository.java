@@ -10,6 +10,18 @@ interface SpringDataTitleRepository extends JpaRepository<TitleJpaEntity, UUID> 
 
     boolean existsByIsbn(String isbn);
 
+    List<TitleJpaEntity> findByIsbnIn(java.util.Collection<String> isbns);
+
+    interface IsbnId {
+        String getIsbn();
+
+        UUID getId();
+    }
+
+    /** Chỉ cột isbn và id (không nạp cả đầu sách) cho kiểm trùng/tra id theo lô khi nhập Excel. */
+    @Query("select t.isbn as isbn, t.id as id from TitleJpaEntity t where t.isbn in :isbns")
+    List<IsbnId> findIdsByIsbnIn(@Param("isbns") java.util.Collection<String> isbns);
+
     boolean existsByIsbnAndIdNot(String isbn, UUID id);
 
     @Query("select t from TitleJpaEntity t where lower(t.name) like lower(concat('%', :keyword, '%')) "

@@ -17,6 +17,10 @@ interface SpringDataBookCopyRepository extends JpaRepository<BookCopyJpaEntity, 
 
     boolean existsByBarcode(String barcode);
 
+    /** Mã vạch đã có trong tập (kiểm trùng theo lô khi nhập Excel). */
+    @Query("select b.barcode from BookCopyJpaEntity b where b.barcode in :barcodes")
+    List<String> findBarcodesIn(@Param("barcodes") Collection<String> barcodes);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select c from BookCopyJpaEntity c where c.id = :id")
     Optional<BookCopyJpaEntity> findByIdForUpdate(@Param("id") UUID id);
