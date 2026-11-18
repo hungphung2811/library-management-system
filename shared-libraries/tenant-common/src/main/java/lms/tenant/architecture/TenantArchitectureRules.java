@@ -35,6 +35,11 @@ public final class TenantArchitectureRules {
             "tenant_contract_reminders",
             // ADR-0013: origin storefront theo tenant (bảng toàn cục do platform admin ghi, lọc tenant tường minh)
             "tenant_storefront_origins", "tenant_storefront_origin_history",
+            // SaaS API Authentication D5: Application/credential/scope/lịch sử là bảng toàn cục có chủ đích (token endpoint và
+            // cấp token theo site key tra client_id khi CHƯA biết tenant, nên không RLS). Chống IDOR bằng lọc
+            // (tenant_id, id) tường minh ở use case và test hai tenant. application_scopes không có cột tenant_id,
+            // giữ trong danh sách như sổ đăng ký bảng toàn cục.
+            "applications", "application_credentials", "application_scopes", "application_history",
             // ADR-0011: nội dung và yêu cầu liên hệ cấp nền tảng của system-service (không thuộc tenant nào)
             "cms_pages", "cms_contact_requests");
 
