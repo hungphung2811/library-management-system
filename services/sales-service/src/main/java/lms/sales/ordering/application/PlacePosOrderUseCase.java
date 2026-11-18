@@ -69,7 +69,7 @@ public class PlacePosOrderUseCase {
     private PosOrderResult place(PlacePosOrderCommand cmd) {
         validate(cmd);
         boolean twoStep = qrCommit != null;
-        if (cmd.paymentMethod() == PaymentMethod.QR && !twoStep) {
+        if (cmd.paymentMethod().isGateway() && !twoStep) {
             throw new SalesException(ErrorCode.PAYMENT_NOT_ENABLED, "Thanh toán QR chưa được bật");
         }
         var existing = orders.findByClientRequestId(cmd.tenantId(), cmd.clientRequestId());

@@ -1,6 +1,7 @@
 package lms.sales.ordering.application;
 
 import java.time.Instant;
+import java.util.Optional;
 import lms.sales.shared.domain.Money;
 
 /**
@@ -14,6 +15,18 @@ public interface PaymentGatewayPort {
 
     /** Tạo dữ liệu mã QR cho một lệnh thanh toán; {@code reference} là nội dung chuyển khoản dùng để đối soát. */
     QrCharge createQr(ChargeRequest request);
+
+    /**
+     * Hỏi cổng xem lệnh đã được thanh toán chưa (cổng không có webhook tới được máy này, như MoMo sandbox). Mặc định
+     * rỗng: cổng đẩy kết quả bằng webhook (SIMULATED) không cần hỏi. Lỗi mạng/cổng thì ném {@link SalesException}.
+     */
+    default Optional<GatewayPayment> queryPayment(String reference) {
+        return Optional.empty();
+    }
+
+    /** Kết quả truy vấn: {@code paid} khi cổng báo thành công, kèm mã giao dịch và số tiền (đồng) của cổng. */
+    record GatewayPayment(boolean paid, String providerTxnId, long amount) {
+    }
 
     record ChargeRequest(String reference, Money amount, Instant expiresAt) {
     }

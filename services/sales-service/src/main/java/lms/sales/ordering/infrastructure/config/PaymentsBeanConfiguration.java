@@ -1,5 +1,6 @@
 package lms.sales.ordering.infrastructure.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Duration;
 import lms.sales.ordering.application.CommitPosPendingOrderUseCase;
@@ -10,6 +11,8 @@ import lms.sales.ordering.application.PaymentIntentUseCases;
 import lms.sales.ordering.application.ProcessPaymentWebhookUseCase;
 import lms.sales.ordering.application.SalesOrderRepository;
 import lms.sales.ordering.application.SalesReturnRepository;
+import lms.sales.ordering.application.SyncGatewayPaymentUseCase;
+import lms.sales.ordering.infrastructure.client.MomoPaymentGateway;
 import lms.sales.ordering.infrastructure.client.SimulatedPaymentGateway;
 import lms.sales.settings.application.GetSalesSettingsUseCase;
 import lms.sales.shared.application.DocumentNumberPort;
@@ -59,15 +62,35 @@ public class PaymentsBeanConfiguration {
         return new SimulatedPaymentGateway(bankBin, accountNo, accountName);
     }
 
+    /** Cổng MoMo sandbox (ví MoMo): chỉ có khi {@code app.payments.momo.enabled=true}; khóa lấy từ cấu hình/biến môi trường. */
+    @Bean
+    @ConditionalOnProperty(name = "app.payments.momo.enabled", havingValue = "true")
+    PaymentGatewayPort momoPaymentGateway(
+            ObjectMapper json,
+            @Value("${app.payments.momo.endpoint:https://test-payment.momo.vn}") String endpoint,
+            @Value("${app.payments.momo.partner-code}") String partnerCode,
+            @Value("${app.payments.momo.access-key}") String accessKey,
+            @Value("${app.payments.momo.secret-key}") String secretKey,
+            @Value("${app.payments.momo.redirect-url:https://example.com/momo/return}") String redirectUrl,
+            @Value("${app.payments.momo.ipn-url:https://example.com/momo/ipn}") String ipnUrl) {
+        return new MomoPaymentGateway(json, endpoint, partnerCode, accessKey, secretKey, redirectUrl, ipnUrl);
+    }
+
+    @Bean
+    SyncGatewayPaymentUseCase syncGatewayPaymentUseCase(ObjectProvider<PaymentGatewayPort> gateways,
+                                                        ProcessPaymentWebhookUseCase processor) {
+        return new SyncGatewayPaymentUseCase(gateways.orderedStream().toList(), processor);
+    }
+
     /** Luồng POS hai bước cho mọi phương thức (ADR-0021); cổng QR chỉ có khi sandbox bật, thiếu thì đơn QR bị 400. */
     @Bean
     CommitPosPendingOrderUseCase commitPosPendingOrderUseCase(
-            SalesOrderRepository orders, PaymentIntentRepository intents, ObjectProvider<PaymentGatewayPort> gateway,
+            SalesOrderRepository orders, PaymentIntentRepository intents, ObjectProvider<PaymentGatewayPort> gateways,
             StockService stockService, GetSalesSettingsUseCase settings, DocumentNumberPort numbers,
             SalesAuditPort audit, TenantDirectoryPort tenants, SalesReturnRepository returns, Clock clock,
             @Value("${app.payments.sandbox.intent-ttl-minutes:10}") long qrTtlMinutes,
             @Value("${app.payments.manual.intent-ttl-minutes:10}") long manualTtlMinutes) {
-        return new CommitPosPendingOrderUseCase(orders, intents, gateway.getIfAvailable(), stockService, settings,
+        return new CommitPosPendingOrderUseCase(orders, intents, gateways.orderedStream().toList(), stockService, settings,
                 numbers, audit, tenants, returns, clock, Duration.ofMinutes(qrTtlMinutes),
                 Duration.ofMinutes(manualTtlMinutes));
     }

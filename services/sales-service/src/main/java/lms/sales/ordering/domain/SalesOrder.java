@@ -166,8 +166,8 @@ public final class SalesOrder {
                                        String walkInPhone, List<LineDraft> drafts, Discount orderDiscount,
                                        PriceCalculator.TaxPolicy tax, UUID clientRequestId,
                                        UUID exchangeOfReturnId) {
-        if (method == null || !method.allowedForPos() || method == PaymentMethod.QR) {
-            // QR không thu xong ngay: dùng createPosAwaitingPayment
+        if (method == null || !method.allowedForPos() || method.isGateway()) {
+            // QR/MoMo không thu xong ngay: dùng createPosAwaitingPayment
             throw SalesException.invalidRequest("Phương thức thanh toán không hợp lệ cho bán tại quầy");
         }
         if (drafts == null || drafts.isEmpty()) {
@@ -196,7 +196,7 @@ public final class SalesOrder {
         if (fulfilment == null || fulfilment == Fulfilment.COUNTER) {
             throw SalesException.invalidRequest("Hình thức nhận hàng phải là nhận tại cửa hàng hoặc giao hàng");
         }
-        if (method == null || method == PaymentMethod.CARD || method == PaymentMethod.QR
+        if (method == null || method == PaymentMethod.CARD || method.isGateway()
                 || (method == PaymentMethod.COD && fulfilment != Fulfilment.DELIVERY)
                 || (method == PaymentMethod.CASH && fulfilment != Fulfilment.PICKUP)) {
             throw SalesException.invalidRequest("Phương thức thanh toán không phù hợp với hình thức nhận hàng");
@@ -335,7 +335,7 @@ public final class SalesOrder {
 
     /** Cổng QR báo đã nhận đủ tiền (người ghi: không có). */
     public PaymentRecord settleQrPayment(String reference, Instant now) {
-        if (paymentMethod != PaymentMethod.QR) {
+        if (paymentMethod == null || !paymentMethod.isGateway()) {
             throw stateConflict();
         }
         return settleAwaitingPayment(reference, null, now);
@@ -386,8 +386,8 @@ public final class SalesOrder {
         if (paymentStatus != PaymentStatus.UNPAID) {
             throw new SalesException(ErrorCode.ORDER_STATE_CONFLICT, "Đơn đã được đánh dấu đã thu");
         }
-        if (method == null || method == PaymentMethod.QR) {
-            // QR chỉ được ghi nhận qua cổng thanh toán (settleQrPayment), không đánh dấu tay
+        if (method == null || method.isGateway()) {
+            // QR/MoMo chỉ được ghi nhận qua cổng thanh toán (settleQrPayment), không đánh dấu tay
             throw SalesException.invalidRequest("Thiếu hoặc sai phương thức thanh toán");
         }
         PaymentRecord p = new PaymentRecord(UUID.randomUUID(), grandTotal, method,

@@ -62,6 +62,11 @@ class PaymentSandboxDisabledWebTest {
         }
 
         @Bean
+        lms.sales.ordering.application.SyncGatewayPaymentUseCase syncGatewayPaymentUseCase(QrFixture fx) {
+            return fx.gatewaySync;
+        }
+
+        @Bean
         lms.sales.ordering.application.PaymentTenantResolverPort paymentTenantResolverPort(QrFixture fx) {
             return fx.resolver;
         }

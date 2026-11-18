@@ -37,8 +37,8 @@ public class CommitPosPendingOrderUseCase {
 
     private final SalesOrderRepository orders;
     private final PaymentIntentRepository intents;
-    /** Null khi cổng QR chưa bật (sandbox tắt): đơn QR bị từ chối 400 PAYMENT_NOT_ENABLED. */
-    private final PaymentGatewayPort gateway;
+    /** Các cổng đang bật (QR giả lập, MoMo); thiếu cổng của phương thức thì đơn bị từ chối 400 PAYMENT_NOT_ENABLED. */
+    private final List<PaymentGatewayPort> gateways;
     private final StockService stockService;
     private final GetSalesSettingsUseCase settingsUseCase;
     private final DocumentNumberPort numbers;
@@ -50,14 +50,14 @@ public class CommitPosPendingOrderUseCase {
     private final Duration manualTtl;
 
     public CommitPosPendingOrderUseCase(SalesOrderRepository orders, PaymentIntentRepository intents,
-                                        PaymentGatewayPort gateway, StockService stockService,
+                                        List<PaymentGatewayPort> gateways, StockService stockService,
                                         GetSalesSettingsUseCase settingsUseCase, DocumentNumberPort numbers,
                                         SalesAuditPort audit, TenantDirectoryPort tenants,
                                         SalesReturnRepository returns, Clock clock, Duration qrTtl,
                                         Duration manualTtl) {
         this.orders = orders;
         this.intents = intents;
-        this.gateway = gateway;
+        this.gateways = gateways;
         this.stockService = stockService;
         this.settingsUseCase = settingsUseCase;
         this.numbers = numbers;
@@ -82,9 +82,11 @@ public class CommitPosPendingOrderUseCase {
         if (existing.isPresent()) {
             return replay(cmd.tenantId(), existing.get());
         }
-        boolean qr = cmd.paymentMethod() == PaymentMethod.QR;
-        if (qr && gateway == null) {
-            throw new SalesException(ErrorCode.PAYMENT_NOT_ENABLED, "Thanh toán QR chưa được bật");
+        boolean viaGateway = cmd.paymentMethod().isGateway();
+        PaymentGatewayPort gateway = viaGateway ? gatewayFor(cmd.paymentMethod()) : null;
+        if (viaGateway && gateway == null) {
+            throw new SalesException(ErrorCode.PAYMENT_NOT_ENABLED, cmd.paymentMethod() == PaymentMethod.MOMO
+                    ? "Thanh toán MoMo chưa được bật" : "Thanh toán QR chưa được bật");
         }
         if (cmd.exchangeOfReturnId() != null
                 && returns.findById(cmd.tenantId(), cmd.exchangeOfReturnId()).isEmpty()) {
@@ -134,7 +136,7 @@ public class CommitPosPendingOrderUseCase {
         String provider = PaymentIntent.PROVIDER_MANUAL;
         String qrPayload = null;
         Instant expiresAt = now.plus(manualTtl);
-        if (qr) {
+        if (viaGateway) {
             expiresAt = now.plus(qrTtl);
             provider = gateway.provider();
             qrPayload = gateway.createQr(new PaymentGatewayPort.ChargeRequest(reference, saved.grandTotal(),
@@ -145,6 +147,11 @@ public class CommitPosPendingOrderUseCase {
         tenants.touch(cmd.tenantId());
         audit(cmd, saved, now, intent);
         return new PosOrderResult(OrderResponse.from(saved), PaymentIntentResponse.from(intent, now));
+    }
+
+    private PaymentGatewayPort gatewayFor(PaymentMethod method) {
+        String provider = method == PaymentMethod.MOMO ? PaymentIntent.PROVIDER_MOMO : PaymentIntent.PROVIDER_SIMULATED;
+        return gateways.stream().filter(g -> provider.equals(g.provider())).findFirst().orElse(null);
     }
 
     private void audit(PlacePosOrderCommand cmd, SalesOrder saved, Instant now, PaymentIntent intent) {

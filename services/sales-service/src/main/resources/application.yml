@@ -81,6 +81,16 @@ app:
 
 # Middleware phân quyền theo endpoint (security-common): khóa Controller/method được đăng ký về identity-service
 lms:
+    # Cổng MoMo sandbox (https://test-payment.momo.vn): mặc định tắt; khóa đọc từ biến môi trường (dev có khóa test công khai
+    # của MoMo ở application-dev.yml). Kết quả lấy bằng truy vấn MoMo khi FE thăm dò, không cần IPN.
+    momo:
+      enabled: ${PAYMENTS_MOMO_ENABLED:false}
+      endpoint: ${PAYMENTS_MOMO_ENDPOINT:https://test-payment.momo.vn}
+      partner-code: ${PAYMENTS_MOMO_PARTNER_CODE:}
+      access-key: ${PAYMENTS_MOMO_ACCESS_KEY:}
+      secret-key: ${PAYMENTS_MOMO_SECRET_KEY:}
+      redirect-url: ${PAYMENTS_MOMO_REDIRECT_URL:https://example.com/momo/return}
+      ipn-url: ${PAYMENTS_MOMO_IPN_URL:https://example.com/momo/ipn}
   security:
     permission:
       service-name: ${spring.application.name}

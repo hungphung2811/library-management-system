@@ -165,7 +165,7 @@ public final class Harness {
             new lms.sales.ordering.application.PaymentIntentUseCases(intents, orderRepo, stockService, auditPort,
                     clock);
     public final lms.sales.ordering.application.CommitPosPendingOrderUseCase commitPending =
-            new lms.sales.ordering.application.CommitPosPendingOrderUseCase(orderRepo, intents, null, stockService,
+            new lms.sales.ordering.application.CommitPosPendingOrderUseCase(orderRepo, intents, java.util.List.of(), stockService,
                     getSettings, numbers, auditPort, tenantDirectory, returnRepo, clock,
                     java.time.Duration.ofMinutes(10), java.time.Duration.ofMinutes(10));
     public final PlacePosOrderUseCase placePos = new PlacePosOrderUseCase(orderRepo, catalog,

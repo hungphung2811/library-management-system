@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Size;
 import java.util.UUID;
 import lms.sales.ordering.application.PaymentIntentResponse;
 import lms.sales.ordering.application.PaymentIntentUseCases;
+import lms.sales.ordering.application.SyncGatewayPaymentUseCase;
 import lms.sales.shared.infrastructure.web.RequestSupport;
 import lms.security.permission.RequiresModule;
 import lms.security.permission.TenantModule;
@@ -33,15 +34,19 @@ public class PaymentIntentController {
 
     private final PaymentIntentUseCases intents;
     private final SimulatedWebhookProcessor webhook;
+    private final SyncGatewayPaymentUseCase gatewaySync;
 
-    public PaymentIntentController(PaymentIntentUseCases intents, SimulatedWebhookProcessor webhook) {
+    public PaymentIntentController(PaymentIntentUseCases intents, SimulatedWebhookProcessor webhook,
+                                   SyncGatewayPaymentUseCase gatewaySync) {
         this.intents = intents;
         this.webhook = webhook;
+        this.gatewaySync = gatewaySync;
     }
 
     @GetMapping("/{id}")
     public PaymentIntentResponse get(@PathVariable UUID id) {
-        return intents.get(RequestSupport.tenant(), id);
+        // Lệnh của cổng không có webhook (MoMo) được hỏi cổng ngay ở lần thăm dò này
+        return gatewaySync.refresh(RequestSupport.tenant(), intents.get(RequestSupport.tenant(), id));
     }
 
     @PostMapping("/{id}/cancel")

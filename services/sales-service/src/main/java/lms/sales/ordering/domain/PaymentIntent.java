@@ -15,6 +15,8 @@ import lms.sales.shared.domain.SalesException;
 public final class PaymentIntent {
 
     public static final String PROVIDER_SIMULATED = "SIMULATED";
+    /** Cổng sandbox của MoMo (captureWallet); kết quả lấy bằng cách truy vấn MoMo khi FE thăm dò. */
+    public static final String PROVIDER_MOMO = "MOMO";
     /** Thu tay tại quầy (tiền mặt, thẻ, chuyển khoản đã đối soát): thu ngân bấm xác nhận (ADR-0021). */
     public static final String PROVIDER_MANUAL = "MANUAL";
     public static final int MAX_TRANSACTION_REF = 64;

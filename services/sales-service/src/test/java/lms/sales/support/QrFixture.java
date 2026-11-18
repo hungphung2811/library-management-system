@@ -35,6 +35,7 @@ public final class QrFixture {
     public final PlacePosOrderUseCase placePos;
     public final PaymentIntentUseCases intentUseCases;
     public final ProcessPaymentWebhookUseCase webhook;
+    public final lms.sales.ordering.application.SyncGatewayPaymentUseCase gatewaySync;
     public final ExpirePaymentIntentsUseCase expire;
     public final PaymentTenantResolverPort resolver;
 
@@ -42,7 +43,7 @@ public final class QrFixture {
         this.h = h;
         this.intents = h.intents;
         this.resolver = reference -> h.intents.tenantOfReference(reference);
-        this.qrCommit = new CommitPosPendingOrderUseCase(h.orderRepo, intents, gateway, h.stockService, h.getSettings,
+        this.qrCommit = new CommitPosPendingOrderUseCase(h.orderRepo, intents, java.util.List.of(gateway), h.stockService, h.getSettings,
                 h.numbers, h.auditPort, h.tenantDirectory, h.returnRepo, h.clock, Duration.ofMinutes(10),
                 Duration.ofMinutes(10));
         this.placePos = new PlacePosOrderUseCase(h.orderRepo, h.catalog,
@@ -50,6 +51,7 @@ public final class QrFixture {
                         h.tenantDirectory, h.returnRepo), qrCommit);
         this.intentUseCases = h.intentUseCases;
         this.webhook = new ProcessPaymentWebhookUseCase(intents, h.orderRepo, h.stockService, h.auditPort, h.clock);
+        this.gatewaySync = new lms.sales.ordering.application.SyncGatewayPaymentUseCase(java.util.List.of(gateway), webhook);
         this.expire = new ExpirePaymentIntentsUseCase(intents, intentUseCases, h.clock, 100);
     }
 }

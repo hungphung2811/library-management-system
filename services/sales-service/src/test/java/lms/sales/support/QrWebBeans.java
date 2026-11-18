@@ -40,6 +40,11 @@ public class QrWebBeans {
     }
 
     @Bean
+    lms.sales.ordering.application.SyncGatewayPaymentUseCase syncGatewayPaymentUseCase(QrFixture fx) {
+        return fx.gatewaySync;
+    }
+
+    @Bean
     PaymentTenantResolverPort paymentTenantResolverPort(QrFixture fx) {
         return fx.resolver;
     }

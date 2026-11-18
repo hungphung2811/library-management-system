@@ -47,12 +47,18 @@ public class ProcessPaymentWebhookUseCase {
         this.clock = clock;
     }
 
-    @Transactional
+    /** Webhook của cổng giả lập (chỉ lệnh SIMULATED). */
     public Result execute(UUID tenantId, Command cmd) {
+        return execute(tenantId, cmd, PaymentIntent.PROVIDER_SIMULATED);
+    }
+
+    /** Ghi nhận thanh toán của cổng {@code provider}: lệnh phải thuộc đúng cổng đó. */
+    @Transactional
+    public Result execute(UUID tenantId, Command cmd, String provider) {
         PaymentIntent intent = intents.findByReference(tenantId, cmd.reference()).orElseThrow(
                 () -> new SalesException(ErrorCode.PAYMENT_INTENT_NOT_FOUND, "Không có lệnh thanh toán"));
         Instant now = clock.instant();
-        if (!PaymentIntent.PROVIDER_SIMULATED.equals(intent.provider())) {
+        if (!provider.equals(intent.provider())) {
             // Lệnh thu tay (MANUAL) không do cổng này xác nhận, dù biết mã tham chiếu và có chữ ký hợp lệ
             throw new SalesException(ErrorCode.PAYMENT_NOT_SIMULATED, "Lệnh thanh toán này không thuộc cổng giả lập");
         }

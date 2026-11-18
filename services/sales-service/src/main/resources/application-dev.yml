@@ -20,6 +20,12 @@ app:
     sandbox:
       enabled: ${PAYMENTS_SANDBOX_ENABLED:true}
       webhook-secret: ${PAYMENTS_SANDBOX_WEBHOOK_SECRET:dev-only-sandbox-webhook-secret}
+    # Khóa test công khai trong mã mẫu chính thức của MoMo (github.com/momo-wallet/payment), chỉ chạy sandbox.
+    momo:
+      enabled: ${PAYMENTS_MOMO_ENABLED:true}
+      partner-code: ${PAYMENTS_MOMO_PARTNER_CODE:MOMOBKUN20180529}
+      access-key: ${PAYMENTS_MOMO_ACCESS_KEY:klm05TvNBzhg7h7j}
+      secret-key: ${PAYMENTS_MOMO_SECRET_KEY:at67qH6mk8w5Y1nAyMoYKMWACiEi2bsa}
 
 # Dev tắt kiểm quyền theo endpoint cùng với cờ bảo mật ở trên
 lms:
