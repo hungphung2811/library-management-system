@@ -20,6 +20,12 @@ public interface ReservationRepository {
     /** Vị trí trong hàng đợi FIFO của đầu sách (1 = đầu hàng); 0 nếu đặt trước không ở trạng thái WAITING. */
     long queuePosition(Reservation reservation);
 
+    /**
+     * Vị trí hàng đợi của nhiều đặt trước bằng một truy vấn (tránh gọi {@link #queuePosition} từng dòng); khóa là id
+     * đặt trước, giá trị theo cùng quy ước (0 nếu không WAITING).
+     */
+    java.util.Map<UUID, Long> queuePositions(java.util.Collection<Reservation> reservations);
+
     /** Người đứng đầu hàng đợi WAITING của đầu sách (QĐ7), khóa dòng để hai lần giữ đồng thời không chọn trùng người. */
     Optional<Reservation> findNextWaitingForUpdate(UUID titleId);
 

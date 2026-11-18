@@ -5,7 +5,11 @@ import lms.circulation.reservation.domain.Reservation;
 import lms.circulation.reservation.domain.ReservationRepository;
 import lms.circulation.reservation.domain.ReservationStatus;
 import java.time.LocalDate;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -55,6 +59,24 @@ class ReservationPersistenceAdapter implements ReservationRepository {
     public long queuePosition(Reservation r) {
         if (r.status() != ReservationStatus.WAITING) return 0;
         return jpa.countAheadOrEqual(r.titleId(), ReservationStatus.WAITING, r.reservedAt(), r.id());
+    }
+
+    @Override
+    public Map<UUID, Long> queuePositions(Collection<Reservation> reservations) {
+        Map<UUID, Long> result = new HashMap<>();
+        Set<UUID> titleIds = new HashSet<>();
+        for (Reservation r : reservations) {
+            result.put(r.id(), 0L);
+            if (r.status() == ReservationStatus.WAITING) titleIds.add(r.titleId());
+        }
+        if (titleIds.isEmpty()) return result;
+        // Xếp hạng trong hàng đợi WAITING của từng đầu sách theo đúng thứ tự (reservedAt, id) của queuePosition.
+        Map<UUID, Long> rankByTitle = new HashMap<>();
+        for (Object[] row : jpa.findQueueOrder(titleIds, ReservationStatus.WAITING)) {
+            long rank = rankByTitle.merge((UUID) row[0], 1L, Long::sum);
+            if (result.containsKey((UUID) row[1])) result.put((UUID) row[1], rank);
+        }
+        return result;
     }
 
     @Override

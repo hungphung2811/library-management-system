@@ -2,9 +2,9 @@ package lms.circulation.policy.infrastructure.web;
 
 import jakarta.validation.Valid;
 import lms.circulation.policy.application.CirculationPolicyResponse;
-import lms.circulation.policy.application.GetCirculationPolicyUseCase;
 import lms.circulation.policy.application.UpdateCirculationPolicyRequest;
 import lms.circulation.policy.application.UpdateCirculationPolicyUseCase;
+import lms.circulation.policy.infrastructure.cache.CachedPolicyReader;
 import lms.security.CurrentUser;
 import lms.security.permission.RequiresModule;
 import lms.security.permission.TenantModule;
@@ -24,17 +24,17 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/internal/circulation/policy")
 public class CirculationPolicyController {
 
-    private final GetCirculationPolicyUseCase getPolicy;
+    private final CachedPolicyReader getPolicy;
     private final UpdateCirculationPolicyUseCase updatePolicy;
 
-    public CirculationPolicyController(GetCirculationPolicyUseCase getPolicy, UpdateCirculationPolicyUseCase updatePolicy) {
+    public CirculationPolicyController(CachedPolicyReader getPolicy, UpdateCirculationPolicyUseCase updatePolicy) {
         this.getPolicy = getPolicy;
         this.updatePolicy = updatePolicy;
     }
 
     @GetMapping
     public CirculationPolicyResponse get() {
-        return getPolicy.execute();
+        return getPolicy.get();
     }
 
     @PutMapping

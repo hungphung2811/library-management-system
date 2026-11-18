@@ -33,6 +33,11 @@ interface SpringDataReservationRepository extends JpaRepository<ReservationJpaEn
     long countAheadOrEqual(@Param("titleId") UUID titleId, @Param("status") ReservationStatus status,
                            @Param("at") Instant at, @Param("id") UUID id);
 
+    /** Hàng đợi WAITING của nhiều đầu sách theo thứ tự (reservedAt, id): phục vụ tính vị trí theo lô (idx_reservations_queue). */
+    @Query("select r.titleId, r.id from ReservationJpaEntity r where r.titleId in :titleIds and r.status = :status "
+            + "order by r.titleId, r.reservedAt, r.id")
+    List<Object[]> findQueueOrder(@Param("titleIds") Collection<UUID> titleIds, @Param("status") ReservationStatus status);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<ReservationJpaEntity> findFirstByTitleIdAndStatusOrderByReservedAtAscIdAsc(UUID titleId,
                                                                                        ReservationStatus status);

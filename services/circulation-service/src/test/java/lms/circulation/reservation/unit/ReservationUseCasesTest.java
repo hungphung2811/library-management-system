@@ -84,7 +84,19 @@ class ReservationUseCasesTest {
         public Optional<Reservation> findReadyByCopyId(UUID copyId) {
             return items.stream().filter(r -> r.status() == ReservationStatus.READY && copyId.equals(r.copyId())).findFirst();
         }
+        int singlePositionCalls;
+        int batchPositionCalls;
+        public Map<UUID, Long> queuePositions(java.util.Collection<Reservation> rs) {
+            batchPositionCalls++;
+            Map<UUID, Long> out = new HashMap<>();
+            for (Reservation r : rs) out.put(r.id(), positionOf(r));
+            return out;
+        }
         public long queuePosition(Reservation r) {
+            singlePositionCalls++;
+            return positionOf(r);
+        }
+        private long positionOf(Reservation r) {
             if (r.status() != ReservationStatus.WAITING) return 0;
             return visible().filter(x -> x.titleId().equals(r.titleId()) && x.status() == ReservationStatus.WAITING
                     && x.reservedAt().compareTo(r.reservedAt()) <= 0).count();
@@ -203,6 +215,22 @@ class ReservationUseCasesTest {
         assertEquals(1, list.execute(other).get(0).queuePosition());
         assertEquals(0, list.execute(reader).get(0).queuePosition());
         assertEquals(ReservationStatus.CANCELLED, list.execute(reader).get(0).status());
+    }
+
+    @Test
+    void danhSachCuaToiTinhViTriTheoLoMotLanKhongGoiTungDong() {
+        // Độc giả đặt trước nhiều đầu sách khác nhau: danh sách chỉ được hỏi vị trí một lần cho cả lô.
+        for (int i = 0; i < 5; i++) {
+            now = now.plusSeconds(1);
+            reserve.execute(reader, UUID.randomUUID());
+        }
+        repo.singlePositionCalls = 0;
+        repo.batchPositionCalls = 0;
+        List<ReservationResponse> mine = new ListMyReservationsUseCase(repo).execute(reader);
+        assertEquals(5, mine.size());
+        assertEquals(0, repo.singlePositionCalls);
+        assertEquals(1, repo.batchPositionCalls);
+        mine.forEach(r -> assertEquals(1, r.queuePosition()));
     }
 
     // ---- QĐ6, QĐ9, UC14 ----
