@@ -14,10 +14,11 @@ public final class StorefrontDtos {
 
     /**
      * Kết quả phân giải storefront từ identity (ADR-0011 2.1). Nội bộ customer-api, KHÔNG bao giờ trả ra ngoài:
-     * accessToken là token dịch vụ (claim svc). expiresIn tính bằng giây.
+     * accessToken là token dịch vụ (claim svc). expiresIn tính bằng giây. {@code applicationId}: id Application khi phân
+     * giải theo site key (Public Site Key, P2); null khi phân giải theo mã tenant ({code}) hoặc identity chưa nâng cấp.
      */
     public record StorefrontAccess(UUID tenantId, String code, String name, String accessToken, long expiresIn,
-                                   Set<String> allowedOrigins, Set<String> modules) {
+                                   Set<String> allowedOrigins, Set<String> modules, UUID applicationId) {
 
         /** Identity cũ chỉ trả tenant có SALES và không có trường modules: coi như chỉ SALES (ADR-0023 2.1). */
         static final Set<String> LEGACY_MODULES = Set.of("SALES");
@@ -52,13 +53,18 @@ public final class StorefrontDtos {
             }
         }
 
+        public StorefrontAccess(UUID tenantId, String code, String name, String accessToken, long expiresIn,
+                                Set<String> allowedOrigins, Set<String> modules) {
+            this(tenantId, code, name, accessToken, expiresIn, allowedOrigins, modules, null);
+        }
+
         public StorefrontAccess(UUID tenantId, String code, String name, String accessToken, long expiresIn) {
-            this(tenantId, code, name, accessToken, expiresIn, null, null);
+            this(tenantId, code, name, accessToken, expiresIn, null, null, null);
         }
 
         public StorefrontAccess(UUID tenantId, String code, String name, String accessToken, long expiresIn,
                                 Set<String> allowedOrigins) {
-            this(tenantId, code, name, accessToken, expiresIn, allowedOrigins, null);
+            this(tenantId, code, name, accessToken, expiresIn, allowedOrigins, null, null);
         }
 
         /** Tenant có ít nhất một module đáp ứng tính năng {@code feature}. */

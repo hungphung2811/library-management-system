@@ -38,10 +38,20 @@ public class HttpStorefrontAccessClient implements StorefrontAccessClient {
 
     @Override
     public Optional<StorefrontAccess> issue(String tenantCode) {
+        return request(new TokenRequest(tenantCode));
+    }
+
+    /** Thân {siteKey}: KHÔNG log, KHÔNG đưa site key vào thông điệp lỗi. */
+    @Override
+    public Optional<StorefrontAccess> issueBySiteKey(String siteKey) {
+        return request(new SiteKeyRequest(siteKey));
+    }
+
+    private Optional<StorefrontAccess> request(Object requestBody) {
         try {
             StorefrontAccess access = client.post().uri("/internal/storefront/access-tokens")
                     .header(SECRET_HEADER, clientSecret)
-                    .body(new TokenRequest(tenantCode))
+                    .body(requestBody)
                     .retrieve().body(StorefrontAccess.class);
             if (access == null || access.accessToken() == null || access.tenantId() == null) {
                 throw PublicApiException.serviceUnavailable();
@@ -71,5 +81,13 @@ public class HttpStorefrontAccessClient implements StorefrontAccessClient {
     }
 
     record TokenRequest(String tenantCode) {
+    }
+
+    record SiteKeyRequest(String siteKey) {
+
+        @Override
+        public String toString() {
+            return "SiteKeyRequest[siteKey=***]";
+        }
     }
 }

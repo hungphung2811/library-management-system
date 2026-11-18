@@ -74,6 +74,33 @@ public class SecurityConfiguration {
             AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/public/t/*/me/reservations/*/cancellation"),
             AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/public/t/*/me/reader-profile"));
 
+    /**
+     * Public API v1 (Public Site Key, SaaS API Authentication P2): danh sách đóng từng mẫu, tenant xác định bằng header
+     * X-Site-Key (do controller kiểm: thiếu/sai thì 404 SHOP_NOT_AVAILABLE). Site key không phải xác thực; ghi chỉ qua phiên khách.
+     */
+    static final RequestMatcher PUBLIC_API_V1 = new OrRequestMatcher(
+            AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/api/public/v1/books"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.HEAD, "/api/public/v1/books"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/api/public/v1/books/suggestions"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.HEAD, "/api/public/v1/books/suggestions"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/api/public/v1/books/*"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.HEAD, "/api/public/v1/books/*"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/api/public/v1/books/*/preview"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.HEAD, "/api/public/v1/books/*/preview"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/api/public/v1/banners"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.HEAD, "/api/public/v1/banners"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/api/public/v1/sessions"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/api/public/v1/sessions/signup"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/api/public/v1/sessions/refresh"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/api/public/v1/sessions/logout"));
+
+    /** Cần phiên khách (JWT storefront) ở Public API v1: đơn hàng. Không có giỏ hàng server, không đặt đơn vãng lai (Q4). */
+    static final RequestMatcher AUTHENTICATED_API_V1 = new OrRequestMatcher(
+            AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/api/public/v1/orders"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/api/public/v1/orders"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/api/public/v1/orders/*"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/api/public/v1/orders/*/cancellation"));
+
     @Bean
     JsonErrorWriter jsonErrorWriter(ObjectMapper mapper) {
         return new JsonErrorWriter(mapper);
@@ -82,10 +109,11 @@ public class SecurityConfiguration {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, JsonErrorWriter writer) throws Exception {
         DefaultBearerTokenResolver defaultResolver = new DefaultBearerTokenResolver();
-        BearerTokenResolver resolver = request -> PUBLIC_API.matches(request) ? null : defaultResolver.resolve(request);
+        BearerTokenResolver resolver = request -> PUBLIC_API.matches(request) || PUBLIC_API_V1.matches(request)
+                ? null : defaultResolver.resolve(request);
         // Chưa xác thực: 401 ở /public/** (cần đăng nhập), còn lại (denyAll) trả 403 để không lộ gì về đường dẫn nội bộ.
         AuthenticationEntryPoint entryPoint = (request, response, ex) -> {
-            if (request.getRequestURI().startsWith("/public/")) {
+            if (request.getRequestURI().startsWith("/public/") || request.getRequestURI().startsWith("/api/public/")) {
                 writer.write(response, HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Cần đăng nhập");
             } else {
                 writer.write(response, HttpStatus.FORBIDDEN, "FORBIDDEN", "Không được phép truy cập");
@@ -100,7 +128,9 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.OPTIONS).permitAll()
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         .requestMatchers(PUBLIC_API).permitAll()
+                        .requestMatchers(PUBLIC_API_V1).permitAll()
                         .requestMatchers(AUTHENTICATED_API).authenticated()
+                        .requestMatchers(AUTHENTICATED_API_V1).authenticated()
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(o -> o.bearerTokenResolver(resolver).authenticationEntryPoint(entryPoint)
                         .accessDeniedHandler(denied).jwt(j -> { }))

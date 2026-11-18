@@ -11,4 +11,12 @@ public interface StorefrontAccessClient {
      *         bí mật sai) ném PublicApiException 503, không bao giờ bị đệm.
      */
     Optional<StorefrontAccess> issue(String tenantCode);
+
+    /**
+     * Như {@link #issue} nhưng theo site key công khai (Public Site Key, P2): identity nhận {@code {siteKey}} và trả thêm
+     * applicationId; allowedOrigins là origin của CHÍNH Application. Mặc định rỗng (client không hỗ trợ site key).
+     */
+    default Optional<StorefrontAccess> issueBySiteKey(String siteKey) {
+        return Optional.empty();
+    }
 }

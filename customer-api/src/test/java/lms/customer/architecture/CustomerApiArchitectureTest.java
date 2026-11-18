@@ -133,6 +133,30 @@ class CustomerApiArchitectureTest {
         };
     }
 
+    /**
+     * Public API v1 (Public Site Key, P2): controller mỏng gọi lại client/DTO của nhóm khác, nhưng không dùng web của nhóm
+     * khác; ngược lại các nhóm khác không biết nhóm publicv1.
+     */
+    @ArchTest
+    static final ArchRule publicv1KhongDungWebNhomKhac = noClasses()
+            .that().resideInAPackage("lms.customer.publicv1..")
+            .should().dependOnClassesThat().resideInAnyPackage("lms.customer.site.web..", "lms.customer.auth.web..",
+                    "lms.customer.storefront.web..", "lms.customer.catalog.web..", "lms.customer.shop.web..",
+                    "lms.customer.banner.web..", "lms.customer.reader.web..");
+
+    @ArchTest
+    static final ArchRule nhomKhacKhongBietPublicv1 = noClasses()
+            .that().resideInAnyPackage("lms.customer.site..", "lms.customer.auth..", "lms.customer.storefront..",
+                    "lms.customer.catalog..", "lms.customer.shop..", "lms.customer.banner..", "lms.customer.reader..")
+            .should().dependOnClassesThat().resideInAPackage("lms.customer.publicv1..");
+
+    /** publicv1 không biết cài đặt HTTP của client (chỉ interface) và không phụ thuộc security-common/tenant-common. */
+    @ArchTest
+    static final ArchRule publicv1ChiDungInterfaceClient = noClasses()
+            .that().resideInAPackage("lms.customer.publicv1..")
+            .should().dependOnClassesThat().resideInAnyPackage("lms.customer.*.client.http..",
+                    "org.springframework.web.client..", "lms.security..", "lms.tenant..");
+
     @ArchTest
     static final ArchRule khongDungRequirePermission = noClasses()
             .that().resideInAPackage("lms.customer..")

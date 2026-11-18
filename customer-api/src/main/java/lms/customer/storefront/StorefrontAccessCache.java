@@ -30,6 +30,8 @@ public class StorefrontAccessCache {
 
     /** Chỉ ASCII: tránh hạ chữ theo Unicode biến ký tự lạ (Kelvin U+212A, İ...) thành ASCII rồi lọt qua. */
     private static final Pattern CODE = Pattern.compile("^[a-zA-Z0-9-]{2,50}$");
+    /** Khớp SiteKey của identity ({@code lms_pk_} + base64url 24 byte = 32 ký tự; chấp nhận tới 56). */
+    private static final Pattern SITE_KEY = Pattern.compile("^lms_pk_[A-Za-z0-9_-]{32,56}$");
     /** Trần expiresIn nhận từ identity (24 giờ): chặn giá trị phi lý làm tràn số hoặc đệm vô hạn. */
     static final long MAX_EXPIRES_IN_SECONDS = Duration.ofHours(24).toSeconds();
 
@@ -122,16 +124,71 @@ public class StorefrontAccessCache {
     /** @throws PublicApiException 404 SHOP_NOT_AVAILABLE (một mã chung), 503 khi identity lỗi. */
     public StorefrontAccess resolve(String rawCode) {
         String code = normalize(rawCode).orElseThrow(PublicApiException::shopNotAvailable);
-        if (negative.getIfPresent(code) != null) {
+        return lookup(code, client::issue);
+    }
+
+    /**
+     * Site key công khai hợp lệ về định dạng ({@code lms_pk_} + 32..56 ký tự base64url): phân biệt hoa thường, KHÔNG hạ
+     * chữ. Sai định dạng thì 404 ngay, không gọi identity, không vào bộ đệm.
+     */
+    public static boolean isSiteKeyFormat(String rawSiteKey) {
+        return rawSiteKey != null && SITE_KEY.matcher(rawSiteKey).matches();
+    }
+
+    /**
+     * Khóa bộ đệm của site key: {@code k:} + SHA-256 (hex) của site key. Site key thô KHÔNG bao giờ là khóa bộ đệm, không
+     * vào log. Tiền tố {@code k:} không thể trùng khóa theo mã tenant (mã chỉ có [a-z0-9-]).
+     */
+    static String siteKeyCacheKey(String siteKey) {
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(siteKey.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return "k:" + java.util.HexFormat.of().formatHex(digest);
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /**
+     * Phân giải theo site key (Public Site Key, P2), cùng bộ đệm dương/phủ định như {@link #resolve} (kết quả phủ định
+     * giữ {@code negativeTtl}, mặc định 60 giây; mục dương giữ tối đa {@code originTtl}). Access trả về mang
+     * {@code applicationId} và allowedOrigins của chính Application.
+     *
+     * @throws PublicApiException 404 SHOP_NOT_AVAILABLE (một mã chung cho mọi lý do), 503 khi identity lỗi.
+     */
+    public StorefrontAccess resolveBySiteKey(String rawSiteKey) {
+        if (!isSiteKeyFormat(rawSiteKey)) {
+            throw PublicApiException.shopNotAvailable();
+        }
+        StorefrontAccess access = lookup(siteKeyCacheKey(rawSiteKey), key -> client.issueBySiteKey(rawSiteKey));
+        // Kết quả theo site key bắt buộc có applicationId (identity cũ không trả): thiếu thì coi như không khả dụng.
+        if (access.applicationId() == null) {
+            throw PublicApiException.shopNotAvailable();
+        }
+        return access;
+    }
+
+    /** Như {@link #resolveBySiteKey} nhưng không ném (quyết định CORS, fail-closed). */
+    public Optional<StorefrontAccess> tryResolveBySiteKey(String rawSiteKey) {
+        try {
+            return Optional.of(resolveBySiteKey(rawSiteKey));
+        } catch (RuntimeException ex) {
+            return Optional.empty();
+        }
+    }
+
+    private StorefrontAccess lookup(String cacheKey,
+                                    java.util.function.Function<String, Optional<StorefrontAccess>> issuer) {
+        if (negative.getIfPresent(cacheKey) != null) {
             throw PublicApiException.shopNotAvailable();
         }
         // Loader trả null thì Caffeine không lưu gì; các request đang chờ cùng mã vào loader lần lượt và dừng ở lần kiểm
         // bộ đệm phủ định bên dưới, nên vẫn chỉ một lời gọi identity cho cả đợt (chống bão).
-        StorefrontAccess access = cache.get(code, key -> {
+        StorefrontAccess access = cache.get(cacheKey, key -> {
             if (negative.getIfPresent(key) != null) {
                 return null;
             }
-            Optional<StorefrontAccess> issued = client.issue(key);
+            Optional<StorefrontAccess> issued = issuer.apply(key);
             if (issued.isEmpty()) {
                 negative.put(key, Boolean.TRUE);
                 return null;
