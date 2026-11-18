@@ -132,7 +132,8 @@ class StorefrontOriginIT {
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
         Map<String, Object> body = JSON.readValue(r.getBody(), Map.class);
         assertThat(body.keySet()).containsExactlyInAnyOrder("tenantId", "code", "name", "accessToken", "expiresIn",
-                "allowedOrigins");
+                "allowedOrigins", "modules", "applicationId");
+        assertThat(body.get("applicationId")).as("tenantCode thì applicationId null").isNull();
         return (List<String>) body.get("allowedOrigins");
     }
 

@@ -119,7 +119,9 @@ class StorefrontAccessIT {
         assertThat(body.get("code")).isEqualTo("sf-ok");
         assertThat(body.get("expiresIn")).isEqualTo(300);
         assertThat(body.keySet()).containsExactlyInAnyOrder("tenantId", "code", "name", "accessToken", "expiresIn",
-                "allowedOrigins");
+                "allowedOrigins", "modules", "applicationId");
+        assertThat(body.get("applicationId")).as("tenantCode thì applicationId null").isNull();
+        assertThat(body.get("modules")).isEqualTo(List.of("SALES"));
 
         Jwt jwt = jwtDecoder.decode((String) body.get("accessToken"));
         assertThat(jwt.getClaimAsString("svc")).isEqualTo("customer-api");

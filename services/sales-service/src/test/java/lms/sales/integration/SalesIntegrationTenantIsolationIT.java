@@ -29,6 +29,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -71,6 +73,7 @@ class SalesIntegrationTenantIsolationIT {
     @Autowired ObjectMapper json;
     @Autowired RegisterStockItemUseCase registerItem;
     @Autowired AdjustStockUseCase adjust;
+    @Autowired PlatformTransactionManager txManager;
 
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean PermissionKeyRegistrar permissionKeyRegistrar;
@@ -108,10 +111,11 @@ class SalesIntegrationTenantIsolationIT {
         UUID title = UUID.randomUUID();
         TITLES.put(title, new CatalogLookupPort.CatalogTitle(title, "Sach rieng cua A", "Tac gia",
                 "ISBN-" + title.toString().substring(0, 8), BigDecimal.valueOf(100_000)));
-        TenantContext.runAs(tenantA, () -> {
+        // Use case ghi có audit MANDATORY nên phải chạy trong transaction (controller thường mở sẵn).
+        TenantContext.runAs(tenantA, () -> new TransactionTemplate(txManager).executeWithoutResult(st -> {
             registerItem.execute(tenantA, user, title, null, null);
             adjust.execute(tenantA, user, title, 10, "ton dau");
-        });
+        }));
         JsonNode created = json.readTree(mvc.perform(post(B + "/pos-orders").with(admin(tenantA))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"lines\":[{\"titleId\":\"" + title + "\",\"quantity\":2}],\"paymentMethod\":\"CASH\","
