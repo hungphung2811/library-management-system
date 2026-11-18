@@ -71,16 +71,6 @@ app:
       account-no: ${PAYMENTS_SANDBOX_ACCOUNT_NO:0123456789}
       account-name: ${PAYMENTS_SANDBOX_ACCOUNT_NAME:LMS DEMO}
       intent-ttl-minutes: ${PAYMENTS_SANDBOX_INTENT_TTL_MINUTES:10}
-    # Thu tay tại quầy (CASH, CARD, BANK_TRANSFER, ADR-0021): lệnh chờ thu ngân xác nhận, hết hạn thì nhả tồn
-    manual:
-      intent-ttl-minutes: ${PAYMENTS_MANUAL_INTENT_TTL_MINUTES:10}
-    # Job dọn lệnh quá hạn (mọi phương thức)
-    expire-delay-ms: 60000
-    expire-batch-size: 100
-    expire-job-enabled: true
-
-# Middleware phân quyền theo endpoint (security-common): khóa Controller/method được đăng ký về identity-service
-lms:
     # Cổng MoMo sandbox (https://test-payment.momo.vn): mặc định tắt; khóa đọc từ biến môi trường (dev có khóa test công khai
     # của MoMo ở application-dev.yml). Kết quả lấy bằng truy vấn MoMo khi FE thăm dò, không cần IPN.
     momo:
@@ -91,6 +81,16 @@ lms:
       secret-key: ${PAYMENTS_MOMO_SECRET_KEY:}
       redirect-url: ${PAYMENTS_MOMO_REDIRECT_URL:https://example.com/momo/return}
       ipn-url: ${PAYMENTS_MOMO_IPN_URL:https://example.com/momo/ipn}
+    # Thu tay tại quầy (CASH, CARD, BANK_TRANSFER, ADR-0021): lệnh chờ thu ngân xác nhận, hết hạn thì nhả tồn
+    manual:
+      intent-ttl-minutes: ${PAYMENTS_MANUAL_INTENT_TTL_MINUTES:10}
+    # Job dọn lệnh quá hạn (mọi phương thức)
+    expire-delay-ms: 60000
+    expire-batch-size: 100
+    expire-job-enabled: true
+
+# Middleware phân quyền theo endpoint (security-common): khóa Controller/method được đăng ký về identity-service
+lms:
   security:
     permission:
       service-name: ${spring.application.name}
