@@ -16,7 +16,7 @@ import org.springframework.data.redis.core.script.RedisScript;
 /**
  * Cửa sổ cố định 60 giây trong Redis (D6): một script Lua nguyên tử làm {@code INCR} + {@code EXPIRE} cho khóa
  * {@code lms:rl:v1:t:{tenantId}:a:{applicationId}:{group}:{epochMinute}} (TTL 120 giây) và, cùng lượt, bộ đếm sử dụng
- * {@code lms:usage:v1:t:{tenantId}:a:{applicationId}:{yyyyMMdd}} (UTC, TTL 35 ngày; chỉ đếm, chưa có API đọc; đếm cả
+ * {@code lms:usage:v1:t:{tenantId}:a:{applicationId}:{yyyyMMdd}} (UTC, TTL 35 ngày; identity đọc qua GET /internal/applications/{id}/usage; chỉ là tổng yêu cầu, đếm cả
  * request bị từ chối).
  *
  * <p>Fail-open: Redis lỗi hoặc chậm thì KHÔNG chặn request; chỉ log WARN rồi tạm bỏ qua Redis

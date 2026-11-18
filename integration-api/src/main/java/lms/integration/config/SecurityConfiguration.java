@@ -3,6 +3,8 @@ package lms.integration.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lms.integration.ratelimit.ApiRateLimiter;
 import lms.integration.ratelimit.RateLimitFilter;
+import lms.integration.revocation.RevocationFilter;
+import lms.integration.revocation.TokenRevocationChecker;
 import lms.integration.web.AccessLogFilter;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -33,7 +35,7 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
  * tương ứng trong claim {@code scope} (lớp phòng thủ đầu, quyết định cuối vẫn ở catalog/sales); đường dẫn khác dưới
  * {@code /api/integration/v1/**} (kể cả {@code /orders/{id}/contact}) đã xác thực chỉ gặp 404; MỌI thứ khác denyAll.
  * Không CORS (API cho backend, không dùng trình duyệt), không session, không CSRF. Log truy cập đặt trước bước xác
- * thực (ghi cả 401); giới hạn tốc độ đặt sau bước xác thực (cần claim tenant/application).
+ * thực (ghi cả 401); kiểm thu hồi token (tùy chọn) rồi giới hạn tốc độ đặt sau bước xác thực (cần claim tenant/application).
  */
 @Configuration
 public class SecurityConfiguration {
@@ -62,7 +64,8 @@ public class SecurityConfiguration {
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, JsonErrorWriter writer,
-                                            ObjectProvider<ApiRateLimiter> rateLimiter) throws Exception {
+                                            ObjectProvider<ApiRateLimiter> rateLimiter,
+                                            ObjectProvider<TokenRevocationChecker> revocation) throws Exception {
         DefaultBearerTokenResolver defaultResolver = new DefaultBearerTokenResolver();
         // Ở token endpoint header Authorization là Basic của client, không phải Bearer: bỏ qua để token cũ/hỏng
         // không làm hỏng yêu cầu xin token.
@@ -107,6 +110,11 @@ public class SecurityConfiguration {
                 .oauth2ResourceServer(o -> o.bearerTokenResolver(resolver).authenticationEntryPoint(entryPoint)
                         .accessDeniedHandler(denied).jwt(j -> { }))
                 .addFilterBefore(new AccessLogFilter(), BearerTokenAuthenticationFilter.class);
+        // Thu hồi chạy trước giới hạn tốc độ (request của token đã thu hồi không đếm vào hạn mức).
+        TokenRevocationChecker revocationChecker = revocation.getIfAvailable();
+        if (revocationChecker != null) {
+            configured.addFilterAfter(new RevocationFilter(revocationChecker, writer), BearerTokenAuthenticationFilter.class);
+        }
         ApiRateLimiter limiter = rateLimiter.getIfAvailable();
         if (limiter != null) {
             configured.addFilterAfter(new RateLimitFilter(limiter, writer), BearerTokenAuthenticationFilter.class);

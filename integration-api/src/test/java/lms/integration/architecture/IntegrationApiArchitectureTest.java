@@ -28,10 +28,11 @@ class IntegrationApiArchitectureTest {
                     "lms.sales..", "lms.catalog..", "lms.identity..", "lms.system..", "lms.circulation..",
                     "lms.support..", "lms.security..", "lms.tenant..", "lms.cache..");
 
-    /** Redis chỉ dùng cho bộ đếm giới hạn tốc độ (D6): ngoài package ratelimit không ai biết Redis. */
+    /** Redis chỉ dùng cho bộ đếm giới hạn tốc độ (D6) và kiểm thu hồi token: ngoài hai package đó không ai biết Redis. */
     @ArchTest
     static final ArchRule redisChiODoanRateLimit = noClasses()
-            .that().resideInAPackage("lms.integration..").and().resideOutsideOfPackage("lms.integration.ratelimit..")
+            .that().resideInAPackage("lms.integration..")
+            .and().resideOutsideOfPackages("lms.integration.ratelimit..", "lms.integration.revocation..")
             .should().dependOnClassesThat().resideInAPackage("org.springframework.data.redis..");
 
     /** Controller chỉ biết interface client và DTO, không biết RestClient hay cài đặt HTTP. */

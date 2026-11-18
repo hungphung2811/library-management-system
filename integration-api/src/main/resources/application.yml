@@ -72,3 +72,7 @@ app:
     rate-limit:
       enabled: ${INTEGRATION_RATE_LIMIT_ENABLED:false}
       default-per-minute: ${INTEGRATION_RATE_LIMIT_PER_MINUTE:600}
+    # Thu hồi token tức thời (tùy chọn, mặc định TẮT, cần Redis): từ chối token có jti trong lms:revoked:v1:jti:{jti} hoặc cấp
+    # trước dấu lms:revoked:v1:app:{applicationId} do identity ghi (INTEGRATION_REVOCATION_ENABLED ở identity). Fail-open.
+    revocation:
+      enabled: ${INTEGRATION_REVOCATION_ENABLED:false}
