@@ -10,6 +10,9 @@ interface SpringDataReaderProfileRepository extends JpaRepository<ReaderProfileJ
 
     boolean existsByCardNo(String cardNo);
 
+    @Query("select p.cardNo from ReaderProfileJpaEntity p where p.cardNo in :cardNos")
+    List<String> findCardNosIn(@Param("cardNos") java.util.Collection<String> cardNos);
+
     @Query("select p.userId from ReaderProfileJpaEntity p where lower(p.email) = lower(:email)")
     List<UUID> findUserIdsByEmail(@Param("email") String email);
 }

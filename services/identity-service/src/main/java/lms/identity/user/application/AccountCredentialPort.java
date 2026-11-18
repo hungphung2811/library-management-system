@@ -17,6 +17,13 @@ public interface AccountCredentialPort {
 
     boolean exists(UUID userId);
 
+    /** Tên đăng nhập (đã chuẩn hóa) trong {@code usernames} đã có credential (mọi tenant); một truy vấn cho cả lô nhập. */
+    default java.util.Set<String> existingUsernames(java.util.Collection<String> usernames) {
+        java.util.Set<String> found = new java.util.HashSet<>();
+        for (String u : usernames) if (findUserIdByUsername(u).isPresent()) found.add(u);
+        return found;
+    }
+
     /** Tài khoản có cờ platform_admin (người vận hành). Không có credential thì false. */
     boolean isPlatformAdmin(UUID userId);
 

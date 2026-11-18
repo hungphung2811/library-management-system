@@ -6,7 +6,6 @@ import lms.identity.user.domain.DuplicateUserException;
 import lms.identity.user.domain.InvalidReaderException;
 import lms.identity.user.domain.InvalidUserException;
 import lms.identity.user.domain.UserRepository;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -36,14 +35,12 @@ public class ImportUsersUseCase {
     static final Pattern EMAIL = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
     static final int MAX_PASSWORD_LENGTH = 72; // giới hạn bcrypt
     static final int MAX_CARD_NO_LENGTH = 32;
-    private static final String ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-    private static final int GENERATED_LENGTH = 14;
 
     private final UserRepository users;
     private final AccountCredentialPort credentials;
     private final DepartmentLookupPort departments;
     private final ImportUserRowExecutor executor;
-    private final SecureRandom random = new SecureRandom();
+    private final TemporaryPasswordGenerator passwords = new TemporaryPasswordGenerator();
 
     public ImportUsersUseCase(UserRepository users, AccountCredentialPort credentials,
                               DepartmentLookupPort departments, ImportUserRowExecutor executor) {
@@ -147,16 +144,8 @@ public class ImportUsersUseCase {
         return new ImportRowResult(number, username, ImportRowResult.FAILED, code, message, null);
     }
 
-    /** Mật khẩu tạm ngẫu nhiên, luôn có chữ hoa, chữ thường và số. */
+    /** Mật khẩu tạm ngẫu nhiên, luôn có chữ hoa, chữ thường và số (dùng chung {@link TemporaryPasswordGenerator}). */
     String generatePassword() {
-        while (true) {
-            StringBuilder sb = new StringBuilder(GENERATED_LENGTH);
-            for (int i = 0; i < GENERATED_LENGTH; i++) sb.append(ALPHABET.charAt(random.nextInt(ALPHABET.length())));
-            String p = sb.toString();
-            if (p.chars().anyMatch(Character::isUpperCase) && p.chars().anyMatch(Character::isLowerCase)
-                    && p.chars().anyMatch(Character::isDigit)) {
-                return p;
-            }
-        }
+        return passwords.generate();
     }
 }

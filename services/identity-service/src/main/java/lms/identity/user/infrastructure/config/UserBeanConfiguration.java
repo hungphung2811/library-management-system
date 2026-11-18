@@ -158,6 +158,33 @@ public class UserBeanConfiguration {
         return new lms.identity.user.application.ImportUsersUseCase(repository, credentials, departments, executor);
     }
 
+    // ---- Nhập người dùng từ Excel (ADR-0024) ----
+
+    /** Bean riêng để mỗi dòng ghi đi qua proxy giao dịch (một transaction mỗi dòng). */
+    @Bean
+    lms.identity.user.application.UserImportRowWriter userImportRowWriter(CreateUserUseCase createUser,
+                                                                          IssueReaderCardUseCase issueReaderCard) {
+        return new lms.identity.user.application.UserImportRowWriter(createUser, issueReaderCard);
+    }
+
+    @Bean
+    lms.identity.user.application.UserImportAuditPort userImportAuditPort(
+            org.springframework.kafka.core.KafkaTemplate<String, String> kafkaTemplate,
+            com.fasterxml.jackson.databind.ObjectMapper objectMapper,
+            @org.springframework.beans.factory.annotation.Value("${app.kafka.topics.auth-events}") String topic) {
+        return new lms.identity.user.infrastructure.messaging.KafkaUserImportAuditAdapter(
+                new lms.messaging.KafkaEventPublisher(kafkaTemplate, objectMapper, topic));
+    }
+
+    @Bean
+    lms.identity.user.application.UserImportHandler userImportHandler(
+            UserRepository users, AccountCredentialPort credentials, ReaderProfileRepository readers,
+            lms.identity.user.application.UserImportRowWriter writer,
+            lms.identity.user.application.UserImportAuditPort audit, Clock clock) {
+        return new lms.identity.user.application.UserImportHandler(users, credentials, readers, writer,
+                new lms.identity.user.application.TemporaryPasswordGenerator(), audit, clock);
+    }
+
     @Bean
     ResetUserPasswordUseCase resetUserPasswordUseCase(UserRepository repository, AccountCredentialPort credentials) {
         return new ResetUserPasswordUseCase(repository, credentials);

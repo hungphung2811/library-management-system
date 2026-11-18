@@ -31,6 +31,11 @@
             <artifactId>cache-common</artifactId>
         </dependency>
         <dependency>
+            <!-- ADR-0024: nhập người dùng từ Excel (preview Redis, confirm nền) -->
+            <groupId>com.company</groupId>
+            <artifactId>import-common</artifactId>
+        </dependency>
+        <dependency>
             <!-- Cache request (cache-common): Lettuce tự nối lại; Redis chỉ là cache phụ -->
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>

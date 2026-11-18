@@ -42,4 +42,14 @@ class ReaderProfilePersistenceAdapter implements ReaderProfileRepository {
     public boolean existsByCardNo(String cardNo) {
         return jpa.existsByCardNo(cardNo);
     }
+
+    @Override
+    public java.util.Set<String> existingCardNos(java.util.Collection<String> cardNos) {
+        java.util.Set<String> found = new java.util.HashSet<>();
+        java.util.List<String> all = new java.util.ArrayList<>(cardNos);
+        for (int i = 0; i < all.size(); i += 1000) {
+            found.addAll(jpa.findCardNosIn(all.subList(i, Math.min(all.size(), i + 1000))));
+        }
+        return found;
+    }
 }

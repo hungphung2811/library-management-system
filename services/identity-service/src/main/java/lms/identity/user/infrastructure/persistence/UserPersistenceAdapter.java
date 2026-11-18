@@ -85,6 +85,26 @@ class UserPersistenceAdapter implements UserRepository {
     }
 
     @Override
+    public java.util.Set<String> existingUsernames(java.util.Collection<String> usernames) {
+        java.util.Set<String> found = new java.util.HashSet<>();
+        java.util.List<String> all = new java.util.ArrayList<>(usernames);
+        for (int i = 0; i < all.size(); i += 1000) {
+            found.addAll(jpa.findUsernamesIn(all.subList(i, Math.min(all.size(), i + 1000))));
+        }
+        return found;
+    }
+
+    @Override
+    public java.util.Set<String> existingEmails(java.util.Collection<String> emails) {
+        java.util.Set<String> found = new java.util.HashSet<>();
+        java.util.List<String> all = emails.stream().map(e -> e.toLowerCase(java.util.Locale.ROOT)).distinct().toList();
+        for (int i = 0; i < all.size(); i += 1000) {
+            found.addAll(jpa.findEmailsIn(all.subList(i, Math.min(all.size(), i + 1000))));
+        }
+        return found;
+    }
+
+    @Override
     public boolean hasMembership(UUID userId, UUID tenantId) {
         return memberships.existsById(new UserMembershipJpaEntity.Key(userId, tenantId));
     }
