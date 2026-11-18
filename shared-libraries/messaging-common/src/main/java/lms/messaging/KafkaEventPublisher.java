@@ -6,6 +6,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.time.Duration;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.springframework.kafka.core.KafkaTemplate;
 
 /** Publish domain event lên một topic dưới dạng EventEnvelope JSON, key theo aggregateId. */
@@ -43,6 +47,40 @@ public class KafkaEventPublisher {
             });
         } catch (RuntimeException e) {
             log.error("Không gửi được {} lên topic {}, eventId={}", event.eventType(), topic, event.eventId(), e);
+        }
+    }
+
+    /**
+     * Gửi đồng bộ: chờ broker xác nhận tối đa {@code timeout}, ném {@link EventPublishException} khi lỗi/hết giờ/bị ngắt.
+     * Dành cho job cần "phát được mới commit" (ADR-0030 D11); không thay thế Outbox: nếu commit lỗi sau khi đã phát,
+     * sự kiện có thể trùng nên consumer phải khử trùng theo eventId. {@link #publish} vẫn best-effort như cũ.
+     */
+    public void publishAndWait(DomainEvent event, Duration timeout) {
+        String json;
+        try {
+            json = objectMapper.writeValueAsString(EventEnvelope.of(event, TenantContext.current().orElse(null)));
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Không serialize được event " + event.eventType(), e);
+        }
+        try {
+            kafkaTemplate.send(topic, event.aggregateId(), json).get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new EventPublishException("Bị ngắt khi gửi " + event.eventType() + " lên topic " + topic, e);
+        } catch (ExecutionException e) {
+            throw new EventPublishException("Gửi " + event.eventType() + " lên topic " + topic + " thất bại", e.getCause());
+        } catch (TimeoutException e) {
+            throw new EventPublishException("Hết " + timeout.toMillis() + "ms chờ gửi " + event.eventType()
+                    + " lên topic " + topic, e);
+        } catch (RuntimeException e) {
+            throw new EventPublishException("Không gửi được " + event.eventType() + " lên topic " + topic, e);
+        }
+    }
+
+    /** Gửi đồng bộ thất bại (broker lỗi, hết giờ, bị ngắt). */
+    public static class EventPublishException extends RuntimeException {
+        public EventPublishException(String message, Throwable cause) {
+            super(message, cause);
         }
     }
 }

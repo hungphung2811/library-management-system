@@ -13,6 +13,7 @@ import lms.common.kernel.DomainEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -95,5 +96,47 @@ class KafkaEventPublisherTest {
         KafkaEventPublisher strict = new KafkaEventPublisher(template, noJavaTime, "topic.x");
 
         assertThatThrownBy(() -> strict.publish(event)).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void publishAndWaitThanhCongKhiBrokerXacNhan() {
+        CompletableFuture<SendResult<String, String>> ok = CompletableFuture.completedFuture(null);
+        when(template.send(eq("topic.x"), eq("agg-1"), any())).thenReturn(ok);
+
+        assertThatCode(() -> publisher.publishAndWait(event, Duration.ofSeconds(1))).doesNotThrowAnyException();
+
+        ArgumentCaptor<String> json = ArgumentCaptor.forClass(String.class);
+        verify(template).send(eq("topic.x"), eq("agg-1"), json.capture());
+        assertThat(json.getValue()).contains("\"eventType\":\"SampleEvent\"");
+    }
+
+    @Test
+    void publishAndWaitNemKhiBrokerBaoLoi() {
+        CompletableFuture<SendResult<String, String>> failed = new CompletableFuture<>();
+        failed.completeExceptionally(new TimeoutException("boom"));
+        when(template.send(any(String.class), any(String.class), any(String.class))).thenReturn(failed);
+
+        assertThatThrownBy(() -> publisher.publishAndWait(event, Duration.ofSeconds(1)))
+                .isInstanceOf(KafkaEventPublisher.EventPublishException.class)
+                .hasCauseInstanceOf(TimeoutException.class);
+    }
+
+    @Test
+    void publishAndWaitNemKhiHetGio() {
+        when(template.send(any(String.class), any(String.class), any(String.class)))
+                .thenReturn(new CompletableFuture<SendResult<String, String>>());
+
+        assertThatThrownBy(() -> publisher.publishAndWait(event, Duration.ofMillis(50)))
+                .isInstanceOf(KafkaEventPublisher.EventPublishException.class)
+                .hasCauseInstanceOf(java.util.concurrent.TimeoutException.class);
+    }
+
+    @Test
+    void publishAndWaitNemKhiGuiNemNgoaiLe() {
+        when(template.send(any(String.class), any(String.class), any(String.class)))
+                .thenThrow(new IllegalStateException("producer closed"));
+
+        assertThatThrownBy(() -> publisher.publishAndWait(event, Duration.ofSeconds(1)))
+                .isInstanceOf(KafkaEventPublisher.EventPublishException.class);
     }
 }
