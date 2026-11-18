@@ -40,4 +40,38 @@ public class RequestCacheAutoConfiguration {
     RequestCache noOpRequestCache() {
         return new NoOpRequestCache();
     }
+
+    /**
+     * Giới hạn tốc độ có công tắc RIÊNG ({@code lms.ratelimit.enabled}, mặc định bật) vì đây là biện pháp bảo mật, không
+     * nên tắt theo cache của dev/demo. Cần Redis; không có Redis hoặc tắt thì cho qua hết.
+     */
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnClass(StringRedisTemplate.class)
+    @ConditionalOnProperty(prefix = "lms.ratelimit", name = "enabled", havingValue = "true", matchIfMissing = true)
+    static class RedisRateLimitConfiguration {
+
+        @Bean
+        @ConditionalOnBean(StringRedisTemplate.class)
+        @ConditionalOnMissingBean(RateLimiter.class)
+        RateLimiter redisRateLimiter(StringRedisTemplate redis, CacheProperties properties,
+                                     ObjectProvider<MeterRegistry> meters) {
+            return new RedisRateLimiter(redis, properties, meters.getIfAvailable());
+        }
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(RateLimiter.class)
+    RateLimiter noOpRateLimiter() {
+        return new RateLimiter() {
+            @Override
+            public boolean tryAcquire(String bucket, String subject, int limit, java.time.Duration window) {
+                return true;
+            }
+
+            @Override
+            public boolean isEnabled() {
+                return false;
+            }
+        };
+    }
 }
