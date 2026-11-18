@@ -75,3 +75,15 @@ Lỗi (chuyển nguyên từ catalog):
 Khóa quyền (phân quyền động, ADR-0003, do catalog kiểm): GET `TitleController/preview`, PUT `TitleController/updatePreview`. Hai khóa tách riêng với `TitleController/update`; role nhân viên được nhập preview phải được gán tay (hiệu lực khi đăng nhập/refresh token kế tiếp). Admin bỏ qua kiểm khóa.
 
 Lưu ý cho FE: cả hai trường là **văn bản thuần**. Hiển thị như text (ví dụ `textContent`, `{{ }}` của Angular), không dùng `innerHTML`/`bypassSecurityTrust*`; xuống dòng hiển thị bằng CSS `white-space: pre-wrap`. Ký tự `<`, `>` được lưu và trả nguyên văn, không bị mã hóa.
+
+## POST /internal/books/lookup-by-isbn (nội bộ, ADR-0024)
+
+Tra nhiều đầu sách theo ISBN trong một lần, cho luồng nhập Excel của sales (mặt hàng tồn kho tham chiếu `titleId`). Không đi qua `lms-api`/FE: sales-service gọi trực tiếp catalog bằng token người dùng chuyển tiếp lúc upload. Một truy vấn `IN` theo `(tenant_id, isbn)` (index `uq_titles_isbn`), không N+1, không cache (dữ liệu nghiệp vụ, xem CLAUDE.md mục cache).
+
+Request: `{ "isbns": ["9786041234567", "..."] }`. Bắt buộc, 1..5.000 phần tử, mỗi phần tử không rỗng và tối đa 20 ký tự (khớp cột `titles.isbn`). Server trim từng ISBN, bỏ trùng; khớp đúng chuỗi (không chuẩn hóa dấu gạch nối).
+
+Response 200: mảng `TitleLookupView` (cùng dạng `POST /internal/books/lookup`: `id, name, author, isbn, coverPrice, description, hasPreview` và các trường bổ sung), chỉ gồm ISBN tồn tại trong tenant của token, theo thứ tự ISBN yêu cầu, mỗi ISBN một lần. ISBN không thấy thì vắng mặt (người gọi tự đối chiếu để báo `TITLE_NOT_FOUND`).
+
+Lỗi: `400 VALIDATION_FAILED` (rỗng, quá 5.000, phần tử rỗng/quá 20 ký tự), `401` không token, `403` thiếu khóa hoặc `TENANT_REQUIRED`, token dịch vụ storefront (`svc`) bị `403` (không có `@StorefrontAccessible`).
+
+Khóa quyền (ADR-0003): `TitleController/lookupByIsbn`. Role gọi qua sales phải được gán khóa này (hiệu lực khi đăng nhập/refresh kế tiếp); migration gán khóa vào role mẫu do việc identity (ADR-0024 1e) làm. Lưu ý: ADR-0024 mục 5 ghi tối đa 1.000 ISBN mỗi lần; endpoint nhận tới 5.000 theo yêu cầu phân việc, sales có thể chia lô nhỏ hơn.

@@ -31,6 +31,8 @@ Mọi response hồ sơ người dùng (`GET /api/users`, `GET /api/users/{id}`,
 ## 4. Nhập / xuất người dùng
 
 ### POST /api/users/imports
+> ⚠️ **Deprecated** (ADR-0024): luồng nhập từ file Excel `/api/identity/imports/users/**` (xem `identity-import.md`) thay thế endpoint JSON này. Endpoint cũ **giữ nguyên hành vi** tới pha dọn dẹp (khi FE đã chuyển xong sẽ gỡ cùng khóa `UserController/importUsers`); FE mới không nên dùng.
+
 ```json
 { "dryRun": true,
   "rows": [ { "username": "alice", "fullName": "Nguyễn A", "email": "a@x.vn",
