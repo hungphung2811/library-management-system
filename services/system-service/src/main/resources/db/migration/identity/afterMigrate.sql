@@ -22,6 +22,10 @@ BEGIN
         IF to_regclass('public.tenant_storefront_origin_history') IS NOT NULL THEN
             REVOKE UPDATE, DELETE ON tenant_storefront_origin_history FROM identity_app;
         END IF;
+        -- SaaS API Authentication (V32): lịch sử ứng dụng chỉ thêm (cũng sau GRANT ở trên). Chưa có bảng thì bỏ qua.
+        IF to_regclass('public.application_history') IS NOT NULL THEN
+            REVOKE UPDATE, DELETE ON application_history FROM identity_app;
+        END IF;
     ELSE
         RAISE WARNING 'Vai trò identity_app chưa tồn tại: bỏ qua cấp quyền (tạo vai trò rồi chạy lại migration)';
     END IF;
