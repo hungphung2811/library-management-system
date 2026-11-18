@@ -41,6 +41,13 @@ public interface SpringDataBorrowingRepository extends JpaRepository<BorrowingJp
             + "(select b2.id from BorrowingJpaEntity b2 join b2.items i where i.bookCopyId = :copyId and i.returnDate is null)")
     Optional<BorrowingJpaEntity> findOpenByCopyIdForUpdate(@Param("copyId") UUID copyId);
 
+    /** Lượt mượn đã đóng bằng LOST gần nhất của bản sao (sắp theo ngày đóng giảm dần); lấy dòng đầu bằng Pageable. */
+    @Query("select b from BorrowingJpaEntity b join b.items i where i.bookCopyId = :copyId and i.condition = :lost "
+            + "order by i.returnDate desc, b.id")
+    List<BorrowingJpaEntity> findLostByCopyIdNewestFirst(@Param("copyId") UUID copyId,
+                                                         @Param("lost") lms.circulation.borrowing.domain.ItemCondition lost,
+                                                         org.springframework.data.domain.Pageable pageable);
+
     @Query("select b from BorrowingJpaEntity b where b.userId = :userId order by b.borrowDate desc, b.id")
     List<BorrowingJpaEntity> findByUserIdOrdered(@Param("userId") UUID userId);
 }

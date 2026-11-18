@@ -6,6 +6,7 @@ import lms.circulation.reservation.application.ExpireOverdueReservationsUseCase;
 import lms.circulation.reservation.application.FulfillReservationUseCase;
 import lms.circulation.reservation.application.HoldCopyForNextReservationUseCase;
 import lms.circulation.reservation.application.ListMyReservationsUseCase;
+import lms.circulation.reservation.application.MoveReservationsToWorkUseCase;
 import lms.circulation.reservation.application.ReaderEligibilityPort;
 import lms.circulation.reservation.application.ReserveTitleUseCase;
 import lms.circulation.reservation.application.TitleCatalogPort;
@@ -94,6 +95,13 @@ public class ReservationBeanConfiguration {
                                                                       KafkaReservationEventPublisher publisher,
                                                                       Clock clock) {
         return new ExpireOverdueReservationsUseCase(repository, holdCopy, publisher, clock);
+    }
+
+    @Bean
+    MoveReservationsToWorkUseCase moveReservationsToWorkUseCase(ReservationRepository repository,
+                                                                HoldCopyForNextReservationUseCase holdCopy,
+                                                                KafkaReservationEventPublisher publisher, Clock clock) {
+        return new MoveReservationsToWorkUseCase(repository, holdCopy, publisher, clock);
     }
 
     @Bean

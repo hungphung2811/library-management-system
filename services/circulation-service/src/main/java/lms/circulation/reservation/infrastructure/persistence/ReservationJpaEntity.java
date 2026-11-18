@@ -34,6 +34,14 @@ class ReservationJpaEntity {
     @Column(name = "title_id", nullable = false)
     private UUID titleId;
 
+    /** Tác phẩm của ấn bản lúc đặt (ADR-0026, V13). NULL chỉ ở dòng do jar cũ chèn: đọc ra thì suy từ title_id. */
+    @Column(name = "work_id")
+    private UUID workId;
+
+    /** Ngôn ngữ ấn bản đã chọn; NULL = mọi ngôn ngữ. */
+    @Column(name = "language", length = 8)
+    private String language;
+
     @Column(name = "reserved_at", nullable = false)
     private Instant reservedAt;
 
@@ -50,7 +58,8 @@ class ReservationJpaEntity {
     protected ReservationJpaEntity() {
     }
 
-    ReservationJpaEntity(UUID id, UUID readerId, UUID titleId, Instant reservedAt, ReservationStatus status,
+    ReservationJpaEntity(UUID id, UUID readerId, UUID titleId, UUID workId, String language, Instant reservedAt,
+                         ReservationStatus status,
                          UUID copyId, LocalDate holdUntil) {
         // Điền sẵn tenant của phiên: merge (save entity mới dựng) không ghi đè tenant_id thành null, insert khớp
         // tenant phiên; không có tenant thì ném TenantRequiredException (fail-closed). Cột updatable=false.
@@ -58,6 +67,8 @@ class ReservationJpaEntity {
         this.id = id;
         this.readerId = readerId;
         this.titleId = titleId;
+        this.workId = workId;
+        this.language = language;
         this.reservedAt = reservedAt;
         this.status = status;
         this.copyId = copyId;
@@ -67,6 +78,8 @@ class ReservationJpaEntity {
     UUID getId() { return id; }
     UUID getReaderId() { return readerId; }
     UUID getTitleId() { return titleId; }
+    UUID getWorkId() { return workId; }
+    String getLanguage() { return language; }
     Instant getReservedAt() { return reservedAt; }
     ReservationStatus getStatus() { return status; }
     UUID getCopyId() { return copyId; }

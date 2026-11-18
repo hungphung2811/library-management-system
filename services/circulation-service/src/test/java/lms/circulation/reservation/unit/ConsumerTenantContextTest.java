@@ -18,7 +18,9 @@ import org.junit.jupiter.api.Test;
 class ConsumerTenantContextTest {
 
     private final HoldCopyForNextReservationUseCase hold = mock(HoldCopyForNextReservationUseCase.class);
-    private final InventoryEventConsumer consumer = new InventoryEventConsumer(new ObjectMapper(), hold);
+    private final lms.circulation.reservation.application.MoveReservationsToWorkUseCase moveToWork =
+            mock(lms.circulation.reservation.application.MoveReservationsToWorkUseCase.class);
+    private final InventoryEventConsumer consumer = new InventoryEventConsumer(new ObjectMapper(), hold, moveToWork);
 
     private static String message(UUID titleId, UUID copyId, UUID tenantId) {
         return "{\"eventId\":\"" + UUID.randomUUID() + "\",\"eventType\":\"CopyAvailableEvent\",\"payload\":{\"copyId\":\""
@@ -32,7 +34,7 @@ class ConsumerTenantContextTest {
         UUID titleId = UUID.randomUUID();
         UUID copyId = UUID.randomUUID();
         List<Optional<UUID>> seen = new ArrayList<>();
-        doAnswer(i -> seen.add(TenantContext.current()) && false).when(hold).holdIfAnyoneWaiting(titleId, copyId);
+        doAnswer(i -> seen.add(TenantContext.current()) && false).when(hold).holdIfAnyoneWaiting(null, null, titleId, copyId);
 
         consumer.onEvent(message(titleId, copyId, tenant));
 

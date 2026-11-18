@@ -57,6 +57,12 @@ public class BorrowingPersistenceAdapter implements SaveBorrowingPort, Borrowing
     }
 
     @Override
+    public Optional<BorrowingRecord> findLatestLostByCopyId(UUID bookCopyId) {
+        return jpa.findLostByCopyIdNewestFirst(bookCopyId, lms.circulation.borrowing.domain.ItemCondition.LOST,
+                PageRequest.of(0, 1)).stream().findFirst().map(BorrowingPersistenceMapper::toDomain);
+    }
+
+    @Override
     public List<BorrowingRecord> findByUserId(UUID userId) {
         return jpa.findByUserIdOrdered(userId).stream().map(BorrowingPersistenceMapper::toDomain).toList();
     }

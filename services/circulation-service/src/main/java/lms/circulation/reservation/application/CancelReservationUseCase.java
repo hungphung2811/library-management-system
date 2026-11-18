@@ -38,7 +38,7 @@ public class CancelReservationUseCase {
         Reservation saved = repository.save(reservation);
         reservation.pullEvents().forEach(eventPort::publish);
         if (wasHoldingCopy) {
-            holdCopy.holdOrRelease(reservation.titleId(), reservation.copyId());
+            holdCopy.holdOrRelease(reservation.workId(), reservation.language(), reservation.titleId(), reservation.copyId());
         }
         return ReservationResponse.from(saved, 0);
     }

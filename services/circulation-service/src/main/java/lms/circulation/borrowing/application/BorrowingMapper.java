@@ -13,15 +13,20 @@ public final class BorrowingMapper {
     }
 
     public static BorrowBookCommand toCommand(BorrowBookRequest request) {
-        return new BorrowBookCommand(request.userId(), request.bookCopyIds());
+        List<BorrowBookCommand.ConditionOverride> overrides = request.items() == null ? List.of()
+                : request.items().stream()
+                .map(i -> new BorrowBookCommand.ConditionOverride(i.bookCopyId(), i.conditionGrade(), i.conditionNote()))
+                .toList();
+        return new BorrowBookCommand(request.userId(), request.bookCopyIds(), overrides);
     }
 
     public static ReturnBookCommand toCommand(UUID borrowingId, ReturnBookRequest request) {
-        return new ReturnBookCommand(borrowingId, request.bookCopyId(), request.barcode(), condition(request.condition()));
+        return new ReturnBookCommand(borrowingId, request.bookCopyId(), request.barcode(), condition(request.condition()),
+                request.damageLevelCode(), request.damageNote(), request.evidenceUrls());
     }
 
     public static ReportLostCommand toCommand(ReportLostRequest request) {
-        return new ReportLostCommand(request.bookCopyId(), request.barcode());
+        return new ReportLostCommand(request.bookCopyId(), request.barcode(), request.damageNote(), request.evidenceUrls());
     }
 
     private static ItemCondition condition(ItemCondition condition) {
@@ -41,6 +46,11 @@ public final class BorrowingMapper {
     }
 
     private static BorrowingResponse.Item toItem(BorrowingItem i) {
-        return new BorrowingResponse.Item(i.bookCopyId(), i.returnDate(), i.condition() == null ? null : i.condition().name());
+        BorrowingResponse.ConditionAtBorrow atBorrow = i.borrowCondition() == null ? null
+                : new BorrowingResponse.ConditionAtBorrow(
+                        i.borrowCondition().grade() == null ? null : i.borrowCondition().grade().name(),
+                        i.borrowCondition().note());
+        return new BorrowingResponse.Item(i.bookCopyId(), i.returnDate(), i.condition() == null ? null : i.condition().name(),
+                atBorrow);
     }
 }

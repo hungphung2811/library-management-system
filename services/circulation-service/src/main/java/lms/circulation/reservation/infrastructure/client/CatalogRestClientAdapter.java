@@ -22,7 +22,7 @@ public class CatalogRestClientAdapter implements TitleCatalogPort {
         this.client = client;
     }
 
-    record TitleDto(UUID id, String name, long availableCopies) {
+    record TitleDto(UUID id, String name, long availableCopies, UUID workId, String language, Long workAvailableCopies) {
     }
 
     @Override
@@ -32,7 +32,8 @@ public class CatalogRestClientAdapter implements TitleCatalogPort {
             BearerTokens.current().ifPresent(t -> request.header(HttpHeaders.AUTHORIZATION, "Bearer " + t));
             lms.security.permission.ActAsTenant.current().ifPresent(tid -> request.header(lms.security.permission.ActAsTenant.HEADER, tid));
             TitleDto dto = request.retrieve().body(TitleDto.class);
-            return dto == null ? Optional.empty() : Optional.of(new TitleInfo(dto.id(), dto.name(), dto.availableCopies()));
+            return dto == null ? Optional.empty() : Optional.of(new TitleInfo(dto.id(), dto.name(), dto.availableCopies(),
+                    dto.workId(), dto.language(), dto.workAvailableCopies()));
         } catch (HttpClientErrorException.NotFound e) {
             return Optional.empty();
         } catch (RestClientException e) {

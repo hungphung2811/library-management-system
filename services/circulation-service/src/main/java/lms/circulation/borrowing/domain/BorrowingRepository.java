@@ -17,6 +17,12 @@ public interface BorrowingRepository {
     /** Phiếu có lượt mượn đang mở của bản sao này (UC07/UC08 tra theo mã bản sao), khóa dòng. */
     Optional<BorrowingRecord> findOpenByCopyIdForUpdate(UUID bookCopyId);
 
+    /**
+     * Phiếu có lượt mượn của bản sao này đã đóng bằng LOST gần nhất (báo mất, rồi tìm lại sách để hoàn khoản).
+     * Không khóa dòng; rỗng nếu bản sao chưa từng được báo mất.
+     */
+    Optional<BorrowingRecord> findLatestLostByCopyId(UUID bookCopyId);
+
     /** Phiếu mượn của độc giả, mới nhất trước (UC05). */
     List<BorrowingRecord> findByUserId(UUID userId);
 

@@ -25,18 +25,39 @@ interface SpringDataReservationRepository extends JpaRepository<ReservationJpaEn
 
     boolean existsByReaderIdAndTitleIdAndStatusIn(UUID readerId, UUID titleId, Collection<ReservationStatus> statuses);
 
+    /** Dòng có work_id NULL (jar cũ chèn trong cửa sổ triển khai, ADR-0026 pha expand) không được các truy vấn theo tác phẩm thấy. */
+    boolean existsByReaderIdAndWorkIdAndStatusIn(UUID readerId, UUID workId, Collection<ReservationStatus> statuses);
+
+    List<ReservationJpaEntity> findByTitleIdAndStatusIn(UUID titleId, Collection<ReservationStatus> statuses);
+
+    List<ReservationJpaEntity> findByWorkIdAndReaderIdInAndStatusIn(UUID workId, Collection<UUID> readerIds,
+                                                                    Collection<ReservationStatus> statuses);
+
     List<ReservationJpaEntity> findByReaderIdOrderByReservedAtDesc(UUID readerId);
 
-    /** Số đặt trước WAITING của đầu sách đứng trước hoặc bằng đặt trước này theo thứ tự (reservedAt, id). */
-    @Query("select count(r) from ReservationJpaEntity r where r.titleId = :titleId and r.status = :status "
-            + "and (r.reservedAt < :at or (r.reservedAt = :at and r.id <= :id))")
-    long countAheadOrEqual(@Param("titleId") UUID titleId, @Param("status") ReservationStatus status,
-                           @Param("at") Instant at, @Param("id") UUID id);
+    /**
+     * Số đặt trước WAITING cùng tác phẩm đứng trước hoặc bằng đặt trước này theo thứ tự (reservedAt, id) mà có thể tranh
+     * cùng bản sao với nó (nhất quán với {@link #findNextInWork}): {@code lang} = "" (đặt trước mọi ngôn ngữ) thì đếm tất
+     * cả; ngược lại đếm đặt trước không khai ngôn ngữ (nhận mọi ngôn ngữ) và đặt trước cùng ngôn ngữ (idx_reservations_work_queue).
+     */
+    @Query("select count(r) from ReservationJpaEntity r where r.workId = :workId "
+            + "and (:lang = '' or r.language is null or r.language = :lang) "
+            + "and r.status = :status and (r.reservedAt < :at or (r.reservedAt = :at and r.id <= :id))")
+    long countAheadOrEqualInWork(@Param("workId") UUID workId, @Param("lang") String lang,
+                                 @Param("status") ReservationStatus status, @Param("at") Instant at, @Param("id") UUID id);
 
-    /** Hàng đợi WAITING của nhiều đầu sách theo thứ tự (reservedAt, id): phục vụ tính vị trí theo lô (idx_reservations_queue). */
-    @Query("select r.titleId, r.id from ReservationJpaEntity r where r.titleId in :titleIds and r.status = :status "
-            + "order by r.titleId, r.reservedAt, r.id")
-    List<Object[]> findQueueOrder(@Param("titleIds") Collection<UUID> titleIds, @Param("status") ReservationStatus status);
+    /** Hàng đợi WAITING của nhiều tác phẩm theo thứ tự (reservedAt, id): phục vụ tính vị trí theo lô (idx_reservations_work_queue). */
+    @Query("select r.workId, coalesce(r.language, ''), r.id from ReservationJpaEntity r where r.workId in :workIds "
+            + "and r.status = :status order by r.workId, r.reservedAt, r.id")
+    List<Object[]> findQueueOrderByWork(@Param("workIds") Collection<UUID> workIds, @Param("status") ReservationStatus status);
+
+    /** Hàng đợi của tác phẩm, chỉ đặt trước nhận được ngôn ngữ {@code language} (null trong dòng = mọi ngôn ngữ). */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from ReservationJpaEntity r where r.workId = :workId and r.status = :status "
+            + "and (r.language is null or r.language = :language) order by r.reservedAt asc, r.id asc")
+    List<ReservationJpaEntity> findNextInWork(@Param("workId") UUID workId, @Param("language") String language,
+                                              @Param("status") ReservationStatus status,
+                                              org.springframework.data.domain.Pageable page);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<ReservationJpaEntity> findFirstByTitleIdAndStatusOrderByReservedAtAscIdAsc(UUID titleId,

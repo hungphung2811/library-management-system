@@ -94,7 +94,19 @@ class CirculationDemoSeedIT {
                 .isEqualTo(DemoPlan.generate(LocalDate.now(VN)).copies().stream()
                         .filter(c -> c.status() == DemoPlan.CopyStatus.LOANED).count());
         assertThat(count("SELECT count(*) FROM fines WHERE " + t + " AND status = 'UNPAID'")).isEqualTo(DemoPlan.UNPAID_FINES);
-        assertThat(count("SELECT count(*) FROM reservations WHERE " + t + " AND status = 'READY'")).isEqualTo(reservations);
+        DemoPlan planNow = DemoPlan.generate(LocalDate.now(VN));
+        assertThat(reservations).isEqualTo(planNow.reservations().size() + planNow.workReservations().size());
+        assertThat(count("SELECT count(*) FROM reservations WHERE " + t + " AND status = 'READY'"))
+                .isEqualTo(planNow.reservations().size());
+        // mô hình tác phẩm (ADR-0026): đặt trước theo tác phẩm đang chờ, mọi dòng có work_id, chọn ngôn ngữ vi/en/mọi ngôn ngữ
+        assertThat(count("SELECT count(*) FROM reservations WHERE " + t + " AND status = 'WAITING'"))
+                .isEqualTo(planNow.workReservations().size());
+        assertThat(count("SELECT count(*) FROM reservations WHERE " + t + " AND work_id IS NULL")).isZero();
+        assertThat(count("SELECT count(*) FROM reservations WHERE " + t + " AND status = 'READY' AND language IS NULL")).isZero();
+        assertThat(count("SELECT count(DISTINCT language) FROM reservations WHERE " + t + " AND status = 'WAITING'"))
+                .isGreaterThanOrEqualTo(2);
+        assertThat(count("SELECT count(*) FROM reservations WHERE " + t + " AND status = 'WAITING' AND language IS NULL"))
+                .isGreaterThanOrEqualTo(1);
 
         // Chạy lần hai: không lỗi, không nhân đôi
         assertThat(runSeed("x", List.of("dev", "demo-seed"))).isEqualTo(DemoSeedRunner.EXIT_OK);

@@ -31,7 +31,7 @@ public class CollectFinesUseCase {
             fine.pay(now);
             repository.save(fine);
             fine.pullEvents().forEach(eventPort::publish);
-            total = total.add(fine.amount());
+            total = total.add(fine.payableAmount());
         }
         return new CollectFinesResponse(readerId, unpaid.size(), total, unpaid.stream().map(FineResponse::from).toList());
     }

@@ -1,11 +1,14 @@
 package lms.circulation.borrowing.application;
 
+import lms.circulation.borrowing.domain.BorrowCondition;
 import lms.circulation.borrowing.domain.BorrowRule;
 import lms.circulation.borrowing.domain.BorrowRuleRepository;
 import lms.circulation.borrowing.domain.BorrowingDomainService;
 import lms.circulation.borrowing.domain.BorrowingRecord;
 import lms.circulation.borrowing.domain.BorrowingRepository;
+import lms.circulation.borrowing.domain.ConditionGrade;
 import lms.circulation.borrowing.domain.CopyStatus;
+import lms.circulation.borrowing.domain.InvalidBorrowingException;
 import lms.circulation.borrowing.domain.NotFoundException;
 import lms.circulation.policy.application.CirculationPolicyResponse;
 import lms.circulation.policy.application.GetCirculationPolicyUseCase;
@@ -91,15 +94,23 @@ public class BorrowBookUseCase {
 
         Map<UUID, CopyStatus> original = new HashMap<>();
         Map<UUID, UUID> titleByCopy = new HashMap<>();
+        Map<UUID, BorrowCondition> conditionByCopy = new HashMap<>();
+        Map<UUID, BorrowBookCommand.ConditionOverride> overrides = overridesByCopy(command);
         for (UUID copyId : command.bookCopyIds()) {
             CopyInventoryPort.CopyInfo copy = CopyResolver.requireCopy(copyId, inventory);
             Optional<UUID> holder = reservations.holderOf(copyId);
             domainService.checkCopyBorrowable(copyId, copy.status(), holder.orElse(null), userId);
             original.put(copyId, copy.status());
             if (copy.titleId() != null) titleByCopy.put(copyId, copy.titleId());
+            // Tình trạng lúc mượn: tự điền từ bản sao, thủ thư ghi đè từng phần khi thực tế khác; chưa có thì grade null
+            BorrowCondition snapshot = new BorrowCondition(ConditionGrade.fromNameOrNull(copy.conditionGrade()), copy.conditionNote());
+            BorrowBookCommand.ConditionOverride override = overrides.get(copyId);
+            if (override != null) snapshot = snapshot.overriddenBy(override.grade(), override.note());
+            conditionByCopy.put(copyId, snapshot);
         }
         // Snapshot đầu sách vào dòng mượn (ADR-0018: thống kê top sách mượn nhóm theo đầu sách).
         record.attachTitles(titleByCopy);
+        record.attachBorrowConditions(conditionByCopy);
 
         BorrowingRecord saved = savePort.save(record);
 
@@ -117,6 +128,20 @@ public class BorrowBookUseCase {
 
         record.pullEvents().forEach(eventPort::publish);
         return BorrowingMapper.toResponse(saved);
+    }
+
+    private static Map<UUID, BorrowBookCommand.ConditionOverride> overridesByCopy(BorrowBookCommand command) {
+        Map<UUID, BorrowBookCommand.ConditionOverride> map = new HashMap<>();
+        if (command.overrides() == null) return map;
+        for (BorrowBookCommand.ConditionOverride o : command.overrides()) {
+            if (o.bookCopyId() == null || !command.bookCopyIds().contains(o.bookCopyId())) {
+                throw new InvalidBorrowingException("Ghi đè tình trạng cho bản sao không thuộc phiếu mượn: " + o.bookCopyId());
+            }
+            if (map.put(o.bookCopyId(), o) != null) {
+                throw new InvalidBorrowingException("Ghi đè tình trạng bị trùng cho bản sao: " + o.bookCopyId());
+            }
+        }
+        return map;
     }
 
     /** Hoàn tác trạng thái các bản sao đã đánh dấu LOANED (best-effort) khi lập phiếu thất bại giữa chừng. */

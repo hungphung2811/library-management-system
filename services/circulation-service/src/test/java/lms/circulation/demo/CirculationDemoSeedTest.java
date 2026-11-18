@@ -123,7 +123,8 @@ class CirculationDemoSeedTest {
 
         assertThat(r.get(0)).isEqualTo(SeedResult.of(ctx.plan().borrowings().size(), 0));
         assertThat(r.get(1)).isEqualTo(SeedResult.of(ctx.plan().fines().size(), 0));
-        assertThat(r.get(2)).isEqualTo(SeedResult.of(ctx.plan().reservations().size(), 0));
+        assertThat(r.get(2)).isEqualTo(SeedResult.of(
+                ctx.plan().reservations().size() + ctx.plan().workReservations().size(), 0));
         assertThat(s.borrowings).hasSizeGreaterThanOrEqualTo(120);
     }
 
@@ -209,12 +210,62 @@ class CirculationDemoSeedTest {
         Set<UUID> reserved = ctx.plan().copies().stream().filter(c -> c.status() == CopyStatus.RESERVED)
                 .map(DemoPlan.CopyPlan::id).collect(Collectors.toSet());
         List<Reservation> all = new ArrayList<>(s.reservations.values());
+        List<Reservation> ready = all.stream().filter(r -> r.status() == ReservationStatus.READY).toList();
 
-        assertThat(all.stream().map(Reservation::copyId).collect(Collectors.toSet())).isEqualTo(reserved);
-        assertThat(all).allMatch(r -> r.status() == ReservationStatus.READY && !r.isHoldExpired(today)
-                && !r.holdUntil().isBefore(today));
+        assertThat(ready.stream().map(Reservation::copyId).collect(Collectors.toSet())).isEqualTo(reserved);
+        assertThat(ready).allMatch(r -> !r.isHoldExpired(today) && !r.holdUntil().isBefore(today));
         // uq_reservations_active: mỗi (độc giả, đầu sách) chỉ một đặt trước còn hiệu lực
         assertThat(all.stream().map(r -> r.readerId() + "/" + r.titleId()).collect(Collectors.toSet())).hasSameSizeAs(all);
+        // uq_reservations_active_work: mỗi (độc giả, tác phẩm) chỉ một đặt trước còn hiệu lực
+        assertThat(all.stream().map(r -> r.readerId() + "/" + r.workId()).collect(Collectors.toSet())).hasSameSizeAs(all);
+    }
+
+    @Test
+    void datTruocCoTacPhamNgonNguVaCoDatTruocTheoTacPhamDangCho() {
+        DemoSeedContext ctx = context(LocalDate.of(2026, 11, 17), DemoPlan.DEFAULT_SEED);
+        Stores s = new Stores();
+        s.runAll(ctx);
+
+        Map<UUID, DemoPlan.TitlePlan> titleById = ctx.plan().titles().stream()
+                .collect(Collectors.toMap(DemoPlan.TitlePlan::id, t -> t));
+        for (DemoPlan.ReservationPlan p : ctx.plan().reservations()) {
+            Reservation r = s.reservations.get(p.id());
+            assertThat(r.workId()).isEqualTo(titleById.get(p.titleId()).workId());
+            assertThat(r.language()).isEqualTo(titleById.get(p.titleId()).language()).isNotNull();
+        }
+        List<Reservation> waiting = s.reservations.values().stream()
+                .filter(r -> r.status() == ReservationStatus.WAITING).toList();
+        assertThat(waiting).hasSameSizeAs(ctx.plan().workReservations()).hasSizeGreaterThanOrEqualTo(3);
+        assertThat(waiting).allMatch(r -> r.copyId() == null && r.holdUntil() == null);
+        assertThat(waiting.stream().map(Reservation::language)).contains("vi", "en").containsNull();
+        for (DemoPlan.WorkReservationPlan p : ctx.plan().workReservations()) {
+            Reservation r = s.reservations.get(p.id());
+            assertThat(r.workId()).isEqualTo(p.workId());
+            assertThat(r.titleId()).isEqualTo(p.titleId());
+            assertThat(r.language()).isEqualTo(p.language());
+            assertThat(r.reservedAt()).isBeforeOrEqualTo(clock(LocalDate.of(2026, 11, 17)).instant());
+        }
+    }
+
+    @Test
+    void dongDatTruocCuChuaCoNgonNguDuocDienMotLanKhongDoiGiKhac() {
+        DemoSeedContext ctx = context(LocalDate.of(2026, 11, 17), DemoPlan.DEFAULT_SEED);
+        Stores s = new Stores();
+        s.runAll(ctx);
+        DemoPlan.ReservationPlan p = ctx.plan().reservations().get(0);
+        Reservation cur = s.reservations.get(p.id());
+        s.reservations.put(p.id(), Reservation.restore(cur.id(), cur.readerId(), cur.titleId(), cur.workId(), null,
+                cur.reservedAt(), cur.status(), cur.copyId(), cur.holdUntil()));
+
+        SeedResult first = s.reservationStep.run(ctx);
+        Reservation after = s.reservations.get(p.id());
+        assertThat(first.created()).isEqualTo(1);
+        assertThat(after.language()).isEqualTo(p.language());
+        assertThat(after.copyId()).isEqualTo(cur.copyId());
+        assertThat(after.holdUntil()).isEqualTo(cur.holdUntil());
+        assertThat(after.status()).isEqualTo(ReservationStatus.READY);
+
+        assertThat(s.reservationStep.run(ctx).created()).isZero();
     }
 
     @Test

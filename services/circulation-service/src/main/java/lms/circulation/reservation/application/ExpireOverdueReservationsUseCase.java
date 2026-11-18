@@ -35,7 +35,7 @@ public class ExpireOverdueReservationsUseCase {
             reservation.expire(today, Instant.now(clock));
             repository.save(reservation);
             reservation.pullEvents().forEach(eventPort::publish);
-            holdCopy.holdOrRelease(reservation.titleId(), reservation.copyId());
+            holdCopy.holdOrRelease(reservation.workId(), reservation.language(), reservation.titleId(), reservation.copyId());
             processed++;
         }
         return processed;

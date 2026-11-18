@@ -25,6 +25,8 @@ import lms.circulation.borrowing.domain.BorrowRule;
 import lms.circulation.borrowing.domain.BorrowRuleRepository;
 import lms.circulation.borrowing.domain.ReaderType;
 import lms.circulation.reservation.application.ActiveTenantsPort;
+import lms.circulation.reservation.domain.Reservation;
+import lms.circulation.reservation.domain.ReservationRepository;
 import lms.circulation.tenant.infrastructure.messaging.TenantEventConsumer;
 import lms.security.permission.PermissionKeyRegistrar;
 import lms.tenant.TenantContext;
@@ -99,6 +101,7 @@ class CirculationTenantIsolationIT {
     @Autowired JdbcTemplate jdbc;
     @Autowired TenantEventConsumer tenantEvents;
     @Autowired BorrowRuleRepository borrowRules;
+    @Autowired ReservationRepository reservationRepo;
     @Autowired ObjectProvider<ActiveTenantsPort> activeTenants;
 
     @MockitoBean JwtDecoder jwtDecoder;
@@ -150,6 +153,32 @@ class CirculationTenantIsolationIT {
     }
 
     // ---------- Đặt trước + gọi catalog bằng token ----------
+
+    @Test
+    void viTriHangDoiTinhNguoiDungTruocCoTheNhanCungBanSaoNhatQuanVoiGiuCho() {
+        UUID work = UUID.randomUUID();
+        java.time.Instant t0 = java.time.Instant.parse("2026-01-01T00:00:00Z");
+        // thứ tự: any(mọi ngôn ngữ), vi, en, any2, vi2
+        List<Reservation> all = TenantContext.callAs(TENANT_A, () -> {
+            List<Reservation> out = new java.util.ArrayList<>();
+            String[] langs = {null, "vi", "en", null, "vi"};
+            for (int i = 0; i < langs.length; i++) {
+                out.add(reservationRepo.save(Reservation.create(UUID.randomUUID(), UUID.randomUUID(), work, langs[i],
+                        t0.plusSeconds(i))));
+            }
+            return out;
+        });
+        // mong đợi: any=1; vi=2 (any trước nó nhận được bản vi); en=2 (any trước, vi không tranh bản en); any2=4 (đếm cả hàng);
+        // vi2 = any, vi, any2, vi2 = 4 (en không tranh bản vi)
+        long[] expected = {1, 2, 2, 4, 4};
+        Map<UUID, Long> batch = TenantContext.callAs(TENANT_A, () -> reservationRepo.queuePositions(all));
+        for (int i = 0; i < all.size(); i++) {
+            Reservation r = all.get(i);
+            long single = TenantContext.callAs(TENANT_A, () -> reservationRepo.queuePosition(r));
+            assertThat(single).as("queuePosition #" + i).isEqualTo(expected[i]);
+            assertThat(batch.get(r.id())).as("queuePositions #" + i).isEqualTo(expected[i]);
+        }
+    }
 
     @Test
     void datTruocHangDoiVaUqReservationsActiveTinhRiengTungTenant() throws Exception {

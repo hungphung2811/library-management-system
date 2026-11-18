@@ -83,6 +83,15 @@ public class BorrowingRecord {
         items.replaceAll(i -> titleIdByCopy.containsKey(i.bookCopyId()) ? i.withTitleId(titleIdByCopy.get(i.bookCopyId())) : i);
     }
 
+    /**
+     * Ghi tình trạng lúc mượn (bookCopyId -> tình trạng) vào các dòng của phiếu mới lập, trước khi lưu. Bản sao không có
+     * trong map giữ nguyên (không có dữ liệu). Sau khi lưu không còn đường nào sửa (bất biến).
+     */
+    public void attachBorrowConditions(java.util.Map<UUID, BorrowCondition> conditionByCopy) {
+        items.replaceAll(i -> conditionByCopy.containsKey(i.bookCopyId())
+                ? i.withBorrowCondition(conditionByCopy.get(i.bookCopyId())) : i);
+    }
+
     /** UC07: nhận trả một bản sao với tình trạng nguyên vẹn hoặc hỏng. */
     public void returnCopy(UUID bookCopyId, ItemCondition condition, LocalDate today) {
         if (condition == null || condition == ItemCondition.LOST) {

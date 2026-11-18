@@ -67,6 +67,21 @@ class ReservationUseCasesTest {
         public boolean existsActive(UUID reader, UUID title) {
             return visible().anyMatch(r -> r.readerId().equals(reader) && r.titleId().equals(title) && r.isActive());
         }
+        public boolean existsActiveInWork(UUID reader, UUID workId) {
+            return visible().anyMatch(r -> r.readerId().equals(reader) && r.workId().equals(workId) && r.isActive());
+        }
+        public List<Reservation> findActiveByTitle(UUID titleId) {
+            return visible().filter(r -> r.titleId().equals(titleId) && r.isActive()).toList();
+        }
+        public List<Reservation> findActiveInWorkByReaders(UUID workId, java.util.Collection<UUID> readers) {
+            return visible().filter(r -> r.workId().equals(workId) && readers.contains(r.readerId()) && r.isActive())
+                    .toList();
+        }
+        public Optional<Reservation> findNextWaitingInWorkForUpdate(UUID workId, String language) {
+            return visible().filter(r -> r.workId().equals(workId) && r.status() == ReservationStatus.WAITING
+                            && (r.language() == null || r.language().equals(language)))
+                    .min(Comparator.comparing(Reservation::reservedAt));
+        }
         public List<Reservation> findByReader(UUID reader) {
             return visible().filter(r -> r.readerId().equals(reader))
                     .sorted(Comparator.comparing(Reservation::reservedAt).reversed()).toList();
@@ -98,7 +113,8 @@ class ReservationUseCasesTest {
         }
         private long positionOf(Reservation r) {
             if (r.status() != ReservationStatus.WAITING) return 0;
-            return visible().filter(x -> x.titleId().equals(r.titleId()) && x.status() == ReservationStatus.WAITING
+            return visible().filter(x -> x.workId().equals(r.workId()) && java.util.Objects.equals(x.language(), r.language())
+                    && x.status() == ReservationStatus.WAITING
                     && x.reservedAt().compareTo(r.reservedAt()) <= 0).count();
         }
     }

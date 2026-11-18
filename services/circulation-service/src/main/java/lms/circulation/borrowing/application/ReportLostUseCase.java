@@ -13,8 +13,9 @@ import java.util.UUID;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * UC08 - Báo mất sách (QĐ4, QĐ8): đóng lượt mượn với tình trạng LOST, lập phí bồi thường 150% giá bìa
- * (không cộng phí trễ dù đã quá hạn), bản sao sang LOST ở catalog.
+ * UC08 - Báo mất sách (QĐ4, QĐ8): đóng lượt mượn với tình trạng LOST, lập phí bồi thường theo chính sách đền bù của
+ * tenant (mặc định 150% giá bìa, không cộng phí trễ dù đã quá hạn), bản sao sang LOST ở catalog. Giá gốc lấy qua cổng
+ * PriceSource của fine (lỗi không tìm thấy bản sao thì rollback như trước).
  */
 public class ReportLostUseCase {
 
@@ -40,13 +41,12 @@ public class ReportLostUseCase {
         UUID copyId = CopyResolver.resolve(command.bookCopyId(), command.barcode(), inventory);
         BorrowingRecord record = repository.findOpenByCopyIdForUpdate(copyId).orElseThrow(() -> new NotFoundException(
                 "COPY_NOT_ON_LOAN", "Bản sao không ở trạng thái đang mượn: " + copyId));
-        CopyInventoryPort.CopyInfo copy = CopyResolver.requireCopy(copyId, inventory);
 
         record.reportLost(copyId, LocalDate.now(clock));
         BorrowingRecord saved = savePort.save(record);
 
         List<FineResponse> issued = fines.assess(new AssessFineCommand(record.userId(), record.id().value(), copyId,
-                copy.coverPrice(), 0, AssessFineCommand.Outcome.LOST));
+                null, 0, AssessFineCommand.Outcome.LOST, null, command.damageNote(), command.evidenceUrls()));
 
         inventory.changeStatus(copyId, CopyStatus.LOST);
 

@@ -5,11 +5,11 @@ import lms.circulation.borrowing.domain.BorrowingNotFoundException;
 import lms.circulation.borrowing.domain.BorrowingRecord;
 import lms.circulation.borrowing.domain.BorrowingRepository;
 import lms.circulation.borrowing.domain.CopyStatus;
+import lms.circulation.borrowing.domain.InvalidBorrowingException;
 import lms.circulation.borrowing.domain.ItemCondition;
 import lms.circulation.borrowing.domain.NotFoundException;
 import lms.circulation.fine.application.AssessFineCommand;
 import lms.circulation.fine.application.FineResponse;
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
@@ -52,16 +52,21 @@ public class ReturnBookUseCase {
                 : repository.findOpenByCopyIdForUpdate(copyId).orElseThrow(() -> new NotFoundException(
                         "COPY_NOT_ON_LOAN", "Bản sao không ở trạng thái đang mượn: " + copyId));
 
+        boolean damaged = condition == ItemCondition.DAMAGED;
+        boolean hasDamageInfo = (command.damageLevelCode() != null && !command.damageLevelCode().isBlank())
+                || (command.damageNote() != null && !command.damageNote().isBlank())
+                || (command.evidenceUrls() != null && !command.evidenceUrls().isEmpty());
+        if (!damaged && hasDamageInfo) {
+            throw new InvalidBorrowingException("damageLevelCode, damageNote, evidenceUrls chỉ áp dụng khi trả sách hỏng (DAMAGED)");
+        }
         long overdueDays = record.overdueDays(today);
-        BigDecimal coverPrice = condition == ItemCondition.DAMAGED
-                ? CopyResolver.requireCopy(copyId, inventory).coverPrice() : null;
 
         record.returnCopy(copyId, condition, today);
         BorrowingRecord saved = savePort.save(record);
 
         List<FineResponse> issued = fines.assess(new AssessFineCommand(record.userId(), record.id().value(), copyId,
-                coverPrice, overdueDays, condition == ItemCondition.DAMAGED
-                        ? AssessFineCommand.Outcome.RETURNED_DAMAGED : AssessFineCommand.Outcome.RETURNED_GOOD));
+                null, overdueDays, damaged ? AssessFineCommand.Outcome.RETURNED_DAMAGED : AssessFineCommand.Outcome.RETURNED_GOOD,
+                command.damageLevelCode(), command.damageNote(), command.evidenceUrls()));
 
         inventory.changeStatus(copyId, condition == ItemCondition.DAMAGED ? CopyStatus.DAMAGED : CopyStatus.AVAILABLE);
 

@@ -1,6 +1,14 @@
 package lms.circulation.fine.infrastructure.config;
 
 import lms.circulation.fine.application.AssessFineUseCase;
+import lms.circulation.fine.application.CopyRestorePort;
+import lms.circulation.fine.application.FineAdjustmentUseCases;
+import lms.circulation.fine.application.FineRefundUseCases;
+import lms.circulation.fine.application.PriceSource;
+import lms.circulation.fine.domain.FineAdjustmentRepository;
+import lms.circulation.fine.domain.FineRefundRepository;
+import lms.circulation.policy.application.GetCompensationPolicyUseCase;
+import lms.circulation.policy.application.ResolveDamageLevelUseCase;
 import lms.circulation.fine.application.CollectFinesUseCase;
 import lms.circulation.fine.application.GetReaderFinesUseCase;
 import lms.circulation.fine.domain.FineCalculator;
@@ -50,8 +58,23 @@ public class FineBeanConfiguration {
     @Bean
     AssessFineUseCase assessFineUseCase(FineCalculator calculator, FineRepository repository,
                                         KafkaFineEventPublisher publisher, Clock clock,
-                                        GetCirculationPolicyUseCase policies) {
-        return new AssessFineUseCase(calculator, repository, publisher, clock, policies);
+                                        GetCirculationPolicyUseCase policies,
+                                        GetCompensationPolicyUseCase compensation, ResolveDamageLevelUseCase levels,
+                                        PriceSource prices) {
+        return new AssessFineUseCase(calculator, repository, publisher, clock, policies, compensation, levels, prices);
+    }
+
+    @Bean
+    FineAdjustmentUseCases fineAdjustmentUseCases(FineRepository fines, FineAdjustmentRepository adjustments,
+                                                  KafkaFineEventPublisher publisher, Clock clock) {
+        return new FineAdjustmentUseCases(fines, adjustments, publisher, clock);
+    }
+
+    @Bean
+    FineRefundUseCases fineRefundUseCases(FineRepository fines, FineRefundRepository refunds,
+                                          GetCompensationPolicyUseCase compensation, CopyRestorePort copies,
+                                          KafkaFineEventPublisher publisher, Clock clock) {
+        return new FineRefundUseCases(fines, refunds, compensation, copies, publisher, clock);
     }
 
     @Bean

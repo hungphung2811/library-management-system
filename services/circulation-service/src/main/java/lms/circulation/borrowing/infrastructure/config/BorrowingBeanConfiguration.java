@@ -14,6 +14,13 @@ import lms.circulation.borrowing.infrastructure.client.IdentityReaderRestClientA
 import lms.circulation.borrowing.infrastructure.integration.FineLedgerAdapter;
 import lms.circulation.borrowing.infrastructure.integration.ReservationHoldAdapter;
 import lms.circulation.fine.application.AssessFineUseCase;
+import lms.circulation.fine.application.CopyRestorePort;
+import lms.circulation.fine.application.FineRefundUseCases;
+import lms.circulation.fine.application.PriceSource;
+import lms.circulation.borrowing.application.RefundRequestPort;
+import lms.circulation.borrowing.application.ReportFoundUseCase;
+import lms.circulation.borrowing.infrastructure.integration.CatalogPriceSourceAdapter;
+import lms.circulation.borrowing.infrastructure.integration.RefundRequestAdapter;
 import lms.circulation.fine.application.GetReaderFinesUseCase;
 import lms.circulation.policy.application.GetCirculationPolicyUseCase;
 import lms.circulation.reservation.application.FulfillReservationUseCase;
@@ -82,6 +89,23 @@ public class BorrowingBeanConfiguration {
     @Bean
     CopyReservationPort copyReservationPort(FulfillReservationUseCase fulfillReservation) {
         return new ReservationHoldAdapter(fulfillReservation);
+    }
+
+    /** Một adapter catalog cho cả PriceSource (giá bìa/giá mua) và CopyRestorePort (LOST về AVAILABLE/DAMAGED). */
+    @Bean
+    CatalogPriceSourceAdapter catalogPriceSourceAdapter(CopyInventoryPort inventory) {
+        return new CatalogPriceSourceAdapter(inventory);
+    }
+
+    @Bean
+    RefundRequestPort refundRequestPort(FineRefundUseCases refunds) {
+        return new RefundRequestAdapter(refunds);
+    }
+
+    @Bean
+    ReportFoundUseCase reportFoundUseCase(BorrowingPersistenceAdapter persistence, CopyInventoryPort inventory,
+                                          RefundRequestPort refunds) {
+        return new ReportFoundUseCase(persistence, inventory, refunds);
     }
 
     @Bean

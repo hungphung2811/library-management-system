@@ -51,6 +51,7 @@ class BorrowingSecurityTest {
     @MockitoBean ReportLostUseCase reportLost;
     @MockitoBean ListBorrowingsUseCase listBorrowings;
     @MockitoBean SearchBorrowingsUseCase searchBorrowings;
+    @MockitoBean lms.circulation.borrowing.application.ReportFoundUseCase reportFound;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean PermissionKeyRegistrar permissionKeyRegistrar;
 

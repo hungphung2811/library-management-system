@@ -74,6 +74,7 @@ class BorrowBookUseCaseTest {
             return findById(id).filter(r -> r.userId().equals(userId));
         }
         public Optional<BorrowingRecord> findByIdForUpdate(BorrowingId id) { return findById(id); }
+        public Optional<BorrowingRecord> findLatestLostByCopyId(UUID copyId) { return Optional.empty(); }
         public Optional<BorrowingRecord> findOpenByCopyIdForUpdate(UUID copyId) {
             return records.values().stream().filter(r -> r.items().stream()
                     .anyMatch(i -> i.bookCopyId().equals(copyId) && !i.isReturned())).findFirst();
@@ -129,6 +130,10 @@ class BorrowBookUseCaseTest {
         public boolean exists(UUID b, UUID c, FineReason r) {
             return fines.stream().anyMatch(f -> f.borrowingId().equals(b) && f.bookCopyId().equals(c) && f.reason() == r);
         }
+        public Optional<Fine> findByIdForUpdate(UUID id) { return fines.stream().filter(f -> f.id().equals(id)).findFirst(); }
+        public Optional<Fine> findByItemAndReason(UUID b, UUID c, FineReason r) {
+            return fines.stream().filter(f -> f.borrowingId().equals(b) && f.bookCopyId().equals(c) && f.reason() == r).findFirst();
+        }
         public List<Fine> findByReader(UUID reader) { return fines.stream().filter(f -> f.readerId().equals(reader)).toList(); }
         public List<Fine> findUnpaidByReaderForUpdate(UUID reader) {
             return fines.stream().filter(f -> f.readerId().equals(reader) && f.isUnpaid()).toList();
@@ -138,8 +143,13 @@ class BorrowBookUseCaseTest {
         }
     };
 
+    final lms.circulation.fine.application.PriceSource priceSource = id -> new lms.circulation.fine.application.PriceSource.Prices(
+            copies.get(id).coverPrice(), copies.get(id).purchasePrice());
     final AssessFineUseCase assessFine = new AssessFineUseCase(new FineCalculator(FineRates.standard()),
-            fineRepository, events::add, clock);
+            fineRepository, events::add, clock,
+            lms.circulation.policy.application.GetCirculationPolicyUseCase.defaultsOnly(),
+            lms.circulation.policy.application.GetCompensationPolicyUseCase.defaultsOnly(),
+            lms.circulation.policy.application.ResolveDamageLevelUseCase.seedsOnly(), priceSource);
     final CollectFinesUseCase collectFines = new CollectFinesUseCase(fineRepository, events::add, clock);
 
     final FineLedgerPort ledger = new FineLedgerPort() {
@@ -225,6 +235,73 @@ class BorrowBookUseCaseTest {
         borrow.execute(new BorrowBookCommand(student, List.of(id)));
 
         assertThat(records.values().iterator().next().items().get(0).titleId()).isNull();
+    }
+
+    private UUID copyWithCondition(String grade, String note) {
+        UUID id = UUID.randomUUID();
+        copies.put(id, new CopyInventoryPort.CopyInfo(id, UUID.randomUUID(), "Sách", "BC-" + id.toString().substring(0, 6),
+                CopyStatus.AVAILABLE, new BigDecimal("100000"), grade, note, null));
+        return id;
+    }
+
+    @Test
+    void muonTuDienTinhTrangTuBanSaoVaThuThuGhiDeTungCuon() {
+        UUID a = copyWithCondition("GOOD", "Gáy hơi cong");
+        UUID b = copyWithCondition("GOOD", "Gáy hơi cong");
+
+        borrow.execute(new BorrowBookCommand(student, List.of(a, b), List.of(
+                new BorrowBookCommand.ConditionOverride(b, lms.circulation.borrowing.domain.ConditionGrade.FAIR, null))));
+
+        var items = records.values().iterator().next().items();
+        var byCopy = items.stream().collect(java.util.stream.Collectors.toMap(i -> i.bookCopyId(), i -> i));
+        assertThat(byCopy.get(a).borrowCondition().grade()).isEqualTo(lms.circulation.borrowing.domain.ConditionGrade.GOOD);
+        assertThat(byCopy.get(a).borrowCondition().note()).isEqualTo("Gáy hơi cong");
+        assertThat(byCopy.get(b).borrowCondition().grade()).isEqualTo(lms.circulation.borrowing.domain.ConditionGrade.FAIR);
+        assertThat(byCopy.get(b).borrowCondition().note()).isEqualTo("Gáy hơi cong");
+    }
+
+    @Test
+    void banSaoChuaCoTinhTrangThiLuuNullVaPhanHoiChuaGhiNhan() {
+        UUID a = copyWithCondition(null, null);
+
+        var response = borrow.execute(new BorrowBookCommand(student, List.of(a)));
+
+        var atBorrow = response.items().get(0).conditionAtBorrow();
+        assertThat(atBorrow).isNotNull();
+        assertThat(atBorrow.grade()).isNull();
+    }
+
+    @Test
+    void luotMuonCuKhongCoDuLieuLucMuonVaTraBinhThuong() {
+        UUID a = UUID.randomUUID();
+        copies.put(a, new CopyInventoryPort.CopyInfo(a, UUID.randomUUID(), "Sách", "BC-OLD", CopyStatus.LOANED, new BigDecimal("1000")));
+        BorrowingRecord old = BorrowingRecord.restore(lms.circulation.borrowing.domain.BorrowingId.newId(), student,
+                List.of(lms.circulation.borrowing.domain.BorrowingItem.borrowed(a)), LocalDate.now(clock).minusDays(3),
+                LocalDate.now(clock).plusDays(11), 0, 14);
+        records.put(old.id().value(), old);
+
+        assertThat(old.items().get(0).borrowCondition()).isNull();
+        var response = giveBack.execute(new ReturnBookCommand(null, a, null, ItemCondition.GOOD));
+        assertThat(response.status()).isEqualTo("RETURNED");
+        assertThat(response.items().get(0).conditionAtBorrow()).isNull();
+    }
+
+    @Test
+    void traSachGiuNguyenTinhTrangLucMuonBatBien() {
+        UUID a = copyWithCondition("WORN", "Cũ");
+        borrow.execute(new BorrowBookCommand(student, List.of(a)));
+        giveBack.execute(new ReturnBookCommand(null, a, null, ItemCondition.GOOD));
+        var item = records.values().iterator().next().items().get(0);
+        assertThat(item.borrowCondition().grade()).isEqualTo(lms.circulation.borrowing.domain.ConditionGrade.WORN);
+        assertThat(item.borrowCondition().note()).isEqualTo("Cũ");
+    }
+
+    @Test
+    void thongTinHongKhiTraNguyenVenBiTuChoi() {
+        UUID a = copyWithCondition("GOOD", null);
+        borrow.execute(new BorrowBookCommand(student, List.of(a)));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> giveBack.execute(new ReturnBookCommand(null, a, null,
+                ItemCondition.GOOD, "MINOR", null, null))).isInstanceOf(lms.circulation.borrowing.domain.InvalidBorrowingException.class);
     }
 
     @Test

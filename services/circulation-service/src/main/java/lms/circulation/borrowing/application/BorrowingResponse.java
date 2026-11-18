@@ -30,11 +30,22 @@ public record BorrowingResponse(
         this(id, userId, status, borrowDate, dueDate, renewCount, items, fines, null);
     }
 
-    /** condition: GOOD, DAMAGED, LOST; null khi còn đang mượn. */
-    public record Item(UUID bookCopyId, LocalDate returnDate, String condition) {
+    /**
+     * condition: GOOD, DAMAGED, LOST; null khi còn đang mượn. conditionAtBorrow: tình trạng bản sao lúc lập phiếu; null =
+     * lượt mượn cũ không có dữ liệu lúc mượn; khác null nhưng grade null = bản sao chưa ghi nhận tình trạng.
+     */
+    public record Item(UUID bookCopyId, LocalDate returnDate, String condition, ConditionAtBorrow conditionAtBorrow) {
+
+        public Item(UUID bookCopyId, LocalDate returnDate, String condition) {
+            this(bookCopyId, returnDate, condition, null);
+        }
 
         public Item(UUID bookCopyId, LocalDate returnDate) {
-            this(bookCopyId, returnDate, null);
+            this(bookCopyId, returnDate, null, null);
         }
+    }
+
+    /** grade: NEW, GOOD, FAIR, WORN hoặc null (chưa ghi nhận); note tối đa 500 ký tự. Bất biến sau khi lập phiếu. */
+    public record ConditionAtBorrow(String grade, String note) {
     }
 }

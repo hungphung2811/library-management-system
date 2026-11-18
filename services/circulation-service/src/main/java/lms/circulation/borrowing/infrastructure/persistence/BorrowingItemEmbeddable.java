@@ -6,6 +6,8 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import java.time.LocalDate;
 import java.util.UUID;
+import lms.circulation.borrowing.domain.BorrowCondition;
+import lms.circulation.borrowing.domain.ConditionGrade;
 import lms.circulation.borrowing.domain.ItemCondition;
 
 @Embeddable
@@ -26,14 +28,36 @@ class BorrowingItemEmbeddable {
     @Column(name = "item_condition", length = 10)
     private ItemCondition condition;
 
+    /** Tình trạng bản sao lúc mượn (migration V11): bất biến, chỉ ghi khi lập phiếu. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "condition_grade", length = 10)
+    private ConditionGrade conditionGrade;
+
+    @Column(name = "condition_note", length = 500)
+    private String conditionNote;
+
+    /** FALSE ở lượt mượn lập trước V11 ("không có dữ liệu lúc mượn"). */
+    @Column(name = "condition_recorded", nullable = false)
+    private boolean conditionRecorded;
+
     protected BorrowingItemEmbeddable() {
     }
 
-    BorrowingItemEmbeddable(UUID bookCopyId, UUID titleId, LocalDate returnDate, ItemCondition condition) {
+    BorrowingItemEmbeddable(UUID bookCopyId, UUID titleId, LocalDate returnDate, ItemCondition condition,
+                            BorrowCondition borrowCondition) {
         this.bookCopyId = bookCopyId;
         this.titleId = titleId;
         this.returnDate = returnDate;
         this.condition = condition;
+        if (borrowCondition != null) {
+            this.conditionRecorded = true;
+            this.conditionGrade = borrowCondition.grade();
+            this.conditionNote = borrowCondition.note();
+        }
+    }
+
+    BorrowCondition borrowCondition() {
+        return conditionRecorded ? new BorrowCondition(conditionGrade, conditionNote) : null;
     }
 
     UUID getBookCopyId() { return bookCopyId; }

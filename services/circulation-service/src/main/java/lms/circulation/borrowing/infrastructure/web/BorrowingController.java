@@ -5,6 +5,9 @@ import lms.circulation.borrowing.application.BorrowingResponse;
 import lms.circulation.borrowing.application.BorrowingPageResponse;
 import lms.circulation.borrowing.application.SearchBorrowingsQuery;
 import lms.circulation.borrowing.application.SearchBorrowingsUseCase;
+import lms.circulation.borrowing.application.ReportFoundRequest;
+import lms.circulation.borrowing.application.ReportFoundUseCase;
+import lms.circulation.fine.application.FineRefundResponse;
 import lms.circulation.borrowing.application.ReportLostRequest;
 import lms.circulation.borrowing.application.ReportLostUseCase;
 import lms.circulation.borrowing.application.ListBorrowingsUseCase;
@@ -48,11 +51,13 @@ public class BorrowingController {
     private final ReportLostUseCase reportLost;
     private final ListBorrowingsUseCase listBorrowings;
     private final SearchBorrowingsUseCase searchBorrowings;
+    private final ReportFoundUseCase reportFound;
 
     public BorrowingController(BorrowBookUseCase borrowBook, ReturnBookUseCase returnBook,
                                RenewBorrowingUseCase renewBorrowing, GetBorrowingUseCase getBorrowing,
                                ReportLostUseCase reportLost, ListBorrowingsUseCase listBorrowings,
-                               SearchBorrowingsUseCase searchBorrowings) {
+                               SearchBorrowingsUseCase searchBorrowings, ReportFoundUseCase reportFound) {
+        this.reportFound = reportFound;
         this.searchBorrowings = searchBorrowings;
         this.reportLost = reportLost;
         this.listBorrowings = listBorrowings;
@@ -78,6 +83,19 @@ public class BorrowingController {
     @PostMapping("/losses")
     public BorrowingResponse reportLost(@Valid @RequestBody ReportLostRequest request) {
         return reportLost.execute(BorrowingMapper.toCommand(request));
+    }
+
+    /**
+     * Ghi nhận tìm lại sách đã báo mất (khóa BorrowingController/reportFound): tạo đề nghị hoàn khoản chờ người khác
+     * duyệt ở /internal/fines/refund-requests/{id}/approve. Quá hạn foundWindowDays hoặc bản sao không LOST thì từ chối.
+     */
+    @PostMapping("/found")
+    public ResponseEntity<FineRefundResponse> reportFound(@Valid @RequestBody ReportFoundRequest request,
+                                                          @AuthenticationPrincipal Jwt jwt) {
+        if (jwt == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Cần đăng nhập");
+        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(reportFound.execute(request, CurrentUser.from(jwt).userId()));
     }
 
     /** UC05: lượt mượn của chính độc giả đang đăng nhập; userId lấy từ token. */

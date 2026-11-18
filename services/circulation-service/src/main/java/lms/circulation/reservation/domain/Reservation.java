@@ -19,14 +19,18 @@ public class Reservation {
     private final UUID id;
     private final UUID readerId;
     private final UUID titleId;
+    /** Tác phẩm của ấn bản lúc đặt (ADR-0026); đổi khi ấn bản chuyển tác phẩm. Luôn khác null. */
+    private UUID workId;
+    /** Ngôn ngữ ấn bản độc giả chọn; null = mọi ngôn ngữ. Hàng đợi/gán bản sao chỉ xét bản sao cùng ngôn ngữ. */
+    private final String language;
     private final Instant reservedAt;
     private ReservationStatus status;
     private UUID copyId;
     private LocalDate holdUntil;
     private final List<DomainEvent> events = new ArrayList<>();
 
-    private Reservation(UUID id, UUID readerId, UUID titleId, Instant reservedAt, ReservationStatus status,
-                        UUID copyId, LocalDate holdUntil) {
+    private Reservation(UUID id, UUID readerId, UUID titleId, UUID workId, String language, Instant reservedAt,
+                        ReservationStatus status, UUID copyId, LocalDate holdUntil) {
         if (id == null) throw new InvalidReservationException("id không được null");
         if (readerId == null) throw new InvalidReservationException("readerId không được null");
         if (titleId == null) throw new InvalidReservationException("titleId không được null");
@@ -38,6 +42,8 @@ public class Reservation {
         this.id = id;
         this.readerId = readerId;
         this.titleId = titleId;
+        this.workId = workId == null ? LegacyWorkIds.ofTitle(titleId) : workId;
+        this.language = language == null || language.isBlank() ? null : language.trim().toLowerCase(java.util.Locale.ROOT);
         this.reservedAt = reservedAt;
         this.status = status;
         this.copyId = copyId;
@@ -46,7 +52,13 @@ public class Reservation {
 
     /** UC03: tạo đặt trước ở cuối hàng đợi (WAITING). Việc kiểm tra điều kiện (QĐ2, QĐ5) do use case đảm nhiệm. */
     public static Reservation create(UUID readerId, UUID titleId, Instant now) {
-        Reservation r = new Reservation(UUID.randomUUID(), readerId, titleId, now, ReservationStatus.WAITING, null, null);
+        return create(readerId, titleId, null, null, now);
+    }
+
+    /** Đặt trước theo tác phẩm {@code workId} (null = tác phẩm 1:1 tất định của ấn bản), cùng ngôn ngữ {@code language}. */
+    public static Reservation create(UUID readerId, UUID titleId, UUID workId, String language, Instant now) {
+        Reservation r = new Reservation(UUID.randomUUID(), readerId, titleId, workId, language, now,
+                ReservationStatus.WAITING, null, null);
         r.events.add(new ReservationCreatedEvent(UUID.randomUUID(), r.id, readerId, titleId, now));
         return r;
     }
@@ -54,12 +66,17 @@ public class Reservation {
     /** Dựng lại aggregate từ persistence, không phát sinh event. */
     public static Reservation restore(UUID id, UUID readerId, UUID titleId, Instant reservedAt,
                                       ReservationStatus status, UUID copyId, LocalDate holdUntil) {
-        return new Reservation(id, readerId, titleId, reservedAt, status, copyId, holdUntil);
+        return new Reservation(id, readerId, titleId, null, null, reservedAt, status, copyId, holdUntil);
+    }
+
+    public static Reservation restore(UUID id, UUID readerId, UUID titleId, UUID workId, String language,
+                                      Instant reservedAt, ReservationStatus status, UUID copyId, LocalDate holdUntil) {
+        return new Reservation(id, readerId, titleId, workId, language, reservedAt, status, copyId, holdUntil);
     }
 
     public static Reservation restore(UUID id, UUID readerId, UUID titleId, Instant reservedAt,
                                       ReservationStatus status) {
-        return new Reservation(id, readerId, titleId, reservedAt, status, null, null);
+        return new Reservation(id, readerId, titleId, null, null, reservedAt, status, null, null);
     }
 
     public boolean isActive() {
@@ -120,6 +137,15 @@ public class Reservation {
         events.add(new ReservationCancelledEvent(UUID.randomUUID(), id, readerId, titleId, copyId, now));
     }
 
+    /** ADR-0026: ấn bản của đặt trước vừa đổi tác phẩm (tách/gộp). Chỉ đặt trước còn hiệu lực mới chuyển. */
+    public void moveToWork(UUID newWorkId) {
+        if (newWorkId == null) throw new InvalidReservationException("workId không được null");
+        if (!isActive()) {
+            throw new InvalidReservationException("Đặt trước không còn hiệu lực (" + status + "), không chuyển tác phẩm");
+        }
+        this.workId = newWorkId;
+    }
+
     public List<DomainEvent> pullEvents() {
         List<DomainEvent> copy = List.copyOf(events);
         events.clear();
@@ -129,6 +155,9 @@ public class Reservation {
     public UUID id() { return id; }
     public UUID readerId() { return readerId; }
     public UUID titleId() { return titleId; }
+    public UUID workId() { return workId; }
+    /** Ngôn ngữ ấn bản đã chọn; null = mọi ngôn ngữ. */
+    public String language() { return language; }
     public Instant reservedAt() { return reservedAt; }
     public ReservationStatus status() { return status; }
     /** Bản sao đang/đã được giữ; null khi chưa từng được giữ. */

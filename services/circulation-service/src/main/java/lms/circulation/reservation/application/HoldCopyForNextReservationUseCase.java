@@ -40,10 +40,23 @@ public class HoldCopyForNextReservationUseCase {
     /** Dùng cho event "bản sao sẵn sàng": giữ cho người chờ nếu có; không có thì không làm gì. @return true nếu đã giữ. */
     @Transactional
     public boolean holdIfAnyoneWaiting(UUID titleId, UUID copyId) {
+        return holdIfAnyoneWaiting(null, null, titleId, copyId);
+    }
+
+    /**
+     * ADR-0026: giữ cho người đầu hàng đợi của TÁC PHẨM, chỉ xét độc giả nhận được ngôn ngữ của bản sao (đặt trước không
+     * khai ngôn ngữ nhận mọi ngôn ngữ). Event cũ không có workId hoặc không có language thì rơi về hàng đợi theo đúng
+     * ấn bản {@code titleId} (hành vi trước ADR-0026).
+     */
+    @Transactional
+    public boolean holdIfAnyoneWaiting(UUID workId, String language, UUID titleId, UUID copyId) {
         if (repository.existsReadyForCopy(copyId)) {
             return true;
         }
-        Optional<Reservation> next = repository.findNextWaitingForUpdate(titleId);
+        String lang = language == null || language.isBlank() ? null : language.trim().toLowerCase(java.util.Locale.ROOT);
+        Optional<Reservation> next = workId != null && lang != null
+                ? repository.findNextWaitingInWorkForUpdate(workId, lang)
+                : repository.findNextWaitingForUpdate(titleId);
         if (next.isEmpty()) {
             return false;
         }
@@ -57,7 +70,13 @@ public class HoldCopyForNextReservationUseCase {
     /** Dùng khi bản sao đang giữ bị nhả (hết hạn/hủy): giữ cho người kế tiếp, không có ai thì báo catalog trả về kho. */
     @Transactional
     public void holdOrRelease(UUID titleId, UUID copyId) {
-        if (!holdIfAnyoneWaiting(titleId, copyId)) {
+        holdOrRelease(null, null, titleId, copyId);
+    }
+
+    /** Như {@link #holdOrRelease(UUID, UUID)} nhưng theo tác phẩm và ngôn ngữ của đặt trước vừa nhả bản sao. */
+    @Transactional
+    public void holdOrRelease(UUID workId, String language, UUID titleId, UUID copyId) {
+        if (!holdIfAnyoneWaiting(workId, language, titleId, copyId)) {
             eventPort.publish(new CopyReleasedEvent(UUID.randomUUID(), copyId, titleId, Instant.now(clock)));
         }
     }

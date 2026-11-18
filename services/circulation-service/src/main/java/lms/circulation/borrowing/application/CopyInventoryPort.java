@@ -17,6 +17,15 @@ public interface CopyInventoryPort {
 
     void changeStatus(UUID copyId, CopyStatus target);
 
-    record CopyInfo(UUID id, UUID titleId, String titleName, String barcode, CopyStatus status, BigDecimal coverPrice) {
+    /**
+     * conditionGrade (NEW, GOOD, FAIR, WORN), conditionNote, purchasePrice là của chính bản sao (catalog trả thêm, null nếu
+     * chưa ghi nhận): chụp tình trạng lúc mượn và tính đền bù theo giá mua. coverPrice là giá bìa của đầu sách.
+     */
+    record CopyInfo(UUID id, UUID titleId, String titleName, String barcode, CopyStatus status, BigDecimal coverPrice,
+                    String conditionGrade, String conditionNote, BigDecimal purchasePrice) {
+
+        public CopyInfo(UUID id, UUID titleId, String titleName, String barcode, CopyStatus status, BigDecimal coverPrice) {
+            this(id, titleId, titleName, barcode, status, coverPrice, null, null, null);
+        }
     }
 }

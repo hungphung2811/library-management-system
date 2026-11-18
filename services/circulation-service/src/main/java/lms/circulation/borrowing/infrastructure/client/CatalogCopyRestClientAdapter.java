@@ -24,7 +24,9 @@ public class CatalogCopyRestClientAdapter implements CopyInventoryPort {
         this.client = client;
     }
 
-    record CopyDto(UUID id, UUID titleId, String titleName, String barcode, CopyStatus status, BigDecimal coverPrice) {
+    /** Các trường conditionGrade, conditionNote, purchasePrice là additive ở catalog; thiếu thì null. */
+    record CopyDto(UUID id, UUID titleId, String titleName, String barcode, CopyStatus status, BigDecimal coverPrice,
+                   String conditionGrade, String conditionNote, BigDecimal purchasePrice) {
     }
 
     @Override
@@ -44,7 +46,8 @@ public class CatalogCopyRestClientAdapter implements CopyInventoryPort {
             lms.security.permission.ActAsTenant.current().ifPresent(tid -> spec.header(lms.security.permission.ActAsTenant.HEADER, tid));
             CopyDto dto = spec.retrieve().body(CopyDto.class);
             return dto == null ? Optional.empty()
-                    : Optional.of(new CopyInfo(dto.id(), dto.titleId(), dto.titleName(), dto.barcode(), dto.status(), dto.coverPrice()));
+                    : Optional.of(new CopyInfo(dto.id(), dto.titleId(), dto.titleName(), dto.barcode(), dto.status(), dto.coverPrice(),
+                            dto.conditionGrade(), dto.conditionNote(), dto.purchasePrice()));
         } catch (HttpClientErrorException.NotFound e) {
             return Optional.empty();
         } catch (HttpClientErrorException e) {
