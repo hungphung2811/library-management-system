@@ -1,14 +1,10 @@
 package lms.catalog.catalog.infrastructure.config;
 
-import lms.catalog.catalog.application.CreateReferenceUseCase;
+import lms.cache.RequestCache;
 import lms.catalog.catalog.application.CreateTitleUseCase;
-import lms.catalog.catalog.application.GetReferenceUseCase;
-import lms.catalog.catalog.application.ReferenceOptionsUseCase;
 import lms.catalog.catalog.application.ReferenceUseCases;
-import lms.catalog.catalog.application.SearchReferencesUseCase;
-import lms.catalog.catalog.application.SetReferenceStatusUseCase;
 import lms.catalog.catalog.application.TitleClassificationService;
-import lms.catalog.catalog.application.UpdateReferenceUseCase;
+import lms.catalog.catalog.infrastructure.cache.CachedReferenceUseCases;
 import lms.catalog.catalog.domain.ReferenceRepository;
 import lms.catalog.catalog.application.GetTitlePreviewUseCase;
 import lms.catalog.catalog.application.GetTitleUseCase;
@@ -31,10 +27,9 @@ public class CatalogBeanConfiguration {
     }
 
     @Bean
-    ReferenceUseCases referenceUseCases(ReferenceRepository references) {
-        return new ReferenceUseCases(new CreateReferenceUseCase(references), new UpdateReferenceUseCase(references),
-                new SetReferenceStatusUseCase(references), new GetReferenceUseCase(references),
-                new SearchReferencesUseCase(references), new ReferenceOptionsUseCase(references));
+    ReferenceUseCases referenceUseCases(ReferenceRepository references, RequestCache cache) {
+        // Danh mục tham chiếu đọc qua cache (TTL 60s, theo tenant); ghi xóa namespace của loại tương ứng
+        return CachedReferenceUseCases.create(references, cache);
     }
 
     @Bean

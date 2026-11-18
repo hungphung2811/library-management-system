@@ -43,4 +43,7 @@ public interface CatalogClient {
 
     /** Gán/đổi/gỡ vị trí kệ của bản sao (shelfLocationId null = gỡ). */
     CopyView moveCopyShelfLocation(UUID id, UUID shelfLocationId);
+
+    /** Thay toàn bộ thông tin nhập kho và tình trạng của bản sao. */
+    CopyView updateCopyAcquisition(UUID id, lms.api.catalog.dto.UpdateCopyAcquisitionRequest request);
 }

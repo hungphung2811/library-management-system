@@ -17,6 +17,8 @@ import lms.catalog.inventory.application.LookupCopiesRequest;
 import lms.catalog.inventory.application.LookupCopiesUseCase;
 import lms.catalog.inventory.application.MoveCopyShelfLocationRequest;
 import lms.catalog.inventory.application.MoveCopyShelfLocationUseCase;
+import lms.catalog.inventory.application.UpdateCopyAcquisitionRequest;
+import lms.catalog.inventory.application.UpdateCopyAcquisitionUseCase;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
@@ -43,10 +45,12 @@ public class BookCopyController {
     private final ChangeCopyStatusUseCase changeStatus;
     private final MoveCopyShelfLocationUseCase moveShelfLocation;
     private final LookupCopiesUseCase lookupCopies;
+    private final UpdateCopyAcquisitionUseCase updateAcquisition;
 
     public BookCopyController(AddCopyUseCase addCopy, ListCopiesUseCase listCopies, GetCopyUseCase getCopy,
                               ChangeCopyStatusUseCase changeStatus, MoveCopyShelfLocationUseCase moveShelfLocation,
-                              LookupCopiesUseCase lookupCopies) {
+                              LookupCopiesUseCase lookupCopies, UpdateCopyAcquisitionUseCase updateAcquisition) {
+        this.updateAcquisition = updateAcquisition;
         this.lookupCopies = lookupCopies;
         this.moveShelfLocation = moveShelfLocation;
         this.addCopy = addCopy;
@@ -81,6 +85,16 @@ public class BookCopyController {
     }
 
     /**
+     * Thay TOÀN BỘ thông tin nhập kho và tình trạng của bản sao (thiếu trường = xóa). Khóa
+     * BookCopyController/updateAcquisition.
+     */
+    @PutMapping("/{id}/acquisition")
+    public CopyResponse updateAcquisition(@PathVariable UUID id,
+                                          @Valid @RequestBody UpdateCopyAcquisitionRequest request) {
+        return updateAcquisition.execute(id, request.acquisition());
+    }
+
+    /**
      * Tra bản sao theo lô (tối đa 100 id), kèm tên/ISBN đầu sách; id không có hoặc thuộc tenant khác thì vắng.
      * Khóa BookCopyController/lookup (ADR-0018): không đổi tên.
      */
@@ -91,7 +105,8 @@ public class BookCopyController {
 
     @PostMapping
     public ResponseEntity<CopyResponse> add(@Valid @RequestBody AddCopyRequest request) {
-        CopyResponse response = addCopy.execute(new AddCopyCommand(request.titleId(), request.barcode(), request.shelfLocationId()));
+        CopyResponse response = addCopy.execute(new AddCopyCommand(request.titleId(), request.barcode(), request.shelfLocationId(),
+                request.acquisition()));
         return ResponseEntity.created(URI.create("/internal/book-copies/" + response.id())).body(response);
     }
 

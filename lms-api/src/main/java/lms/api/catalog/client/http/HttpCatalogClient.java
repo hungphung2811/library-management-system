@@ -23,11 +23,15 @@ public class HttpCatalogClient implements CatalogClient {
     /** DTO nội bộ của catalog-service; tách khỏi DTO cho FE để hai bên đổi độc lập. */
     record InternalTitle(UUID id, String name, String author, String isbn, BigDecimal coverPrice, long availableCopies,
                          UUID tenantId, UUID publisherId, String publisherName, UUID categoryId, String categoryName,
-                         List<AuthorRefView> authors) {
+                         List<AuthorRefView> authors, String subtitle, Integer publicationYear, String edition,
+                         String language, Integer pageCount, String format, String translator, String series,
+                         Integer seriesNumber, String coverImageUrl, List<String> tags) {
     }
 
     record InternalCopy(UUID id, UUID titleId, String barcode, String status, UUID tenantId, UUID shelfLocationId,
-                        String shelfLocationCode) {
+                        String shelfLocationCode, java.time.LocalDate acquiredDate, String acquisitionSource,
+                        Long purchasePrice, String conditionGrade, String conditionNote,
+                        java.time.LocalDate lastInventoryDate) {
     }
 
     record InternalCopyDetails(UUID id, UUID titleId, String titleName, String barcode, String status,
@@ -43,12 +47,15 @@ public class HttpCatalogClient implements CatalogClient {
     private static TitleView view(InternalTitle t) {
         return new TitleView(t.id(), t.name(), t.author(), t.isbn(), t.coverPrice(), t.availableCopies(), t.tenantId(),
                 t.publisherId(), t.publisherName(), t.categoryId(), t.categoryName(),
-                t.authors() == null ? List.of() : t.authors());
+                t.authors() == null ? List.of() : t.authors(), t.subtitle(), t.publicationYear(), t.edition(),
+                t.language(), t.pageCount(), t.format(), t.translator(), t.series(), t.seriesNumber(),
+                t.coverImageUrl(), t.tags() == null ? List.of() : t.tags());
     }
 
     private static CopyView view(InternalCopy c) {
         return new CopyView(c.id(), c.titleId(), c.barcode(), c.status(), c.tenantId(), c.shelfLocationId(),
-                c.shelfLocationCode());
+                c.shelfLocationCode(), c.acquiredDate(), c.acquisitionSource(), c.purchasePrice(), c.conditionGrade(),
+                c.conditionNote(), c.lastInventoryDate());
     }
 
     private static CopyDetailsView view(InternalCopyDetails c) {
@@ -140,6 +147,12 @@ public class HttpCatalogClient implements CatalogClient {
         java.util.Map<String, Object> body = new java.util.HashMap<>();
         body.put("shelfLocationId", shelfLocationId);
         return view(client.put().uri("/internal/book-copies/{id}/shelf-location", id).body(body).retrieve()
+                .body(InternalCopy.class));
+    }
+
+    @Override
+    public CopyView updateCopyAcquisition(UUID id, lms.api.catalog.dto.UpdateCopyAcquisitionRequest request) {
+        return view(client.put().uri("/internal/book-copies/{id}/acquisition", id).body(request).retrieve()
                 .body(InternalCopy.class));
     }
 

@@ -2,6 +2,8 @@ package lms.api.catalog;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -15,6 +17,7 @@ import lms.api.catalog.client.CatalogClient;
 import lms.api.catalog.dto.CopyDetailsView;
 import lms.api.catalog.dto.CopyStatus;
 import lms.api.catalog.dto.CopyView;
+import lms.api.catalog.dto.CreateTitleRequest;
 import lms.api.catalog.dto.TitleView;
 import lms.api.catalog.web.CatalogController;
 import lms.api.config.SecurityConfiguration;
@@ -25,6 +28,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -85,6 +89,110 @@ class CatalogControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Clean Code 2"))
                 .andExpect(jsonPath("$.availableCopies").value(1));
+    }
+
+    @Test
+    void timKiemTraDayDuTenTruongThongTinBoSung() throws Exception {
+        when(catalog.searchTitles(eq(null), eq(false), eq(null))).thenReturn(List.of(new TitleView(TITLE, "HP", "Rowling",
+                null, new BigDecimal("120000"), 1, null, null, null, null, null, List.of(), "Phụ đề", 2017, "Tái bản",
+                "vi", 368, "PAPERBACK", "Lý Lan", "Harry Potter", 1, "https://img.example/a.jpg",
+                List.of("giả tưởng", "phép thuật"))));
+        mvc.perform(get("/api/books").with(jwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].subtitle").value("Phụ đề"))
+                .andExpect(jsonPath("$[0].publicationYear").value(2017))
+                .andExpect(jsonPath("$[0].edition").value("Tái bản"))
+                .andExpect(jsonPath("$[0].language").value("vi"))
+                .andExpect(jsonPath("$[0].pageCount").value(368))
+                .andExpect(jsonPath("$[0].format").value("PAPERBACK"))
+                .andExpect(jsonPath("$[0].translator").value("Lý Lan"))
+                .andExpect(jsonPath("$[0].series").value("Harry Potter"))
+                .andExpect(jsonPath("$[0].seriesNumber").value(1))
+                .andExpect(jsonPath("$[0].coverImageUrl").value("https://img.example/a.jpg"))
+                .andExpect(jsonPath("$[0].tags[1]").value("phép thuật"));
+    }
+
+    @Test
+    void taoDauSachChuyenDuTruongMoiXuongClient() throws Exception {
+        when(catalog.createTitle(any())).thenReturn(new TitleView(TITLE, "A", "B", null, BigDecimal.ONE, 0, null));
+        mvc.perform(post("/api/books").with(jwt()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"A\",\"author\":\"B\",\"coverPrice\":1,\"subtitle\":\"S\","
+                                + "\"publicationYear\":2020,\"edition\":\"E\",\"language\":\"en\",\"pageCount\":10,"
+                                + "\"format\":\"EBOOK\",\"translator\":\"T\",\"series\":\"Sr\",\"seriesNumber\":2,"
+                                + "\"coverImageUrl\":\"http://x.example/c.png\",\"tags\":[\"a\",\"b\"]}"))
+                .andExpect(status().isCreated());
+        ArgumentCaptor<CreateTitleRequest> captor = ArgumentCaptor.forClass(CreateTitleRequest.class);
+        verify(catalog).createTitle(captor.capture());
+        CreateTitleRequest r = captor.getValue();
+        org.junit.jupiter.api.Assertions.assertEquals("S", r.subtitle());
+        org.junit.jupiter.api.Assertions.assertEquals(2020, r.publicationYear());
+        org.junit.jupiter.api.Assertions.assertEquals("EBOOK", r.format());
+        org.junit.jupiter.api.Assertions.assertEquals(List.of("a", "b"), r.tags());
+        org.junit.jupiter.api.Assertions.assertEquals(2, r.seriesNumber());
+    }
+
+    @Test
+    void truongMoiSaiRangBuocBi400KhongGoiClient() throws Exception {
+        String base = "{\"name\":\"A\",\"author\":\"B\",\"coverPrice\":1,";
+        for (String bad : List.of("\"language\":\"VI\"", "\"language\":\"v\"", "\"publicationYear\":999",
+                "\"pageCount\":0", "\"pageCount\":20001", "\"format\":\"AUDIO\"", "\"seriesNumber\":0",
+                "\"coverImageUrl\":\"ftp://x.example/a\"", "\"coverImageUrl\":\"javascript:alert(1)\"",
+                "\"tags\":[\"1\",\"2\",\"3\",\"4\",\"5\",\"6\",\"7\",\"8\",\"9\",\"10\",\"11\"]",
+                "\"tags\":[\"" + "a".repeat(51) + "\"]", "\"subtitle\":\"" + "a".repeat(256) + "\"")) {
+            mvc.perform(post("/api/books").with(jwt()).contentType(MediaType.APPLICATION_JSON).content(base + bad + "}"))
+                    .andExpect(status().isBadRequest());
+            mvc.perform(put("/api/books/" + TITLE).with(jwt()).contentType(MediaType.APPLICATION_JSON)
+                            .content(base + bad + "}"))
+                    .andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(catalog);
+    }
+
+    @Test
+    void banSaoChuyenThongTinNhapKhoVaTraDayDuTruong() throws Exception {
+        UUID copyId = UUID.randomUUID();
+        var view = new CopyView(copyId, TITLE, "BC-1", "AVAILABLE", null, null, null, java.time.LocalDate.of(2024, 5, 1),
+                "PURCHASE", 45000L, "GOOD", "Gáy mòn", java.time.LocalDate.of(2026, 1, 10));
+        when(catalog.addCopy(any())).thenReturn(view);
+        when(catalog.updateCopyAcquisition(eq(copyId), any())).thenReturn(view);
+        String acq = "\"acquiredDate\":\"2024-05-01\",\"acquisitionSource\":\"PURCHASE\",\"purchasePrice\":45000,"
+                + "\"conditionGrade\":\"GOOD\",\"conditionNote\":\"Gáy mòn\",\"lastInventoryDate\":\"2026-01-10\"";
+        mvc.perform(post("/api/book-copies").with(jwt()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"titleId\":\"" + TITLE + "\",\"barcode\":\"BC-1\"," + acq + "}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.acquiredDate").value("2024-05-01"))
+                .andExpect(jsonPath("$.acquisitionSource").value("PURCHASE"))
+                .andExpect(jsonPath("$.purchasePrice").value(45000))
+                .andExpect(jsonPath("$.conditionGrade").value("GOOD"))
+                .andExpect(jsonPath("$.conditionNote").value("Gáy mòn"))
+                .andExpect(jsonPath("$.lastInventoryDate").value("2026-01-10"));
+        ArgumentCaptor<lms.api.catalog.dto.AddCopyRequest> c = ArgumentCaptor.forClass(lms.api.catalog.dto.AddCopyRequest.class);
+        verify(catalog).addCopy(c.capture());
+        org.junit.jupiter.api.Assertions.assertEquals(45000L, c.getValue().purchasePrice());
+        org.junit.jupiter.api.Assertions.assertEquals("GOOD", c.getValue().conditionGrade());
+
+        mvc.perform(put("/api/book-copies/" + copyId + "/acquisition").with(jwt()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{" + acq + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.conditionGrade").value("GOOD"));
+        mvc.perform(put("/api/book-copies/" + copyId + "/acquisition").contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void banSaoSaiThongTinNhapKhoBi400() throws Exception {
+        for (String bad : List.of("\"acquiredDate\":\"2999-01-01\"", "\"purchasePrice\":-1",
+                "\"acquisitionSource\":\"GIFT\"", "\"conditionGrade\":\"BROKEN\"",
+                "\"conditionNote\":\"" + "a".repeat(301) + "\"", "\"lastInventoryDate\":\"2999-01-01\"")) {
+            mvc.perform(put("/api/book-copies/" + UUID.randomUUID() + "/acquisition").with(jwt())
+                            .contentType(MediaType.APPLICATION_JSON).content("{" + bad + "}"))
+                    .andExpect(status().isBadRequest());
+            mvc.perform(post("/api/book-copies").with(jwt()).contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"titleId\":\"" + TITLE + "\",\"barcode\":\"B\"," + bad + "}"))
+                    .andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(catalog);
     }
 
     @Test

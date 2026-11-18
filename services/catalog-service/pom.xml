@@ -35,6 +35,15 @@
             <artifactId>observability-common</artifactId>
         </dependency>
         <dependency>
+            <!-- Cache Redis theo tenant cho danh mục tham chiếu; LMS_CACHE_ENABLED=false tắt -->
+            <groupId>com.company</groupId>
+            <artifactId>cache-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        <dependency>
             <!-- ADR-0018: DemoSeedStep chạy khi bật profile demo-seed -->
             <groupId>com.company</groupId>
             <artifactId>demo-seed</artifactId>

@@ -7,12 +7,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lms.catalog.catalog.domain.Reference;
+import lms.catalog.catalog.domain.ReferenceExtras;
 import lms.catalog.catalog.domain.ReferenceKind;
 import lms.catalog.catalog.domain.ReferenceRepository;
 import lms.catalog.catalog.domain.Title;
+import lms.catalog.catalog.domain.TitleExtras;
+import lms.catalog.catalog.domain.TitleFormat;
 import lms.catalog.catalog.domain.TitleRepository;
 import lms.demo.plan.DemoIds;
 import lms.demo.plan.DemoPlan;
+import lms.demo.plan.DemoPlan.AuthorPlan;
+import lms.demo.plan.DemoPlan.PublisherPlan;
+import lms.demo.plan.DemoPlan.ShelfPlan;
 import lms.demo.plan.DemoPlan.StockItemPlan;
 import lms.demo.plan.DemoPlan.TitlePlan;
 import lms.demo.runner.DemoSeedContext;
@@ -27,7 +33,9 @@ import org.springframework.transaction.support.TransactionOperations;
  * Seed demo (ADR-0018) cho context catalog: thể loại, tác giả chuẩn và đầu sách theo {@link DemoPlan}.
  * Ghi qua repository của chính context dưới {@code TenantContext} của tenant demo (do runner đặt), nên @TenantId và RLS
  * của vai trò catalog_app vẫn áp dụng. Không phát event Kafka. Dùng id tất định ({@link DemoIds}) để chạy lại không nhân đôi:
- * mục đã có (theo id) thì bỏ qua, không cập nhật. Đầu sách trùng ISBN với một đầu sách khác id (dữ liệu không phải demo)
+ * mục đã có (theo id) thì bỏ qua. Ngoại lệ có điều kiện: đầu sách demo đã seed từ bản cũ (chưa có thông tin bổ sung nào) được
+ * làm mới một lần theo kế hoạch (tên, tác giả, nhà xuất bản, thông tin bổ sung; tính vào {@code created}); sau đó
+ * có thông tin bổ sung nên chạy lại chỉ còn bỏ qua. Đầu sách trùng ISBN với một đầu sách khác id (dữ liệu không phải demo)
  * cũng bị bỏ qua và ghi cảnh báo.
  */
 @Component
@@ -70,16 +78,39 @@ public class CatalogDemoSeedStep implements DemoSeedStep {
 
         Map<String, UUID> categoryIds = new LinkedHashMap<>();
         Map<String, UUID> authorIds = new LinkedHashMap<>();
+        Map<String, UUID> publisherIds = new LinkedHashMap<>();
         for (TitlePlan t : plan.titles()) {
             if (!categoryIds.containsKey(t.category())) categoryIds.put(t.category(), DemoIds.of("category", categoryIds.size()));
-            if (!authorIds.containsKey(t.author())) authorIds.put(t.author(), DemoIds.of("author", authorIds.size()));
+            // Tác giả dùng loại id riêng "author2": bản kế hoạch cũ đặt tác giả giả theo "author" nên không dùng lại.
+            if (!authorIds.containsKey(t.author())) authorIds.put(t.author(), DemoIds.of("author2", authorIds.size()));
+            if (t.publisher() != null && !publisherIds.containsKey(t.publisher())) {
+                publisherIds.put(t.publisher(), DemoIds.of("publisher", publisherIds.size()));
+            }
         }
 
+        Map<String, AuthorPlan> authorPlans = new HashMap<>();
+        plan.authors().forEach(a -> authorPlans.put(a.name(), a));
+        Map<String, PublisherPlan> publisherPlans = new HashMap<>();
+        plan.publishers().forEach(p -> publisherPlans.put(p.name(), p));
+
         for (Map.Entry<String, UUID> e : categoryIds.entrySet()) {
-            if (saveReference(ReferenceKind.CATEGORY, e.getValue(), e.getKey())) created++; else skipped++;
+            if (saveReference(ReferenceKind.CATEGORY, e.getValue(), e.getKey(), ReferenceExtras.EMPTY)) created++; else skipped++;
         }
         for (Map.Entry<String, UUID> e : authorIds.entrySet()) {
-            if (saveReference(ReferenceKind.AUTHOR, e.getValue(), e.getKey())) created++; else skipped++;
+            AuthorPlan a = authorPlans.get(e.getKey());
+            ReferenceExtras x = a == null ? ReferenceExtras.EMPTY
+                    : ReferenceExtras.author(a.birthYear(), a.deathYear(), a.nationality(), null, a.website());
+            if (saveReference(ReferenceKind.AUTHOR, e.getValue(), e.getKey(), x)) created++; else skipped++;
+        }
+        for (Map.Entry<String, UUID> e : publisherIds.entrySet()) {
+            PublisherPlan p = publisherPlans.get(e.getKey());
+            ReferenceExtras x = p == null ? ReferenceExtras.EMPTY
+                    : ReferenceExtras.publisher(p.country(), p.foundedYear(), p.website(), p.address());
+            if (saveReference(ReferenceKind.PUBLISHER, e.getValue(), e.getKey(), x)) created++; else skipped++;
+        }
+        for (ShelfPlan s : plan.shelves()) {
+            ReferenceExtras x = ReferenceExtras.shelf(s.floor(), s.zone(), s.capacity());
+            if (saveReference(ReferenceKind.SHELF_LOCATION, s.id(), s.code(), x)) created++; else skipped++;
         }
 
         Map<UUID, Long> prices = new HashMap<>();
@@ -88,8 +119,20 @@ public class CatalogDemoSeedStep implements DemoSeedStep {
         }
 
         for (TitlePlan t : plan.titles()) {
-            if (titles.findById(t.id()).isPresent()) {
-                skipped++;
+            UUID publisherId = t.publisher() == null ? null : publisherIds.get(t.publisher());
+            UUID categoryId = categoryIds.get(t.category());
+            List<UUID> authors = List.of(authorIds.get(t.author()));
+            TitleExtras extras = extrasOf(t);
+            Title current = titles.findById(t.id()).orElse(null);
+            if (current != null) {
+                if (current.extras().isEmpty() && !extras.isEmpty()) {
+                    // Đầu sách seed từ bản cũ: làm mới một lần, giữ id/ISBN/giá bìa/mô tả; sau đó extras khác rỗng nên chỉ bỏ qua.
+                    titles.save(current.update(t.name(), t.author(), current.isbn(), current.coverPrice())
+                            .withClassification(publisherId, categoryId, authors).withExtras(extras));
+                    created++;
+                } else {
+                    skipped++;
+                }
                 continue;
             }
             if (titles.existsByIsbn(t.isbn())) {
@@ -99,16 +142,43 @@ public class CatalogDemoSeedStep implements DemoSeedStep {
             }
             long price = prices.getOrDefault(t.id(), BASE_COVER_PRICE + (t.index() % 7) * 10_000L);
             titles.save(Title.restore(t.id(), t.name(), t.author(), t.isbn(), BigDecimal.valueOf(price), null,
-                    null, null, null, categoryIds.get(t.category()), List.of(authorIds.get(t.author()))));
+                    null, null, publisherId, categoryId, authors, extras));
             created++;
         }
         return SeedResult.of(created, skipped);
     }
 
-    /** @return true nếu vừa tạo, false nếu đã có (cùng id). Cùng tên khác id nghĩa là tenant không sạch: lỗi rõ ràng. */
-    private boolean saveReference(ReferenceKind kind, UUID id, String name) {
-        if (references.findById(kind, id).isPresent()) return false;
-        Reference ref = Reference.restore(id, kind, null, name, null, null, true);
+    private static TitleExtras extrasOf(TitlePlan t) {
+        return new TitleExtras(t.subtitle(), t.publishYear(), t.edition(), t.language(), t.pageCount(),
+                t.format() == null ? null : TitleFormat.valueOf(t.format()), t.translator(), t.series(),
+                t.seriesNumber(), t.coverImageUrl(), t.tags());
+    }
+
+    /** Giữ giá trị hiện có, chỉ lấy giá trị kế hoạch ở các trường hiện còn null. */
+    static ReferenceExtras fillNulls(ReferenceExtras cur, ReferenceExtras plan) {
+        return new ReferenceExtras(first(cur.birthYear(), plan.birthYear()), first(cur.deathYear(), plan.deathYear()),
+                first(cur.nationality(), plan.nationality()), first(cur.photoUrl(), plan.photoUrl()),
+                first(cur.website(), plan.website()), first(cur.country(), plan.country()),
+                first(cur.foundedYear(), plan.foundedYear()), first(cur.address(), plan.address()),
+                first(cur.floor(), plan.floor()), first(cur.zone(), plan.zone()),
+                first(cur.capacity(), plan.capacity()));
+    }
+
+    private static <T> T first(T current, T planned) {
+        return current != null ? current : planned;
+    }
+
+    /** @return true nếu vừa tạo hoặc vừa điền thông tin bổ sung, false nếu đã có đủ (cùng id). Cùng tên khác id nghĩa là tenant không sạch: lỗi rõ ràng. */
+    private boolean saveReference(ReferenceKind kind, UUID id, String name, ReferenceExtras extras) {
+        Reference existing = references.findById(kind, id).orElse(null);
+        if (existing != null) {
+            // Đã có: chỉ điền các trường bổ sung còn null, không đè giá trị đã có.
+            ReferenceExtras merged = fillNulls(existing.extras(), extras);
+            if (merged.equals(existing.extras())) return false;
+            references.save(existing.withExtras(merged));
+            return true;
+        }
+        Reference ref = Reference.restore(id, kind, null, name, null, null, true, extras);
         if (references.existsByNameKey(kind, ref.nameKey(), null)) {
             throw new IllegalStateException("Tenant đã có " + kind.label() + " '" + name
                     + "' nhưng không phải bản ghi demo; seed chỉ chạy trên tenant demo sạch");

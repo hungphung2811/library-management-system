@@ -105,6 +105,16 @@ public class CatalogController {
     }
 
     /** Gán/đổi/gỡ vị trí kệ chuẩn của bản sao (shelfLocationId null = gỡ); 404 SHELF_LOCATION_NOT_FOUND, 422 SHELF_LOCATION_INACTIVE. */
+    /**
+     * Thay TOÀN BỘ thông tin nhập kho và tình trạng của bản sao (thiếu trường = xóa). Khóa do catalog kiểm:
+     * BookCopyController/updateAcquisition.
+     */
+    @PutMapping("/book-copies/{id}/acquisition")
+    public CopyView updateCopyAcquisition(@PathVariable UUID id,
+                                          @Valid @RequestBody lms.api.catalog.dto.UpdateCopyAcquisitionRequest request) {
+        return catalog.updateCopyAcquisition(id, request);
+    }
+
     @PutMapping("/book-copies/{id}/shelf-location")
     public CopyView moveShelfLocation(@PathVariable UUID id,
                                       @Valid @RequestBody lms.api.catalog.dto.MoveCopyShelfLocationRequest request) {

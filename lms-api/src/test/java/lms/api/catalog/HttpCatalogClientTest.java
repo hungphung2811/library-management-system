@@ -135,4 +135,48 @@ class HttpCatalogClientTest {
         assertEquals("DAMAGED", client.changeCopyStatus(copy, CopyStatus.DAMAGED).status());
         server.verify();
     }
+
+    @Test
+    void anhXaThongTinBoSungTuCatalogVaGuiNguyenTruongMoiKhiTao() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://catalog")
+                .requestInterceptor(new TokenRelayInterceptor());
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        HttpCatalogClient client = new HttpCatalogClient(builder.build());
+
+        UUID title = UUID.randomUUID();
+        server.expect(requestTo("http://catalog/internal/books"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.language").value("vi"))
+                .andExpect(jsonPath("$.format").value("HARDCOVER"))
+                .andExpect(jsonPath("$.tags[0]").value("a"))
+                .andRespond(withSuccess("{\"id\":\"" + title + "\",\"name\":\"A\",\"author\":\"B\",\"coverPrice\":1,"
+                        + "\"availableCopies\":0,\"subtitle\":\"S\",\"publicationYear\":2020,\"edition\":\"E\","
+                        + "\"language\":\"vi\",\"pageCount\":99,\"format\":\"HARDCOVER\",\"translator\":\"T\","
+                        + "\"series\":\"Sr\",\"seriesNumber\":3,\"coverImageUrl\":\"https://x.example/c.png\","
+                        + "\"tags\":[\"a\"]}", MediaType.APPLICATION_JSON));
+
+        var created = client.createTitle(new lms.api.catalog.dto.CreateTitleRequest("A", "B", null,
+                java.math.BigDecimal.ONE, null, null, null, "S", 2020, "E", "vi", 99, "HARDCOVER", "T", "Sr", 3,
+                "https://x.example/c.png", java.util.List.of("a")));
+        assertEquals("S", created.subtitle());
+        assertEquals(2020, created.publicationYear());
+        assertEquals("HARDCOVER", created.format());
+        assertEquals(3, created.seriesNumber());
+        assertEquals(java.util.List.of("a"), created.tags());
+        server.verify();
+    }
+
+    @Test
+    void catalogKhongTraTruongMoiThiNullVaTagsRong() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://catalog");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        HttpCatalogClient client = new HttpCatalogClient(builder.build());
+        UUID title = UUID.randomUUID();
+        server.expect(requestTo("http://catalog/internal/books/" + title))
+                .andRespond(withSuccess("{\"id\":\"" + title + "\",\"name\":\"A\",\"author\":\"B\",\"coverPrice\":1,"
+                        + "\"availableCopies\":0}", MediaType.APPLICATION_JSON));
+        var t = client.getTitle(title);
+        assertEquals(null, t.subtitle());
+        assertEquals(java.util.List.of(), t.tags());
+    }
 }

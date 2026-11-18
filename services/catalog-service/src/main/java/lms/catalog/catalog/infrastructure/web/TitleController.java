@@ -64,14 +64,14 @@ public class TitleController {
     public TitleResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateTitleRequest request) {
         return updateTitle.execute(new UpdateTitleCommand(
                 id, request.name(), request.author(), request.isbn(), request.coverPrice(),
-                request.publisherId(), request.categoryId(), request.authorIds()));
+                request.publisherId(), request.categoryId(), request.authorIds(), request.extras()));
     }
 
     @PostMapping
     public ResponseEntity<TitleResponse> create(@Valid @RequestBody CreateTitleRequest request) {
         TitleResponse response = createTitle.execute(new CreateTitleCommand(
                 request.name(), request.author(), request.isbn(), request.coverPrice(),
-                request.publisherId(), request.categoryId(), request.authorIds()));
+                request.publisherId(), request.categoryId(), request.authorIds(), request.extras()));
         return ResponseEntity.created(URI.create("/internal/books/" + response.id())).body(response);
     }
 

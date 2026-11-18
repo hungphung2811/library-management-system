@@ -5,6 +5,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 import java.util.UUID;
 import lms.catalog.catalog.domain.Reference;
+import lms.catalog.catalog.domain.ReferenceExtras;
 import lms.catalog.catalog.domain.ReferenceKind;
 import lms.tenant.TenantContext;
 import org.hibernate.annotations.TenantId;
@@ -59,7 +60,10 @@ abstract class ReferenceJpaEntity {
 
     UUID parentId() { return null; }
 
+    /** Thông tin bổ sung của loại (các bảng có cột bổ sung ghi đè). */
+    ReferenceExtras extras() { return ReferenceExtras.EMPTY; }
+
     Reference toDomain() {
-        return Reference.restore(id, kind(), tenantId, name, description, parentId(), active);
+        return Reference.restore(id, kind(), tenantId, name, description, parentId(), active, extras());
     }
 }

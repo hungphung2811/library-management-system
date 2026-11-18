@@ -33,6 +33,8 @@ Khóa quyền (phân quyền động, ADR-0003): `TitleController/update`. Khóa
 
 Lưu ý: chưa có optimistic lock (bảng `titles` không có cột version); hai người sửa cùng lúc thì bản ghi sau thắng.
 
+Từ 2026-11-18 đầu sách có thêm 10 trường bổ sung tùy chọn trong body và response (`subtitle`, `publicationYear`, `edition`, `language`, `pageCount`, `format`, `translator`, `series`, `seriesNumber`, `coverImageUrl`, `tags`): xem `docs/api/catalog-title-extra-fields.md`. PUT thiếu các trường này nghĩa là xóa chúng.
+
 Các khóa quyền khác của nhóm này: `TitleController/create` (POST /api/books), `TitleController/search` (GET /api/books), `TitleController/get` (GET /api/books/{id}).
 
 ## GET /api/books/{id}/preview và PUT /api/books/{id}/preview (mô tả ngắn và preview)

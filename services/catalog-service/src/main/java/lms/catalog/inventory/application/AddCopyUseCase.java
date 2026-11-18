@@ -28,7 +28,8 @@ public class AddCopyUseCase {
         if (!repository.titleExists(command.titleId())) {
             throw new CopyTitleNotFoundException(command.titleId());
         }
-        BookCopy copy = BookCopy.register(command.titleId(), command.barcode(), command.shelfLocationId());
+        BookCopy copy = BookCopy.register(command.titleId(), command.barcode(), command.shelfLocationId(),
+                command.acquisition());
         if (repository.existsByBarcode(copy.barcode())) {
             throw new DuplicateBarcodeException(copy.barcode());
         }

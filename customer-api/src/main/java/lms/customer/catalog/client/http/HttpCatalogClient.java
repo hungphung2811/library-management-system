@@ -8,10 +8,12 @@ import lms.customer.catalog.dto.BookDtos.BookDetailView;
 import lms.customer.catalog.dto.BookDtos.BookPageView;
 import lms.customer.catalog.dto.BookDtos.BookPreviewView;
 import lms.customer.catalog.dto.BookDtos.BookSummaryView;
+import lms.customer.catalog.dto.BookDtos.SuggestionView;
 import lms.customer.web.DownstreamErrorCode;
 import lms.customer.web.PublicApiException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.client.RestClient;
@@ -38,10 +40,16 @@ public class HttpCatalogClient implements CatalogClient {
     }
 
     @Override
-    public BookPageView list(String serviceToken, String keyword, int page, int size) {
+    public BookPageView list(String serviceToken, String keyword, String sort, boolean inStock, int page, int size) {
         UpstreamPage body = call(() -> client.get()
                 .uri(b -> {
                     b.path("/internal/sales/storefront/items").queryParam("page", page).queryParam("size", size);
+                    if (sort != null) {
+                        b.queryParam("sort", sort);
+                    }
+                    if (inStock) {
+                        b.queryParam("inStock", "true");
+                    }
                     if (keyword != null) {
                         b.queryParam("keyword", "{keyword}");
                         return b.build(keyword);
@@ -51,7 +59,19 @@ public class HttpCatalogClient implements CatalogClient {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + serviceToken).retrieve().body(UpstreamPage.class));
         List<UpstreamItem> items = body.items() == null ? List.of() : body.items();
         return new BookPageView(items.stream().map(i -> new BookSummaryView(i.titleId(), i.name(), i.author(),
-                i.price(), i.inStock(), i.hasPreview())).toList(), body.page(), body.size(), body.total());
+                i.price(), i.inStock(), i.hasPreview(), i.subtitle(), i.publicationYear(), i.edition(), i.language(),
+                i.pageCount(), i.format(), i.translator(), i.series(), i.seriesNumber(), i.coverImageUrl(),
+                tags(i.tags()))).toList(), body.page(), body.size(), body.total());
+    }
+
+    @Override
+    public List<SuggestionView> suggestions(String serviceToken, String q, int limit) {
+        List<UpstreamSuggestion> body = call(() -> client.get()
+                .uri(b -> b.path("/internal/sales/storefront/suggestions").queryParam("q", "{q}")
+                        .queryParam("limit", limit).build(q))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + serviceToken).retrieve()
+                .body(new ParameterizedTypeReference<List<UpstreamSuggestion>>() { }));
+        return body.stream().limit(limit).map(s -> new SuggestionView(s.titleId(), s.name(), s.author())).toList();
     }
 
     @Override
@@ -59,7 +79,8 @@ public class HttpCatalogClient implements CatalogClient {
         UpstreamDetail d = call(() -> client.get().uri("/internal/sales/storefront/items/{id}", bookRef)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + serviceToken).retrieve().body(UpstreamDetail.class));
         return new BookDetailView(d.titleId(), d.name(), d.author(), d.price(), d.inStock(), d.hasPreview(),
-                d.description());
+                d.description(), d.subtitle(), d.publicationYear(), d.edition(), d.language(), d.pageCount(),
+                d.format(), d.translator(), d.series(), d.seriesNumber(), d.coverImageUrl(), tags(d.tags()));
     }
 
     @Override
@@ -87,14 +108,26 @@ public class HttpCatalogClient implements CatalogClient {
         }
     }
 
-    record UpstreamItem(UUID titleId, String name, String author, long price, boolean inStock, boolean hasPreview) {
+    private static List<String> tags(List<String> tags) {
+        return tags == null ? List.of() : List.copyOf(tags);
+    }
+
+    record UpstreamItem(UUID titleId, String name, String author, long price, boolean inStock, boolean hasPreview,
+                        String subtitle, Integer publicationYear, String edition, String language, Integer pageCount,
+                        String format, String translator, String series, Integer seriesNumber, String coverImageUrl,
+                        List<String> tags) {
     }
 
     record UpstreamPage(List<UpstreamItem> items, long total, int page, int size) {
     }
 
     record UpstreamDetail(UUID titleId, String name, String author, long price, boolean inStock, boolean hasPreview,
-                          String description) {
+                          String description, String subtitle, Integer publicationYear, String edition,
+                          String language, Integer pageCount, String format, String translator, String series,
+                          Integer seriesNumber, String coverImageUrl, List<String> tags) {
+    }
+
+    record UpstreamSuggestion(UUID titleId, String name, String author) {
     }
 
     record UpstreamPreview(UUID titleId, String name, String previewText) {

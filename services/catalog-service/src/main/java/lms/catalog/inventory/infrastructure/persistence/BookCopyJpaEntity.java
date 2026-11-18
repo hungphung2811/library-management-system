@@ -7,7 +7,11 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDate;
 import java.util.UUID;
+import lms.catalog.inventory.domain.AcquisitionSource;
+import lms.catalog.inventory.domain.ConditionGrade;
+import lms.catalog.inventory.domain.CopyAcquisition;
 import org.hibernate.annotations.TenantId;
 import lms.tenant.TenantContext;
 
@@ -36,6 +40,26 @@ class BookCopyJpaEntity {
     @Column(name = "shelf_location_id")
     private UUID shelfLocationId;
 
+    @Column(name = "acquired_date")
+    private LocalDate acquiredDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "acquisition_source", length = 20)
+    private AcquisitionSource acquisitionSource;
+
+    @Column(name = "purchase_price")
+    private Long purchasePrice;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "condition_grade", length = 10)
+    private ConditionGrade conditionGrade;
+
+    @Column(name = "condition_note", length = 300)
+    private String conditionNote;
+
+    @Column(name = "last_inventory_date")
+    private LocalDate lastInventoryDate;
+
     protected BookCopyJpaEntity() {
     }
 
@@ -48,6 +72,22 @@ class BookCopyJpaEntity {
         this.barcode = barcode;
         this.status = status;
         this.shelfLocationId = shelfLocationId;
+    }
+
+    /** Ghi thông tin nhập kho từ domain. */
+    BookCopyJpaEntity withAcquisition(CopyAcquisition a) {
+        this.acquiredDate = a.acquiredDate();
+        this.acquisitionSource = a.acquisitionSource();
+        this.purchasePrice = a.purchasePrice();
+        this.conditionGrade = a.conditionGrade();
+        this.conditionNote = a.conditionNote();
+        this.lastInventoryDate = a.lastInventoryDate();
+        return this;
+    }
+
+    CopyAcquisition toAcquisition() {
+        return new CopyAcquisition(acquiredDate, acquisitionSource, purchasePrice, conditionGrade, conditionNote,
+                lastInventoryDate);
     }
 
     UUID getId() { return id; }

@@ -16,6 +16,15 @@ spring:
   flyway:
     # Migration do system-service chạy tập trung; service chỉ validate schema (ddl-auto: validate)
     enabled: false
+  # Cache danh mục tham chiếu: Lettuce tự nối lại; timeout ngắn để Redis chết không làm chậm request
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 200ms
+      connect-timeout: 200ms
+      repositories:
+        enabled: false
   kafka:
     producer:
       properties:
@@ -34,6 +43,10 @@ management:
     health:
       probes:
         enabled: true
+  health:
+    # Redis chỉ là cache phụ: Redis chết không được làm service DOWN
+    redis:
+      enabled: false
 
 logging:
   pattern:

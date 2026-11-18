@@ -5,11 +5,11 @@ import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 import lms.catalog.catalog.application.ReferenceOption;
-import lms.catalog.catalog.application.ReferencePageResponse;
-import lms.catalog.catalog.application.ReferenceResponse;
+import lms.catalog.catalog.application.AuthorResponse;
+import lms.catalog.catalog.application.ReferencePage;
 import lms.catalog.catalog.application.ReferenceSearchQuery;
 import lms.catalog.catalog.application.ReferenceUseCases;
-import lms.catalog.catalog.application.SaveNamedReferenceRequest;
+import lms.catalog.catalog.application.SaveAuthorRequest;
 import lms.catalog.catalog.application.SetReferenceStatusRequest;
 import lms.catalog.catalog.domain.ReferenceKind;
 import org.springframework.http.ResponseEntity;
@@ -39,8 +39,8 @@ public class AuthorController {
 
     /** Tìm có phân trang (keyword theo tên/mô tả, active, page từ 0, size 1..100). */
     @GetMapping
-    public ReferencePageResponse search(ReferenceSearchQuery query) {
-        return useCases.search().execute(KIND, query);
+    public ReferencePage<AuthorResponse> search(ReferenceSearchQuery query) {
+        return ReferencePage.of(useCases.search().execute(KIND, query), AuthorResponse::from);
     }
 
     /** Danh sách rút gọn (id, tên) các mục đang active cho ô chọn; tối đa 200. */
@@ -50,24 +50,26 @@ public class AuthorController {
     }
 
     @GetMapping("/{id}")
-    public ReferenceResponse get(@PathVariable UUID id) {
-        return useCases.get().execute(KIND, id);
+    public AuthorResponse get(@PathVariable UUID id) {
+        return AuthorResponse.from(useCases.get().execute(KIND, id));
     }
 
     @PostMapping
-    public ResponseEntity<ReferenceResponse> create(@Valid @RequestBody SaveNamedReferenceRequest request) {
-        ReferenceResponse created = useCases.create().execute(KIND, request.name(), request.description(), null);
+    public ResponseEntity<AuthorResponse> create(@Valid @RequestBody SaveAuthorRequest request) {
+        AuthorResponse created = AuthorResponse.from(
+                useCases.create().execute(KIND, request.name(), request.description(), null, request.extras()));
         return ResponseEntity.created(URI.create("/internal/authors/" + created.id())).body(created);
     }
 
     @PutMapping("/{id}")
-    public ReferenceResponse update(@PathVariable UUID id, @Valid @RequestBody SaveNamedReferenceRequest request) {
-        return useCases.update().execute(KIND, id, request.name(), request.description(), null);
+    public AuthorResponse update(@PathVariable UUID id, @Valid @RequestBody SaveAuthorRequest request) {
+        return AuthorResponse.from(useCases.update().execute(KIND, id, request.name(), request.description(), null,
+                request.extras()));
     }
 
     /** Bật/ngừng sử dụng (thay cho xóa cứng). */
     @PutMapping("/{id}/status")
-    public ReferenceResponse setStatus(@PathVariable UUID id, @Valid @RequestBody SetReferenceStatusRequest request) {
-        return useCases.setStatus().execute(KIND, id, request.active());
+    public AuthorResponse setStatus(@PathVariable UUID id, @Valid @RequestBody SetReferenceStatusRequest request) {
+        return AuthorResponse.from(useCases.setStatus().execute(KIND, id, request.active()));
     }
 }

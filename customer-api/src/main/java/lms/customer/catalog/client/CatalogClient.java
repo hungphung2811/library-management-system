@@ -1,6 +1,8 @@
 package lms.customer.catalog.client;
 
+import java.util.List;
 import java.util.UUID;
+import lms.customer.catalog.dto.BookDtos.SuggestionView;
 import lms.customer.catalog.dto.BookDtos.BookDetailView;
 import lms.customer.catalog.dto.BookDtos.BookPageView;
 import lms.customer.catalog.dto.BookDtos.BookPreviewView;
@@ -12,8 +14,15 @@ import lms.customer.catalog.dto.BookDtos.BookPreviewView;
  */
 public interface CatalogClient {
 
-    /** @param page tính từ 0; @param size đã chặn trong 1..50 bởi người gọi. */
-    BookPageView list(String serviceToken, String keyword, int page, int size);
+    /**
+     * @param sort null hoặc đúng một trong newest|price_asc|price_desc (đã kiểm bởi người gọi, gửi nguyên sang sales)
+     * @param inStock true = chỉ sách còn hàng (false = không lọc, không gửi tham số)
+     * @param page tính từ 0; @param size đã chặn trong 1..50 bởi người gọi.
+     */
+    BookPageView list(String serviceToken, String keyword, String sort, boolean inStock, int page, int size);
+
+    /** Gợi ý tìm kiếm (ADR-0019): {@code q} đã trim và kiểm 2..50 ký tự, {@code limit} đã chặn 1..8 bởi người gọi. */
+    List<SuggestionView> suggestions(String serviceToken, String q, int limit);
 
     /** @throws lms.customer.web.PublicApiException hoặc lỗi downstream 404 BOOK_NOT_FOUND khi không có/không đang bán. */
     BookDetailView get(String serviceToken, UUID bookRef);

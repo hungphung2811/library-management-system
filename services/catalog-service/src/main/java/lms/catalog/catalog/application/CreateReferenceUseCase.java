@@ -2,6 +2,7 @@ package lms.catalog.catalog.application;
 
 import lms.catalog.catalog.domain.DuplicateReferenceException;
 import lms.catalog.catalog.domain.Reference;
+import lms.catalog.catalog.domain.ReferenceExtras;
 import lms.catalog.catalog.domain.ReferenceKind;
 import lms.catalog.catalog.domain.ReferenceRepository;
 import java.util.UUID;
@@ -18,7 +19,13 @@ public class CreateReferenceUseCase {
 
     @Transactional
     public ReferenceResponse execute(ReferenceKind kind, String name, String description, UUID parentId) {
-        Reference reference = Reference.create(kind, name, description, parentId);
+        return execute(kind, name, description, parentId, null);
+    }
+
+    @Transactional
+    public ReferenceResponse execute(ReferenceKind kind, String name, String description, UUID parentId,
+                                     ReferenceExtras extras) {
+        Reference reference = Reference.create(kind, name, description, parentId, extras);
         if (repository.existsByNameKey(kind, reference.nameKey(), null)) {
             throw new DuplicateReferenceException(kind, reference.name());
         }

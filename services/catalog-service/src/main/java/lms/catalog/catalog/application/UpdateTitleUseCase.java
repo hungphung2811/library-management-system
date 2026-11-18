@@ -8,7 +8,7 @@ import lms.catalog.inventory.application.CopyAvailabilityQuery;
 import java.util.List;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Sửa thông tin đầu sách (tên, tác giả, ISBN, giá bìa). Không đụng bản sao (book_copies). */
+/** Sửa thông tin đầu sách (tên, tác giả, ISBN, giá bìa, thông tin bổ sung). Không đụng bản sao (book_copies). */
 public class UpdateTitleUseCase {
 
     private final TitleRepository repository;
@@ -29,7 +29,8 @@ public class UpdateTitleUseCase {
     @Transactional
     public TitleResponse execute(UpdateTitleCommand command) {
         Title current = repository.findById(command.id()).orElseThrow(() -> new TitleNotFoundException(command.id()));
-        Title updated = current.update(command.name(), command.author(), command.isbn(), command.coverPrice());
+        Title updated = current.update(command.name(), command.author(), command.isbn(), command.coverPrice())
+                .withExtras(command.extras());
         if (updated.isbn() != null && repository.existsByIsbnAndIdNot(updated.isbn(), updated.id())) {
             throw new DuplicateIsbnException(updated.isbn());
         }

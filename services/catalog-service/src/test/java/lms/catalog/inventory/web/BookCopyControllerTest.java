@@ -62,6 +62,7 @@ class BookCopyControllerTest {
     @MockitoBean ChangeCopyStatusUseCase changeStatus;
     @MockitoBean lms.catalog.inventory.application.MoveCopyShelfLocationUseCase moveShelfLocation;
     @MockitoBean lms.catalog.inventory.application.LookupCopiesUseCase lookupCopies;
+    @MockitoBean lms.catalog.inventory.application.UpdateCopyAcquisitionUseCase updateAcquisition;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean PermissionKeyRegistrar permissionKeyRegistrar;
 
@@ -357,5 +358,69 @@ class BookCopyControllerTest {
         when(listCopies.execute(TITLE_ID)).thenThrow(new CopyTitleNotFoundException(TITLE_ID));
         mvc.perform(get("/internal/book-copies").param("titleId", TITLE_ID.toString()).with(admin()))
                 .andExpect(status().isNotFound());
+    }
+
+    // --- thông tin nhập kho (V8) ---
+
+    private static final String ACQ = "\"acquiredDate\":\"2024-05-01\",\"acquisitionSource\":\"PURCHASE\","
+            + "\"purchasePrice\":45000,\"conditionGrade\":\"GOOD\",\"conditionNote\":\"Gáy mòn\","
+            + "\"lastInventoryDate\":\"2026-01-10\"";
+
+    private static CopyResponse withAcquisition(UUID id) {
+        return new CopyResponse(id, TITLE_ID, "BC-001", CopyStatus.AVAILABLE, TENANT, null, null,
+                java.time.LocalDate.of(2024, 5, 1), lms.catalog.inventory.domain.AcquisitionSource.PURCHASE, 45000L,
+                lms.catalog.inventory.domain.ConditionGrade.GOOD, "Gáy mòn", java.time.LocalDate.of(2026, 1, 10));
+    }
+
+    @Test
+    void themBanSaoChuyenThongTinNhapKhoVaTraVeDayDuTruong() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(addCopy.execute(any())).thenReturn(withAcquisition(id));
+        mvc.perform(post("/internal/book-copies").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"titleId\":\"" + TITLE_ID + "\",\"barcode\":\"BC-001\"," + ACQ + "}")
+                        .with(withKey("BookCopyController/add")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.acquiredDate").value("2024-05-01"))
+                .andExpect(jsonPath("$.acquisitionSource").value("PURCHASE"))
+                .andExpect(jsonPath("$.purchasePrice").value(45000))
+                .andExpect(jsonPath("$.conditionGrade").value("GOOD"))
+                .andExpect(jsonPath("$.conditionNote").value("Gáy mòn"))
+                .andExpect(jsonPath("$.lastInventoryDate").value("2026-01-10"));
+        org.mockito.ArgumentCaptor<AddCopyCommand> c = org.mockito.ArgumentCaptor.forClass(AddCopyCommand.class);
+        verify(addCopy).execute(c.capture());
+        org.junit.jupiter.api.Assertions.assertEquals(45000L, c.getValue().acquisition().purchasePrice());
+    }
+
+    @Test
+    void capNhatThongTinNhapKhoDungKhoaVaPutThayToanBo() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(updateAcquisition.execute(any(), any())).thenReturn(withAcquisition(id));
+        mvc.perform(put("/internal/book-copies/" + id + "/acquisition").contentType(MediaType.APPLICATION_JSON)
+                        .content("{" + ACQ + "}").with(withKey("BookCopyController/updateAcquisition")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.conditionGrade").value("GOOD"));
+        mvc.perform(put("/internal/book-copies/" + id + "/acquisition").contentType(MediaType.APPLICATION_JSON)
+                        .content("{}").with(withKey("BookCopyController/moveShelfLocation")))
+                .andExpect(status().isForbidden());
+        mvc.perform(put("/internal/book-copies/" + id + "/acquisition").contentType(MediaType.APPLICATION_JSON)
+                        .content("{}").with(noPermission()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void thongTinNhapKhoSaiRangBuocTra400HoacNghiepVuTra422() throws Exception {
+        UUID id = UUID.randomUUID();
+        for (String bad : List.of("\"acquiredDate\":\"2999-01-01\"", "\"lastInventoryDate\":\"2999-01-01\"",
+                "\"purchasePrice\":-1", "\"acquisitionSource\":\"GIFT\"", "\"conditionGrade\":\"BROKEN\"",
+                "\"conditionNote\":\"" + "a".repeat(301) + "\"")) {
+            mvc.perform(put("/internal/book-copies/" + id + "/acquisition").contentType(MediaType.APPLICATION_JSON)
+                            .content("{" + bad + "}").with(admin()))
+                    .andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(updateAcquisition);
+        // giá mua không có nguồn PURCHASE: qua validation cú pháp nhưng domain từ chối (422)
+        mvc.perform(put("/internal/book-copies/" + id + "/acquisition").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"purchasePrice\":1000,\"acquisitionSource\":\"DONATION\"}").with(admin()))
+                .andExpect(status().isUnprocessableEntity());
     }
 }

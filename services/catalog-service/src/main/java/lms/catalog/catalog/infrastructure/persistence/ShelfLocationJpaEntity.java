@@ -6,6 +6,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import lms.catalog.catalog.domain.Reference;
+import lms.catalog.catalog.domain.ReferenceExtras;
 import lms.catalog.catalog.domain.ReferenceKind;
 
 /** Vị trí kệ (bảng shelf_locations): "tên" của danh mục là cột code, khóa so trùng là code_key. */
@@ -17,11 +18,28 @@ import lms.catalog.catalog.domain.ReferenceKind;
 })
 class ShelfLocationJpaEntity extends ReferenceJpaEntity {
 
+    @Column(length = 20)
+    private String floor;
+
+    @Column(length = 50)
+    private String zone;
+
+    private Integer capacity;
+
     protected ShelfLocationJpaEntity() {
     }
 
     ShelfLocationJpaEntity(Reference r) {
         super(r);
+        ReferenceExtras x = r.extras();
+        this.floor = x.floor();
+        this.zone = x.zone();
+        this.capacity = x.capacity();
+    }
+
+    @Override
+    ReferenceExtras extras() {
+        return ReferenceExtras.shelf(floor, zone, capacity);
     }
 
     @Override

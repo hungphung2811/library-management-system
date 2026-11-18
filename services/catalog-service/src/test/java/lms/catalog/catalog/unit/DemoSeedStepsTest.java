@@ -20,6 +20,7 @@ import lms.catalog.catalog.domain.Reference;
 import lms.catalog.catalog.domain.ReferenceKind;
 import lms.catalog.catalog.domain.ReferenceRepository;
 import lms.catalog.catalog.domain.Title;
+import lms.catalog.catalog.domain.TitleExtras;
 import lms.catalog.catalog.domain.TitleRepository;
 import lms.catalog.catalog.infrastructure.demo.CatalogDemoSeedStep;
 import lms.catalog.inventory.domain.BookCopy;
@@ -47,6 +48,10 @@ class DemoSeedStepsTest {
     final FakeCopies copies = new FakeCopies(titles);
     final CatalogDemoSeedStep catalogStep = new CatalogDemoSeedStep(references, titles, TransactionOperations.withoutTransaction());
     final InventoryDemoSeedStep inventoryStep = new InventoryDemoSeedStep(copies, TransactionOperations.withoutTransaction());
+
+    {
+        copies.activeShelf = id -> references.rows.get(ReferenceKind.SHELF_LOCATION).containsKey(id);
+    }
 
     private static DemoSeedContext context(DemoPlan plan) {
         return new DemoSeedContext(TENANT, plan, "x", Clock.system(ZoneId.of("Asia/Ho_Chi_Minh")));
@@ -95,6 +100,172 @@ class DemoSeedStepsTest {
         assertThat(titles.rows.values().stream().map(Title::isbn).collect(Collectors.toSet())).hasSize(PLAN.titles().size());
         assertThat(references.rows.get(ReferenceKind.CATEGORY)).hasSize(
                 PLAN.titles().stream().map(DemoPlan.TitlePlan::category).collect(Collectors.toSet()).size());
+    }
+
+    @Test
+    void dauSachCoThongTinBoSungVaNhaXuatBanKhopKeHoach() {
+        catalogStep.run(context(PLAN));
+
+        for (DemoPlan.TitlePlan p : PLAN.titles()) {
+            Title t = titles.rows.get(p.id());
+            TitleExtras x = t.extras();
+            assertThat(x.publicationYear()).isEqualTo(p.publishYear()).isBetween(2005, 2024);
+            assertThat(x.pageCount()).isEqualTo(p.pageCount()).isBetween(120, 700);
+            assertThat(x.language()).isIn("vi", "en");
+            assertThat(x.format()).isNotNull();
+            assertThat(x.format().name()).isEqualTo(p.format());
+            assertThat(x.tags()).isEqualTo(p.tags()).isNotEmpty();
+            assertThat(x.translator()).isEqualTo(p.translator());
+            assertThat(x.series()).isEqualTo(p.series());
+            assertThat(x.seriesNumber()).isEqualTo(p.seriesNumber());
+            assertThat(x.coverImageUrl()).isEqualTo(p.coverImageUrl());
+            assertThat(t.publisherId()).isNotNull();
+            assertThat(references.rows.get(ReferenceKind.PUBLISHER).get(t.publisherId()).name()).isEqualTo(p.publisher());
+        }
+        List<TitleExtras> all = titles.rows.values().stream().map(Title::extras).toList();
+        assertThat(all.stream().filter(x -> x.translator() != null)).hasSizeGreaterThanOrEqualTo(20);
+        assertThat(all.stream().filter(x -> x.series() != null)).hasSizeGreaterThanOrEqualTo(8);
+        assertThat(all.stream().filter(x -> "en".equals(x.language()))).hasSizeGreaterThanOrEqualTo(5);
+        assertThat(all.stream().map(TitleExtras::format).collect(Collectors.toSet())).hasSize(3);
+        assertThat(all.stream().filter(x -> x.coverImageUrl() == null)).isNotEmpty();
+        assertThat(references.rows.get(ReferenceKind.PUBLISHER).values().stream().map(Reference::name))
+                .contains("NXB Trẻ", "NXB Kim Đồng", "Nhã Nam", "NXB Văn học");
+    }
+
+    @Test
+    void dauSachSeedBanCuChuaCoThongTinBoSungDuocLamMoiMotLanDuyNhat() {
+        DemoPlan.TitlePlan p = PLAN.titles().get(21);
+        titles.rows.put(p.id(), Title.restore(p.id(), "Tên cũ", "Tác giả giả", p.isbn(),
+                java.math.BigDecimal.valueOf(111_000)));
+
+        DemoSeedStep.SeedResult first = catalogStep.run(context(PLAN));
+        Title t = titles.rows.get(p.id());
+        assertThat(t.name()).isEqualTo(p.name());
+        assertThat(t.author()).isEqualTo(p.author());
+        assertThat(t.isbn()).isEqualTo(p.isbn());
+        assertThat(t.coverPrice()).isEqualByComparingTo("111000");
+        assertThat(t.extras().isEmpty()).isFalse();
+        assertThat(t.publisherId()).isNotNull();
+        assertThat(t.authorIds()).hasSize(1);
+        assertThat(first.created()).isEqualTo(
+                references.rows.values().stream().mapToInt(Map::size).sum() + PLAN.titles().size());
+
+        DemoSeedStep.SeedResult second = catalogStep.run(context(PLAN));
+        assertThat(second.created()).isZero();
+        assertThat(titles.rows).hasSize(PLAN.titles().size());
+    }
+
+    @Test
+    void khongGhiDeDauSachDaCoThongTinBoSung() {
+        catalogStep.run(context(PLAN));
+        DemoPlan.TitlePlan p = PLAN.titles().get(0);
+        Title edited = titles.rows.get(p.id()).withExtras(new TitleExtras("Đã sửa tay", null, null, null, null, null,
+                null, null, null, null, null));
+        titles.rows.put(p.id(), edited);
+
+        DemoSeedStep.SeedResult r = catalogStep.run(context(PLAN));
+
+        assertThat(titles.rows.get(p.id()).extras().subtitle()).isEqualTo("Đã sửa tay");
+        assertThat(r.created()).isZero();
+    }
+
+    @Test
+    void tacGiaNhaXuatBanVaKeCoThongTinBoSung() {
+        catalogStep.run(context(PLAN));
+
+        var authors = references.rows.get(ReferenceKind.AUTHOR).values();
+        var hawking = authors.stream().filter(a -> a.name().equals("Stephen Hawking")).findFirst().orElseThrow();
+        assertThat(hawking.extras().birthYear()).isEqualTo(1942);
+        assertThat(hawking.extras().deathYear()).isEqualTo(2018);
+        assertThat(hawking.extras().nationality()).isEqualTo("Anh");
+        assertThat(authors.stream().filter(a -> a.extras().nationality() != null)).hasSizeGreaterThanOrEqualTo(40);
+
+        var publishers = references.rows.get(ReferenceKind.PUBLISHER).values();
+        var tre = publishers.stream().filter(p -> p.name().equals("NXB Trẻ")).findFirst().orElseThrow();
+        assertThat(tre.extras().country()).isEqualTo("Việt Nam");
+        assertThat(tre.extras().foundedYear()).isEqualTo(1981);
+        assertThat(tre.extras().website()).startsWith("https://");
+        assertThat(tre.extras().address()).isNotBlank();
+        assertThat(publishers.stream().filter(p -> p.extras().country() != null)).hasSameSizeAs(publishers);
+
+        var shelves = references.rows.get(ReferenceKind.SHELF_LOCATION).values();
+        assertThat(shelves).hasSize(PLAN.shelves().size()).hasSizeGreaterThanOrEqualTo(8);
+        for (var s : shelves) {
+            assertThat(s.extras().floor()).isIn("Tầng 1", "Tầng 2");
+            assertThat(s.extras().zone()).startsWith("Khu ");
+            assertThat(s.extras().capacity()).isBetween(1, 100000);
+        }
+    }
+
+    @Test
+    void banSaoCoThongTinNhapKhoVaKeTheoKeHoach() {
+        catalogStep.run(context(PLAN));
+        inventoryStep.run(context(PLAN));
+
+        java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
+        for (DemoPlan.CopyPlan p : PLAN.copies()) {
+            BookCopy c = copies.rows.get(p.id());
+            var a = c.acquisition();
+            assertThat(a.acquiredDate()).isEqualTo(p.acquiredDate()).isNotNull();
+            assertThat(a.acquisitionSource()).isNotNull();
+            assertThat(a.acquisitionSource().name()).isEqualTo(p.acquisitionSource());
+            assertThat(a.lastInventoryDate()).isAfterOrEqualTo(a.acquiredDate()).isBeforeOrEqualTo(today);
+            if (a.acquisitionSource() == lms.catalog.inventory.domain.AcquisitionSource.PURCHASE) {
+                assertThat(a.purchasePrice()).isPositive();
+            } else {
+                assertThat(a.purchasePrice()).isNull();
+            }
+            assertThat(c.shelfLocationId()).isNotNull();
+            assertThat(references.rows.get(ReferenceKind.SHELF_LOCATION)).containsKey(c.shelfLocationId());
+        }
+        var all = copies.rows.values().stream().map(BookCopy::acquisition).toList();
+        assertThat(all.stream().map(x -> x.acquisitionSource()).collect(Collectors.toSet())).hasSize(4);
+        assertThat(all.stream().map(x -> x.conditionGrade()).filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet())).hasSize(4);
+        // giá mua hợp lý theo giá bìa: 55%..70% (làm tròn 500) và luôn nhỏ hơn giá bìa
+        for (DemoPlan.CopyPlan p : PLAN.copies()) {
+            if (p.purchasePrice() == null) continue;
+            long cover = titles.rows.get(p.titleId()).coverPrice().longValue();
+            assertThat(p.purchasePrice()).isLessThan(cover).isGreaterThanOrEqualTo(cover * 50 / 100);
+        }
+    }
+
+    @Test
+    void chayLaiChiDienTruongConNullKhongDeGiaTriDaCo() {
+        catalogStep.run(context(PLAN));
+        inventoryStep.run(context(PLAN));
+        DemoPlan.CopyPlan p = PLAN.copies().get(0);
+        UUID shelf = copies.rows.get(p.id()).shelfLocationId();
+
+        // người dùng đã sửa tay: đổi tình trạng, xóa ngày kiểm kê, gỡ kệ
+        BookCopy c = copies.rows.get(p.id());
+        var cur = c.acquisition();
+        c.updateAcquisition(new lms.catalog.inventory.domain.CopyAcquisition(cur.acquiredDate(),
+                cur.acquisitionSource(), cur.purchasePrice(), lms.catalog.inventory.domain.ConditionGrade.WORN,
+                "Sửa tay", null));
+        c.moveToShelfLocation(null);
+        // tác giả: đã có quốc tịch khác, thiếu năm sinh
+        var hawking = references.rows.get(ReferenceKind.AUTHOR).values().stream()
+                .filter(a -> a.name().equals("Stephen Hawking")).findFirst().orElseThrow();
+        references.rows.get(ReferenceKind.AUTHOR).put(hawking.id(), hawking.withExtras(
+                lms.catalog.catalog.domain.ReferenceExtras.author(null, null, "Tự nhập", null, null)));
+
+        catalogStep.run(context(PLAN));
+        inventoryStep.run(context(PLAN));
+
+        var after = copies.rows.get(p.id());
+        assertThat(after.acquisition().conditionGrade()).isEqualTo(lms.catalog.inventory.domain.ConditionGrade.WORN);
+        assertThat(after.acquisition().conditionNote()).isEqualTo("Sửa tay");
+        assertThat(after.acquisition().lastInventoryDate()).isEqualTo(p.lastInventoryDate());
+        assertThat(after.shelfLocationId()).isEqualTo(shelf);
+        var h = references.rows.get(ReferenceKind.AUTHOR).get(hawking.id());
+        assertThat(h.extras().nationality()).isEqualTo("Tự nhập");
+        assertThat(h.extras().birthYear()).isEqualTo(1942);
+        assertThat(h.extras().deathYear()).isEqualTo(2018);
+
+        // lần nữa không còn gì để điền
+        assertThat(catalogStep.run(context(PLAN)).created()).isZero();
+        assertThat(inventoryStep.run(context(PLAN)).created()).isZero();
     }
 
     @Test
@@ -282,8 +453,16 @@ class DemoSeedStepsTest {
         final Map<UUID, BookCopy> rows = new LinkedHashMap<>();
         private final FakeTitles titles;
 
+        /** Kệ nào được coi là đang active (mặc định không có kệ nào). */
+        java.util.function.Predicate<UUID> activeShelf = id -> false;
+
         FakeCopies(FakeTitles titles) {
             this.titles = titles;
+        }
+
+        @Override
+        public Optional<Boolean> findShelfLocationActive(UUID shelfLocationId) {
+            return activeShelf.test(shelfLocationId) ? Optional.of(true) : Optional.empty();
         }
 
         @Override

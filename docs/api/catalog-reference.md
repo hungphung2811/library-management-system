@@ -18,6 +18,7 @@ Tất cả đi qua `lms-api` (`/api/**`), quyền do catalog-service kiểm theo
 Controller: `AuthorController`, `PublisherController`, `CategoryController` (cùng 6 method search, options, get, create, update, setStatus).
 
 `ReferenceView`: `{id, name, description, parentId, parentName, active, tenantId}` (`parentId`/`parentName` chỉ có ở thể loại).
+Từ 2026-11-18 tác giả/nhà xuất bản/vị trí kệ/bản sao có thêm thông tin bổ sung tùy chọn (PUT thay toàn bộ): xem `docs/api/catalog-copy-reference-extra-fields.md`.
 
 Quy tắc: tên được chuẩn hóa (NFC, bỏ khoảng trắng thừa), duy nhất theo tenant không phân biệt hoa thường. Ngừng dùng (`active=false`) thay cho xóa cứng; không có endpoint xóa. Thể loại tối đa 2 cấp.
 

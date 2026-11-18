@@ -1,7 +1,10 @@
 package lms.customer.catalog.web;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import lms.customer.catalog.dto.BookDtos.SuggestionView;
 import lms.customer.catalog.client.CatalogClient;
 import lms.customer.catalog.dto.BookDtos.BookDetailView;
 import lms.customer.catalog.dto.BookDtos.BookPageView;
@@ -30,10 +33,19 @@ public class BookController {
     static final int MAX_SIZE = 50;
     static final int MAX_KEYWORD_LENGTH = 100;
     static final Duration LIST_MAX_AGE = Duration.ofSeconds(30);
+    static final Duration SUGGEST_MAX_AGE = Duration.ofSeconds(15);
+    static final int MIN_SUGGEST_LENGTH = 2;
+    static final int MAX_SUGGEST_LENGTH = 50;
+    static final int DEFAULT_SUGGEST_LIMIT = 5;
+    static final int MAX_SUGGEST_LIMIT = 8;
+    static final Set<String> SORTS = Set.of("newest", "price_asc", "price_desc");
     static final Duration PREVIEW_MAX_AGE = Duration.ofSeconds(60);
 
     /** Query gom thành một record (CLAUDE.md): Spring tự bind. */
-    public record BookQuery(String keyword, Integer page, Integer size) {
+    public record BookQuery(String keyword, String sort, String inStock, Integer page, Integer size) {
+    }
+
+    public record SuggestionQuery(String q, Integer limit) {
     }
 
     private final StorefrontAccessCache storefronts;
@@ -46,10 +58,25 @@ public class BookController {
 
     @GetMapping
     public ResponseEntity<BookPageView> list(@PathVariable String code, BookQuery query) {
+        // Kiểm chặt TRƯỚC khi phân giải cửa hàng và gọi sales (400 không tốn lời gọi nào).
+        String keyword = keyword(query.keyword());
+        String sort = sort(query.sort());
+        boolean inStock = inStock(query.inStock());
         StorefrontAccess shop = storefronts.resolve(code);
         int page = query.page() == null || query.page() < 0 ? 0 : query.page();
         int size = query.size() == null || query.size() < 1 ? DEFAULT_SIZE : Math.min(query.size(), MAX_SIZE);
-        return PublicCache.publicFor(LIST_MAX_AGE, catalog.list(shop.accessToken(), keyword(query.keyword()), page, size));
+        return PublicCache.publicFor(LIST_MAX_AGE,
+                catalog.list(shop.accessToken(), keyword, sort, inStock, page, size));
+    }
+
+    /** Khai báo trước {bookRef}; Spring cũng ưu tiên đoạn literal nên không phụ thuộc thứ tự. */
+    @GetMapping("/suggestions")
+    public ResponseEntity<List<SuggestionView>> suggestions(@PathVariable String code, SuggestionQuery query) {
+        String q = suggestionText(query.q());
+        int limit = query.limit() == null || query.limit() < 1 ? DEFAULT_SUGGEST_LIMIT
+                : Math.min(query.limit(), MAX_SUGGEST_LIMIT);
+        StorefrontAccess shop = storefronts.resolve(code);
+        return PublicCache.publicFor(SUGGEST_MAX_AGE, catalog.suggestions(shop.accessToken(), q, limit));
     }
 
     @GetMapping("/{bookRef}")
@@ -62,6 +89,46 @@ public class BookController {
     public ResponseEntity<BookPreviewView> preview(@PathVariable String code, @PathVariable String bookRef) {
         StorefrontAccess shop = storefronts.resolve(code);
         return PublicCache.publicFor(PREVIEW_MAX_AGE, catalog.preview(shop.accessToken(), bookRef(bookRef)));
+    }
+
+    private static PublicApiException invalid() {
+        return new PublicApiException(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Dữ liệu không hợp lệ");
+    }
+
+    /** Vắng = null; chỉ nhận đúng newest|price_asc|price_desc (phân biệt hoa thường), còn lại 400. */
+    private static String sort(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        if (!SORTS.contains(raw)) {
+            throw invalid();
+        }
+        return raw;
+    }
+
+    /** Vắng = false; chỉ nhận đúng "true", còn lại (false, 1, yes, rỗng...) 400. */
+    private static boolean inStock(String raw) {
+        if (raw == null) {
+            return false;
+        }
+        if (!"true".equals(raw)) {
+            throw invalid();
+        }
+        return true;
+    }
+
+    /** q bắt buộc, cắt khoảng trắng, 2..50 code point, không ký tự điều khiển. */
+    private static String suggestionText(String raw) {
+        if (raw == null) {
+            throw invalid();
+        }
+        String trimmed = raw.trim();
+        int length = trimmed.codePointCount(0, trimmed.length());
+        if (length < MIN_SUGGEST_LENGTH || length > MAX_SUGGEST_LENGTH
+                || trimmed.chars().anyMatch(Character::isISOControl)) {
+            throw invalid();
+        }
+        return trimmed;
     }
 
     /** Từ khóa: cắt khoảng trắng, rỗng thì bỏ; quá dài hoặc có ký tự điều khiển thì 400. */

@@ -25,6 +25,8 @@ import lms.catalog.catalog.application.UpdateTitleCommand;
 import lms.catalog.catalog.application.UpdateTitleUseCase;
 import lms.catalog.catalog.domain.DuplicateIsbnException;
 import lms.catalog.catalog.domain.InvalidTitleException;
+import lms.catalog.catalog.domain.TitleExtras;
+import lms.catalog.catalog.domain.TitleFormat;
 import lms.catalog.catalog.domain.TitleNotFoundException;
 import lms.catalog.catalog.infrastructure.web.TitleController;
 import lms.catalog.config.SecurityConfiguration;
@@ -518,5 +520,94 @@ class TitleControllerTest {
     @Test
     void idKhongPhaiUuidTra400() throws Exception {
         mvc.perform(get("/internal/books/khong-phai-uuid").with(admin())).andExpect(status().isBadRequest());
+    }
+
+    // --- thông tin bổ sung (V7) ---
+
+    private static final String WITH_EXTRAS = "{\"name\":\"Harry Potter\",\"author\":\"J.K. Rowling\",\"coverPrice\":120000,"
+            + "\"subtitle\":\"  Phụ đề \",\"publicationYear\":2017,\"edition\":\"Tái bản lần thứ 8\",\"language\":\"vi\","
+            + "\"pageCount\":368,\"format\":\"PAPERBACK\",\"translator\":\"Lý Lan\",\"series\":\"Harry Potter\","
+            + "\"seriesNumber\":1,\"coverImageUrl\":\"https://img.example/hp.jpg\",\"tags\":[\"Giả tưởng\",\"giả tưởng\",\"Phép thuật\"]}";
+
+    private static String with(String field) {
+        return WITH_EXTRAS.substring(0, WITH_EXTRAS.length() - 1) + "," + field + "}";
+    }
+
+    @Test
+    void taoDauSachChuyenThongTinBoSungDaChuanHoaVaTraVeDayDuTruong() throws Exception {
+        UUID id = UUID.randomUUID();
+        TitleExtras expected = new TitleExtras("Phụ đề", 2017, "Tái bản lần thứ 8", "vi", 368, TitleFormat.PAPERBACK,
+                "Lý Lan", "Harry Potter", 1, "https://img.example/hp.jpg", List.of("Giả tưởng", "Phép thuật"));
+        when(createTitle.execute(any())).thenReturn(new TitleResponse(id, "Harry Potter", "J.K. Rowling", null,
+                new BigDecimal("120000"), 0, TENANT, null, null, null, null, List.of(), "Phụ đề", 2017,
+                "Tái bản lần thứ 8", "vi", 368, TitleFormat.PAPERBACK, "Lý Lan", "Harry Potter", 1,
+                "https://img.example/hp.jpg", List.of("Giả tưởng", "Phép thuật")));
+
+        mvc.perform(post("/internal/books").contentType(MediaType.APPLICATION_JSON).content(WITH_EXTRAS)
+                        .with(withKey("TitleController/create")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.subtitle").value("Phụ đề"))
+                .andExpect(jsonPath("$.publicationYear").value(2017))
+                .andExpect(jsonPath("$.edition").value("Tái bản lần thứ 8"))
+                .andExpect(jsonPath("$.language").value("vi"))
+                .andExpect(jsonPath("$.pageCount").value(368))
+                .andExpect(jsonPath("$.format").value("PAPERBACK"))
+                .andExpect(jsonPath("$.translator").value("Lý Lan"))
+                .andExpect(jsonPath("$.series").value("Harry Potter"))
+                .andExpect(jsonPath("$.seriesNumber").value(1))
+                .andExpect(jsonPath("$.coverImageUrl").value("https://img.example/hp.jpg"))
+                .andExpect(jsonPath("$.tags[0]").value("Giả tưởng"))
+                .andExpect(jsonPath("$.tags.length()").value(2));
+        verify(createTitle).execute(new CreateTitleCommand("Harry Potter", "J.K. Rowling", null,
+                new BigDecimal("120000"), null, null, null, expected));
+    }
+
+    @Test
+    void suaDauSachChuyenThongTinBoSung() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(updateTitle.execute(any())).thenReturn(title(id));
+        mvc.perform(put("/internal/books/" + id).contentType(MediaType.APPLICATION_JSON).content(WITH_EXTRAS)
+                        .with(withKey("TitleController/update")))
+                .andExpect(status().isOk());
+        verify(updateTitle).execute(new UpdateTitleCommand(id, "Harry Potter", "J.K. Rowling", null,
+                new BigDecimal("120000"), null, null, null,
+                new TitleExtras("Phụ đề", 2017, "Tái bản lần thứ 8", "vi", 368, TitleFormat.PAPERBACK, "Lý Lan",
+                        "Harry Potter", 1, "https://img.example/hp.jpg", List.of("Giả tưởng", "Phép thuật"))));
+    }
+
+    @Test
+    void bodyCuKhongCoTruongMoiVanHopLeVaExtrasRong() throws Exception {
+        when(createTitle.execute(any())).thenReturn(title(UUID.randomUUID()));
+        mvc.perform(post("/internal/books").contentType(MediaType.APPLICATION_JSON).content(VALID)
+                        .with(withKey("TitleController/create")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.subtitle").doesNotExist())
+                .andExpect(jsonPath("$.tags").isEmpty());
+    }
+
+    @Test
+    void thongTinBoSungSaiRangBuocTra400() throws Exception {
+        for (String bad : List.of(
+                "\"language\":\"VI\"", "\"language\":\"v\"", "\"language\":\"vietnamese\"",
+                "\"publicationYear\":999", "\"publicationYear\":3001", "\"pageCount\":0", "\"pageCount\":20001",
+                "\"seriesNumber\":0", "\"format\":\"AUDIO\"", "\"coverImageUrl\":\"ftp://x.example/a.jpg\"",
+                "\"coverImageUrl\":\"javascript:alert(1)\"", "\"subtitle\":\"" + "a".repeat(256) + "\"",
+                "\"edition\":\"" + "a".repeat(51) + "\"",
+                "\"tags\":[\"1\",\"2\",\"3\",\"4\",\"5\",\"6\",\"7\",\"8\",\"9\",\"10\",\"11\"]",
+                "\"tags\":[\"" + "a".repeat(51) + "\"]")) {
+            mvc.perform(post("/internal/books").contentType(MediaType.APPLICATION_JSON).content(with(bad))
+                            .with(admin()))
+                    .andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(createTitle);
+    }
+
+    @Test
+    void soTapKhongCoBoSachTra422VaKhongGoiUseCase() throws Exception {
+        String body = "{\"name\":\"A\",\"author\":\"B\",\"coverPrice\":1,\"seriesNumber\":2}";
+        mvc.perform(post("/internal/books").contentType(MediaType.APPLICATION_JSON).content(body).with(admin()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("INVALID_TITLE"));
+        verifyNoInteractions(createTitle);
     }
 }

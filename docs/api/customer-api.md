@@ -96,12 +96,12 @@ trả 423/403 riêng). Đó là việc riêng, chưa xử lý ở đây.
 
 ### Danh mục sách
 
-Phản hồi chỉ có các trường sau (test so tập tên trường); KHÔNG có số tồn, giá nhập, ngưỡng, tenantId, ISBN, ảnh.
+Phản hồi chỉ có các trường sau (test so tập tên trường); KHÔNG có số tồn, giá nhập, ngưỡng, tenantId, ISBN. Thông tin bổ sung công khai (tùy chọn, null; `tags` rỗng nếu chưa có) xem `docs/api/catalog-title-extra-fields.md`.
 
 | Endpoint | Trường |
 |---|---|
-| `GET .../books` | `{items:[{bookRef, title, author, price, inStock, hasPreview}], page, size, total}`; `page` từ 0; `size` mặc định 20, tối đa 50 (lớn hơn thì cắt về 50); `keyword` <=100 ký tự (dài hơn hoặc có ký tự điều khiển: 400) |
-| `GET .../books/{bookRef}` | `{bookRef, title, author, price, inStock, hasPreview, description}` (`description` null nếu chưa nhập) |
+| `GET .../books` | `{items:[{bookRef, title, author, price, inStock, hasPreview, subtitle, publicationYear, edition, language, pageCount, format, translator, series, seriesNumber, coverImageUrl, tags}], page, size, total}`; `page` từ 0; `size` mặc định 20, tối đa 50 (lớn hơn thì cắt về 50); `keyword` <=100 ký tự (dài hơn hoặc có ký tự điều khiển: 400) |
+| `GET .../books/{bookRef}` | `{bookRef, title, author, price, inStock, hasPreview, description, subtitle, publicationYear, edition, language, pageCount, format, translator, series, seriesNumber, coverImageUrl, tags}` (`description` null nếu chưa nhập; `format` là PAPERBACK|HARDCOVER|EBOOK; `coverImageUrl` chỉ http/https) |
 | `GET .../books/{bookRef}/preview` | `{bookRef, title, previewText}` |
 
 `bookRef` là UUID (chính là `titleId` khi đặt hàng). `price` là số nguyên VND. `bookRef` sai định dạng hoặc sách không có/không

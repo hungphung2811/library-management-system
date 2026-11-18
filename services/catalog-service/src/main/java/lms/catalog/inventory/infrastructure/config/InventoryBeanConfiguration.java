@@ -8,6 +8,7 @@ import lms.catalog.inventory.application.HoldCopyUseCase;
 import lms.catalog.inventory.application.ListCopiesUseCase;
 import lms.catalog.inventory.application.MoveCopyShelfLocationUseCase;
 import lms.catalog.inventory.application.ReleaseCopyUseCase;
+import lms.catalog.inventory.application.UpdateCopyAcquisitionUseCase;
 import lms.catalog.inventory.domain.BookCopyRepository;
 import lms.catalog.inventory.infrastructure.messaging.KafkaInventoryEventPublisher;
 import lms.messaging.KafkaEventPublisher;
@@ -64,6 +65,11 @@ public class InventoryBeanConfiguration {
     @Bean
     MoveCopyShelfLocationUseCase moveCopyShelfLocationUseCase(BookCopyRepository repository) {
         return new MoveCopyShelfLocationUseCase(repository);
+    }
+
+    @Bean
+    UpdateCopyAcquisitionUseCase updateCopyAcquisitionUseCase(BookCopyRepository repository) {
+        return new UpdateCopyAcquisitionUseCase(repository);
     }
 
     @Bean

@@ -19,6 +19,8 @@ import lms.catalog.catalog.application.UpdateTitleUseCase;
 import lms.catalog.catalog.domain.DuplicateIsbnException;
 import lms.catalog.catalog.domain.InvalidTitleException;
 import lms.catalog.catalog.domain.Title;
+import lms.catalog.catalog.domain.TitleExtras;
+import lms.catalog.catalog.domain.TitleFormat;
 import lms.catalog.catalog.domain.TitleNotFoundException;
 import lms.catalog.catalog.domain.TitleRepository;
 import lms.catalog.inventory.application.CopyAvailabilityQuery;
@@ -119,5 +121,25 @@ class UpdateTitleUseCaseTest {
         assertThrows(InvalidTitleException.class, () -> useCase.execute(new UpdateTitleCommand(id, "A", "B", null, new BigDecimal("-1"))));
         assertThrows(InvalidTitleException.class, () -> useCase.execute(new UpdateTitleCommand(id, "A", "B", null, null)));
         assertTrue(store.get(id) == existing);
+    }
+
+    @Test
+    void suaThayThongTinBoSungVaThieuNghiaLaXoa() {
+        TitleExtras extras = new TitleExtras("Phụ", 2020, "Lần 2", "vi", 200, TitleFormat.HARDCOVER, "Dịch giả",
+                "Bộ", 3, "https://x.example/a.png", List.of("a", "A", "b"));
+        TitleResponse r = useCase.execute(new UpdateTitleCommand(existing.id(), "A", "B", "111", BigDecimal.ONE,
+                null, null, null, extras));
+        assertEquals("Phụ", r.subtitle());
+        assertEquals(2020, r.publicationYear());
+        assertEquals(TitleFormat.HARDCOVER, r.format());
+        assertEquals(List.of("a", "b"), r.tags());
+        assertEquals(3, r.seriesNumber());
+        assertEquals("Phụ", store.get(existing.id()).extras().subtitle());
+
+        TitleResponse cleared = useCase.execute(new UpdateTitleCommand(existing.id(), "A", "B", "111", BigDecimal.ONE));
+        assertNull(cleared.subtitle());
+        assertNull(cleared.format());
+        assertTrue(cleared.tags().isEmpty());
+        assertTrue(store.get(existing.id()).extras().isEmpty());
     }
 }

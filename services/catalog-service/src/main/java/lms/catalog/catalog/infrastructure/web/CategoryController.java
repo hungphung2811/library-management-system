@@ -5,8 +5,8 @@ import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 import lms.catalog.catalog.application.ReferenceOption;
-import lms.catalog.catalog.application.ReferencePageResponse;
-import lms.catalog.catalog.application.ReferenceResponse;
+import lms.catalog.catalog.application.CategoryResponse;
+import lms.catalog.catalog.application.ReferencePage;
 import lms.catalog.catalog.application.ReferenceSearchQuery;
 import lms.catalog.catalog.application.ReferenceUseCases;
 import lms.catalog.catalog.application.SaveCategoryRequest;
@@ -39,8 +39,8 @@ public class CategoryController {
 
     /** Tìm có phân trang (keyword theo tên/mô tả, active, page từ 0, size 1..100). */
     @GetMapping
-    public ReferencePageResponse search(ReferenceSearchQuery query) {
-        return useCases.search().execute(KIND, query);
+    public ReferencePage<CategoryResponse> search(ReferenceSearchQuery query) {
+        return ReferencePage.of(useCases.search().execute(KIND, query), CategoryResponse::from);
     }
 
     /** Danh sách rút gọn (id, tên) các mục đang active cho ô chọn; tối đa 200. */
@@ -50,24 +50,26 @@ public class CategoryController {
     }
 
     @GetMapping("/{id}")
-    public ReferenceResponse get(@PathVariable UUID id) {
-        return useCases.get().execute(KIND, id);
+    public CategoryResponse get(@PathVariable UUID id) {
+        return CategoryResponse.from(useCases.get().execute(KIND, id));
     }
 
     @PostMapping
-    public ResponseEntity<ReferenceResponse> create(@Valid @RequestBody SaveCategoryRequest request) {
-        ReferenceResponse created = useCases.create().execute(KIND, request.name(), request.description(), request.parentId());
+    public ResponseEntity<CategoryResponse> create(@Valid @RequestBody SaveCategoryRequest request) {
+        CategoryResponse created = CategoryResponse.from(
+                useCases.create().execute(KIND, request.name(), request.description(), request.parentId()));
         return ResponseEntity.created(URI.create("/internal/categories/" + created.id())).body(created);
     }
 
     @PutMapping("/{id}")
-    public ReferenceResponse update(@PathVariable UUID id, @Valid @RequestBody SaveCategoryRequest request) {
-        return useCases.update().execute(KIND, id, request.name(), request.description(), request.parentId());
+    public CategoryResponse update(@PathVariable UUID id, @Valid @RequestBody SaveCategoryRequest request) {
+        return CategoryResponse.from(
+                useCases.update().execute(KIND, id, request.name(), request.description(), request.parentId()));
     }
 
     /** Bật/ngừng sử dụng (thay cho xóa cứng). */
     @PutMapping("/{id}/status")
-    public ReferenceResponse setStatus(@PathVariable UUID id, @Valid @RequestBody SetReferenceStatusRequest request) {
-        return useCases.setStatus().execute(KIND, id, request.active());
+    public CategoryResponse setStatus(@PathVariable UUID id, @Valid @RequestBody SetReferenceStatusRequest request) {
+        return CategoryResponse.from(useCases.setStatus().execute(KIND, id, request.active()));
     }
 }

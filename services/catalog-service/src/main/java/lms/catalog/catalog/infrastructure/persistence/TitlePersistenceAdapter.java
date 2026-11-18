@@ -25,7 +25,8 @@ class TitlePersistenceAdapter implements TitleRepository {
     @Override
     public Title save(Title title) {
         TitleJpaEntity entity = new TitleJpaEntity(title.id(), title.name(), title.author(), title.isbn(), title.coverPrice(),
-                title.description(), title.previewText(), title.publisherId(), title.categoryId());
+                title.description(), title.previewText(), title.publisherId(), title.categoryId())
+                .withExtras(title.extras());
         jpa.save(entity);
         // Đồng bộ bảng nối title_authors (xóa rồi ghi lại theo thứ tự); bulk delete tự flush để dòng titles đã có trước.
         titleAuthors.deleteByTitleId(title.id());
@@ -83,6 +84,6 @@ class TitlePersistenceAdapter implements TitleRepository {
 
     private static Title toDomain(TitleJpaEntity e, List<UUID> authorIds) {
         return Title.restore(e.getId(), e.getName(), e.getAuthor(), e.getIsbn(), e.getCoverPrice(), e.getTenantId(),
-                e.getDescription(), e.getPreviewText(), e.getPublisherId(), e.getCategoryId(), authorIds);
+                e.getDescription(), e.getPreviewText(), e.getPublisherId(), e.getCategoryId(), authorIds, e.toExtras());
     }
 }

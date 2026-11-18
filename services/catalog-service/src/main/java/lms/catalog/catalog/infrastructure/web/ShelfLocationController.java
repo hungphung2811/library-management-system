@@ -61,14 +61,15 @@ public class ShelfLocationController {
     @PostMapping
     public ResponseEntity<ShelfLocationResponse> create(@Valid @RequestBody SaveShelfLocationRequest request) {
         ShelfLocationResponse created = ShelfLocationResponse.from(
-                useCases.create().execute(KIND, request.code(), request.description(), null));
+                useCases.create().execute(KIND, request.code(), request.description(), null, request.extras()));
         return ResponseEntity.created(URI.create("/internal/shelf-locations/" + created.id())).body(created);
     }
 
     @PutMapping("/{id}")
     public ShelfLocationResponse update(@PathVariable UUID id, @Valid @RequestBody SaveShelfLocationRequest request) {
         return ShelfLocationResponse.from(
-                useCases.update().execute(KIND, id, request.code(), request.description(), null));
+                useCases.update().execute(KIND, id, request.code(), request.description(), null,
+                        request.extras()));
     }
 
     @PutMapping("/{id}/status")

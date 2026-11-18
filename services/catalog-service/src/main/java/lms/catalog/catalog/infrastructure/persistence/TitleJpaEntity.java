@@ -5,7 +5,14 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
+import lms.catalog.catalog.domain.TitleExtras;
+import lms.catalog.catalog.domain.TitleFormat;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.hibernate.annotations.TenantId;
 import lms.tenant.TenantContext;
 
@@ -44,6 +51,42 @@ class TitleJpaEntity {
     @Column(name = "category_id")
     private UUID categoryId;
 
+    @Column(name = "subtitle", length = 255)
+    private String subtitle;
+
+    @Column(name = "publication_year")
+    private Integer publicationYear;
+
+    @Column(name = "edition", length = 50)
+    private String edition;
+
+    @Column(name = "language", length = 8)
+    private String language;
+
+    @Column(name = "page_count")
+    private Integer pageCount;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "format", length = 20)
+    private TitleFormat format;
+
+    @Column(name = "translator", length = 255)
+    private String translator;
+
+    @Column(name = "series", length = 255)
+    private String series;
+
+    @Column(name = "series_number")
+    private Integer seriesNumber;
+
+    @Column(name = "cover_image_url", length = 500)
+    private String coverImageUrl;
+
+    /** Cột text[] của Postgres; null khi không có nhãn. */
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "tags")
+    private List<String> tags;
+
     protected TitleJpaEntity() {
     }
 
@@ -61,6 +104,27 @@ class TitleJpaEntity {
         this.previewText = previewText;
         this.publisherId = publisherId;
         this.categoryId = categoryId;
+    }
+
+    /** Ghi thông tin bổ sung từ domain (null/rỗng nghĩa là không có). */
+    TitleJpaEntity withExtras(TitleExtras x) {
+        this.subtitle = x.subtitle();
+        this.publicationYear = x.publicationYear();
+        this.edition = x.edition();
+        this.language = x.language();
+        this.pageCount = x.pageCount();
+        this.format = x.format();
+        this.translator = x.translator();
+        this.series = x.series();
+        this.seriesNumber = x.seriesNumber();
+        this.coverImageUrl = x.coverImageUrl();
+        this.tags = x.tags().isEmpty() ? null : new java.util.ArrayList<>(x.tags());
+        return this;
+    }
+
+    TitleExtras toExtras() {
+        return new TitleExtras(subtitle, publicationYear, edition, language, pageCount, format, translator, series,
+                seriesNumber, coverImageUrl, tags);
     }
 
     UUID getId() { return id; }

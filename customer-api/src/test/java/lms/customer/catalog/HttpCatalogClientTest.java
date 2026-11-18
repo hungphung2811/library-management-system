@@ -45,7 +45,7 @@ class HttpCatalogClientTest {
                         + "\"price\":1000,\"inStock\":true,\"hasPreview\":false,\"onHand\":42,\"reserved\":3,"
                         + "\"available\":39,\"costPrice\":1,\"tenantId\":\"t\",\"isbn\":\"123\"}],"
                         + "\"total\":1,\"page\":1,\"size\":50,\"onHandTotal\":99}", MediaType.APPLICATION_JSON));
-        BookPageView page = client.list("svc-token", "c++ & java", 1, 50);
+        BookPageView page = client.list("svc-token", "c++ & java", null, false, 1, 50);
         assertEquals(1, page.items().size());
         assertEquals(id, page.items().get(0).bookRef());
         String out = json.writeValueAsString(page);

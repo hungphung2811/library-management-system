@@ -5,11 +5,11 @@ import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 import lms.catalog.catalog.application.ReferenceOption;
-import lms.catalog.catalog.application.ReferencePageResponse;
-import lms.catalog.catalog.application.ReferenceResponse;
+import lms.catalog.catalog.application.PublisherResponse;
+import lms.catalog.catalog.application.ReferencePage;
 import lms.catalog.catalog.application.ReferenceSearchQuery;
 import lms.catalog.catalog.application.ReferenceUseCases;
-import lms.catalog.catalog.application.SaveNamedReferenceRequest;
+import lms.catalog.catalog.application.SavePublisherRequest;
 import lms.catalog.catalog.application.SetReferenceStatusRequest;
 import lms.catalog.catalog.domain.ReferenceKind;
 import org.springframework.http.ResponseEntity;
@@ -39,8 +39,8 @@ public class PublisherController {
 
     /** Tìm có phân trang (keyword theo tên/mô tả, active, page từ 0, size 1..100). */
     @GetMapping
-    public ReferencePageResponse search(ReferenceSearchQuery query) {
-        return useCases.search().execute(KIND, query);
+    public ReferencePage<PublisherResponse> search(ReferenceSearchQuery query) {
+        return ReferencePage.of(useCases.search().execute(KIND, query), PublisherResponse::from);
     }
 
     /** Danh sách rút gọn (id, tên) các mục đang active cho ô chọn; tối đa 200. */
@@ -50,24 +50,26 @@ public class PublisherController {
     }
 
     @GetMapping("/{id}")
-    public ReferenceResponse get(@PathVariable UUID id) {
-        return useCases.get().execute(KIND, id);
+    public PublisherResponse get(@PathVariable UUID id) {
+        return PublisherResponse.from(useCases.get().execute(KIND, id));
     }
 
     @PostMapping
-    public ResponseEntity<ReferenceResponse> create(@Valid @RequestBody SaveNamedReferenceRequest request) {
-        ReferenceResponse created = useCases.create().execute(KIND, request.name(), request.description(), null);
+    public ResponseEntity<PublisherResponse> create(@Valid @RequestBody SavePublisherRequest request) {
+        PublisherResponse created = PublisherResponse.from(
+                useCases.create().execute(KIND, request.name(), request.description(), null, request.extras()));
         return ResponseEntity.created(URI.create("/internal/publishers/" + created.id())).body(created);
     }
 
     @PutMapping("/{id}")
-    public ReferenceResponse update(@PathVariable UUID id, @Valid @RequestBody SaveNamedReferenceRequest request) {
-        return useCases.update().execute(KIND, id, request.name(), request.description(), null);
+    public PublisherResponse update(@PathVariable UUID id, @Valid @RequestBody SavePublisherRequest request) {
+        return PublisherResponse.from(useCases.update().execute(KIND, id, request.name(), request.description(), null,
+                request.extras()));
     }
 
     /** Bật/ngừng sử dụng (thay cho xóa cứng). */
     @PutMapping("/{id}/status")
-    public ReferenceResponse setStatus(@PathVariable UUID id, @Valid @RequestBody SetReferenceStatusRequest request) {
-        return useCases.setStatus().execute(KIND, id, request.active());
+    public PublisherResponse setStatus(@PathVariable UUID id, @Valid @RequestBody SetReferenceStatusRequest request) {
+        return PublisherResponse.from(useCases.setStatus().execute(KIND, id, request.active()));
     }
 }

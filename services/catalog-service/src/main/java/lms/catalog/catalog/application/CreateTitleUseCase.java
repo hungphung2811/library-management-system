@@ -21,7 +21,8 @@ public class CreateTitleUseCase {
 
     @Transactional
     public TitleResponse execute(CreateTitleCommand command) {
-        Title title = Title.create(command.name(), command.author(), command.isbn(), command.coverPrice());
+        Title title = Title.create(command.name(), command.author(), command.isbn(), command.coverPrice())
+                .withExtras(command.extras());
         if (title.isbn() != null && repository.existsByIsbn(title.isbn())) {
             throw new DuplicateIsbnException(title.isbn());
         }

@@ -20,9 +20,11 @@ public final class Reference {
     private final String description;
     private final UUID parentId;
     private final boolean active;
+    /** Thông tin bổ sung tùy chọn theo loại (không bao giờ null). */
+    private final ReferenceExtras extras;
 
     private Reference(UUID id, ReferenceKind kind, UUID tenantId, String name, String description, UUID parentId,
-                      boolean active) {
+                      boolean active, ReferenceExtras extras) {
         if (kind == null) throw new IllegalArgumentException("kind không được null");
         if (id == null) throw new InvalidReferenceException(kind, "id không được null");
         String n = normalizeName(name);
@@ -48,6 +50,7 @@ public final class Reference {
         this.description = d;
         this.parentId = parentId;
         this.active = active;
+        this.extras = (extras == null ? ReferenceExtras.EMPTY : extras).normalized(kind);
     }
 
     public static String normalizeName(String raw) {
@@ -56,21 +59,42 @@ public final class Reference {
     }
 
     public static Reference create(ReferenceKind kind, String name, String description, UUID parentId) {
-        return new Reference(UUID.randomUUID(), kind, null, name, description, parentId, true);
+        return new Reference(UUID.randomUUID(), kind, null, name, description, parentId, true, null);
     }
 
     public static Reference restore(UUID id, ReferenceKind kind, UUID tenantId, String name, String description,
                                     UUID parentId, boolean active) {
-        return new Reference(id, kind, tenantId, name, description, parentId, active);
+        return new Reference(id, kind, tenantId, name, description, parentId, active, null);
+    }
+
+    /** Dựng mới kèm thông tin bổ sung. */
+    public static Reference create(ReferenceKind kind, String name, String description, UUID parentId,
+                                   ReferenceExtras extras) {
+        return new Reference(UUID.randomUUID(), kind, null, name, description, parentId, true, extras);
+    }
+
+    /** Dựng lại kèm thông tin bổ sung. */
+    public static Reference restore(UUID id, ReferenceKind kind, UUID tenantId, String name, String description,
+                                    UUID parentId, boolean active, ReferenceExtras extras) {
+        return new Reference(id, kind, tenantId, name, description, parentId, active, extras);
     }
 
     /** Bản đã sửa (cùng id, giữ trạng thái active). */
     public Reference update(String name, String description, UUID parentId) {
-        return new Reference(id, kind, tenantId, name, description, parentId, active);
+        return new Reference(id, kind, tenantId, name, description, parentId, active, extras);
+    }
+
+    /** Bản đã sửa và thay toàn bộ thông tin bổ sung (null = xóa hết). */
+    public Reference update(String name, String description, UUID parentId, ReferenceExtras extras) {
+        return new Reference(id, kind, tenantId, name, description, parentId, active, extras);
+    }
+
+    public Reference withExtras(ReferenceExtras extras) {
+        return new Reference(id, kind, tenantId, name, description, parentId, active, extras);
     }
 
     public Reference withActive(boolean active) {
-        return new Reference(id, kind, tenantId, name, description, parentId, active);
+        return new Reference(id, kind, tenantId, name, description, parentId, active, extras);
     }
 
     /** Khóa so trùng: tên đã chuẩn hóa, chữ thường. */
@@ -83,4 +107,5 @@ public final class Reference {
     public String description() { return description; }
     public UUID parentId() { return parentId; }
     public boolean active() { return active; }
+    public ReferenceExtras extras() { return extras; }
 }
