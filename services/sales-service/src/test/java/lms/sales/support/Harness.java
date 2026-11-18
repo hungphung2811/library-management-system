@@ -35,6 +35,8 @@ import lms.sales.shared.application.SalesAuditQueryPort;
 import lms.sales.shared.application.SalesAuditQueryUseCase;
 import lms.sales.shared.application.TenantDirectoryPort;
 import lms.sales.stock.application.StorefrontQueryUseCases;
+import lms.sales.stock.application.StorefrontRow;
+import lms.sales.stock.application.StorefrontSort;
 import lms.sales.ordering.domain.SalesOrder;
 import lms.sales.settings.application.GetSalesSettingsUseCase;
 import lms.sales.settings.application.SalesSettingsPort;
@@ -91,6 +93,12 @@ public final class Harness {
     public final Map<UUID, CatalogLookupPort.CatalogTitle> catalogTitles = new HashMap<>();
     public SalesOrder raceWinner; // nếu đặt: lần save đơn kế tiếp thua cuộc đua clientRequestId
     public int catalogCalls;
+    // ADR-0019: bản sao giá bìa + ngày đưa vào bán của mặt hàng (StockItem domain không mang hai giá trị này)
+    public final Map<UUID, Long> coverSnapshots = new HashMap<>();
+    public final Map<UUID, Instant> listedAt = new HashMap<>();
+    public final List<Map<UUID, Long>> snapshotWrites = new ArrayList<>();
+    public boolean failSnapshotWrites;
+    public int storefrontListCalls;
 
     public final StockPort stockPort = new StockAdapter();
     public final SalesOrderRepository orderRepo = new OrderAdapter();
@@ -142,15 +150,53 @@ public final class Harness {
     public final RegisterStockItemUseCase registerItem = new RegisterStockItemUseCase(stockPort, catalog, getSettings,
             auditPort, clock);
     public final GetStockItemUseCase getItem = new GetStockItemUseCase(stockPort, catalog, getSettings);
+    public final lms.sales.stock.application.StockItemDetailsUseCases itemDetails =
+            new lms.sales.stock.application.StockItemDetailsUseCases(stockPort, auditPort, clock);
     public final AdjustStockUseCase adjust = new AdjustStockUseCase(stockService, auditPort, clock);
     public final StocktakeUseCase stocktake = new StocktakeUseCase(stockPort, stockService, auditPort, clock);
     public final ReconcileStockUseCase reconcile = new ReconcileStockUseCase(stockPort);
     public final SupplierUseCases supplierUseCases = new SupplierUseCases(supplierRepo, auditPort, clock);
     public final GoodsReceiptUseCases receiptUseCases = new GoodsReceiptUseCases(new GoodsReceiptCreator(receiptRepo,
             supplierRepo, stockPort, numbers, auditPort, clock), receiptRepo, stockService, auditPort, clock);
+    // ADR-0021: POS hai bước. Bản dùng thật (createWithPayment) giữ nguyên; create/createWithDiscount ở đây là lối tắt
+    // cho test cũ: tạo đơn hai bước rồi xác nhận thu tay ngay, nên kết quả vẫn là đơn COMPLETED + PAID.
+    public final InMemoryIntents intents = new InMemoryIntents();
+    public final lms.sales.ordering.application.PaymentIntentUseCases intentUseCases =
+            new lms.sales.ordering.application.PaymentIntentUseCases(intents, orderRepo, stockService, auditPort,
+                    clock);
+    public final lms.sales.ordering.application.CommitPosPendingOrderUseCase commitPending =
+            new lms.sales.ordering.application.CommitPosPendingOrderUseCase(orderRepo, intents, null, stockService,
+                    getSettings, numbers, auditPort, tenantDirectory, returnRepo, clock,
+                    java.time.Duration.ofMinutes(10), java.time.Duration.ofMinutes(10));
     public final PlacePosOrderUseCase placePos = new PlacePosOrderUseCase(orderRepo, catalog,
             new CommitPosOrderUseCase(orderRepo, stockService, getSettings, numbers, auditPort, clock, tenantDirectory,
-                    returnRepo));
+                    returnRepo), commitPending) {
+        @Override
+        public lms.sales.ordering.application.OrderResponse create(
+                lms.sales.ordering.application.PlacePosOrderCommand cmd) {
+            return paidNow(cmd, createWithPayment(cmd));
+        }
+
+        @Override
+        public lms.sales.ordering.application.OrderResponse createWithDiscount(
+                lms.sales.ordering.application.PlacePosOrderCommand cmd) {
+            return paidNow(cmd, createWithDiscountAndPayment(cmd));
+        }
+
+        private lms.sales.ordering.application.OrderResponse paidNow(
+                lms.sales.ordering.application.PlacePosOrderCommand cmd,
+                lms.sales.ordering.application.PosOrderResult r) {
+            if (r.paymentIntent() == null) {
+                return r.order();
+            }
+            boolean needsRef = cmd.paymentMethod() != lms.sales.ordering.domain.PaymentMethod.CASH;
+            intentUseCases.confirm(cmd.tenantId(), cmd.userId(), r.paymentIntent().id(),
+                    new lms.sales.ordering.application.PaymentIntentUseCases.ConfirmCommand(null,
+                            needsRef ? "TEST-REF" : null));
+            return lms.sales.ordering.application.OrderResponse.from(
+                    orderRepo.findById(cmd.tenantId(), r.order().id()).orElseThrow());
+        }
+    };
     public final OrderQueryUseCases orderQueries = new OrderQueryUseCases(orderRepo);
     public final PlaceOnlineOrderUseCase placeOnline = new PlaceOnlineOrderUseCase(orderRepo, catalog,
             new CommitOnlineOrderUseCase(orderRepo, stockService, getSettings, numbers, auditPort, tenantDirectory,
@@ -262,15 +308,31 @@ public final class Harness {
                 throw new SalesException(ErrorCode.STOCK_ITEM_EXISTS, "exists");
             }
             items.put(item.titleId(), item);
+            listedAt.put(item.titleId(), Instant.EPOCH.plusSeconds(items.size()));
             return item;
         }
 
         public StockItem saveAttributes(StockItem item) {
             StockItem cur = items.get(item.titleId());
             StockItem merged = StockItem.restore(cur.id(), cur.tenantId(), cur.titleId(), cur.onHand(),
-                    cur.reserved(), item.sellingPrice(), item.lowStockThreshold(), item.active(), cur.version());
+                    cur.reserved(), item.sellingPrice(), item.lowStockThreshold(), item.active(), cur.version(),
+                    item.details());
             items.put(item.titleId(), merged);
             return merged;
+        }
+
+        public Optional<StockItem> findBySku(UUID t, String sku) {
+            return items.values().stream().filter(i -> sku != null && sku.equals(i.details().sku())).findFirst();
+        }
+
+        public void touchLastRestocked(UUID t, Collection<UUID> titleIds, Instant at) {
+            for (UUID id : titleIds) {
+                StockItem cur = items.get(id);
+                if (cur != null && (cur.details().lastRestockedAt() == null
+                        || cur.details().lastRestockedAt().isBefore(at))) {
+                    items.put(id, cur.withDetails(cur.details().withLastRestockedAt(at)));
+                }
+            }
         }
 
         public boolean tryApply(UUID t, UUID titleId, long dOn, long dRes) {
@@ -296,10 +358,60 @@ public final class Harness {
             return new PageResult<>(all, all.size(), page, size);
         }
 
-        public PageResult<StockItem> listActive(UUID t, int page, int size) {
-            var all = items.values().stream().filter(StockItem::active).toList();
-            int from = Math.min(all.size(), page * size);
-            return new PageResult<>(all.subList(from, Math.min(all.size(), from + size)), all.size(), page, size);
+        private StorefrontRow row(StockItem i) {
+            return new StorefrontRow(i.titleId(), i.sellingPrice(), coverSnapshots.get(i.titleId()),
+                    i.available() > 0, listedAt.getOrDefault(i.titleId(), Instant.EPOCH));
+        }
+
+        private Long effective(StorefrontRow r) {
+            return r.sellingPrice() != null ? Long.valueOf(r.sellingPrice().amount()) : r.coverPriceSnapshot();
+        }
+
+        public PageResult<StorefrontRow> listStorefront(UUID t, StorefrontSort sort, boolean inStockOnly, int page,
+                                                        int size) {
+            storefrontListCalls++;
+            var rows = new ArrayList<>(items.values().stream().filter(StockItem::active).map(this::row)
+                    .filter(r -> !inStockOnly || r.inStock())
+                    .filter(r -> !sort.byPrice() || effective(r) != null).toList());
+            java.util.Comparator<StorefrontRow> byId = java.util.Comparator.comparing(StorefrontRow::titleId);
+            switch (sort) {
+                case NEWEST -> rows.sort(java.util.Comparator.comparing(StorefrontRow::listedAt).reversed()
+                        .thenComparing(byId));
+                case PRICE_ASC -> rows.sort(java.util.Comparator.<StorefrontRow, Long>comparing(this::effective).thenComparing(byId));
+                case PRICE_DESC -> rows.sort(java.util.Comparator.<StorefrontRow, Long>comparing(this::effective).thenComparing(byId)
+                        .reversed());
+            }
+            int from = Math.min(rows.size(), page * size);
+            return new PageResult<>(rows.subList(from, Math.min(rows.size(), from + size)), rows.size(), page, size);
+        }
+
+        public Map<UUID, StorefrontRow> findStorefrontRows(UUID t, Collection<UUID> ids) {
+            Map<UUID, StorefrontRow> out = new HashMap<>();
+            ids.forEach(id -> {
+                StockItem i = items.get(id);
+                if (i != null && i.active()) {
+                    out.put(id, row(i));
+                }
+            });
+            return out;
+        }
+
+        public List<UUID> titleIdsMissingCoverPrice(UUID t, int limit) {
+            return items.values().stream().filter(StockItem::active)
+                    .filter(i -> i.sellingPrice() == null && !coverSnapshots.containsKey(i.titleId()))
+                    .map(StockItem::titleId).limit(limit).toList();
+        }
+
+        public void refreshCoverPrices(UUID t, Map<UUID, Long> prices) {
+            if (failSnapshotWrites) {
+                throw new IllegalStateException("db down");
+            }
+            snapshotWrites.add(Map.copyOf(prices));
+            prices.forEach((id, v) -> {
+                if (items.containsKey(id)) {
+                    coverSnapshots.put(id, v);
+                }
+            });
         }
 
         public PageResult<StockMovement> ledger(UUID t, UUID titleId, int page, int size) {

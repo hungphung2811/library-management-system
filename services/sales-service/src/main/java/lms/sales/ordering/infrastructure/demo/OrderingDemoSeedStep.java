@@ -99,8 +99,22 @@ public class OrderingDemoSeedStep implements DemoSeedStep {
         int skipped = 0;
 
         for (OrderPlan o : plan.orders()) {
-            if (orders.findById(tenantId, o.id()).isPresent()) {
-                skipped++;
+            var existing = orders.findById(tenantId, o.id());
+            if (existing.isPresent()) {
+                // Đã có đơn: chỉ điền ghi chú/ngày giao còn trống (chạy lại không đổi gì thì bỏ qua)
+                boolean updated = Boolean.TRUE.equals(tx.execute(status -> {
+                    SalesOrder cur = orders.findById(tenantId, o.id()).orElseThrow();
+                    if (!cur.fillMissingNotes(o.customerNote(), o.staffNote(), expectedDelivery(plan, o))) {
+                        return false;
+                    }
+                    orders.save(cur);
+                    return true;
+                }));
+                if (updated) {
+                    created++;
+                } else {
+                    skipped++;
+                }
                 continue;
             }
             tx.executeWithoutResult(status -> {
@@ -216,7 +230,14 @@ public class OrderingDemoSeedStep implements DemoSeedStep {
                 Money.of(o.shippingFee()), Money.of(o.total()), orderDiscount,
                 DemoIds.of("request:order", o.index()), null, online ? customer : staff, t.created(), t.confirmed(),
                 t.confirmed() != null ? staff : null, t.paid(), t.completed(), t.cancelled(),
-                t.cancelled() != null ? customer : null, cancelReason, null, lines, payments, 0));
+                t.cancelled() != null ? customer : null, cancelReason, null, lines, payments, 0, o.customerNote(),
+                o.staffNote(), fulfilment == Fulfilment.COUNTER ? null : expectedDelivery(plan, o)));
+    }
+
+    /** Ngày giao/nhận dự kiến = ngày tạo đơn + số ngày của kế hoạch; null nếu kế hoạch không có. */
+    private static java.time.LocalDate expectedDelivery(DemoPlan plan, OrderPlan o) {
+        return o.expectedDeliveryDays() == null ? null
+                : plan.today().minusDays(o.createdDaysAgo()).plusDays(o.expectedDeliveryDays());
     }
 
     // ---- Phiếu trả hàng và hoàn tiền ----

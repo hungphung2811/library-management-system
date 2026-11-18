@@ -9,9 +9,9 @@ import jakarta.validation.constraints.Size;
 import java.net.URI;
 import java.util.List;
 import java.util.UUID;
-import lms.sales.ordering.application.OrderResponse;
 import lms.sales.ordering.application.PlacePosOrderCommand;
 import lms.sales.ordering.application.PlacePosOrderUseCase;
+import lms.sales.ordering.application.PosOrderResult;
 import lms.sales.ordering.domain.Discount;
 import lms.sales.ordering.domain.PaymentMethod;
 import lms.sales.shared.infrastructure.web.RequestSupport;
@@ -53,7 +53,11 @@ public class PosOrderController {
                                   @NotNull PaymentMethod paymentMethod, UUID customerUserId,
                                   @Valid WalkInRequest walkIn, @Valid DiscountRequest orderDiscount,
                                   @NotBlank @Size(max = 100) String clientRequestId,
-                                  UUID exchangeOfReturnId) {
+                                  UUID exchangeOfReturnId, @Size(max = 500) String customerNote) {
+        @Override
+        public String toString() { // ghi chú của khách có thể chứa dữ liệu cá nhân: không in
+            return "PosOrderRequest[lines=" + (lines == null ? 0 : lines.size()) + "]";
+        }
     }
 
     private final PlacePosOrderUseCase placeOrder;
@@ -63,19 +67,20 @@ public class PosOrderController {
     }
 
     @PostMapping
-    public ResponseEntity<OrderView> create(@Valid @RequestBody PosOrderRequest request,
-                                            @AuthenticationPrincipal Jwt jwt) {
-        return created(placeOrder.create(toCommand(request, jwt)));
+    public ResponseEntity<PosOrderView> create(@Valid @RequestBody PosOrderRequest request,
+                                               @AuthenticationPrincipal Jwt jwt) {
+        return created(placeOrder.createWithPayment(toCommand(request, jwt)));
     }
 
     @PostMapping("/discounted")
-    public ResponseEntity<OrderView> createWithDiscount(@Valid @RequestBody PosOrderRequest request,
-                                                        @AuthenticationPrincipal Jwt jwt) {
-        return created(placeOrder.createWithDiscount(toCommand(request, jwt)));
+    public ResponseEntity<PosOrderView> createWithDiscount(@Valid @RequestBody PosOrderRequest request,
+                                                           @AuthenticationPrincipal Jwt jwt) {
+        return created(placeOrder.createWithDiscountAndPayment(toCommand(request, jwt)));
     }
 
-    private static ResponseEntity<OrderView> created(OrderResponse order) {
-        return ResponseEntity.created(URI.create("/internal/sales/orders/" + order.id())).body(OrderView.from(order));
+    private static ResponseEntity<PosOrderView> created(PosOrderResult result) {
+        return ResponseEntity.created(URI.create("/internal/sales/orders/" + result.order().id()))
+                .body(PosOrderView.from(result));
     }
 
     private static PlacePosOrderCommand toCommand(PosOrderRequest r, Jwt jwt) {
@@ -85,7 +90,7 @@ public class PosOrderController {
         return new PlacePosOrderCommand(RequestSupport.tenant(), RequestSupport.user(jwt), lines, r.paymentMethod(),
                 r.customerUserId(), r.walkIn() == null ? null : r.walkIn().name(),
                 r.walkIn() == null ? null : r.walkIn().phone(), discount(r.orderDiscount()),
-                RequestSupport.clientRequestId(r.clientRequestId()), r.exchangeOfReturnId());
+                RequestSupport.clientRequestId(r.clientRequestId()), r.exchangeOfReturnId(), r.customerNote());
     }
 
     private static Discount discount(DiscountRequest d) {

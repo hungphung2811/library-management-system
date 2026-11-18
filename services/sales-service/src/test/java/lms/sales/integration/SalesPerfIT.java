@@ -73,6 +73,7 @@ class SalesPerfIT {
 
     @Autowired PlaceOnlineOrderUseCase placeOnline;
     @Autowired PlacePosOrderUseCase placePos;
+    @Autowired lms.sales.ordering.application.PaymentIntentUseCases intentUseCases;
     @Autowired ShopOrderUseCases shopOrders;
     @Autowired RegisterStockItemUseCase registerItem;
     @Autowired AdjustStockUseCase adjust;
@@ -127,10 +128,20 @@ class SalesPerfIT {
         return scalar("select reserved from stock_items where tenant_id='" + t + "' and title_id='" + title + "'");
     }
 
+    /** ADR-0021: POS hai bước; xác nhận thu tay ngay để đơn thành COMPLETED + PAID và tồn được xuất như trước. */
+    private lms.sales.ordering.application.OrderResponse paid(UUID tenant, UUID actor,
+            lms.sales.ordering.application.PosOrderResult r) {
+        if (r.paymentIntent() != null) {
+            intentUseCases.confirm(tenant, actor, r.paymentIntent().id(),
+                    new lms.sales.ordering.application.PaymentIntentUseCases.ConfirmCommand(null, "IT-REF"));
+        }
+        return r.order();
+    }
+
     OrderResponse pos(UUID tenant, UUID title, int qty) {
-        return TenantContext.callAs(tenant, () -> placePos.create(new PlacePosOrderCommand(tenant, staff,
-                List.of(new PlacePosOrderCommand.Line(title, qty, null)), PaymentMethod.CASH, null, null, null,
-                null, UUID.randomUUID())));
+        return TenantContext.callAs(tenant, () -> paid(tenant, staff, placePos.createWithPayment(
+                new PlacePosOrderCommand(tenant, staff, List.of(new PlacePosOrderCommand.Line(title, qty, null)),
+                        PaymentMethod.CASH, null, null, null, null, UUID.randomUUID()))));
     }
 
     ShopOrderResponse online(UUID tenant, UUID customer, UUID title, int qty) {

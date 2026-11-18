@@ -16,6 +16,15 @@ spring:
   flyway:
     # Migration do system-service chạy tập trung (target sales); service chỉ validate schema (ddl-auto: validate)
     enabled: false
+  # Cache GET cài đặt/nhà cung cấp (cache-common). Timeout ngắn để Redis chết không làm chậm request
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 200ms
+      connect-timeout: 200ms
+      repositories:
+        enabled: false
   kafka:
     producer:
       properties:
@@ -23,6 +32,10 @@ spring:
         max.block.ms: 2000
 
 management:
+  health:
+    # Redis chỉ là cache phụ: chết không được làm service DOWN
+    redis:
+      enabled: false
   endpoints:
     web:
       exposure:
@@ -47,6 +60,25 @@ app:
     topic-partitions: ${SALES_EVENTS_PARTITIONS:3}
     topic-replicas: ${SALES_EVENTS_REPLICAS:1}
 
+  # Thanh toán QR bằng cổng GIẢ LẬP nội bộ cho POS (ADR-0020). KHÔNG dùng cho production: mặc định tắt (QR bị từ chối,
+  # webhook và nút giả lập trả 404); dev bật ở application-dev.yml. Bí mật ký webhook đọc từ biến môi trường.
+  payments:
+    sandbox:
+      enabled: ${PAYMENTS_SANDBOX_ENABLED:false}
+      webhook-secret: ${PAYMENTS_SANDBOX_WEBHOOK_SECRET:}
+      # Tài khoản/ngân hàng demo in vào mã VietQR (BIN 970422 = MB, chỉ để minh họa)
+      bank-bin: ${PAYMENTS_SANDBOX_BANK_BIN:970422}
+      account-no: ${PAYMENTS_SANDBOX_ACCOUNT_NO:0123456789}
+      account-name: ${PAYMENTS_SANDBOX_ACCOUNT_NAME:LMS DEMO}
+      intent-ttl-minutes: ${PAYMENTS_SANDBOX_INTENT_TTL_MINUTES:10}
+    # Thu tay tại quầy (CASH, CARD, BANK_TRANSFER, ADR-0021): lệnh chờ thu ngân xác nhận, hết hạn thì nhả tồn
+    manual:
+      intent-ttl-minutes: ${PAYMENTS_MANUAL_INTENT_TTL_MINUTES:10}
+    # Job dọn lệnh quá hạn (mọi phương thức)
+    expire-delay-ms: 60000
+    expire-batch-size: 100
+    expire-job-enabled: true
+
 # Middleware phân quyền theo endpoint (security-common): khóa Controller/method được đăng ký về identity-service
 lms:
   security:
@@ -67,3 +99,6 @@ lms:
     contact:
       max-per-user-per-day: 5
       duplicate-window: PT10M
+  # Che dữ liệu cá nhân ở API nhân viên (đơn, liên hệ): true = che (mặc định, bắt buộc ở prod); dev tắt ở application-dev.yml
+  privacy:
+    mask-personal-data: ${LMS_PRIVACY_MASK_PERSONAL_DATA:true}

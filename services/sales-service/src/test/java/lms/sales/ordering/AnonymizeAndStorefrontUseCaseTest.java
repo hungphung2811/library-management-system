@@ -97,7 +97,7 @@ class AnonymizeAndStorefrontUseCaseTest {
     void danhMucChiCoInStockKhongLoTonIsbnHayGiaNhap() {
         UUID a = sellable("Sách A", 100_000, 3);
         UUID b = sellable("Sách B", 50_000, 0);
-        var page = h.storefront.list(h.tenant, null, 0, 20);
+        var page = h.storefront.list(h.tenant, null, null, null, 0, 20);
         assertEquals(2, page.total());
         var va = page.items().stream().filter(v -> v.titleId().equals(a)).findFirst().orElseThrow();
         var vb = page.items().stream().filter(v -> v.titleId().equals(b)).findFirst().orElseThrow();
@@ -120,7 +120,7 @@ class AnonymizeAndStorefrontUseCaseTest {
         UUID a = h.book("Sách A", 100_000, 80_000L, 2);
         UUID off = sellable("Sách Tắt", 10_000, 2);
         h.stockPort.saveAttributes(h.item(off).withActive(false));
-        var page = h.storefront.list(h.tenant, null, 0, 20);
+        var page = h.storefront.list(h.tenant, null, null, null, 0, 20);
         assertEquals(1, page.total());
         assertEquals(80_000, page.items().get(0).price());
         assertEquals(ErrorCode.STOCK_ITEM_NOT_FOUND,
@@ -136,7 +136,7 @@ class AnonymizeAndStorefrontUseCaseTest {
             sellable("Sách " + i, 1_000, 1);
         }
         h.catalogCalls = 0;
-        var page = h.storefront.list(h.tenant, null, 0, 500);
+        var page = h.storefront.list(h.tenant, null, null, null, 0, 500);
         assertEquals(50, page.items().size());
         assertEquals(50, page.size());
         assertEquals(60, page.total());
@@ -147,10 +147,10 @@ class AnonymizeAndStorefrontUseCaseTest {
     void tuKhoaGiaoVoiMatHangDangBanVaPreviewChiQuaEndpointRieng() {
         UUID a = sellable("Dế Mèn", 100_000, 1);
         sellable("Tôi Thấy Hoa Vàng", 90_000, 1);
-        var found = h.storefront.list(h.tenant, "dế", 0, 20);
+        var found = h.storefront.list(h.tenant, "dế", null, null, 0, 20);
         assertEquals(1, found.total());
         assertEquals(a, found.items().get(0).titleId());
-        assertEquals(0, h.storefront.list(h.tenant, "không có", 0, 20).total());
+        assertEquals(0, h.storefront.list(h.tenant, "không có", null, null, 0, 20).total());
 
         h.catalogPreviews.put(a, new CatalogLookupPort.CatalogPreview(a, "Dế Mèn", "Đoạn đọc thử ..."));
         assertEquals("Đoạn đọc thử ...", h.storefront.preview(h.tenant, a).previewText());

@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -33,6 +34,9 @@ public class SecurityConfiguration {
                 .authorizeHttpRequests(a -> a
                         .requestMatchers("/actuator/health/**", "/actuator/info", "/v3/api-docs/**", "/swagger-ui/**",
                                 "/swagger-ui.html").permitAll()
+                        // Webhook cổng thanh toán giả lập (ADR-0020): không có JWT; chỉ xác thực bằng chữ ký HMAC
+                        // (X-Signature) trong SimulatedWebhookProcessor, và 404 khi sandbox tắt
+                        .requestMatchers(HttpMethod.POST, "/internal/payments/webhook/simulated").permitAll()
                         // Chỉ xác thực ở đây; quyền theo endpoint (Controller/method) do PermissionInterceptor kiểm
                         .requestMatchers("/internal/**").authenticated()
                         .anyRequest().denyAll())

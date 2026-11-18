@@ -60,6 +60,18 @@ public class SalesStockController {
         return sales.updateStockItemPrice(titleId, request);
     }
 
+    /** Chi tiết quản lý gồm giá nhập và ghi chú nội bộ: khóa quyền riêng (Thủ kho, Quản lý cửa hàng). */
+    @GetMapping("/stock-items/{titleId}/details")
+    public StockItemDetailsView getStockItemDetails(@PathVariable UUID titleId) {
+        return sales.getStockItemDetails(titleId);
+    }
+
+    @PutMapping("/stock-items/{titleId}/details")
+    public StockItemDetailsView updateStockItemDetails(@PathVariable UUID titleId,
+                                                       @Valid @RequestBody UpdateStockItemDetailsRequest request) {
+        return sales.updateStockItemDetails(titleId, request);
+    }
+
     @GetMapping("/stock-items/{titleId}/ledger")
     public SalesPage<LedgerEntryView> stockLedger(@PathVariable UUID titleId, PageQuery query) {
         return sales.stockLedger(titleId, query);

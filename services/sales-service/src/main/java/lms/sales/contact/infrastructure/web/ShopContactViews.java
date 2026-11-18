@@ -6,7 +6,7 @@ import lms.sales.contact.application.ShopContactQueryUseCases;
 import lms.sales.contact.domain.ContactStatus;
 import lms.sales.contact.domain.ContactTopic;
 import lms.sales.contact.domain.ShopContactRequest;
-import lms.sales.shared.domain.PersonalDataMasker;
+import lms.sales.shared.application.PersonalDataVisibility;
 
 /**
  * View allowlist của liên hệ (dựng tường minh từ domain, không trả entity). Danh sách và chi tiết CHE tên/email/điện
@@ -67,7 +67,7 @@ public final class ShopContactViews {
     }
 
     private static MaskedContact masked(ShopContactRequest r) {
-        return new MaskedContact(PersonalDataMasker.maskName(r.contactName()),
-                PersonalDataMasker.maskEmail(r.contactEmail()), PersonalDataMasker.maskPhone(r.contactPhone()));
+        return new MaskedContact(PersonalDataVisibility.name(r.contactName()),
+                PersonalDataVisibility.email(r.contactEmail()), PersonalDataVisibility.phone(r.contactPhone()));
     }
 }

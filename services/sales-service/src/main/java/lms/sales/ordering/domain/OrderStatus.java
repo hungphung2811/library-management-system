@@ -6,5 +6,7 @@ public enum OrderStatus {
     READY_FOR_PICKUP,
     SHIPPING,
     COMPLETED,
-    CANCELLED
+    CANCELLED,
+    /** Đơn POS thanh toán QR đang chờ cổng báo nhận tiền (ADR-0020); hàng đang được giữ (reserved). */
+    AWAITING_PAYMENT
 }

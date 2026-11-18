@@ -8,7 +8,14 @@ import lms.sales.ordering.domain.Recipient;
 
 /** Khách đặt đơn online. {@code customerUserId} luôn lấy từ token, không nhận từ body. */
 public record PlaceOnlineOrderCommand(UUID tenantId, UUID customerUserId, List<Line> lines, Fulfilment fulfilment,
-                                      PaymentMethod paymentMethod, Recipient recipient, UUID clientRequestId) {
+                                      PaymentMethod paymentMethod, Recipient recipient, UUID clientRequestId,
+                                      String customerNote) {
+
+    /** Đơn không có ghi chú của khách. */
+    public PlaceOnlineOrderCommand(UUID tenantId, UUID customerUserId, List<Line> lines, Fulfilment fulfilment,
+                                   PaymentMethod paymentMethod, Recipient recipient, UUID clientRequestId) {
+        this(tenantId, customerUserId, lines, fulfilment, paymentMethod, recipient, clientRequestId, null);
+    }
 
     public record Line(UUID titleId, int quantity) {
     }

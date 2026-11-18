@@ -1,5 +1,7 @@
 package lms.sales.support;
 
+import lms.cache.NoOpRequestCache;
+import lms.cache.RequestCache;
 import lms.sales.ordering.application.CreateReturnUseCase;
 import lms.sales.ordering.application.OrderQueryUseCases;
 import lms.sales.ordering.application.OrderWorkflowUseCases;
@@ -31,6 +33,12 @@ import org.springframework.context.annotation.Bean;
 @TestConfiguration
 public class HarnessBeans {
 
+    /** Cache tắt trong test WebMvc: controller chạy thẳng nghiệp vụ, không chạm Redis. */
+    @Bean
+    RequestCache requestCache() {
+        return new NoOpRequestCache();
+    }
+
     @Bean
     Harness harness() {
         return new Harness();
@@ -49,6 +57,11 @@ public class HarnessBeans {
     @Bean
     RegisterStockItemUseCase registerStockItemUseCase(Harness h) {
         return h.registerItem;
+    }
+
+    @Bean
+    lms.sales.stock.application.StockItemDetailsUseCases stockItemDetailsUseCases(Harness h) {
+        return h.itemDetails;
     }
 
     @Bean

@@ -1,5 +1,6 @@
 package lms.api.sales.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -10,6 +11,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -47,11 +49,29 @@ public final class SalesDtos {
     // ---- Mặt hàng, kho ----
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    public record RegisterStockItemRequest(@NotNull UUID titleId, @Min(0) Long sellingPrice, @Min(0) Integer lowStockThreshold) {
+    public record RegisterStockItemRequest(@NotNull UUID titleId, @Min(0) Long sellingPrice, @Min(0) Integer lowStockThreshold,
+                                           @Size(max = 40) String sku, @Size(max = 255) String supplier,
+                                           @Min(0) Long costPrice, @Size(max = 64) String binLocation,
+                                           @Min(0) Integer reorderQuantity, Instant lastRestockedAt,
+                                           @Size(max = 500) String note) {
     }
 
+    /** Không có costPrice và note (nội bộ): lấy qua {@link StockItemDetailsView} (khóa quyền riêng). */
     public record StockItemView(UUID titleId, String titleName, int onHand, int reserved, int available, Long sellingPrice,
-                                long effectivePrice, boolean lowStock) {
+                                long effectivePrice, boolean lowStock, String sku, String supplier, String binLocation,
+                                Integer reorderQuantity, Instant lastRestockedAt) {
+    }
+
+    /** Chi tiết đầy đủ gồm giá nhập và ghi chú nội bộ. */
+    public record StockItemDetailsView(UUID titleId, String sku, String supplier, Long costPrice, String binLocation,
+                                       Integer reorderQuantity, Instant lastRestockedAt, String note) {
+    }
+
+    /** Thay toàn bộ chi tiết; trường vắng là xóa, riêng lastRestockedAt vắng thì giữ nguyên giá trị hiện có. */
+    public record UpdateStockItemDetailsRequest(@Size(max = 40) String sku, @Size(max = 255) String supplier,
+                                                @Min(0) Long costPrice, @Size(max = 64) String binLocation,
+                                                @Min(0) Integer reorderQuantity, Instant lastRestockedAt,
+                                                @Size(max = 500) String note) {
     }
 
     /** sellingPrice null = quay về giá bìa (coverPrice) của đầu sách: phải gửi tường minh, nên không NON_NULL. */
@@ -129,12 +149,13 @@ public final class SalesDtos {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record PosOrderRequest(
             @NotEmpty @Size(max = 100) List<@Valid PosOrderLineRequest> lines,
-            @NotNull @Pattern(regexp = "CASH|BANK_TRANSFER|CARD") String paymentMethod,
+            @NotNull @Pattern(regexp = "CASH|BANK_TRANSFER|CARD|QR") String paymentMethod,
             UUID customerUserId,
             @Valid WalkInRequest walkIn,
             @Valid DiscountRequest orderDiscount,
             @NotBlank @Size(max = 100) String clientRequestId,
-            UUID exchangeOfReturnId) {
+            UUID exchangeOfReturnId,
+            @Size(max = 500) String customerNote) {
     }
 
     // ---- Đọc đơn ----
@@ -156,7 +177,52 @@ public final class SalesDtos {
                                  List<OrderLineView> lines, long subtotal, long discountTotal, long vatTotal,
                                  long shippingFee, long grandTotal, int vatRateBps, boolean pricesIncludeVat,
                                  Instant createdAt, Instant confirmedAt, Instant paidAt, Instant completedAt,
-                                 Instant cancelledAt, String cancelReason, UUID exchangeOfReturnId, long version) {
+                                 Instant cancelledAt, String cancelReason, UUID exchangeOfReturnId, long version,
+                                 String customerNote, LocalDate expectedDeliveryDate,
+                                 @JsonInclude(JsonInclude.Include.NON_NULL) PaymentIntentView paymentIntent) {
+
+        /** Đơn không kèm lệnh thanh toán (mọi đường đọc/tìm đơn, và POS không dùng QR). */
+        public SalesOrderView(UUID id, String orderNo, String status, String paymentStatus, String channel,
+                              String fulfilment, String paymentMethod, UUID customerUserId, OrderContactView contact,
+                              List<OrderLineView> lines, long subtotal, long discountTotal, long vatTotal,
+                              long shippingFee, long grandTotal, int vatRateBps, boolean pricesIncludeVat,
+                              Instant createdAt, Instant confirmedAt, Instant paidAt, Instant completedAt,
+                              Instant cancelledAt, String cancelReason, UUID exchangeOfReturnId, long version,
+                              String customerNote, LocalDate expectedDeliveryDate) {
+            this(id, orderNo, status, paymentStatus, channel, fulfilment, paymentMethod, customerUserId, contact,
+                    lines, subtotal, discountTotal, vatTotal, shippingFee, grandTotal, vatRateBps, pricesIncludeVat,
+                    createdAt, confirmedAt, paidAt, completedAt, cancelledAt, cancelReason, exchangeOfReturnId,
+                    version, customerNote, expectedDeliveryDate, null);
+        }
+    }
+
+    /**
+     * Lệnh thanh toán của đơn POS (ADR-0020, ADR-0021). provider: MANUAL (CASH/CARD/BANK_TRANSFER, thu ngân xác nhận,
+     * qrPayload null) hoặc SIMULATED (QR, tự xác nhận qua webhook). status: PENDING, PAID, EXPIRED, CANCELLED (EXPIRED báo
+     * ngay khi quá hạn dù job dọn chưa chạy). qrPayload là chuỗi VietQR/EMVCo để FE vẽ mã QR; amount là số đồng;
+     * tenderedAmount/changeDue chỉ có với tiền mặt đã xác nhận; transactionRef với lệnh đã xác nhận có mã.
+     */
+    public record PaymentIntentView(UUID id, UUID orderId, String reference, long amount, String status,
+                                    String provider, String qrPayload, Instant expiresAt, Instant paidAt,
+                                    Instant createdAt, Long tenderedAmount, Long changeDue, String transactionRef) {
+    }
+
+    /**
+     * Xác nhận thu tay (lệnh provider MANUAL, ADR-0021). tenderedAmount chỉ tiền mặt (vắng thì bằng đúng số tiền, phải
+     * lớn hơn hoặc bằng số tiền); transactionRef bắt buộc với thẻ/chuyển khoản, tối đa 64 ký tự.
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record ConfirmPaymentRequest(@Min(0) Long tenderedAmount, @Size(max = 64) String transactionRef) {
+    }
+
+    /** Ghi chú đầy đủ của đơn gồm staffNote (nội bộ, không có ở SalesOrderView); khóa quyền riêng. */
+    public record OrderNotesView(UUID id, String customerNote, String staffNote, LocalDate expectedDeliveryDate,
+                                 long version) {
+    }
+
+    /** Thay toàn bộ ghi chú nội bộ và ngày giao/nhận dự kiến (vắng là xóa); version tùy chọn (lệch thì 409). */
+    public record UpdateOrderNotesRequest(@Size(max = 500) String staffNote, LocalDate expectedDeliveryDate,
+                                          @Min(0) Long version) {
     }
 
     public record SalesOrderSearchQuery(String status, String paymentStatus, String channel, String from, String to,
@@ -298,5 +364,23 @@ public final class SalesDtos {
     }
 
     public record UpdateShopContactStatusRequest(@NotNull String status, @NotNull @Min(0) Long version) {
+    }
+
+    // ---- Quản trị banner trang chủ (ADR-0019 B5) ----
+
+    /**
+     * Thân tạo/sửa banner. Quy tắc trường do sales kiểm (INVALID_BANNER); lms-api chỉ chặn thô kích thước.
+     * version chỉ dùng ở PUT (sales bắt buộc), POST bỏ qua.
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record SaveBannerRequest(@Size(max = 1000) String title, @Size(max = 1000) String subtitle,
+                                    @Size(max = 1000) String linkPath, Integer sortOrder, Boolean active,
+                                    @JsonFormat(shape = JsonFormat.Shape.STRING) Instant startsAt,
+                                    @JsonFormat(shape = JsonFormat.Shape.STRING) Instant endsAt, Long version) {
+    }
+
+    public record BannerAdminView(UUID id, String title, String subtitle, String linkPath, int sortOrder,
+                                  boolean active, Instant startsAt, Instant endsAt, String status, long version,
+                                  Instant createdAt, Instant updatedAt) {
     }
 }

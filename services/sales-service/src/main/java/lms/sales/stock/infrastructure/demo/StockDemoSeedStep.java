@@ -26,6 +26,7 @@ import lms.sales.stock.domain.GoodsReceiptLine;
 import lms.sales.stock.domain.MovementType;
 import lms.sales.stock.domain.ReceiptStatus;
 import lms.sales.stock.domain.StockItem;
+import lms.sales.stock.domain.StockItemDetails;
 import lms.sales.stock.domain.StockMovement;
 import lms.sales.stock.domain.Supplier;
 import org.springframework.context.annotation.Profile;
@@ -105,7 +106,12 @@ public class StockDemoSeedStep implements DemoSeedStep {
 
         for (StockItemPlan item : plan.stockItems()) {
             if (stock.find(tenantId, item.titleId()).isPresent()) {
-                skipped++;
+                // Đã có mặt hàng: chỉ bổ sung chi tiết quản lý còn trống (chạy lại không đổi gì thì bỏ qua)
+                if (Boolean.TRUE.equals(tx.execute(status -> topUpDetails(tenantId, plan, item, context)))) {
+                    created++;
+                } else {
+                    skipped++;
+                }
                 continue;
             }
             tx.executeWithoutResult(status -> createItem(tenantId, plan, item, actor, context));
@@ -132,7 +138,8 @@ public class StockDemoSeedStep implements DemoSeedStep {
             throw new IllegalStateException("Kế hoạch tồn kho lệch sổ cái ở mặt hàng " + s.index());
         }
         StockItem item = StockItem.restore(DemoIds.of("stock-item", s.index()), tenantId, s.titleId(), s.onHand(),
-                s.reserved(), Money.of(s.unitPrice()), s.lowStockThreshold(), true, 0);
+                s.reserved(), Money.of(s.unitPrice()), s.lowStockThreshold(), true, 0,
+                detailsOf(plan, s, context));
         List<StockMovement> movements = movementsOf(tenantId, plan, s, actor, context);
         long onHand = movements.stream().mapToLong(StockMovement::deltaOnHand).sum();
         long reserved = movements.stream().mapToLong(StockMovement::deltaReserved).sum();
@@ -141,6 +148,30 @@ public class StockDemoSeedStep implements DemoSeedStep {
         }
         stock.insert(item);
         movements.forEach(stock::append);
+    }
+
+    /** Chi tiết quản lý theo kế hoạch; lần nhập gần nhất là thời điểm xác nhận phiếu nhập (khớp sổ cái RECEIPT). */
+    private static StockItemDetails detailsOf(DemoPlan plan, StockItemPlan s, DemoSeedContext context) {
+        Instant restocked = s.receivedQuantity() > 0
+                ? receiptTime(plan, plan.receipts().get(s.receiptIndex()), context) : null;
+        return StockItemDetails.of(s.sku(), s.supplierName(), s.costPrice(), s.binLocation(), s.reorderQuantity(),
+                restocked, s.note());
+    }
+
+    /** Điền các trường chi tiết còn null của mặt hàng đã có; true nếu có thay đổi. Không ghi đè giá trị đã có. */
+    private boolean topUpDetails(UUID tenantId, DemoPlan plan, StockItemPlan s, DemoSeedContext context) {
+        StockItem item = stock.find(tenantId, s.titleId()).orElseThrow();
+        StockItemDetails desired = detailsOf(plan, s, context);
+        if (desired.sku() != null && item.details().sku() == null
+                && stock.findBySku(tenantId, desired.sku()).filter(o -> !o.id().equals(item.id())).isPresent()) {
+            desired = desired.withoutSku(); // SKU đã thuộc mặt hàng khác: bỏ qua, không làm hỏng lần chạy
+        }
+        StockItemDetails merged = item.details().fillMissingFrom(desired);
+        if (merged.equals(item.details())) {
+            return false;
+        }
+        stock.saveAttributes(item.withDetails(merged));
+        return true;
     }
 
     private List<StockMovement> movementsOf(UUID tenantId, DemoPlan plan, StockItemPlan s, UUID actor,

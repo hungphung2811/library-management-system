@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -50,6 +51,17 @@ public class SalesOrderController {
     @GetMapping("/orders/{id}/contact")
     public OrderContactView getOrderContact(@PathVariable UUID id) {
         return sales.getOrderContact(id);
+    }
+
+    /** Ghi chú đầy đủ gồm staffNote (nội bộ): khóa quyền riêng, không có trong SalesOrderView. */
+    @GetMapping("/orders/{id}/notes")
+    public OrderNotesView getOrderNotes(@PathVariable UUID id) {
+        return sales.getOrderNotes(id);
+    }
+
+    @PutMapping("/orders/{id}/notes")
+    public OrderNotesView updateOrderNotes(@PathVariable UUID id, @Valid @RequestBody UpdateOrderNotesRequest request) {
+        return sales.updateOrderNotes(id, request);
     }
 
     @GetMapping("/orders/{id}/receipt")

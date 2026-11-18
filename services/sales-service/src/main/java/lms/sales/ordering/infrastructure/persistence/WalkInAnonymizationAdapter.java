@@ -39,7 +39,7 @@ class WalkInAnonymizationAdapter implements WalkInAnonymizationPort {
             return 0;
         }
         return em.createQuery("update SalesOrderJpaEntity o set o.walkInName = null, o.walkInPhone = null, "
-                        + "o.piiAnonymizedAt = :now, o.version = o.version + 1 "
+                        + "o.customerNote = null, o.staffNote = null, o.piiAnonymizedAt = :now, o.version = o.version + 1 "
                         + "where o.tenantId = :t and o.id in :ids and o.piiAnonymizedAt is null")
                 .setParameter("now", now).setParameter("t", tenantId).setParameter("ids", orderIds)
                 .executeUpdate();

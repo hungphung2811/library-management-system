@@ -11,7 +11,16 @@ import lms.sales.ordering.domain.PaymentMethod;
  */
 public record PlacePosOrderCommand(UUID tenantId, UUID userId, List<Line> lines, PaymentMethod paymentMethod,
                                    UUID customerUserId, String walkInName, String walkInPhone,
-                                   Discount orderDiscount, UUID clientRequestId, UUID exchangeOfReturnId) {
+                                   Discount orderDiscount, UUID clientRequestId, UUID exchangeOfReturnId,
+                                   String customerNote) {
+
+    /** Đơn POS không có ghi chú của khách. */
+    public PlacePosOrderCommand(UUID tenantId, UUID userId, List<Line> lines, PaymentMethod paymentMethod,
+                                UUID customerUserId, String walkInName, String walkInPhone,
+                                Discount orderDiscount, UUID clientRequestId, UUID exchangeOfReturnId) {
+        this(tenantId, userId, lines, paymentMethod, customerUserId, walkInName, walkInPhone, orderDiscount,
+                clientRequestId, exchangeOfReturnId, null);
+    }
 
     /** Đơn POS thường (không phải đổi hàng). */
     public PlacePosOrderCommand(UUID tenantId, UUID userId, List<Line> lines, PaymentMethod paymentMethod,

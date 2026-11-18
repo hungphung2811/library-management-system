@@ -1,6 +1,7 @@
 package lms.sales.ordering.domain;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +19,8 @@ import lms.sales.shared.domain.SalesException;
  */
 public final class SalesOrder {
 
+    public static final int MAX_NOTE = 500;
+
     /** Dòng đầu vào lúc lập đơn, đã resolve giá bán và snapshot đầu sách. */
     public record LineDraft(UUID titleId, String titleName, String isbn, Money unitPrice, int quantity,
                             Discount lineDiscount) {
@@ -32,7 +35,25 @@ public final class SalesOrder {
                            UUID clientRequestId, UUID exchangeOfReturnId, UUID createdBy, Instant createdAt,
                            Instant confirmedAt, UUID confirmedBy, Instant paidAt, Instant completedAt,
                            Instant cancelledAt, UUID cancelledBy, String cancelReason, Instant piiAnonymizedAt,
-                           List<OrderLine> lines, List<PaymentRecord> payments, long version) {
+                           List<OrderLine> lines, List<PaymentRecord> payments, long version,
+                           String customerNote, String staffNote, LocalDate expectedDeliveryDate) {
+        /** Đơn không có ghi chú và ngày giao dự kiến. */
+        public Snapshot(UUID id, UUID tenantId, String orderNo, OrderChannel channel, OrderStatus status,
+                        PaymentStatus paymentStatus, PaymentMethod paymentMethod, UUID customerUserId,
+                        String walkInName, String walkInPhone, Fulfilment fulfilment, Recipient recipient,
+                        int vatRateBps, boolean pricesIncludeVat, Money subtotal, Money discountTotal,
+                        Money vatTotal, Money shippingFee, Money grandTotal, Discount orderDiscount,
+                        UUID clientRequestId, UUID exchangeOfReturnId, UUID createdBy, Instant createdAt,
+                        Instant confirmedAt, UUID confirmedBy, Instant paidAt, Instant completedAt,
+                        Instant cancelledAt, UUID cancelledBy, String cancelReason, Instant piiAnonymizedAt,
+                        List<OrderLine> lines, List<PaymentRecord> payments, long version) {
+            this(id, tenantId, orderNo, channel, status, paymentStatus, paymentMethod, customerUserId, walkInName,
+                    walkInPhone, fulfilment, recipient, vatRateBps, pricesIncludeVat, subtotal, discountTotal,
+                    vatTotal, shippingFee, grandTotal, orderDiscount, clientRequestId, exchangeOfReturnId, createdBy,
+                    createdAt, confirmedAt, confirmedBy, paidAt, completedAt, cancelledAt, cancelledBy, cancelReason,
+                    piiAnonymizedAt, lines, payments, version, null, null, null);
+        }
+
         @Override
         public String toString() {
             return "Snapshot[" + orderNo + "]";
@@ -71,6 +92,9 @@ public final class SalesOrder {
     private UUID cancelledBy;
     private String cancelReason;
     private Instant piiAnonymizedAt;
+    private String customerNote;
+    private String staffNote;
+    private LocalDate expectedDeliveryDate;
     private List<OrderLine> lines;
     private final List<PaymentRecord> payments;
     private final long version;
@@ -108,6 +132,9 @@ public final class SalesOrder {
         this.cancelledBy = s.cancelledBy();
         this.cancelReason = s.cancelReason();
         this.piiAnonymizedAt = s.piiAnonymizedAt();
+        this.customerNote = s.customerNote();
+        this.staffNote = s.staffNote();
+        this.expectedDeliveryDate = s.expectedDeliveryDate();
         this.lines = List.copyOf(s.lines());
         this.payments = new ArrayList<>(s.payments());
         this.version = s.version();
@@ -139,7 +166,8 @@ public final class SalesOrder {
                                        String walkInPhone, List<LineDraft> drafts, Discount orderDiscount,
                                        PriceCalculator.TaxPolicy tax, UUID clientRequestId,
                                        UUID exchangeOfReturnId) {
-        if (method == null || !method.allowedForPos()) {
+        if (method == null || !method.allowedForPos() || method == PaymentMethod.QR) {
+            // QR không thu xong ngay: dùng createPosAwaitingPayment
             throw SalesException.invalidRequest("Phương thức thanh toán không hợp lệ cho bán tại quầy");
         }
         if (drafts == null || drafts.isEmpty()) {
@@ -168,7 +196,7 @@ public final class SalesOrder {
         if (fulfilment == null || fulfilment == Fulfilment.COUNTER) {
             throw SalesException.invalidRequest("Hình thức nhận hàng phải là nhận tại cửa hàng hoặc giao hàng");
         }
-        if (method == null || method == PaymentMethod.CARD
+        if (method == null || method == PaymentMethod.CARD || method == PaymentMethod.QR
                 || (method == PaymentMethod.COD && fulfilment != Fulfilment.DELIVERY)
                 || (method == PaymentMethod.CASH && fulfilment != Fulfilment.PICKUP)) {
             throw SalesException.invalidRequest("Phương thức thanh toán không phù hợp với hình thức nhận hàng");
@@ -193,8 +221,142 @@ public final class SalesOrder {
                 buildLines(drafts, result), List.of(), 0));
     }
 
+    /** Như {@link #placeOnline} kèm ghi chú của khách (tối đa {@value #MAX_NOTE} ký tự, rỗng thì bỏ). */
+    public static SalesOrder placeOnline(UUID tenantId, String orderNo, UUID customerUserId, Instant now,
+                                         PaymentMethod method, Fulfilment fulfilment, Recipient recipient,
+                                         List<LineDraft> drafts, PriceCalculator.TaxPolicy tax,
+                                         UUID clientRequestId, String customerNote) {
+        SalesOrder order = placeOnline(tenantId, orderNo, customerUserId, now, method, fulfilment, recipient, drafts,
+                tax, clientRequestId);
+        order.customerNote = note(customerNote, "Ghi chú của khách");
+        return order;
+    }
+
+    /** Như {@link #createPos} (bản có đơn đổi hàng) kèm ghi chú của khách. */
+    public static SalesOrder createPos(UUID tenantId, String orderNo, UUID createdBy, Instant now,
+                                       PaymentMethod method, UUID customerUserId, String walkInName,
+                                       String walkInPhone, List<LineDraft> drafts, Discount orderDiscount,
+                                       PriceCalculator.TaxPolicy tax, UUID clientRequestId,
+                                       UUID exchangeOfReturnId, String customerNote) {
+        SalesOrder order = createPos(tenantId, orderNo, createdBy, now, method, customerUserId, walkInName,
+                walkInPhone, drafts, orderDiscount, tax, clientRequestId, exchangeOfReturnId);
+        order.customerNote = note(customerNote, "Ghi chú của khách");
+        return order;
+    }
+
+    /**
+     * Nhân viên đặt ghi chú nội bộ và ngày giao/nhận dự kiến (thay toàn bộ, null là xóa). Ngày dự kiến chỉ cho đơn
+     * nhận tại cửa hàng hoặc giao hàng. Ghi chú của khách không đổi sau khi đặt. Ghi chú không vào audit/log.
+     */
+    public void updateNotes(String newStaffNote, LocalDate newExpectedDeliveryDate) {
+        String note = note(newStaffNote, "Ghi chú nội bộ");
+        if (newExpectedDeliveryDate != null && fulfilment == Fulfilment.COUNTER) {
+            throw SalesException.invalidRequest("Ngày giao dự kiến chỉ áp dụng cho đơn nhận tại cửa hàng hoặc giao hàng");
+        }
+        this.staffNote = note;
+        this.expectedDeliveryDate = newExpectedDeliveryDate;
+    }
+
+    /**
+     * Chỉ điền các trường ghi chú/ngày giao còn trống, không ghi đè giá trị đã có; trả true nếu có thay đổi. Dùng khi
+     * nạp dữ liệu demo bổ sung cho đơn đã tồn tại. Ngày giao dự kiến bị bỏ qua với đơn nhận tại quầy.
+     */
+    public boolean fillMissingNotes(String newCustomerNote, String newStaffNote, LocalDate newExpectedDeliveryDate) {
+        boolean changed = false;
+        if (customerNote == null && blankToNull(newCustomerNote) != null) {
+            customerNote = note(newCustomerNote, "Ghi chú của khách");
+            changed = true;
+        }
+        if (staffNote == null && blankToNull(newStaffNote) != null) {
+            staffNote = note(newStaffNote, "Ghi chú nội bộ");
+            changed = true;
+        }
+        if (expectedDeliveryDate == null && newExpectedDeliveryDate != null && fulfilment != Fulfilment.COUNTER) {
+            expectedDeliveryDate = newExpectedDeliveryDate;
+            changed = true;
+        }
+        return changed;
+    }
+
+    /** Cắt khoảng trắng, rỗng thành null, quá {@value #MAX_NOTE} ký tự thì INVALID_REQUEST. */
+    private static String note(String value, String label) {
+        String v = blankToNull(value);
+        if (v != null && v.length() > MAX_NOTE) {
+            throw SalesException.invalidRequest(label + " tối đa " + MAX_NOTE + " ký tự");
+        }
+        return v;
+    }
+
     public static SalesOrder restore(Snapshot snapshot) {
         return new SalesOrder(snapshot);
+    }
+
+    /**
+     * Đơn POS hai bước (ADR-0020, ADR-0021): AWAITING_PAYMENT + UNPAID, chưa có bản ghi thu, với MỌI phương thức POS
+     * (CASH, CARD, BANK_TRANSFER thu tay; QR thu qua cổng). Hàng được giữ (reserved) bởi use case; thành COMPLETED + PAID
+     * khi {@link #settleAwaitingPayment}, hoặc CANCELLED khi {@link #cancelAwaitingPayment}. Tổng tiền 0 (giảm giá hết) vẫn
+     * tạo được: use case thu ngay vì không có gì để chờ.
+     */
+    public static SalesOrder createPosAwaitingPayment(UUID tenantId, String orderNo, UUID createdBy, Instant now,
+                                                      PaymentMethod method, UUID customerUserId, String walkInName,
+                                                      String walkInPhone, List<LineDraft> drafts,
+                                                      Discount orderDiscount, PriceCalculator.TaxPolicy tax,
+                                                      UUID clientRequestId, UUID exchangeOfReturnId,
+                                                      String customerNote) {
+        if (method == null || !method.allowedForPos()) {
+            throw SalesException.invalidRequest("Phương thức thanh toán không hợp lệ cho bán tại quầy");
+        }
+        if (drafts == null || drafts.isEmpty()) {
+            throw SalesException.invalidRequest("Đơn cần ít nhất một dòng");
+        }
+        var result = calculate(drafts, orderDiscount, tax, Money.ZERO);
+        SalesOrder order = new SalesOrder(new Snapshot(UUID.randomUUID(), tenantId, orderNo, OrderChannel.POS,
+                OrderStatus.AWAITING_PAYMENT, PaymentStatus.UNPAID, method, customerUserId,
+                blankToNull(walkInName), blankToNull(walkInPhone), Fulfilment.COUNTER, null, tax.vatRate().bps(),
+                tax.pricesIncludeVat(), result.subtotal(), result.discountTotal(), result.vatTotal(),
+                result.shippingFee(), result.grandTotal(), orderDiscount, clientRequestId, exchangeOfReturnId,
+                createdBy, now, null, null, null, null, null, null, null, null, buildLines(drafts, result),
+                List.of(), 0));
+        order.customerNote = note(customerNote, "Ghi chú của khách");
+        return order;
+    }
+
+    /** Thu xong (cổng báo hoặc thu ngân xác nhận): AWAITING_PAYMENT sang COMPLETED + PAID, ghi bản ghi thu theo phương thức của đơn. */
+    public PaymentRecord settleAwaitingPayment(String reference, UUID by, Instant now) {
+        requireAwaitingPayment();
+        PaymentRecord p = new PaymentRecord(UUID.randomUUID(), grandTotal, paymentMethod, reference, by, now);
+        payments.add(p);
+        this.paymentStatus = PaymentStatus.PAID;
+        this.status = OrderStatus.COMPLETED;
+        this.paidAt = now;
+        this.completedAt = now;
+        return p;
+    }
+
+    /** Cổng QR báo đã nhận đủ tiền (người ghi: không có). */
+    public PaymentRecord settleQrPayment(String reference, Instant now) {
+        if (paymentMethod != PaymentMethod.QR) {
+            throw stateConflict();
+        }
+        return settleAwaitingPayment(reference, null, now);
+    }
+
+    /** Hết hạn hoặc thu ngân hủy khi chưa thu tiền: AWAITING_PAYMENT sang CANCELLED (use case nhả hàng giữ). */
+    public void cancelAwaitingPayment(String reason, UUID by, Instant now) {
+        requireAwaitingPayment();
+        if (reason == null || reason.isBlank()) {
+            throw SalesException.reasonRequired();
+        }
+        this.status = OrderStatus.CANCELLED;
+        this.cancelledAt = now;
+        this.cancelledBy = by;
+        this.cancelReason = reason.trim();
+    }
+
+    private void requireAwaitingPayment() {
+        if (channel != OrderChannel.POS || status != OrderStatus.AWAITING_PAYMENT) {
+            throw stateConflict();
+        }
     }
 
     // ---- máy trạng thái ----
@@ -224,8 +386,9 @@ public final class SalesOrder {
         if (paymentStatus != PaymentStatus.UNPAID) {
             throw new SalesException(ErrorCode.ORDER_STATE_CONFLICT, "Đơn đã được đánh dấu đã thu");
         }
-        if (method == null) {
-            throw SalesException.invalidRequest("Thiếu phương thức thanh toán");
+        if (method == null || method == PaymentMethod.QR) {
+            // QR chỉ được ghi nhận qua cổng thanh toán (settleQrPayment), không đánh dấu tay
+            throw SalesException.invalidRequest("Thiếu hoặc sai phương thức thanh toán");
         }
         PaymentRecord p = new PaymentRecord(UUID.randomUUID(), grandTotal, method,
                 reference == null || reference.isBlank() ? null : reference.trim(), by, now);
@@ -427,6 +590,10 @@ public final class SalesOrder {
     public UUID cancelledBy() { return cancelledBy; }
     public String cancelReason() { return cancelReason; }
     public Instant piiAnonymizedAt() { return piiAnonymizedAt; }
+    public String customerNote() { return customerNote; }
+    /** Ghi chú nội bộ: chỉ qua endpoint khóa riêng của nhân viên, không bao giờ ra storefront/log/audit. */
+    public String staffNote() { return staffNote; }
+    public LocalDate expectedDeliveryDate() { return expectedDeliveryDate; }
     public List<OrderLine> lines() { return lines; }
     public List<PaymentRecord> payments() { return List.copyOf(payments); }
     public long version() { return version; }

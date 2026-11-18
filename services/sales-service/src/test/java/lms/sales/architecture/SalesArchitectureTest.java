@@ -55,6 +55,21 @@ class SalesArchitectureTest {
             .should().dependOnClassesThat().resideInAPackage("lms.sales.contact..")
             .allowEmptyShould(true);
 
+    /** ADR-0019: banner chỉ phụ thuộc shared (không stock, ordering, settings, contact); không context nào dùng banner. */
+    @ArchTest
+    static final ArchRule bannerChiPhuThuocShared = noClasses()
+            .that().resideInAPackage("lms.sales.banner..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "lms.sales.ordering..", "lms.sales.stock..", "lms.sales.settings..", "lms.sales.contact..")
+            .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule cacContextKhacKhongBietBanner = noClasses()
+            .that().resideInAnyPackage("lms.sales.ordering..", "lms.sales.stock..", "lms.sales.settings..",
+                    "lms.sales.contact..")
+            .should().dependOnClassesThat().resideInAPackage("lms.sales.banner..")
+            .allowEmptyShould(true);
+
     /** Entity JPA là chi tiết của adapter: không lộ ra ngoài gói persistence (domain/application dùng POJO). */
     @ArchTest
     static final ArchRule entityJpaKhongLoRaNgoaiPersistence = noClasses()

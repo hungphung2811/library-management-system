@@ -22,6 +22,10 @@ public interface SalesClient {
 
     StockItemView updateStockItemPrice(UUID titleId, UpdateStockItemPriceRequest request);
 
+    StockItemDetailsView getStockItemDetails(UUID titleId);
+
+    StockItemDetailsView updateStockItemDetails(UUID titleId, UpdateStockItemDetailsRequest request);
+
     SalesPage<LedgerEntryView> stockLedger(UUID titleId, PageQuery query);
 
     StockItemView adjustStock(StockAdjustmentRequest request);
@@ -53,6 +57,10 @@ public interface SalesClient {
     SalesOrderView getOrder(UUID id);
 
     OrderContactView getOrderContact(UUID id);
+
+    OrderNotesView getOrderNotes(UUID id);
+
+    OrderNotesView updateOrderNotes(UUID id, UpdateOrderNotesRequest request);
 
     ReceiptView getReceipt(UUID id);
 
@@ -99,4 +107,16 @@ public interface SalesClient {
     ShopContactDetailView updateContactRequestStatus(UUID id, UpdateShopContactStatusRequest request);
 
     ShopContactDetailView anonymizeContactRequest(UUID id);
+
+    // ---- Quản trị banner trang chủ (ADR-0019 B5) ----
+
+    List<BannerAdminView> listBanners();
+
+    BannerAdminView getBanner(UUID id);
+
+    BannerAdminView createBanner(SaveBannerRequest request);
+
+    BannerAdminView updateBanner(UUID id, SaveBannerRequest request);
+
+    void deleteBanner(UUID id);
 }

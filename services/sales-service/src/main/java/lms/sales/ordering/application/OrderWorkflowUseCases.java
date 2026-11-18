@@ -168,6 +168,41 @@ public class OrderWorkflowUseCases {
         return OrderResponse.from(saved);
     }
 
+    /** Ghi chú của đơn gồm ghi chú nội bộ (staffNote): chỉ qua use case/endpoint khóa riêng, không vào log/audit. */
+    public record OrderNotes(UUID orderId, String customerNote, String staffNote,
+                             java.time.LocalDate expectedDeliveryDate, long version) {
+        static OrderNotes of(SalesOrder o) {
+            return new OrderNotes(o.id(), o.customerNote(), o.staffNote(), o.expectedDeliveryDate(), o.version());
+        }
+
+        @Override
+        public String toString() {
+            return "OrderNotes[order=" + orderId + "]";
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public OrderNotes notes(UUID tenantId, UUID orderId) {
+        return OrderNotes.of(load(tenantId, orderId, null));
+    }
+
+    /**
+     * Đặt ghi chú nội bộ và ngày giao/nhận dự kiến (thay toàn bộ; null là xóa). Audit chỉ ghi có/không, không ghi nội
+     * dung. {@code expectedVersion} lệch thì 409 ORDER_STATE_CONFLICT.
+     */
+    @Transactional
+    public OrderNotes updateNotes(UUID tenantId, UUID actor, UUID orderId, String staffNote,
+                                  java.time.LocalDate expectedDeliveryDate, Long expectedVersion) {
+        SalesOrder o = load(tenantId, orderId, expectedVersion);
+        Instant now = clock.instant();
+        o.updateNotes(staffNote, expectedDeliveryDate);
+        SalesOrder saved = orders.save(o);
+        record(saved, SalesAuditPort.Actions.ORDER_NOTES_UPDATED, actor, now,
+                Map.of("hasStaffNote", saved.staffNote() != null,
+                        "hasExpectedDeliveryDate", saved.expectedDeliveryDate() != null));
+        return OrderNotes.of(saved);
+    }
+
     private SalesOrder load(UUID tenantId, UUID orderId, Long expectedVersion) {
         SalesOrder o = orders.findById(tenantId, orderId)
                 .orElseThrow(() -> new SalesException(ErrorCode.ORDER_NOT_FOUND, "Không có đơn hàng"));

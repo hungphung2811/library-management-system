@@ -10,6 +10,10 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import lms.sales.banner.application.BannerAdminUseCases;
+import lms.sales.banner.application.PublicBannerQuery;
+import lms.sales.banner.infrastructure.web.SalesBannerController;
+import lms.sales.banner.infrastructure.web.StorefrontBannerController;
 import lms.sales.config.SecurityConfiguration;
 import lms.sales.contact.application.ShopContactQueryUseCases;
 import lms.sales.contact.application.ShopContactWorkflowUseCases;
@@ -57,7 +61,8 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 @WebMvcTest({SalesSettingsController.class, StockItemController.class, StockAdjustmentController.class,
         SupplierController.class, GoodsReceiptController.class, PosOrderController.class, SalesOrderController.class,
         ShopController.class, StorefrontController.class, SalesReturnController.class, RefundController.class,
-        SalesAuditController.class, ShopContactController.class, SalesContactController.class})
+        SalesAuditController.class, ShopContactController.class, SalesContactController.class, SalesBannerController.class,
+        StorefrontBannerController.class})
 @Import({SecurityConfiguration.class, PermissionAutoConfiguration.class, TenantAutoConfiguration.class,
         HarnessBeans.class})
 @TestPropertySource(properties = {"app.security.enabled=true", "lms.security.permission.enabled=true"})
@@ -84,13 +89,19 @@ class SalesPermissionSeedMatchesCodeTest {
     ShopContactWorkflowUseCases shopContactWorkflow;
 
     @MockitoBean
+    BannerAdminUseCases bannerAdmin;
+
+    @MockitoBean
+    PublicBannerQuery publicBannerQuery;
+
+    @MockitoBean
     PermissionKeyRegistrar permissionKeyRegistrar;
 
     private static String migrationSql() throws IOException {
         Resource[] found = new PathMatchingResourcePatternResolver().getResources(
                 "classpath*:db/migration/identity/V*__sales_*.sql");
-        // V17 (pha 1: 23 khóa), V20 (pha 2: 21 khóa, mẫu Khách hàng) và V22 (liên hệ: 6 khóa); file seed mới sau này tên sales_* cũng được gộp
-        assertThat(found).as("migration seed khóa sales trên classpath (jar system-service)").hasSize(3);
+        // V17 (pha 1: 23 khóa), V20 (pha 2: 21 khóa, mẫu Khách hàng) và V22 (liên hệ: 6 khóa) và V26 (banner + gợi ý: 7 khóa) và V28 (chi tiết mặt hàng + ghi chú đơn: 4 khóa); file seed mới sau này tên sales_* cũng được gộp
+        assertThat(found).as("migration seed khóa sales trên classpath (jar system-service)").hasSize(5);
         StringBuilder sql = new StringBuilder();
         for (Resource r : found) {
             try (var in = r.getInputStream()) {
@@ -127,7 +138,7 @@ class SalesPermissionSeedMatchesCodeTest {
             seeded.put(m.group(1), m.group(2) + " " + m.group(3));
         }
         Map<String, String> actual = actual();
-        assertThat(actual).hasSize(50);
+        assertThat(actual).hasSize(61);
         // path-variable có thể đặt tên khác nhau giữa service và seed: so tên biến sau khi chuẩn hóa về {}
         assertThat(normalize(seeded)).isEqualTo(normalize(actual));
     }

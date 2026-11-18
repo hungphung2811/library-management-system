@@ -67,7 +67,7 @@ class PosOrderUseCaseTest {
 
         assertEquals(8, h.item(a).onHand());
         var last = h.ledger().get(h.ledger().size() - 1);
-        assertEquals(MovementType.SALE, last.type());
+        assertEquals(MovementType.FULFIL, last.type()); // ADR-0021: hai bước, tồn giữ rồi xuất khi xác nhận thu
         assertEquals(-2, last.deltaOnHand());
         assertTrue(h.reconcile.execute(h.tenant, a).consistent());
         assertTrue(h.audits().stream().anyMatch(e -> e.action().equals(SalesAuditPort.Actions.ORDER_CREATED)

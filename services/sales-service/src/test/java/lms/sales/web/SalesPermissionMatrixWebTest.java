@@ -90,6 +90,10 @@ class SalesPermissionMatrixWebTest {
             new Endpoint(HttpMethod.PUT, B + "/stock-items/" + ID + "/price", "{\"sellingPrice\":1000}",
                     "StockItemController/updatePrice"),
             new Endpoint(HttpMethod.GET, B + "/stock-items/" + ID + "/ledger", null, "StockItemController/ledger"),
+            new Endpoint(HttpMethod.GET, B + "/stock-items/" + ID + "/details", null,
+                    "StockItemController/getDetails"),
+            new Endpoint(HttpMethod.PUT, B + "/stock-items/" + ID + "/details", "{\"sku\":\"LMS-1\"}",
+                    "StockItemController/updateDetails"),
             new Endpoint(HttpMethod.POST, B + "/stock-adjustments",
                     "{\"titleId\":\"" + TITLE + "\",\"delta\":5,\"reason\":\"kiem\"}",
                     "StockAdjustmentController/adjust"),
@@ -113,6 +117,9 @@ class SalesPermissionMatrixWebTest {
             new Endpoint(HttpMethod.GET, B + "/orders", null, "SalesOrderController/search"),
             new Endpoint(HttpMethod.GET, B + "/orders/" + ID, null, "SalesOrderController/get"),
             new Endpoint(HttpMethod.GET, B + "/orders/" + ID + "/contact", null, "SalesOrderController/getContact"),
+            new Endpoint(HttpMethod.GET, B + "/orders/" + ID + "/notes", null, "SalesOrderController/getNotes"),
+            new Endpoint(HttpMethod.PUT, B + "/orders/" + ID + "/notes", "{\"staffNote\":\"x\"}",
+                    "SalesOrderController/updateNotes"),
             new Endpoint(HttpMethod.GET, B + "/orders/" + ID + "/receipt", null, "SalesOrderController/receipt"),
             new Endpoint(HttpMethod.POST, B + "/orders/" + ID + "/confirmation", "{\"shippingFee\":0}",
                     "SalesOrderController/confirm"),
@@ -138,6 +145,8 @@ class SalesPermissionMatrixWebTest {
             new Endpoint(HttpMethod.GET, B + "/storefront/items/" + ID, null, "StorefrontController/get"),
             new Endpoint(HttpMethod.GET, B + "/storefront/items/" + ID + "/preview", null,
                     "StorefrontController/preview"),
+            new Endpoint(HttpMethod.GET, B + "/storefront/suggestions?q=abc", null,
+                    "StorefrontController/suggestions"),
             new Endpoint(HttpMethod.POST, B + "/returns", RETURN, "SalesReturnController/create"),
             new Endpoint(HttpMethod.POST, B + "/returns/late", RETURN_LATE, "SalesReturnController/createLate"),
             new Endpoint(HttpMethod.GET, B + "/returns/" + ID, null, "SalesReturnController/get"),
@@ -250,6 +259,6 @@ class SalesPermissionMatrixWebTest {
             }
         }
         assertThat(actual).containsExactlyInAnyOrderElementsOf(ENDPOINTS.stream().map(Endpoint::key).toList());
-        assertThat(actual).hasSize(44);
+        assertThat(actual).hasSize(49);
     }
 }

@@ -1,6 +1,7 @@
 package lms.sales.stock.application;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,8 +32,20 @@ public interface StockPort {
     /** Chèn mặt hàng mới; trùng (tenant, title) thì ném SalesException(STOCK_ITEM_EXISTS). */
     StockItem insert(StockItem item);
 
-    /** Lưu các trường không phải bộ đếm: sellingPrice, lowStockThreshold, active. */
+    /** Lưu các trường không phải bộ đếm: sellingPrice, lowStockThreshold, active và thông tin quản lý (details). */
     StockItem saveAttributes(StockItem item);
+
+    /**
+     * Đặt lastRestockedAt = {@code at} cho các mặt hàng vừa có phiếu nhập RECEIPT (chỉ khi mới hơn giá trị đang có).
+     * Chạy trong transaction của caller. Mặc định không làm gì (bản giả test không theo dõi trường này).
+     */
+    default void touchLastRestocked(UUID tenantId, Collection<UUID> titleIds, java.time.Instant at) {
+    }
+
+    /** Mặt hàng theo SKU đã chuẩn hóa (chữ hoa), dùng kiểm trùng SKU trước khi ghi. */
+    default Optional<StockItem> findBySku(UUID tenantId, String sku) {
+        return Optional.empty();
+    }
 
     boolean tryApply(UUID tenantId, UUID titleId, long deltaOnHand, long deltaReserved);
 
@@ -49,8 +62,25 @@ public interface StockPort {
         return list(tenantId, lowStockOnly, tenantThreshold, page, size);
     }
 
-    /** Mặt hàng đang bán (active), mới nhất trước: danh mục công khai (storefront). */
-    PageResult<StockItem> listActive(UUID tenantId, int page, int size);
+    /**
+     * Mặt hàng đang bán (active) cho storefront, phân trang ở DB (ADR-0019). {@code NEWEST}: theo ngày đưa vào bán;
+     * {@code PRICE_*}: theo giá hiệu lực của DB (selling_price, nếu không có thì bản sao giá bìa), loại mặt hàng chưa có
+     * giá hiệu lực; thứ tự ổn định theo id. {@code inStockOnly}: chỉ available > 0.
+     */
+    PageResult<StorefrontRow> listStorefront(UUID tenantId, StorefrontSort sort, boolean inStockOnly, int page,
+                                             int size);
+
+    /** Dòng storefront của các đầu sách cho trước; chỉ mặt hàng active (không thấy thì không có trong map). */
+    Map<UUID, StorefrontRow> findStorefrontRows(UUID tenantId, Collection<UUID> titleIds);
+
+    /** Tối đa {@code limit} đầu sách active chưa có giá hiệu lực ở DB (không selling_price, chưa có bản sao giá bìa). */
+    List<UUID> titleIdsMissingCoverPrice(UUID tenantId, int limit);
+
+    /**
+     * Ghi bản sao giá bìa (đồng, đã làm tròn) cho mặt hàng, chỉ khi khác giá trị đang có. Ghi trong transaction riêng
+     * (hoặc cùng transaction của caller nếu có); không bao giờ do khách điều khiển.
+     */
+    void refreshCoverPrices(UUID tenantId, Map<UUID, Long> pricesByTitle);
 
     PageResult<StockMovement> ledger(UUID tenantId, UUID titleId, int page, int size);
 

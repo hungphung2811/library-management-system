@@ -14,12 +14,21 @@ spring:
 app:
   security:
     enabled: false
+  # Dev/demo: bật cổng thanh toán QR giả lập (ADR-0020). Bí mật dev chỉ để chạy máy cá nhân; đặt
+  # PAYMENTS_SANDBOX_WEBHOOK_SECRET để dùng giá trị khác.
+  payments:
+    sandbox:
+      enabled: ${PAYMENTS_SANDBOX_ENABLED:true}
+      webhook-secret: ${PAYMENTS_SANDBOX_WEBHOOK_SECRET:dev-only-sandbox-webhook-secret}
 
 # Dev tắt kiểm quyền theo endpoint cùng với cờ bảo mật ở trên
 lms:
   security:
     permission:
       enabled: false
+  # Dev: hiện dữ liệu cá nhân đầy đủ ở API nhân viên (prod giữ che)
+  privacy:
+    mask-personal-data: false
 
 logging:
   level:

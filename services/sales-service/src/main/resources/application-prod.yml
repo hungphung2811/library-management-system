@@ -19,3 +19,11 @@ lms:
 logging:
   level:
     root: INFO
+
+# Prod giữ che dữ liệu cá nhân (lms.privacy.mask-personal-data=true, mặc định); không đặt false ở prod
+
+# Cổng thanh toán QR giả lập (ADR-0020) luôn tắt ở prod, không đọc từ biến môi trường để tránh bật nhầm
+app:
+  payments:
+    sandbox:
+      enabled: false

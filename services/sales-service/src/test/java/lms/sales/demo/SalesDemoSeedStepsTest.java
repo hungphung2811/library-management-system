@@ -102,6 +102,11 @@ class SalesDemoSeedStepsTest {
             items.put(i.titleId(), i);
             return i;
         });
+        when(stock.saveAttributes(any())).thenAnswer(a -> {
+            StockItem i = a.getArgument(0);
+            items.put(i.titleId(), i);
+            return i;
+        });
         org.mockito.Mockito.doAnswer(a -> {
             ledger.add(a.<StockMovement>getArgument(0));
             return null;
@@ -302,6 +307,75 @@ class SalesDemoSeedStepsTest {
         });
         assertThat(ledger).allSatisfy(m -> assertThat(m.occurredAt()).isBeforeOrEqualTo(now));
         assertThat(receipts.values()).allSatisfy(r -> assertThat(r.confirmedAt()).isBeforeOrEqualTo(now));
+    }
+
+    @Test
+    void matHangCoChiTietQuanLyDayDuVaKhopSoCai() {
+        seed(clockAt("2026-11-17T15:00:00"));
+        assertThat(items.values()).allSatisfy(i -> {
+            var d = i.details();
+            assertThat(d.sku()).matches("LMS-\\d{4}-\\d{4}");
+            assertThat(d.supplier()).isNotBlank();
+            assertThat(d.binLocation()).matches("K\\d-[A-D]\\d");
+            assertThat(d.reorderQuantity()).isPositive();
+            double ratio = (double) d.costPrice().amount() / i.sellingPrice().amount();
+            assertThat(ratio).isBetween(0.54, 0.71);
+            assertThat(d.lastRestockedAt()).isNotNull();
+        });
+        assertThat(items.values().stream().map(i -> i.details().sku()).distinct()).hasSize(items.size());
+        assertThat(items.values().stream().map(i -> i.details().supplier()).distinct().toList())
+                .contains("Fahasa", "Nhà sách Phương Nam", "Nhã Nam", "First News - Trí Việt");
+        // lần nhập gần nhất khớp thời điểm sổ cái RECEIPT của chính mặt hàng
+        items.values().forEach(i -> assertThat(ledger.stream().filter(m -> m.titleId().equals(i.titleId())
+                && m.type() == lms.sales.stock.domain.MovementType.RECEIPT).map(StockMovement::occurredAt))
+                .contains(i.details().lastRestockedAt()));
+    }
+
+    @Test
+    void donCoGhiChuKhachNoiBoVaNgayGiaoDuKienHopLe() {
+        seed(clockAt("2026-11-17T15:00:00"));
+        assertThat(orders.values().stream().filter(o -> o.customerNote() != null)).hasSizeGreaterThan(10);
+        assertThat(orders.values().stream().filter(o -> o.staffNote() != null)).hasSizeGreaterThan(10);
+        assertThat(orders.values()).allSatisfy(o -> {
+            if (o.expectedDeliveryDate() != null) {
+                assertThat(o.fulfilment()).isNotEqualTo(lms.sales.ordering.domain.Fulfilment.COUNTER);
+                assertThat(o.expectedDeliveryDate()).isAfterOrEqualTo(o.createdAt().atZone(VN).toLocalDate());
+            }
+        });
+        assertThat(orders.values().stream().filter(o -> o.status() == lms.sales.ordering.domain.OrderStatus.CANCELLED))
+                .allSatisfy(o -> assertThat(o.expectedDeliveryDate()).isNull());
+    }
+
+    @Test
+    void chayLaiBoSungChiTietCuaBanGhiCuChiKhiConTrong() {
+        seed(clockAt("2026-11-17T15:00:00"));
+        // mô phỏng dữ liệu seed cũ: mặt hàng không có chi tiết (một cái có SKU riêng), đơn không có ghi chú
+        var all = List.copyOf(items.values());
+        StockItem keep = all.get(0);
+        StockItem strip = all.get(1);
+        items.put(keep.titleId(), keep.withDetails(lms.sales.stock.domain.StockItemDetails.of("MY-SKU", null, null,
+                null, null, null, null)));
+        items.put(strip.titleId(), strip.withDetails(lms.sales.stock.domain.StockItemDetails.EMPTY));
+        var order = orders.values().iterator().next();
+        orders.put(order.id(), SalesOrder.restore(new SalesOrder.Snapshot(order.id(), order.tenantId(),
+                order.orderNo(), order.channel(), order.status(), order.paymentStatus(), order.paymentMethod(),
+                order.customerUserId(), null, null, order.fulfilment(), order.recipient(), order.vatRateBps(),
+                order.pricesIncludeVat(), order.subtotal(), order.discountTotal(), order.vatTotal(),
+                order.shippingFee(), order.grandTotal(), order.orderDiscount(), order.clientRequestId(),
+                order.exchangeOfReturnId(), order.createdBy(), order.createdAt(), order.confirmedAt(),
+                order.confirmedBy(), order.paidAt(), order.completedAt(), order.cancelledAt(), order.cancelledBy(),
+                order.cancelReason(), order.piiAnonymizedAt(), order.lines(), order.payments(), order.version(),
+                "Ghi chú có sẵn", null, null)));
+
+        SeedResult[] again = seed(clockAt("2026-11-17T15:30:00"));
+        assertThat(again[1].created()).isEqualTo(2); // chỉ hai mặt hàng được bổ sung
+        assertThat(items.get(keep.titleId()).details().sku()).isEqualTo("MY-SKU"); // không ghi đè
+        assertThat(items.get(keep.titleId()).details().supplier()).isNotNull();    // trường trống được điền
+        assertThat(items.get(strip.titleId()).details().sku()).startsWith("LMS-");
+        assertThat(orders.get(order.id()).customerNote()).isEqualTo("Ghi chú có sẵn");
+        // chạy lần nữa: không còn gì để làm
+        SeedResult[] third = seed(clockAt("2026-11-17T15:45:00"));
+        assertThat(third).allSatisfy(r -> assertThat(r.created()).isZero());
     }
 
     @Test

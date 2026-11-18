@@ -20,9 +20,10 @@ public final class StockItem {
     private final Integer lowStockThreshold;
     private final boolean active;
     private final long version;
+    private final StockItemDetails details;
 
     private StockItem(UUID id, UUID tenantId, UUID titleId, long onHand, long reserved, Money sellingPrice,
-                      Integer lowStockThreshold, boolean active, long version) {
+                      Integer lowStockThreshold, boolean active, long version, StockItemDetails details) {
         if (onHand < 0 || reserved < 0 || reserved > onHand) {
             throw new IllegalStateException("Vi phạm bất biến tồn kho: onHand=" + onHand + ", reserved=" + reserved);
         }
@@ -38,17 +39,32 @@ public final class StockItem {
         this.lowStockThreshold = lowStockThreshold;
         this.active = active;
         this.version = version;
+        this.details = details == null ? StockItemDetails.EMPTY : details;
     }
 
     /** Mặt hàng mới đưa vào bán: tồn 0. */
     public static StockItem register(UUID tenantId, UUID titleId, Money sellingPrice, Integer lowStockThreshold) {
-        return new StockItem(UUID.randomUUID(), tenantId, titleId, 0, 0, sellingPrice, lowStockThreshold, true, 0);
+        return register(tenantId, titleId, sellingPrice, lowStockThreshold, null);
+    }
+
+    /** Như trên, kèm thông tin quản lý (SKU, nhà cung cấp, giá nhập...). */
+    public static StockItem register(UUID tenantId, UUID titleId, Money sellingPrice, Integer lowStockThreshold,
+                                     StockItemDetails details) {
+        return new StockItem(UUID.randomUUID(), tenantId, titleId, 0, 0, sellingPrice, lowStockThreshold, true, 0,
+                details);
     }
 
     public static StockItem restore(UUID id, UUID tenantId, UUID titleId, long onHand, long reserved,
                                     Money sellingPrice, Integer lowStockThreshold, boolean active, long version) {
+        return restore(id, tenantId, titleId, onHand, reserved, sellingPrice, lowStockThreshold, active, version,
+                null);
+    }
+
+    public static StockItem restore(UUID id, UUID tenantId, UUID titleId, long onHand, long reserved,
+                                    Money sellingPrice, Integer lowStockThreshold, boolean active, long version,
+                                    StockItemDetails details) {
         return new StockItem(id, tenantId, titleId, onHand, reserved, sellingPrice, lowStockThreshold, active,
-                version);
+                version, details);
     }
 
     /** Áp delta; ném INSUFFICIENT_STOCK (kèm available hiện tại) nếu kết quả vi phạm bất biến. */
@@ -59,16 +75,22 @@ public final class StockItem {
             throw SalesException.insufficientStock(titleId, available());
         }
         return new StockItem(id, tenantId, titleId, newOnHand, newReserved, sellingPrice, lowStockThreshold, active,
-                version);
+                version, details);
     }
 
     public StockItem withSellingPrice(Money price) {
-        return new StockItem(id, tenantId, titleId, onHand, reserved, price, lowStockThreshold, active, version);
+        return new StockItem(id, tenantId, titleId, onHand, reserved, price, lowStockThreshold, active, version,
+                details);
+    }
+
+    public StockItem withDetails(StockItemDetails newDetails) {
+        return new StockItem(id, tenantId, titleId, onHand, reserved, sellingPrice, lowStockThreshold, active, version,
+                newDetails);
     }
 
     public StockItem withActive(boolean newActive) {
         return new StockItem(id, tenantId, titleId, onHand, reserved, sellingPrice, lowStockThreshold, newActive,
-                version);
+                version, details);
     }
 
     public long available() {
@@ -90,4 +112,5 @@ public final class StockItem {
     public Integer lowStockThreshold() { return lowStockThreshold; }
     public boolean active() { return active; }
     public long version() { return version; }
+    public StockItemDetails details() { return details; }
 }

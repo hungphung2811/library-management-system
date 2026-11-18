@@ -122,10 +122,10 @@ class HttpSalesClientTest {
         client.confirmGoodsReceipt(id);
         client.cancelGoodsReceipt(id);
         client.createPosOrder(new PosOrderRequest(List.of(new PosOrderLineRequest(title, 1, null)), "CASH", null, null,
-                null, "r1", null));
+                null, "r1", null, null));
         client.createPosOrderWithDiscount(new PosOrderRequest(
                 List.of(new PosOrderLineRequest(title, 1, new DiscountRequest("PERCENT", 1000))), "CASH", null, null,
-                null, "r2", UUID.randomUUID()));
+                null, "r2", UUID.randomUUID(), null));
         assertEquals(105000, client.getReceipt(id).grandTotal());
         assertEquals("An", client.getOrderContact(id).name());
         server.verify();

@@ -1,6 +1,7 @@
 package lms.sales.ordering.infrastructure.web;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import lms.sales.ordering.application.ShopOrderResponse;
@@ -15,7 +16,7 @@ public record ShopOrderView(UUID id, String orderNo, String status, String payme
                             String fulfilment, Recipient recipient, String currency, long subtotal,
                             long discountTotal, long vatTotal, long shippingFee, long grandTotal, Instant createdAt,
                             Instant confirmedAt, Instant paidAt, Instant completedAt, Instant cancelledAt,
-                            List<Line> lines) {
+                            List<Line> lines, String customerNote, LocalDate expectedDeliveryDate) {
 
     public record Recipient(String name, String phone, String address) {
         @Override
@@ -36,6 +37,6 @@ public record ShopOrderView(UUID id, String orderNo, String status, String payme
                 o.discountTotal(), o.vatTotal(), o.shippingFee(), o.grandTotal(), o.createdAt(), o.confirmedAt(),
                 o.paidAt(), o.completedAt(), o.cancelledAt(),
                 o.lines().stream().map(l -> new Line(l.titleId(), l.titleName(), l.quantity(), l.unitPrice(),
-                        l.lineTotal())).toList());
+                        l.lineTotal())).toList(), o.customerNote(), o.expectedDeliveryDate());
     }
 }

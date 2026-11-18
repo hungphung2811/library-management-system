@@ -223,7 +223,17 @@ class ReportingUseCaseTest {
                 int from = Math.min(all.size(), page * size);
                 return new PageResult<>(all.subList(from, Math.min(all.size(), from + size)), all.size(), page, size);
             }
-            public PageResult<StockItem> listActive(UUID t, int page, int size) { return h.stockPort.listActive(t, page, size); }
+            public PageResult<lms.sales.stock.application.StorefrontRow> listStorefront(UUID t,
+                    lms.sales.stock.application.StorefrontSort sort, boolean inStock, int page, int size) {
+                return h.stockPort.listStorefront(t, sort, inStock, page, size);
+            }
+            public Map<UUID, lms.sales.stock.application.StorefrontRow> findStorefrontRows(UUID t, Collection<UUID> ids) {
+                return h.stockPort.findStorefrontRows(t, ids);
+            }
+            public java.util.List<UUID> titleIdsMissingCoverPrice(UUID t, int limit) {
+                return h.stockPort.titleIdsMissingCoverPrice(t, limit);
+            }
+            public void refreshCoverPrices(UUID t, Map<UUID, Long> prices) { h.stockPort.refreshCoverPrices(t, prices); }
             public PageResult<lms.sales.stock.domain.StockMovement> ledger(UUID t, UUID id, int page, int size) { return h.stockPort.ledger(t, id, page, size); }
             public LedgerTotals ledgerTotals(UUID t, UUID id) { return h.stockPort.ledgerTotals(t, id); }
         };

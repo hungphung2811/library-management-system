@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +28,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -79,6 +81,28 @@ public class SalesOrderController {
     public record CancelRequest(@NotBlank @Size(max = 500) String reason, @Min(0) Long version) {
     }
 
+    /** Thay toàn bộ ghi chú nội bộ và ngày giao/nhận dự kiến (vắng/null là xóa). */
+    public record NotesRequest(@Size(max = 500) String staffNote, LocalDate expectedDeliveryDate, @Min(0) Long version) {
+        @Override
+        public String toString() { // ghi chú nội bộ: không in
+            return "NotesRequest[***]";
+        }
+    }
+
+    /** Ghi chú đầy đủ gồm staffNote (nội bộ); khóa quyền riêng getNotes/updateNotes. */
+    public record NotesResponse(UUID id, String customerNote, String staffNote, LocalDate expectedDeliveryDate,
+                                long version) {
+        static NotesResponse from(OrderWorkflowUseCases.OrderNotes n) {
+            return new NotesResponse(n.orderId(), n.customerNote(), n.staffNote(), n.expectedDeliveryDate(),
+                    n.version());
+        }
+
+        @Override
+        public String toString() {
+            return "NotesResponse[***]";
+        }
+    }
+
     private final OrderQueryUseCases queries;
     private final OrderWorkflowUseCases workflow;
 
@@ -104,6 +128,18 @@ public class SalesOrderController {
     public ContactResponse getContact(@PathVariable UUID id) {
         var c = queries.contact(RequestSupport.tenant(), id);
         return new ContactResponse(c.name(), c.phone(), c.address(), c.piiAnonymizedAt());
+    }
+
+    @GetMapping("/{id}/notes")
+    public NotesResponse getNotes(@PathVariable UUID id) {
+        return NotesResponse.from(workflow.notes(RequestSupport.tenant(), id));
+    }
+
+    @PutMapping("/{id}/notes")
+    public NotesResponse updateNotes(@PathVariable UUID id, @RequestBody @Valid NotesRequest body,
+                                     @AuthenticationPrincipal Jwt jwt) {
+        return NotesResponse.from(workflow.updateNotes(RequestSupport.tenant(), RequestSupport.user(jwt), id,
+                body.staffNote(), body.expectedDeliveryDate(), body.version()));
     }
 
     @GetMapping("/{id}/receipt")

@@ -166,8 +166,8 @@ Không có `ShopController/listItems` (thiết kế gốc 5.3): danh mục sách
 
 | Method, đường dẫn (service) | Khóa | Kết quả |
 |---|---|---|
-| GET `/internal/sales/storefront/items` | `StorefrontController/list` | query `{keyword?, page?, size?}` (size tối đa 50, mặc định 20); `{items[{titleId, name, author, price, inStock, hasPreview}], total, page, size}`; một truy vấn trang + một lời gọi lô tới catalog |
-| GET `/internal/sales/storefront/items/{titleId}` | `StorefrontController/get` | như mục danh sách + `description` (null nếu chưa nhập); không có `previewText` |
+| GET `/internal/sales/storefront/items` | `StorefrontController/list` | query `{keyword?, page?, size?}` (size tối đa 50, mặc định 20); `{items[{titleId, name, author, price, inStock, hasPreview, subtitle, publicationYear, edition, language, pageCount, format, translator, series, seriesNumber, coverImageUrl, tags}], total, page, size}`; một truy vấn trang + một lời gọi lô tới catalog |
+| GET `/internal/sales/storefront/items/{titleId}` | `StorefrontController/get` | như mục danh sách + `description` (null nếu chưa nhập); không có `previewText`. Các trường bổ sung lấy từ catalog (`docs/api/catalog-title-extra-fields.md`), null/`tags` rỗng nếu chưa nhập |
 | GET `/internal/sales/storefront/items/{titleId}/preview` | `StorefrontController/preview` | `{titleId, name, previewText}` |
 
 Chỉ mặt hàng `active`; `price` = `sellingPrice` hoặc giá bìa làm tròn đồng; `inStock = available > 0`. KHÔNG bao giờ trả `onHand`, `reserved`, `available`, giá nhập, ngưỡng tồn, `tenant_id`, ISBN. Mặt hàng không có/không active: `404 STOCK_ITEM_NOT_FOUND`. `keyword` lọc theo tên/tác giả bằng `GET /internal/books/lookup?keyword=` của catalog (tối đa 200 đầu sách) rồi giao với mặt hàng đang bán. Lỗi catalog: `503 CATALOG_UNAVAILABLE`. Không có endpoint BFF `lms-api` cho nhóm này: `customer-api` gọi thẳng.
@@ -274,8 +274,168 @@ Số khóa: CASHIER 16, STOCK_KEEPER 16 (không đổi), STORE_MANAGER 46 (41 + 
 
 Danh sách 44 khóa (50 với 6 khóa liên hệ của V22) nay có đủ trong `permissions` (V17: 23 khóa pha 1 + `TitleController/lookup`; V20: 21 khóa pha 2). Đường dẫn của `ShopController/*` và `StorefrontController/*` ghi dạng service `/internal/sales/...` (không có đường BFF); test `SalesPermissionSeedMatchesCodeTest` ở sales-service so cả 50 khóa với code thật (3 file seed `V*__sales_*.sql`).
 
+## Chi tiết quản lý mặt hàng và ghi chú đơn (migration sales `V8`, identity `V28`)
+
+Mọi trường mới đều tùy chọn (nullable), không backfill dữ liệu cũ; FE phải chịu được `null`. Tất cả chuỗi được cắt khoảng trắng đầu/cuối, chuỗi rỗng coi là `null`. Vi phạm giới hạn: `400` (`VALIDATION_FAILED` hoặc `INVALID_REQUEST`/`INVALID_PRICE`/`INVALID_QUANTITY`).
+
+### Mặt hàng (`stock_items`)
+
+| Trường JSON | Kiểu | Giới hạn / ý nghĩa |
+|---|---|---|
+| `sku` | string | tối đa 40; chuẩn hóa chữ HOA; duy nhất theo tenant khi có (trùng: `409 SKU_EXISTS`) |
+| `supplier` | string | tối đa 255; tên nhà cung cấp/nhà phát hành (chuỗi tự do, không liên kết bảng nhà cung cấp của phiếu nhập) |
+| `costPrice` | number (đồng) | `>= 0`; giá nhập. NỘI BỘ |
+| `binLocation` | string | tối đa 64; vị trí trong kho/quầy, ví dụ `K1-A3` |
+| `reorderQuantity` | integer | `>= 0`; số lượng đặt lại gợi ý |
+| `lastRestockedAt` | ISO-8601 instant | tự cập nhật khi xác nhận phiếu nhập (`GoodsReceiptController/confirm`, ghi sổ cái `RECEIPT`, chỉ tăng); cũng nhận qua `details` |
+| `note` | string | tối đa 500; ghi chú nội bộ. NỘI BỘ |
+
+- `POST /api/sales/stock-items` (`StockItemController/register`): body thêm đủ 7 trường trên (tùy chọn). Phản hồi KHÔNG chứa `costPrice` và `note`.
+- `GET /api/sales/stock-items` và `GET /api/sales/stock-items/{titleId}` (`search`, `get`; Thu ngân cũng có khóa này) và các phản hồi `updatePrice`, `adjust`, `stocktake` thêm `sku, supplier, binLocation, reorderQuantity, lastRestockedAt`. KHÔNG có `costPrice`, `note`.
+- `GET /api/sales/stock-items/{titleId}/details` (khóa MỚI `StockItemController/getDetails`) trả `{titleId, sku, supplier, costPrice, binLocation, reorderQuantity, lastRestockedAt, note}`.
+- `PUT /api/sales/stock-items/{titleId}/details` (khóa MỚI `StockItemController/updateDetails`): body `{sku?, supplier?, costPrice?, binLocation?, reorderQuantity?, lastRestockedAt?, note?}`, THAY TOÀN BỘ: trường vắng/`null` là xóa, riêng `lastRestockedAt` vắng thì giữ nguyên. Trả cùng dạng với GET details. `404 STOCK_ITEM_NOT_FOUND`, `409 SKU_EXISTS`.
+- Storefront (`StorefrontController/*`) và `/public/**` KHÔNG trả bất kỳ trường nào ở trên.
+
+### Đơn (`sales_orders`)
+
+| Trường JSON | Kiểu | Ghi chú |
+|---|---|---|
+| `customerNote` | string, tối đa 500 | ghi chú của khách; đặt lúc tạo đơn (`POST /api/sales/pos-orders[/discounted]` body thêm `customerNote?`; đơn online `POST /internal/sales/shop/orders` thêm `customerNote?`), không sửa sau đó |
+| `expectedDeliveryDate` | `yyyy-MM-dd` | ngày giao/nhận dự kiến; chỉ đơn `fulfilment` `DELIVERY` hoặc `PICKUP` (đơn `COUNTER`: `400 INVALID_REQUEST`) |
+| `staffNote` | string, tối đa 500 | ghi chú nội bộ của nhân viên. NỘI BỘ |
+
+- `SalesOrderView` (`search`, `get`, phản hồi POS và các thao tác đơn) thêm `customerNote`, `expectedDeliveryDate`. KHÔNG có `staffNote`. Phản hồi cho KHÁCH (`/internal/sales/shop/orders...`) thêm `customerNote`, `expectedDeliveryDate`, không có `staffNote`.
+- `GET /api/sales/orders/{id}/notes` (khóa MỚI `SalesOrderController/getNotes`) trả `{id, customerNote, staffNote, expectedDeliveryDate, version}`.
+- `PUT /api/sales/orders/{id}/notes` (khóa MỚI `SalesOrderController/updateNotes`): body `{staffNote?, expectedDeliveryDate?, version?}`, thay toàn bộ hai trường (vắng là xóa); `version` tùy chọn, lệch thì `409 ORDER_STATE_CONFLICT`. `customerNote` không đổi qua đây. Trả cùng dạng với GET notes. `404 ORDER_NOT_FOUND`.
+- Ẩn danh khách vãng lai (B2.5) xóa luôn `customerNote` và `staffNote` của đơn đó (văn bản tự do có thể chứa dữ liệu cá nhân).
+
+### Quyền và dữ liệu nhạy cảm
+
+- Khóa mới: `StockItemController/getDetails`, `StockItemController/updateDetails`, `SalesOrderController/getNotes`, `SalesOrderController/updateNotes` (nâng tổng khóa sales lên 61, đối chiếu với code trong `SalesPermissionSeedMatchesCodeTest`). Migration identity `V28__sales_stock_order_details_permissions.sql` đăng ký khóa và gán cho mẫu role: `getDetails/updateDetails` cho STOCK_KEEPER và STORE_MANAGER, `getNotes/updateNotes` cho STORE_MANAGER; CASHIER và CUSTOMER không có. V28 KHÔNG backfill role của tenant đã tồn tại: tenant admin gán tay 4 khóa cho role cần dùng.
+- `costPrice`, `note` (mặt hàng) và `staffNote` (đơn) chỉ đi qua các endpoint khóa riêng ở trên, không có ở danh sách/chi tiết thường, storefront hay `customer-api`.
+- Ghi chú (`customerNote`, `staffNote`, `note`) và giá nhập không ghi vào log, audit hay event Kafka: audit `STOCK_ITEM_DETAILS_UPDATED` chỉ có tên trường đổi (`changedFields`), `ORDER_NOTES_UPDATED` chỉ có cờ `hasStaffNote`, `hasExpectedDeliveryDate`.
+- Mã lỗi mới: `409 SKU_EXISTS`.
+
 ## Triển khai
 
 - `app.services.sales-url` (`SALES_SERVICE_URL`, mặc định `http://localhost:8087`) trong `lms-api`; `docker-compose.yml` đặt `SALES_SERVICE_URL=http://sales-service:8087` cho lms-api.
 - sales-service gọi `POST /internal/books/lookup` của catalog bằng token người dùng chuyển tiếp (`CATALOG_SERVICE_URL`, `lms.sales.catalog.base-url`); vai trò cần khóa `TitleController/lookup` (xem `docs/api/catalog-lookup.md`).
 - Tắt phát Kafka bằng `lms.sales.events.enabled=false`.
+- Che dữ liệu cá nhân là cấu hình theo môi trường: `lms.privacy.mask-personal-data` (env `LMS_PRIVACY_MASK_PERSONAL_DATA`, boolean, mặc định `true`). Giá trị `false` (đặt sẵn trong `application-dev.yml`; prod giữ `true`) khiến API nhân viên trả giá trị đầy đủ ở: `OrderView.contact.{name, phone, address}` (đơn POS và đơn online), `ShopContactSummaryView/DetailView.contact.{name, email, phone}`. Hợp đồng JSON không đổi (tên trường và cấu trúc giữ nguyên, kể cả các tên `*Masked` ở lớp ứng dụng); khi tắt che các trường này chứa giá trị đầy đủ nên FE không được giả định chúng luôn che. Không ảnh hưởng ẩn danh theo thời hạn (`piiAnonymizedAt`, dữ liệu đã xóa vẫn null), audit, log, Kafka (không bao giờ chứa dữ liệu cá nhân). Đề xuất (chưa làm): thêm cờ `piiMasked` vào phản hồi nếu FE cần biết đang che hay không.
+
+## Thanh toán QR cho POS bằng cổng giả lập (ADR-0020, migration sales `V9`)
+
+POS có thêm phương thức `paymentMethod = "QR"`. Đơn QR **không** thu ngay: tạo ở `status = AWAITING_PAYMENT`, `paymentStatus = UNPAID`, hàng được giữ (`reserved`, như đơn online), kèm một lệnh thanh toán (`paymentIntent`). Khi cổng báo đã nhận tiền, đơn thành `COMPLETED` + `PAID`, ghi bản ghi thu (`method = QR`, `reference` = mã tham chiếu) và hàng giữ chuyển thành xuất thật (FULFIL). Hết hạn hoặc hủy thì đơn thành `CANCELLED` và hàng giữ được nhả. CASH, BANK_TRANSFER, CARD cũng đi hai bước từ ADR-0021 (mục "POS hai bước" bên dưới, **thay đổi phá vỡ**). Cổng là **giả lập nội bộ (sandbox), không dùng cho production**: chỉ chạy khi `app.payments.sandbox.enabled=true` (dev bật, prod tắt).
+
+### Thay đổi hợp đồng (BFF `lms-api`)
+
+- `POST /api/sales/pos-orders` và `/api/sales/pos-orders/discounted`: `paymentMethod` nhận thêm `QR`. Với `QR` response `201` có thêm khối `paymentIntent`; các phương thức khác không có trường này (không thay đổi gì với FE cũ). Đơn QR không đi với `exchangeOfReturnId` (400) và tổng tiền phải lớn hơn 0.
+- `SalesOrderView.status` có thêm giá trị `AWAITING_PAYMENT` (chỉ đơn POS QR); `paymentMethod` có thêm `QR`. FE phải coi `AWAITING_PAYMENT` là "chờ thanh toán", không phải đơn đã bán.
+- Sandbox tắt: tạo đơn `QR` trả `400 PAYMENT_NOT_ENABLED`.
+
+```json
+{
+  "id": "…", "orderNo": "O-000123", "status": "AWAITING_PAYMENT", "paymentStatus": "UNPAID",
+  "paymentMethod": "QR", "grandTotal": 215000,
+  "paymentIntent": {
+    "id": "6b1d…", "orderId": "…", "reference": "LMS7K2M9QXPAB", "amount": 215000,
+    "status": "PENDING", "provider": "SIMULATED",
+    "qrPayload": "00020101021238…6304ABCD",
+    "expiresAt": "2026-11-18T03:10:00Z", "paidAt": null, "createdAt": "2026-11-18T03:00:00Z"
+  }
+}
+```
+
+`qrPayload` là chuỗi VietQR/EMVCo (TLV, CRC16/CCITT-FALSE, số tiền, nội dung chuyển khoản = `reference`) để FE vẽ mã QR. Tài khoản/ngân hàng in vào mã là tài khoản demo trong cấu hình.
+
+### Endpoint cho FE và khóa quyền (mới)
+
+| Phương thức, đường dẫn (lms-api) | Service | Khóa quyền | Ghi chú |
+|---|---|---|---|
+| `GET /api/sales/payments/intents/{id}` | `GET /internal/payments/intents/{id}` | `PaymentIntentController/get` | FE thăm dò trạng thái (2 đến 3 giây/lần). `status` báo `EXPIRED` ngay khi quá `expiresAt` dù job dọn chưa chạy. |
+| `POST /api/sales/payments/intents/{id}/cancel` | `POST /internal/payments/intents/{id}/cancel` | `PaymentIntentController/cancel` | Chỉ lệnh `PENDING`; hủy lại lệnh đã hủy trả nguyên trạng (200); lệnh đã `PAID`/`EXPIRED` thì `409 PAYMENT_INTENT_STATE_CONFLICT`. Đơn thành `CANCELLED`, tồn được nhả. |
+| `POST /api/sales/payments/intents/{id}/simulate-paid` | `POST /internal/payments/intents/{id}/simulate-paid` | `PaymentIntentController/simulatePaid` | Nút "giả lập đã thanh toán": tự dựng thân webhook có ký rồi đi đúng luồng webhook. Sandbox tắt thì `404 PAYMENT_SANDBOX_DISABLED`. |
+| (không qua lms-api) | `POST /internal/payments/webhook/simulated` | không có (`@PublicEndpoint`) | Webhook của cổng; chỉ xác thực bằng chữ ký HMAC. |
+
+Cần `PaymentIntentController/*` trong role (admin tenant bỏ qua kiểm khóa). Migration identity `V29__payment_intent_permissions.sql` gán `get`, `cancel`, `confirm` cho mẫu Thu ngân và Quản lý cửa hàng (role còn nguyên mẫu được backfill; role đã chỉnh cần gán tay); `simulatePaid` chỉ đăng ký, không gán.
+
+### Webhook `POST /internal/payments/webhook/simulated`
+
+Header `X-Signature` = hex thường của `HMAC-SHA256(thân thô, app.payments.sandbox.webhook-secret)` (chấp nhận tiền tố `sha256=`); thân JSON `{"reference","amount","providerTxnId","status"}` (`status`: `PAID` hoặc `SUCCESS` là đã nhận tiền, giá trị khác như `FAILED` chỉ được ghi nhận, không đổi gì). Không cần JWT. Không đi qua lms-api/nginx của FE (cổng gọi thẳng sales-service; nếu muốn mở ra ngoài phải thêm location riêng vào nginx và giới hạn tần suất).
+
+| Tình huống | HTTP | `code` |
+|---|---|---|
+| Sandbox tắt hoặc chưa đặt bí mật | 404 | `PAYMENT_SANDBOX_DISABLED` |
+| Thiếu/sai chữ ký | 401 | `INVALID_WEBHOOK_SIGNATURE` |
+| Thân không phải JSON hoặc thiếu trường | 400 | `INVALID_REQUEST` |
+| Không có lệnh với `reference` | 404 | `PAYMENT_INTENT_NOT_FOUND` |
+| Lệch số tiền | 400 | `PAYMENT_AMOUNT_MISMATCH` (không đổi gì) |
+| Lệnh đã hết hạn | 409 | `PAYMENT_INTENT_EXPIRED` |
+| Lệnh đã hủy | 409 | `PAYMENT_INTENT_CANCELLED` |
+| Đã thanh toán bằng mã giao dịch khác, hoặc hai tiến trình tranh nhau | 409 | `PAYMENT_INTENT_STATE_CONFLICT` |
+| Mã giao dịch đã dùng cho lệnh khác | 409 | `PAYMENT_DUPLICATE_TRANSACTION` |
+| Thành công | 200 | `{"result":"PROCESSED","reference","intentStatus":"PAID"}` |
+| Gửi lại cùng `providerTxnId` (idempotent) | 200 | `{"result":"ALREADY_PROCESSED",…}` |
+| `status` khác `PAID`/`SUCCESS` | 200 | `{"result":"IGNORED",…}` |
+
+### Sơ đồ trạng thái
+
+```
+Lệnh thanh toán:   PENDING --webhook đúng tiền, chưa hết hạn--> PAID
+                   PENDING --quá expiresAt (job mỗi 60 giây)--> EXPIRED
+                   PENDING --thu ngân hủy-------------------> CANCELLED
+Đơn POS QR:        AWAITING_PAYMENT --PAID--> COMPLETED + PAID (ghi PaymentRecord QR, FULFIL tồn)
+                   AWAITING_PAYMENT --EXPIRED/CANCELLED--> CANCELLED + UNPAID (RELEASE tồn, không có khoản hoàn)
+```
+
+`expiresAt` mặc định `createdAt + 10 phút` (`app.payments.sandbox.intent-ttl-minutes`). Job dọn chạy mỗi 60 giây (`expire-delay-ms`).
+
+### Dữ liệu và cấu hình
+
+- Migration sales `V9__payment_intents.sql`: bảng `payment_intents` (RLS ENABLE + FORCE, `platform_read_all`, `UNIQUE(reference)`, `UNIQUE(tenant_id, provider_txn_id)`, chỉ mục `(status, expires_at)`); thêm `QR` vào CHECK `payment_method` (đơn, bản ghi thu, khoản hoàn) và `AWAITING_PAYMENT` vào CHECK `status` của đơn.
+- Cấu hình `app.payments.sandbox.*`: `enabled`, `webhook-secret` (biến `PAYMENTS_SANDBOX_WEBHOOK_SECRET`; dev có giá trị mặc định chỉ để chạy máy cá nhân), `bank-bin`, `account-no`, `account-name`, `intent-ttl-minutes`, `expire-delay-ms`, `expire-job-enabled`. Prod luôn `enabled=false`.
+
+## POS hai bước cho mọi hình thức thanh toán (ADR-0021, migration sales `V10`) — THAY ĐỔI PHÁ VỠ HỢP ĐỒNG
+
+Trước: `POST /api/sales/pos-orders[/discounted]` với CASH/CARD/BANK_TRANSFER trả đơn `COMPLETED` + `PAID` ngay. **Nay mọi phương thức đều hai bước**: tạo đơn ra `status = AWAITING_PAYMENT`, `paymentStatus = UNPAID`, giữ tồn, kèm `paymentIntent`; thu ngân bấm xác nhận thu (hoặc cổng QR báo) thì đơn mới `COMPLETED` + `PAID` và hàng mới xuất thật. Đơn đổi hàng (`exchangeOfReturnId`) cũng hai bước. Ngoại lệ: tổng tiền 0 (giảm giá hết) thu ngay, `paymentIntent` không có.
+
+### FE biết lệnh là MANUAL hay QR bằng `paymentIntent.provider`
+
+| `provider` | Phương thức đơn | `qrPayload` | Hành động của thu ngân |
+|---|---|---|---|
+| `MANUAL` | CASH, CARD, BANK_TRANSFER | `null` | Form xác nhận thu: CASH nhập tiền khách đưa (tùy chọn), CARD/BANK_TRANSFER nhập mã giao dịch (bắt buộc), rồi gọi `confirm` |
+| `SIMULATED` | QR | chuỗi VietQR | Hiện mã QR, thăm dò `GET`; không có `confirm` (409 `PAYMENT_NOT_MANUAL`); dev có nút `simulate-paid` |
+
+Phương thức của đơn có sẵn ở `paymentMethod` của đơn; `provider` quyết định hiển thị form hay mã QR.
+
+### Endpoint mới
+
+`POST /api/sales/payments/intents/{id}/confirm` (service `POST /internal/payments/intents/{id}/confirm`, khóa `PaymentIntentController/confirm`). Thân tùy chọn `ConfirmPaymentRequest`:
+
+```json
+{ "tenderedAmount": 500000, "transactionRef": "POS-778899" }
+```
+
+- `tenderedAmount` (số đồng, chỉ CASH, lớn hơn hoặc bằng `amount`; vắng thì bằng đúng `amount`). Gửi cho CARD/BANK_TRANSFER thì 400.
+- `transactionRef` (tối đa 64 ký tự): bắt buộc với CARD/BANK_TRANSFER, tùy chọn với CASH. Lưu làm `reference` của bản ghi thu (không có thì dùng `paymentIntent.reference`).
+- Response 200: `PaymentIntentView` với `status = "PAID"`, `paidAt`, và (nếu có) `tenderedAmount`, `changeDue` (tiền thối = tendered trừ amount), `transactionRef`. Xác nhận lại lệnh đã PAID: 200 nguyên trạng.
+
+`PaymentIntentView` (lms-api) có thêm 3 trường nullable: `tenderedAmount`, `changeDue`, `transactionRef`.
+
+| Tình huống | HTTP | `code` |
+|---|---|---|
+| Tiền khách đưa chưa đủ | 400 | `PAYMENT_AMOUNT_MISMATCH` |
+| Thiếu mã giao dịch (thẻ/chuyển khoản), `tenderedAmount` cho thẻ/chuyển khoản, mã quá 64 ký tự | 400 | `INVALID_REQUEST` |
+| Lệnh hết hạn, đã hủy | 409 | `PAYMENT_INTENT_STATE_CONFLICT` |
+| Lệnh QR (SIMULATED) | 409 | `PAYMENT_NOT_MANUAL` |
+| `simulate-paid` hoặc webhook cho lệnh MANUAL | 409 | `PAYMENT_NOT_SIMULATED` |
+| Xung đột (hai người bấm cùng lúc, hoặc cùng lúc với hủy) | 409 | `PAYMENT_INTENT_STATE_CONFLICT` (bên thua thử lại và thấy 200 nguyên trạng hoặc 409) |
+
+### Thay đổi khác
+
+- Thời hạn lệnh MANUAL: `app.payments.manual.intent-ttl-minutes` (mặc định 10). Job dọn xử lý mọi lệnh quá hạn (hủy đơn, nhả tồn); không còn phụ thuộc sandbox: `app.payments.expire-job-enabled`.
+- `GET /api/sales/orders/{id}/receipt` với đơn POS chưa thu (`AWAITING_PAYMENT` hoặc đã hủy chưa thu): 409 `ORDER_NOT_PAID` (chưa có phiếu thu).
+- Doanh thu, top bán, thống kê theo `paid_at` nên chỉ tính từ lúc xác nhận thu. Danh sách đơn hiện đơn chờ với `status = AWAITING_PAYMENT`.
+- Đơn đổi hàng chờ thanh toán bị hủy thì phiếu trả được đổi lại (chỉ mục duy nhất bỏ qua đơn `CANCELLED`).
+- Audit: `ORDER_CREATED` (kèm `paymentIntentId`, `provider`), `ORDER_PAID` (kèm người bấm, `changeDue`), `ORDER_CANCELLED` khi hủy/hết hạn.
+- Khóa mới `PaymentIntentController/confirm` (FE phải đồng bộ danh sách quyền màn POS); migration identity V29 đã gán cho Thu ngân và Quản lý cửa hàng.

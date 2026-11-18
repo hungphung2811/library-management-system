@@ -94,6 +94,7 @@ class SalesFlowIT {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @Autowired PlacePosOrderUseCase placePos;
+    @Autowired lms.sales.ordering.application.PaymentIntentUseCases intentUseCases;
     @Autowired RegisterStockItemUseCase registerItem;
     @Autowired AdjustStockUseCase adjust;
     @Autowired ReconcileStockUseCase reconcile;
@@ -152,13 +153,24 @@ class SalesFlowIT {
         return json.readTree(r.andReturn().getResponse().getContentAsString());
     }
 
+    /** ADR-0021: POS hai bước; xác nhận thu tay ngay để đơn thành COMPLETED + PAID và tồn được xuất như trước. */
+    private lms.sales.ordering.application.OrderResponse paid(UUID tenant, UUID actor,
+            lms.sales.ordering.application.PosOrderResult r) {
+        if (r.paymentIntent() != null) {
+            intentUseCases.confirm(tenant, actor, r.paymentIntent().id(),
+                    new lms.sales.ordering.application.PaymentIntentUseCases.ConfirmCommand(null, "IT-REF"));
+        }
+        return r.order();
+    }
+
     private OrderResponse sell(UUID tenant, Discount orderDiscount, UUID requestId, Object... titleQtyPairs) {
         List<PlacePosOrderCommand.Line> lines = new ArrayList<>();
         for (int i = 0; i < titleQtyPairs.length; i += 2) {
             lines.add(new PlacePosOrderCommand.Line((UUID) titleQtyPairs[i], (Integer) titleQtyPairs[i + 1], null));
         }
-        return TenantContext.callAs(tenant, () -> placePos.createWithDiscount(new PlacePosOrderCommand(tenant, user,
-                lines, PaymentMethod.CASH, null, null, null, orderDiscount, requestId)));
+        return TenantContext.callAs(tenant, () -> paid(tenant, user, placePos.createWithDiscountAndPayment(
+                new PlacePosOrderCommand(tenant, user, lines, PaymentMethod.CASH, null, null, null, orderDiscount,
+                        requestId))));
     }
 
     private long scalar(String sql) throws SQLException {
@@ -198,11 +210,16 @@ class SalesFlowIT {
                 .andExpect(status().isCreated())).get("id").asText();
         mvc.perform(post(B + "/goods-receipts/" + receipt + "/confirmation").with(admin(tenantA)))
                 .andExpect(status().isOk());
-        String order = body(mvc.perform(post(B + "/pos-orders").with(admin(tenantA))
+        JsonNode created = body(mvc.perform(post(B + "/pos-orders").with(admin(tenantA))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"lines\":[{\"titleId\":\"" + title + "\",\"quantity\":3}],\"paymentMethod\":\"CASH\","
                         + "\"walkIn\":{\"name\":\"Tran Thi Bich\",\"phone\":\"0987654321\"},\"clientRequestId\":\""
-                        + UUID.randomUUID() + "\"}")).andExpect(status().isCreated())).get("id").asText();
+                        + UUID.randomUUID() + "\"}")).andExpect(status().isCreated()));
+        String order = created.get("id").asText();
+        // ADR-0021: POS hai bước; xác nhận thu để đơn có bản ghi thu và tồn được xuất
+        TenantContext.runAs(tenantA, () -> intentUseCases.confirm(tenantA, user,
+                UUID.fromString(created.get("paymentIntent").get("id").asText()),
+                new lms.sales.ordering.application.PaymentIntentUseCases.ConfirmCommand(null, "IT-REF")));
 
         // Mọi bảng chính có dữ liệu của A và không có của B (kiểm bằng superuser, bỏ qua RLS)
         for (String table : BANG) {

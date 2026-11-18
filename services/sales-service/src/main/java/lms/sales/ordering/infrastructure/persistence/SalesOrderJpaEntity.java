@@ -127,6 +127,16 @@ class SalesOrderJpaEntity {
     @Column(name = "pii_anonymized_at")
     private Instant piiAnonymizedAt;
 
+    /** Ghi chú (V8): văn bản tự do, có thể chứa dữ liệu cá nhân; không ghi log/audit/event. */
+    @Column(name = "customer_note", length = 500)
+    private String customerNote;
+
+    @Column(name = "staff_note", length = 500)
+    private String staffNote;
+
+    @Column(name = "expected_delivery_date")
+    private java.time.LocalDate expectedDeliveryDate;
+
     @Version
     @Column(name = "version", nullable = false)
     private Long version;
@@ -180,6 +190,9 @@ class SalesOrderJpaEntity {
         this.cancelledBy = o.cancelledBy();
         this.cancelReason = o.cancelReason();
         this.piiAnonymizedAt = o.piiAnonymizedAt();
+        this.customerNote = o.customerNote();
+        this.staffNote = o.staffNote();
+        this.expectedDeliveryDate = o.expectedDeliveryDate();
     }
 
     UUID getId() { return id; }
@@ -217,6 +230,9 @@ class SalesOrderJpaEntity {
     UUID getCancelledBy() { return cancelledBy; }
     String getCancelReason() { return cancelReason; }
     Instant getPiiAnonymizedAt() { return piiAnonymizedAt; }
+    String getCustomerNote() { return customerNote; }
+    String getStaffNote() { return staffNote; }
+    java.time.LocalDate getExpectedDeliveryDate() { return expectedDeliveryDate; }
     long getVersion() { return version; }
 
     /** Không in dữ liệu cá nhân. */

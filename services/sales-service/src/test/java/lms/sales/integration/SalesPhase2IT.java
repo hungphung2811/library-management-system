@@ -96,6 +96,7 @@ class SalesPhase2IT {
 
     @Autowired PlaceOnlineOrderUseCase placeOnline;
     @Autowired PlacePosOrderUseCase placePos;
+    @Autowired lms.sales.ordering.application.PaymentIntentUseCases intentUseCases;
     @Autowired OrderWorkflowUseCases workflow;
     @Autowired ShopOrderUseCases shopOrders;
     @Autowired CreateReturnUseCase createReturn;
@@ -150,10 +151,20 @@ class SalesPhase2IT {
                 new Recipient("Nguyen Van An", "0912345678", "1 A, Quan 1, TP HCM"), UUID.randomUUID())));
     }
 
+    /** ADR-0021: POS hai bước; xác nhận thu tay ngay để đơn thành COMPLETED + PAID và tồn được xuất như trước. */
+    private lms.sales.ordering.application.OrderResponse paid(UUID tenant, UUID actor,
+            lms.sales.ordering.application.PosOrderResult r) {
+        if (r.paymentIntent() != null) {
+            intentUseCases.confirm(tenant, actor, r.paymentIntent().id(),
+                    new lms.sales.ordering.application.PaymentIntentUseCases.ConfirmCommand(null, "IT-REF"));
+        }
+        return r.order();
+    }
+
     private OrderResponse pos(UUID tenant, UUID title, int qty, String walkInName, String walkInPhone) {
-        return TenantContext.callAs(tenant, () -> placePos.create(new PlacePosOrderCommand(tenant, staff,
-                List.of(new PlacePosOrderCommand.Line(title, qty, null)), PaymentMethod.CASH, null, walkInName,
-                walkInPhone, null, UUID.randomUUID())));
+        return TenantContext.callAs(tenant, () -> paid(tenant, staff, placePos.createWithPayment(
+                new PlacePosOrderCommand(tenant, staff, List.of(new PlacePosOrderCommand.Line(title, qty, null)),
+                        PaymentMethod.CASH, null, walkInName, walkInPhone, null, UUID.randomUUID()))));
     }
 
     private void assertReconciled(UUID tenant, UUID title) {
@@ -306,9 +317,9 @@ class SalesPhase2IT {
         assertThat(TenantContext.callAs(tenantA, () -> shopOrders.myOrders(tenantA, customerB, 0, 10).total()))
                 .isZero();
         // đơn POS gắn tài khoản của A không hiện trong "đơn của tôi" và không mở được bằng id
-        var posOrder = TenantContext.callAs(tenantA, () -> placePos.create(new PlacePosOrderCommand(tenantA, staff,
-                List.of(new PlacePosOrderCommand.Line(title, 1, null)), PaymentMethod.CASH, customerA, null, null,
-                null, UUID.randomUUID())));
+        var posOrder = TenantContext.callAs(tenantA, () -> paid(tenantA, staff, placePos.createWithPayment(
+                new PlacePosOrderCommand(tenantA, staff, List.of(new PlacePosOrderCommand.Line(title, 1, null)),
+                        PaymentMethod.CASH, customerA, null, null, null, UUID.randomUUID()))));
         assertThat(catchCode(() -> TenantContext.runAs(tenantA, () -> shopOrders.myOrder(tenantA, customerA,
                 posOrder.id())))).isEqualTo(ErrorCode.ORDER_NOT_FOUND);
         assertThat(TenantContext.callAs(tenantA, () -> shopOrders.myOrders(tenantA, customerA, 0, 10).total()))

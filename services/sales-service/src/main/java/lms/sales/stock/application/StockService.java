@@ -99,9 +99,11 @@ public class StockService {
 
     /** Nhập kho: onHand += q; mặt hàng chưa đưa vào bán thì STOCK_ITEM_NOT_REGISTERED. */
     public void receiveAll(UUID tenantId, UUID actorId, Collection<StockLine> lines, String refType, UUID refId) {
-        for (var e : merge(lines).entrySet()) {
+        Map<UUID, Long> merged = merge(lines);
+        for (var e : merged.entrySet()) {
             applyOne(tenantId, actorId, e.getKey(), MovementType.RECEIPT, e.getValue(), 0, refType, refId, null);
         }
+        stock.touchLastRestocked(tenantId, merged.keySet(), clock.instant());
     }
 
     /** Điều chỉnh tay (delta khác 0), bắt buộc lý do. */

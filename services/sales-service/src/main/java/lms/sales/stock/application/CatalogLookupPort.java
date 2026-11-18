@@ -25,8 +25,21 @@ public interface CatalogLookupPort {
         return Optional.empty();
     }
 
+    /** Ngoài 7 trường đầu, các trường bổ sung (từ phụ đề tới tags) đều tùy chọn; format là PAPERBACK|HARDCOVER|EBOOK. */
     record CatalogTitle(UUID id, String name, String author, String isbn, BigDecimal coverPrice, String description,
-                        boolean hasPreview) {
+                        boolean hasPreview, String subtitle, Integer publicationYear, String edition, String language,
+                        Integer pageCount, String format, String translator, String series, Integer seriesNumber,
+                        String coverImageUrl, List<String> tags) {
+        public CatalogTitle {
+            tags = tags == null ? List.of() : List.copyOf(tags);
+        }
+
+        public CatalogTitle(UUID id, String name, String author, String isbn, BigDecimal coverPrice,
+                            String description, boolean hasPreview) {
+            this(id, name, author, isbn, coverPrice, description, hasPreview, null, null, null, null, null, null,
+                    null, null, null, null, List.of());
+        }
+
         public CatalogTitle(UUID id, String name, String author, String isbn, BigDecimal coverPrice) {
             this(id, name, author, isbn, coverPrice, null, false);
         }

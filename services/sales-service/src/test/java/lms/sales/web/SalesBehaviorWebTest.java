@@ -94,8 +94,9 @@ class SalesBehaviorWebTest {
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", startsWith(B + "/orders/")))
-                .andExpect(jsonPath("$.status").value("COMPLETED"))
-                .andExpect(jsonPath("$.paymentStatus").value("PAID"))
+                .andExpect(jsonPath("$.status").value("AWAITING_PAYMENT"))
+                .andExpect(jsonPath("$.paymentStatus").value("UNPAID"))
+                .andExpect(jsonPath("$.paymentIntent.provider").value("MANUAL"))
                 .andExpect(jsonPath("$.fulfilment").value("COUNTER"))
                 .andExpect(jsonPath("$.grandTotal").value(200_000))
                 .andExpect(jsonPath("$.lines[0].quantity").value(2))
@@ -104,7 +105,16 @@ class SalesBehaviorWebTest {
         // Liên hệ đã che, không lộ tên/điện thoại đầy đủ
         assertThat(response).doesNotContain("Nguyen Van An").doesNotContain("0912345678");
         JsonNode order = json.readTree(response);
+        // ADR-0021: hai bước. Chờ thu: tồn mới giữ, chưa có phiếu thu; thu ngân xác nhận thì xuất kho và có phiếu
+        assertThat(h.item(title).onHand()).isEqualTo(5);
+        assertThat(h.item(title).reserved()).isEqualTo(2);
+        mvc.perform(get(B + "/orders/" + order.get("id").asText() + "/receipt")
+                        .with(withKey("SalesOrderController/receipt")))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("ORDER_NOT_PAID"));
+        h.intentUseCases.confirm(TENANT, USER, UUID.fromString(order.get("paymentIntent").get("id").asText()),
+                new lms.sales.ordering.application.PaymentIntentUseCases.ConfirmCommand(null, null));
         assertThat(h.item(title).onHand()).isEqualTo(3);
+        assertThat(h.item(title).reserved()).isEqualTo(0);
 
         // Đọc chi tiết vẫn che; liên hệ đầy đủ chỉ qua getContact
         mvc.perform(get(B + "/orders/" + order.get("id").asText()).with(withKey("SalesOrderController/get")))
@@ -166,7 +176,7 @@ class SalesBehaviorWebTest {
         mvc.perform(post(B + "/pos-orders").with(withKey("PosOrderController/create"))
                         .contentType(MediaType.APPLICATION_JSON).content(ok))
                 .andExpect(status().isCreated());
-        assertThat(h.item(title).onHand()).isZero();
+        assertThat(h.item(title).reserved()).isEqualTo(1); // hai bước: giữ tồn một lần dù gửi lại
         // đơn khác hết hàng
         mvc.perform(post(B + "/pos-orders").with(withKey("PosOrderController/create"))
                         .contentType(MediaType.APPLICATION_JSON).content(pos(title, 1, null, UUID.randomUUID())))
@@ -185,7 +195,7 @@ class SalesBehaviorWebTest {
             mvc.perform(post(B + "/pos-orders").with(withKey("PosOrderController/create"))
                     .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isCreated());
         }
-        assertThat(h.item(title).onHand()).isEqualTo(4);
+        assertThat(h.item(title).reserved()).isEqualTo(1); // giữ một lần dù gửi lại (idempotent)
     }
 
     @Test

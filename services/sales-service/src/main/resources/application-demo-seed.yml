@@ -22,3 +22,8 @@ lms:
     events:
       # Không phát sales.events lên Kafka
       enabled: false
+
+# Tiến trình một lần không có lịch @Scheduled: tắt job dọn lệnh thanh toán QR hết hạn (sandbox vẫn bật theo profile dev)
+app:
+  payments:
+    expire-job-enabled: false

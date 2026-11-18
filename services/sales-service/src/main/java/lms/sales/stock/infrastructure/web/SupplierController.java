@@ -3,8 +3,11 @@ package lms.sales.stock.infrastructure.web;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import com.fasterxml.jackson.core.type.TypeReference;
 import java.net.URI;
+import java.time.Duration;
 import java.util.UUID;
+import lms.cache.RequestCache;
 import lms.sales.shared.application.PageResult;
 import lms.sales.shared.infrastructure.web.RequestSupport;
 import lms.sales.stock.application.SupplierUseCases;
@@ -44,22 +47,36 @@ public class SupplierController {
         }
     }
 
-    private final SupplierUseCases suppliers;
+    static final String CACHE_NAMESPACE = "sales.suppliers";
+    private static final Duration CACHE_TTL = Duration.ofSeconds(30);
 
-    public SupplierController(SupplierUseCases suppliers) {
+    /** Khóa cache: mọi đầu vào làm đổi kết quả (từ khóa, trang, cỡ trang đã chuẩn hóa). */
+    private record SearchKey(String keyword, int page, int size) {
+    }
+
+    private final SupplierUseCases suppliers;
+    private final RequestCache cache;
+
+    public SupplierController(SupplierUseCases suppliers, RequestCache cache) {
         this.suppliers = suppliers;
+        this.cache = cache;
     }
 
     @GetMapping
     public PageResult<SupplierResponse> search(SupplierSearchQuery q) {
-        return suppliers.search(RequestSupport.tenant(), q.keyword(), RequestSupport.page(q.page()),
-                RequestSupport.size(q.size())).map(SupplierResponse::from);
+        var tenant = RequestSupport.tenant();
+        int page = RequestSupport.page(q.page());
+        int size = RequestSupport.size(q.size());
+        return cache.get(CACHE_NAMESPACE, new SearchKey(q.keyword(), page, size), CACHE_TTL,
+                new TypeReference<PageResult<SupplierResponse>>() { },
+                () -> suppliers.search(tenant, q.keyword(), page, size).map(SupplierResponse::from));
     }
 
     @PostMapping
     public ResponseEntity<SupplierResponse> create(@Valid @RequestBody SupplierRequest r,
                                                    @AuthenticationPrincipal Jwt jwt) {
         Supplier s = suppliers.create(RequestSupport.tenant(), RequestSupport.user(jwt), data(r));
+        cache.evictNamespace(CACHE_NAMESPACE);
         return ResponseEntity.created(URI.create("/internal/sales/suppliers/" + s.id()))
                 .body(SupplierResponse.from(s));
     }
@@ -67,8 +84,10 @@ public class SupplierController {
     @PutMapping("/{id}")
     public SupplierResponse update(@PathVariable UUID id, @Valid @RequestBody SupplierRequest r,
                                    @AuthenticationPrincipal Jwt jwt) {
-        return SupplierResponse.from(suppliers.update(RequestSupport.tenant(), RequestSupport.user(jwt), id,
-                data(r), r.active()));
+        SupplierResponse saved = SupplierResponse.from(suppliers.update(RequestSupport.tenant(),
+                RequestSupport.user(jwt), id, data(r), r.active()));
+        cache.evictNamespace(CACHE_NAMESPACE);
+        return saved;
     }
 
     private static SupplierUseCases.SupplierData data(SupplierRequest r) {

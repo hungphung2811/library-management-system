@@ -1,5 +1,6 @@
 package lms.sales.stock.infrastructure.web;
 
+import java.util.List;
 import java.util.UUID;
 import lms.sales.shared.application.PageResult;
 import lms.sales.shared.infrastructure.web.RequestSupport;
@@ -24,7 +25,12 @@ import org.springframework.web.bind.annotation.RestController;
 @StorefrontAccessible
 public class StorefrontController {
 
-    public record StorefrontQuery(String keyword, Integer page, Integer size) {
+    /** {@code sort}: newest | price_asc | price_desc (ngoài allowlist: 400 INVALID_REQUEST); {@code inStock=true} lọc còn hàng. */
+    public record StorefrontQuery(String keyword, String sort, Boolean inStock, Integer page, Integer size) {
+    }
+
+    /** Gợi ý tìm kiếm: {@code q} 2..50 ký tự (use case kiểm lại), {@code limit} 1..8 (mặc định 5). */
+    public record SuggestionQuery(String q, Integer limit) {
     }
 
     private final StorefrontQueryUseCases storefront;
@@ -37,7 +43,13 @@ public class StorefrontController {
     public PageResult<StorefrontQueryUseCases.ItemView> list(StorefrontQuery query) {
         int size = query.size() == null || query.size() < 1 ? StorefrontQueryUseCases.DEFAULT_PAGE_SIZE
                 : Math.min(query.size(), StorefrontQueryUseCases.MAX_PAGE_SIZE);
-        return storefront.list(RequestSupport.tenant(), query.keyword(), RequestSupport.page(query.page()), size);
+        return storefront.list(RequestSupport.tenant(), query.keyword(), query.sort(), query.inStock(),
+                RequestSupport.page(query.page()), size);
+    }
+
+    @GetMapping("/suggestions")
+    public List<StorefrontQueryUseCases.SuggestionView> suggestions(SuggestionQuery query) {
+        return storefront.suggest(RequestSupport.tenant(), query.q(), query.limit());
     }
 
     @GetMapping("/items/{titleId}")

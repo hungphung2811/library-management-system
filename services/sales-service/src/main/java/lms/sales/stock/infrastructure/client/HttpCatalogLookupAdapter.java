@@ -32,9 +32,13 @@ public class HttpCatalogLookupAdapter implements CatalogLookupPort {
     private static final Logger log = LoggerFactory.getLogger(HttpCatalogLookupAdapter.class);
 
     record TitleDto(UUID id, String name, String author, String isbn, BigDecimal coverPrice, String description,
-                    boolean hasPreview) {
+                    boolean hasPreview, String subtitle, Integer publicationYear, String edition, String language,
+                    Integer pageCount, String format, String translator, String series, Integer seriesNumber,
+                    String coverImageUrl, List<String> tags) {
         CatalogTitle toTitle() {
-            return new CatalogTitle(id, name, author, isbn, coverPrice, description, hasPreview);
+            return new CatalogTitle(id, name, author, isbn, coverPrice, description, hasPreview, subtitle,
+                    publicationYear, edition, language, pageCount, format, translator, series, seriesNumber,
+                    coverImageUrl, tags);
         }
     }
 

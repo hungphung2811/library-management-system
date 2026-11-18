@@ -55,7 +55,14 @@ public class OrderQueryUseCases {
 
     @Transactional(readOnly = true)
     public ReceiptResponse receipt(UUID tenantId, UUID orderId) {
-        return ReceiptResponse.from(load(tenantId, orderId));
+        var order = load(tenantId, orderId);
+        if (order.channel() == lms.sales.ordering.domain.OrderChannel.POS
+                && order.paymentStatus() == lms.sales.ordering.domain.PaymentStatus.UNPAID) {
+            // Đơn POS chờ thanh toán hoặc đã hủy chưa thu: chưa phải phiếu thu (ADR-0021)
+            throw new lms.sales.shared.domain.SalesException(lms.sales.shared.domain.ErrorCode.ORDER_NOT_PAID,
+                    "Đơn chưa thu tiền, chưa có phiếu thu");
+        }
+        return ReceiptResponse.from(order);
     }
 
     @Transactional(readOnly = true)

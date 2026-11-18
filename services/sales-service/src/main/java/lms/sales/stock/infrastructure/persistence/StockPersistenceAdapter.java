@@ -17,8 +17,11 @@ import lms.sales.shared.domain.Money;
 import lms.sales.shared.domain.SalesException;
 import lms.sales.shared.infrastructure.persistence.PersistenceErrors;
 import lms.sales.stock.application.StockPort;
+import lms.sales.stock.application.StorefrontRow;
+import lms.sales.stock.application.StorefrontSort;
 import lms.sales.stock.domain.MovementType;
 import lms.sales.stock.domain.StockItem;
+import lms.sales.stock.domain.StockItemDetails;
 import lms.sales.stock.domain.StockMovement;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -77,10 +80,14 @@ class StockPersistenceAdapter implements StockPort {
         StockItemJpaEntity entity = new StockItemJpaEntity(item.id(), item.titleId(), (int) item.onHand(),
                 (int) item.reserved(), item.sellingPrice() == null ? null : item.sellingPrice().amount(),
                 item.lowStockThreshold(), item.active());
+        applyDetails(entity, item.details());
         try {
             em.persist(entity);
             em.flush();
         } catch (PersistenceException e) {
+            if (PersistenceErrors.isUniqueViolation(e, "uq_stock_items_tenant_sku")) {
+                throw new SalesException(ErrorCode.SKU_EXISTS, "SKU đã được dùng cho mặt hàng khác");
+            }
             if (PersistenceErrors.isUniqueViolation(e, "uq_stock_items_tenant_title")) {
                 throw new SalesException(ErrorCode.STOCK_ITEM_EXISTS, "Đầu sách đã được đưa vào bán");
             }
@@ -98,8 +105,45 @@ class StockPersistenceAdapter implements StockPort {
         }
         entity.updateAttributes(item.sellingPrice() == null ? null : item.sellingPrice().amount(),
                 item.lowStockThreshold(), item.active());
-        em.flush();
+        applyDetails(entity, item.details());
+        try {
+            em.flush();
+        } catch (PersistenceException e) {
+            if (PersistenceErrors.isUniqueViolation(e, "uq_stock_items_tenant_sku")) {
+                throw new SalesException(ErrorCode.SKU_EXISTS, "SKU đã được dùng cho mặt hàng khác");
+            }
+            throw e;
+        }
         return toDomain(entity);
+    }
+
+    private static void applyDetails(StockItemJpaEntity entity, StockItemDetails d) {
+        entity.updateDetails(d.sku(), d.supplier(), d.costPrice() == null ? null : d.costPrice().amount(),
+                d.binLocation(), d.reorderQuantity(), d.lastRestockedAt(), d.note());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<StockItem> findBySku(UUID tenantId, String sku) {
+        if (sku == null) {
+            return Optional.empty();
+        }
+        return em.createQuery("select s from StockItemJpaEntity s where s.tenantId = :t and s.sku = :sku",
+                StockItemJpaEntity.class).setParameter("t", tenantId).setParameter("sku", sku).getResultList()
+                .stream().findFirst().map(StockPersistenceAdapter::toDomain);
+    }
+
+    @Override
+    @Transactional
+    public void touchLastRestocked(UUID tenantId, Collection<UUID> titleIds, Instant at) {
+        if (titleIds == null || titleIds.isEmpty()) {
+            return;
+        }
+        em.createQuery("update StockItemJpaEntity s set s.lastRestockedAt = :at "
+                        + "where s.tenantId = :t and s.titleId in :ids "
+                        + "and (s.lastRestockedAt is null or s.lastRestockedAt < :at)")
+                .setParameter("at", at).setParameter("t", tenantId).setParameter("ids", List.copyOf(titleIds))
+                .executeUpdate();
     }
 
     @Override
@@ -138,14 +182,79 @@ class StockPersistenceAdapter implements StockPort {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResult<StockItem> listActive(UUID tenantId, int page, int size) {
-        long total = em.createQuery("select count(s) from StockItemJpaEntity s where s.tenantId = :t "
-                + "and s.active = true", Long.class).setParameter("t", tenantId).getSingleResult();
-        List<StockItem> rows = em.createQuery("select s from StockItemJpaEntity s where s.tenantId = :t "
-                        + "and s.active = true order by s.createdAt desc, s.id", StockItemJpaEntity.class)
+    public PageResult<StorefrontRow> listStorefront(UUID tenantId, StorefrontSort sort, boolean inStockOnly,
+                                                    int page, int size) {
+        // Mọi mảnh JPQL là hằng chữ; order by chọn bằng switch trên enum, không nối giá trị từ request.
+        String where = "from StockItemJpaEntity s where s.tenantId = :t and s.active = true"
+                + (sort.byPrice() ? " and s.effectivePrice is not null" : "")
+                + (inStockOnly ? " and (s.onHand - s.reserved) > 0" : "");
+        String order = switch (sort) {
+            case NEWEST -> " order by s.createdAt desc, s.id";
+            case PRICE_ASC -> " order by s.effectivePrice asc, s.id asc";
+            case PRICE_DESC -> " order by s.effectivePrice desc, s.id desc";
+        };
+        long total = em.createQuery("select count(s) " + where, Long.class).setParameter("t", tenantId)
+                .getSingleResult();
+        List<StorefrontRow> rows = em.createQuery("select s " + where + order, StockItemJpaEntity.class)
                 .setParameter("t", tenantId).setFirstResult(page * size).setMaxResults(size).getResultList()
-                .stream().map(StockPersistenceAdapter::toDomain).toList();
+                .stream().map(StockPersistenceAdapter::toRow).toList();
         return new PageResult<>(rows, total, page, size);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<UUID, StorefrontRow> findStorefrontRows(UUID tenantId, Collection<UUID> titleIds) {
+        Map<UUID, StorefrontRow> out = new HashMap<>();
+        if (titleIds == null || titleIds.isEmpty()) {
+            return out;
+        }
+        em.createQuery("select s from StockItemJpaEntity s where s.tenantId = :t and s.active = true "
+                        + "and s.titleId in :ids", StockItemJpaEntity.class)
+                .setParameter("t", tenantId).setParameter("ids", List.copyOf(titleIds)).getResultList()
+                .forEach(e -> out.put(e.getTitleId(), toRow(e)));
+        return out;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UUID> titleIdsMissingCoverPrice(UUID tenantId, int limit) {
+        return em.createQuery("select s.titleId from StockItemJpaEntity s where s.tenantId = :t and s.active = true "
+                        + "and s.sellingPrice is null and s.coverPriceSnapshot is null order by s.id", UUID.class)
+                .setParameter("t", tenantId).setMaxResults(limit).getResultList();
+    }
+
+    @Override
+    @Transactional
+    public void refreshCoverPrices(UUID tenantId, Map<UUID, Long> pricesByTitle) {
+        if (pricesByTitle == null || pricesByTitle.isEmpty()) {
+            return;
+        }
+        List<Map.Entry<UUID, Long>> valid = pricesByTitle.entrySet().stream()
+                .filter(e -> e.getKey() != null && e.getValue() != null && e.getValue() >= 0).toList();
+        // Một câu UPDATE ... CASE cho mỗi lô COVER_PRICE_CHUNK mặt hàng (thay vì một UPDATE cho từng mặt hàng).
+        // Mảnh JPQL chỉ là hằng chữ và tên tham số do ta sinh (id0, v0...), giá trị luôn bind qua tham số.
+        for (int from = 0; from < valid.size(); from += COVER_PRICE_CHUNK) {
+            List<Map.Entry<UUID, Long>> chunk = valid.subList(from, Math.min(from + COVER_PRICE_CHUNK, valid.size()));
+            StringBuilder jpql = new StringBuilder("update StockItemJpaEntity s set s.coverPriceSnapshot = case");
+            for (int i = 0; i < chunk.size(); i++) {
+                jpql.append(" when s.titleId = :id").append(i).append(" then :v").append(i);
+            }
+            jpql.append(" else s.coverPriceSnapshot end where s.tenantId = :t and s.titleId in :ids");
+            var q = em.createQuery(jpql.toString()).setParameter("t", tenantId)
+                    .setParameter("ids", chunk.stream().map(Map.Entry::getKey).toList());
+            for (int i = 0; i < chunk.size(); i++) {
+                q.setParameter("id" + i, chunk.get(i).getKey()).setParameter("v" + i, chunk.get(i).getValue());
+            }
+            q.executeUpdate();
+        }
+    }
+
+    /** Số mặt hàng tối đa trong một câu UPDATE đồng bộ giá bìa (2 tham số mỗi mặt hàng, nằm xa giới hạn driver). */
+    private static final int COVER_PRICE_CHUNK = 100;
+
+    private static StorefrontRow toRow(StockItemJpaEntity e) {
+        return new StorefrontRow(e.getTitleId(), e.getSellingPrice() == null ? null : Money.of(e.getSellingPrice()),
+                e.getCoverPriceSnapshot(), e.getOnHand() - e.getReserved() > 0, e.getCreatedAt());
     }
 
     @Override
@@ -228,6 +337,9 @@ class StockPersistenceAdapter implements StockPort {
     private static StockItem toDomain(StockItemJpaEntity e) {
         return StockItem.restore(e.getId(), e.getTenantId(), e.getTitleId(), e.getOnHand(), e.getReserved(),
                 e.getSellingPrice() == null ? null : Money.of(e.getSellingPrice()), e.getLowStockThreshold(),
-                e.isActive(), 0);
+                e.isActive(), 0,
+                new StockItemDetails(e.getSku(), e.getSupplier(),
+                        e.getCostPrice() == null ? null : Money.of(e.getCostPrice()), e.getBinLocation(),
+                        e.getReorderQuantity(), e.getLastRestockedAt(), e.getNote()));
     }
 }

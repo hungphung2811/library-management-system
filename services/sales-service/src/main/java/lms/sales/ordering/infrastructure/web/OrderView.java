@@ -1,6 +1,7 @@
 package lms.sales.ordering.infrastructure.web;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import lms.sales.ordering.application.OrderResponse;
@@ -15,7 +16,8 @@ public record OrderView(UUID id, String orderNo, String channel, String status, 
                         int vatRateBps, boolean pricesIncludeVat, String currency, long subtotal, long discountTotal,
                         long vatTotal, long shippingFee, long grandTotal, Instant createdAt, Instant confirmedAt,
                         Instant paidAt, Instant completedAt, Instant cancelledAt, String cancelReason,
-                        UUID exchangeOfReturnId, long version, List<OrderResponse.Line> lines) {
+                        UUID exchangeOfReturnId, long version, List<OrderResponse.Line> lines,
+                        String customerNote, LocalDate expectedDeliveryDate) {
 
     public record Contact(String name, String phone, String address, Instant piiAnonymizedAt) {
         @Override
@@ -35,6 +37,7 @@ public record OrderView(UUID id, String orderNo, String channel, String status, 
                 o.paymentMethod().name(), o.fulfilment().name(), o.customerUserId(), contact, o.vatRateBps(),
                 o.pricesIncludeVat(), o.currency(), o.subtotal(), o.discountTotal(), o.vatTotal(), o.shippingFee(),
                 o.grandTotal(), o.createdAt(), o.confirmedAt(), o.paidAt(), o.completedAt(), o.cancelledAt(),
-                o.cancelReason(), o.exchangeOfReturnId(), o.version(), o.lines());
+                o.cancelReason(), o.exchangeOfReturnId(), o.version(), o.lines(), o.customerNote(),
+                o.expectedDeliveryDate());
     }
 }

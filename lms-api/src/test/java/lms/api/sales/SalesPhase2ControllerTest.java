@@ -55,7 +55,7 @@ class SalesPhase2ControllerTest {
 
     private static SalesOrderView order() {
         return new SalesOrderView(ID, "DH-000001", "CONFIRMED", "UNPAID", "ONLINE", "PICKUP", "BANK_TRANSFER", null, null,
-                List.of(), 100000, 0, 0, 0, 100000, 0, false, null, null, null, null, null, null, null, 1);
+                List.of(), 100000, 0, 0, 0, 100000, 0, false, null, null, null, null, null, null, null, 1, null, null);
     }
 
     private static ReturnView ret() {

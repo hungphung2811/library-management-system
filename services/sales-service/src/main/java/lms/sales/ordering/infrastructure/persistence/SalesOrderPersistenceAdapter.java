@@ -231,6 +231,7 @@ class SalesOrderPersistenceAdapter implements SalesOrderRepository {
                 Money.of(e.getGrandTotal()), discount, e.getClientRequestId(), e.getExchangeOfReturnId(),
                 e.getCreatedBy(), e.getCreatedAt(), e.getConfirmedAt(), e.getConfirmedBy(), e.getPaidAt(),
                 e.getCompletedAt(), e.getCancelledAt(), e.getCancelledBy(), e.getCancelReason(),
-                e.getPiiAnonymizedAt(), lines, payments, e.getVersion()));
+                e.getPiiAnonymizedAt(), lines, payments, e.getVersion(), e.getCustomerNote(), e.getStaffNote(),
+                e.getExpectedDeliveryDate()));
     }
 }

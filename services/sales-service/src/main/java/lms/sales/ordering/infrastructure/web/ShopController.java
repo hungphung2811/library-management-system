@@ -53,7 +53,12 @@ public class ShopController {
     public record PlaceOrderRequest(@NotEmpty @Size(max = 200) List<@Valid @NotNull LineRequest> lines,
                                     @NotNull Fulfilment fulfilment, @NotNull PaymentMethod paymentMethod,
                                     @NotNull @Valid RecipientRequest recipient,
-                                    @NotBlank @Size(max = 100) String clientRequestId) {
+                                    @NotBlank @Size(max = 100) String clientRequestId,
+                                    @Size(max = 500) String customerNote) {
+        @Override
+        public String toString() { // ghi chú của khách có thể chứa dữ liệu cá nhân: không in
+            return "PlaceOrderRequest[lines=" + (lines == null ? 0 : lines.size()) + "]";
+        }
     }
 
     public record MyOrdersQuery(Integer page, Integer size) {
@@ -77,7 +82,8 @@ public class ShopController {
                 request.lines().stream().map(l -> new PlaceOnlineOrderCommand.Line(l.titleId(), l.quantity()))
                         .toList(), request.fulfilment(), request.paymentMethod(),
                 new Recipient(request.recipient().name(), request.recipient().phone(),
-                        request.recipient().address()), RequestSupport.strictClientRequestId(request.clientRequestId())));
+                        request.recipient().address()), RequestSupport.strictClientRequestId(request.clientRequestId()),
+                request.customerNote()));
         return ResponseEntity.created(URI.create("/internal/sales/shop/orders/" + order.order().id()))
                 .body(ShopOrderView.from(order));
     }

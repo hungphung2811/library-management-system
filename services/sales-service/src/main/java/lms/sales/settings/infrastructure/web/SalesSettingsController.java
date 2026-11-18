@@ -2,7 +2,10 @@ package lms.sales.settings.infrastructure.web;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import com.fasterxml.jackson.core.type.TypeReference;
+import java.time.Duration;
 import java.time.Instant;
+import lms.cache.RequestCache;
 import lms.sales.settings.application.GetSalesSettingsUseCase;
 import lms.sales.settings.application.SalesSettingsView;
 import lms.sales.settings.application.UpdateSalesSettingsCommand;
@@ -40,25 +43,36 @@ public class SalesSettingsController {
         }
     }
 
+    /** Cache chỉ ở đường GET của controller; use case nghiệp vụ đọc cài đặt trực tiếp qua port, không qua cache. */
+    static final String CACHE_NAMESPACE = "sales.settings";
+    private static final Duration CACHE_TTL = Duration.ofSeconds(30);
+
     private final GetSalesSettingsUseCase getSettings;
     private final UpdateSalesSettingsUseCase updateSettings;
+    private final RequestCache cache;
 
-    public SalesSettingsController(GetSalesSettingsUseCase getSettings, UpdateSalesSettingsUseCase updateSettings) {
+    public SalesSettingsController(GetSalesSettingsUseCase getSettings, UpdateSalesSettingsUseCase updateSettings,
+                                   RequestCache cache) {
         this.getSettings = getSettings;
         this.updateSettings = updateSettings;
+        this.cache = cache;
     }
 
     @GetMapping
     public SettingsResponse get() {
-        return SettingsResponse.from(getSettings.execute(RequestSupport.tenant()));
+        var tenant = RequestSupport.tenant();
+        return cache.get(CACHE_NAMESPACE, "current", CACHE_TTL, new TypeReference<SettingsResponse>() { },
+                () -> SettingsResponse.from(getSettings.execute(tenant)));
     }
 
     @PutMapping
     public SettingsResponse update(@Valid @RequestBody UpdateSettingsRequest r,
                                    @AuthenticationPrincipal Jwt jwt) {
-        return SettingsResponse.from(updateSettings.execute(new UpdateSalesSettingsCommand(
+        SettingsResponse saved = SettingsResponse.from(updateSettings.execute(new UpdateSalesSettingsCommand(
                 RequestSupport.tenant(), RequestSupport.user(jwt), r.vatRateBps(), r.pricesIncludeVat(),
                 r.returnWindowDays(), r.fixedShippingFee(), r.lowStockThreshold(), r.walkInPiiRetentionMonths(),
                 r.version())));
+        cache.evictNamespace(CACHE_NAMESPACE);
+        return saved;
     }
 }

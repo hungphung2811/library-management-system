@@ -138,7 +138,7 @@ class SalesPhase2WebTest {
     private static final java.util.Set<String> SHOP_ORDER_FIELDS = java.util.Set.of("id", "orderNo", "status",
             "paymentStatus", "paymentMethod", "fulfilment", "recipient", "currency", "subtotal", "discountTotal",
             "vatTotal", "shippingFee", "grandTotal", "createdAt", "confirmedAt", "paidAt", "completedAt",
-            "cancelledAt", "lines");
+            "cancelledAt", "lines", "customerNote", "expectedDeliveryDate");
     private static final java.util.Set<String> SHOP_LINE_FIELDS = java.util.Set.of("titleId", "titleName",
             "quantity", "unitPrice", "lineTotal");
 
@@ -266,7 +266,7 @@ class SalesPhase2WebTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("COMPLETED"));
 
         // audit: người, số tiền, không PII
-        MvcResult r = mvc.perform(get(B + "/audit-log?action=ORDER_PAID").with(withKey("SalesAuditController/search")))
+        MvcResult r = mvc.perform(get(B + "/audit-log?action=ORDER_PAID&aggregateId=" + id).with(withKey("SalesAuditController/search")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(1)).andReturn();
         String body = r.getResponse().getContentAsString();
         assertThat(body).contains("\"amount\":100000").contains(USER.toString()).doesNotContain("Nguyen Van An")
@@ -313,9 +313,16 @@ class SalesPhase2WebTest {
     private JsonNode posOrder(UUID title, int qty) throws Exception {
         String body = "{\"lines\":[{\"titleId\":\"" + title + "\",\"quantity\":" + qty + "}],"
                 + "\"paymentMethod\":\"CASH\",\"clientRequestId\":\"" + UUID.randomUUID() + "\"}";
-        return json.readTree(mvc.perform(post(B + "/pos-orders").with(withKey("PosOrderController/create"))
+        JsonNode created = json.readTree(mvc.perform(post(B + "/pos-orders")
+                        .with(withKey("PosOrderController/create"))
                         .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString());
+        // ADR-0021: POS hai bước; thu ngân xác nhận thu thì đơn mới COMPLETED + PAID (trả hàng cần đơn đã bán)
+        h.intentUseCases.confirm(TENANT, USER, UUID.fromString(created.get("paymentIntent").get("id").asText()),
+                new lms.sales.ordering.application.PaymentIntentUseCases.ConfirmCommand(null, null));
+        return json.readTree(json.writeValueAsString(h.orderRepo.findById(TENANT,
+                UUID.fromString(created.get("id").asText())).map(lms.sales.ordering.application.OrderResponse::from)
+                .orElseThrow()));
     }
 
     private static String returnBody(JsonNode order, int qty, String extra) {

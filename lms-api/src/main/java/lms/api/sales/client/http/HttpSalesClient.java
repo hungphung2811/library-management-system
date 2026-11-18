@@ -24,6 +24,8 @@ public class HttpSalesClient implements SalesClient {
     private static final ParameterizedTypeReference<SalesPage<AuditLogEntryView>> AUDIT_PAGE = new ParameterizedTypeReference<>() { };
     private static final ParameterizedTypeReference<SalesPage<ShopContactSummaryView>> CONTACT_PAGE = new ParameterizedTypeReference<>() { };
 
+    private static final ParameterizedTypeReference<List<BannerAdminView>> BANNER_LIST = new ParameterizedTypeReference<>() { };
+
     private final RestClient client;
 
     public HttpSalesClient(RestClient client) {
@@ -76,6 +78,18 @@ public class HttpSalesClient implements SalesClient {
     public StockItemView updateStockItemPrice(UUID titleId, UpdateStockItemPriceRequest request) {
         return client.put().uri(BASE + "/stock-items/{titleId}/price", titleId).body(request).retrieve()
                 .body(StockItemView.class);
+    }
+
+    @Override
+    public StockItemDetailsView getStockItemDetails(UUID titleId) {
+        return client.get().uri(BASE + "/stock-items/{titleId}/details", titleId).retrieve()
+                .body(StockItemDetailsView.class);
+    }
+
+    @Override
+    public StockItemDetailsView updateStockItemDetails(UUID titleId, UpdateStockItemDetailsRequest request) {
+        return client.put().uri(BASE + "/stock-items/{titleId}/details", titleId).body(request).retrieve()
+                .body(StockItemDetailsView.class);
     }
 
     @Override
@@ -186,6 +200,16 @@ public class HttpSalesClient implements SalesClient {
     @Override
     public OrderContactView getOrderContact(UUID id) {
         return client.get().uri(BASE + "/orders/{id}/contact", id).retrieve().body(OrderContactView.class);
+    }
+
+    @Override
+    public OrderNotesView getOrderNotes(UUID id) {
+        return client.get().uri(BASE + "/orders/{id}/notes", id).retrieve().body(OrderNotesView.class);
+    }
+
+    @Override
+    public OrderNotesView updateOrderNotes(UUID id, UpdateOrderNotesRequest request) {
+        return client.put().uri(BASE + "/orders/{id}/notes", id).body(request).retrieve().body(OrderNotesView.class);
     }
 
     @Override
@@ -320,5 +344,31 @@ public class HttpSalesClient implements SalesClient {
     public ShopContactDetailView anonymizeContactRequest(UUID id) {
         return client.post().uri(BASE + "/contact-requests/{id}/anonymization", id).retrieve()
                 .body(ShopContactDetailView.class);
+    }
+
+    @Override
+    public List<BannerAdminView> listBanners() {
+        List<BannerAdminView> r = client.get().uri(BASE + "/banners").retrieve().body(BANNER_LIST);
+        return r == null ? List.of() : r;
+    }
+
+    @Override
+    public BannerAdminView getBanner(UUID id) {
+        return client.get().uri(BASE + "/banners/{id}", id).retrieve().body(BannerAdminView.class);
+    }
+
+    @Override
+    public BannerAdminView createBanner(SaveBannerRequest request) {
+        return client.post().uri(BASE + "/banners").body(request).retrieve().body(BannerAdminView.class);
+    }
+
+    @Override
+    public BannerAdminView updateBanner(UUID id, SaveBannerRequest request) {
+        return client.put().uri(BASE + "/banners/{id}", id).body(request).retrieve().body(BannerAdminView.class);
+    }
+
+    @Override
+    public void deleteBanner(UUID id) {
+        client.delete().uri(BASE + "/banners/{id}", id).retrieve().toBodilessEntity();
     }
 }

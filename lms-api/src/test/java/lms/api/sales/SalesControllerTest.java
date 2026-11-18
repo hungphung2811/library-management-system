@@ -54,7 +54,7 @@ class SalesControllerTest {
 
     private static SalesOrderView order(UUID id) {
         return new SalesOrderView(id, "POS-1", "COMPLETED", "PAID", "POS", null, "CASH", null, null, List.of(), 100000, 0,
-                5000, 0, 105000, 500, false, null, null, null, null, null, null, null, 0);
+                5000, 0, 105000, 500, false, null, null, null, null, null, null, null, 0, null, null);
     }
 
     @Test
@@ -84,7 +84,7 @@ class SalesControllerTest {
 
     @Test
     void dangKyMatHangTra201KemLocationVaThieuTitleIdBi400() throws Exception {
-        when(sales.registerStockItem(any())).thenReturn(new StockItemView(TITLE, "S", 0, 0, 0, null, 90000, true));
+        when(sales.registerStockItem(any())).thenReturn(new StockItemView(TITLE, "S", 0, 0, 0, null, 90000, true, null, null, null, null, null));
         mvc.perform(post("/api/sales/stock-items").with(jwt()).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"titleId\":\"" + TITLE + "\"}"))
                 .andExpect(status().isCreated())

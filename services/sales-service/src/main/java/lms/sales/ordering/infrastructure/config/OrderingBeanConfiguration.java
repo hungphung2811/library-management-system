@@ -5,6 +5,7 @@ import lms.sales.ordering.application.AnonymizeWalkInBatchUseCase;
 import lms.sales.ordering.application.AnonymizeWalkInContactsUseCase;
 import lms.sales.ordering.application.CommitOnlineOrderUseCase;
 import lms.sales.ordering.application.CommitPosOrderUseCase;
+import lms.sales.ordering.application.CommitPosPendingOrderUseCase;
 import lms.sales.ordering.application.CommitReturnUseCase;
 import lms.sales.ordering.application.CreateReturnUseCase;
 import lms.sales.ordering.application.OrderQueryUseCases;
@@ -24,6 +25,7 @@ import lms.sales.shared.application.SalesAuditPort;
 import lms.sales.shared.application.TenantDirectoryPort;
 import lms.sales.stock.application.CatalogLookupPort;
 import lms.sales.stock.application.StockService;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -45,8 +47,10 @@ public class OrderingBeanConfiguration {
 
     @Bean
     PlacePosOrderUseCase placePosOrderUseCase(SalesOrderRepository orders, CatalogLookupPort catalog,
-                                              CommitPosOrderUseCase commit) {
-        return new PlacePosOrderUseCase(orders, catalog, commit);
+                                              CommitPosOrderUseCase commit,
+                                              ObjectProvider<CommitPosPendingOrderUseCase> qrCommit) {
+        // Đơn QR (ADR-0020) chỉ có khi sandbox thanh toán bật; thiếu thì POS từ chối QR bằng 400
+        return new PlacePosOrderUseCase(orders, catalog, commit, qrCommit.getIfAvailable());
     }
 
     @Bean

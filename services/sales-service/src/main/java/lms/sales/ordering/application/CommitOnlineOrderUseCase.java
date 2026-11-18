@@ -74,7 +74,7 @@ public class CommitOnlineOrderUseCase {
         SalesOrder order = SalesOrder.placeOnline(cmd.tenantId(), numbers.next(cmd.tenantId(),
                         DocumentNumberPort.ORDER), cmd.customerUserId(), now, cmd.paymentMethod(), cmd.fulfilment(),
                 cmd.recipient(), drafts, new PriceCalculator.TaxPolicy(settings.vatRate(),
-                        settings.pricesIncludeVat()), cmd.clientRequestId());
+                        settings.pricesIncludeVat()), cmd.clientRequestId(), cmd.customerNote());
 
         // Giữ tồn trong cùng transaction: hết hàng thì ném INSUFFICIENT_STOCK và rollback cả đơn
         stockService.reserveAll(cmd.tenantId(), cmd.customerUserId(),

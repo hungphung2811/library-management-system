@@ -16,6 +16,7 @@ import lms.sales.stock.application.ListStockItemsUseCase;
 import lms.sales.stock.application.ReconcileStockUseCase;
 import lms.sales.stock.application.RegisterStockItemUseCase;
 import lms.sales.stock.application.StockPort;
+import lms.sales.stock.application.StockItemDetailsUseCases;
 import lms.sales.stock.application.StockService;
 import lms.sales.stock.application.StocktakeUseCase;
 import lms.sales.stock.application.SupplierRepository;
@@ -62,6 +63,11 @@ public class StockBeanConfiguration {
     ListStockItemsUseCase listStockItemsUseCase(StockPort stock, CatalogLookupPort catalog,
                                                 GetSalesSettingsUseCase settings) {
         return new ListStockItemsUseCase(stock, catalog, settings);
+    }
+
+    @Bean
+    StockItemDetailsUseCases stockItemDetailsUseCases(StockPort stock, SalesAuditPort audit, Clock clock) {
+        return new StockItemDetailsUseCases(stock, audit, clock);
     }
 
     @Bean

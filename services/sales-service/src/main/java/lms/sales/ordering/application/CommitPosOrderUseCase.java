@@ -84,7 +84,7 @@ public class CommitPosOrderUseCase {
                         DocumentNumberPort.ORDER), cmd.userId(), now, cmd.paymentMethod(), cmd.customerUserId(),
                 cmd.walkInName(), cmd.walkInPhone(), drafts, cmd.orderDiscount(),
                 new PriceCalculator.TaxPolicy(settings.vatRate(), settings.pricesIncludeVat()),
-                cmd.clientRequestId(), cmd.exchangeOfReturnId());
+                cmd.clientRequestId(), cmd.exchangeOfReturnId(), cmd.customerNote());
 
         stockService.sellAll(cmd.tenantId(), cmd.userId(),
                 cmd.lines().stream().map(l -> new StockLine(l.titleId(), l.quantity())).toList(), "ORDER",

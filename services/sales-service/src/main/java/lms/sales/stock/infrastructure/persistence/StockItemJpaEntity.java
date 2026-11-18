@@ -45,6 +45,37 @@ class StockItemJpaEntity {
     @Column(name = "active", nullable = false)
     private boolean active;
 
+    /** Bản sao giá bìa chỉ để sắp (ADR-0019 2.1); ghi bằng JPQL bulk ở adapter. */
+    @Column(name = "cover_price_snapshot")
+    private Long coverPriceSnapshot;
+
+    /** Cột sinh COALESCE(selling_price, cover_price_snapshot): chỉ đọc, DB tự tính. */
+    @Column(name = "effective_price", insertable = false, updatable = false)
+    private Long effectivePrice;
+
+    /** Thông tin quản lý tùy chọn (V8). cost_price và note là dữ liệu nội bộ. */
+    @Column(name = "sku", length = 40)
+    private String sku;
+
+    @Column(name = "supplier")
+    private String supplier;
+
+    @Column(name = "cost_price")
+    private Long costPrice;
+
+    @Column(name = "bin_location", length = 64)
+    private String binLocation;
+
+    @Column(name = "reorder_quantity")
+    private Integer reorderQuantity;
+
+    /** Cập nhật bằng JPQL bulk khi có phiếu nhập (touchLastRestocked) hoặc qua API chi tiết. */
+    @Column(name = "last_restocked_at")
+    private Instant lastRestockedAt;
+
+    @Column(name = "note", length = 500)
+    private String note;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -68,6 +99,17 @@ class StockItemJpaEntity {
         this.updatedAt = this.createdAt;
     }
 
+    void updateDetails(String sku, String supplier, Long costPrice, String binLocation, Integer reorderQuantity,
+                       Instant lastRestockedAt, String note) {
+        this.sku = sku;
+        this.supplier = supplier;
+        this.costPrice = costPrice;
+        this.binLocation = binLocation;
+        this.reorderQuantity = reorderQuantity;
+        this.lastRestockedAt = lastRestockedAt;
+        this.note = note;
+    }
+
     void updateAttributes(Long sellingPrice, Integer lowStockThreshold, boolean active) {
         this.sellingPrice = sellingPrice;
         this.lowStockThreshold = lowStockThreshold;
@@ -83,4 +125,14 @@ class StockItemJpaEntity {
     Long getSellingPrice() { return sellingPrice; }
     Integer getLowStockThreshold() { return lowStockThreshold; }
     boolean isActive() { return active; }
+    Instant getCreatedAt() { return createdAt; }
+    Long getCoverPriceSnapshot() { return coverPriceSnapshot; }
+    Long getEffectivePrice() { return effectivePrice; }
+    String getSku() { return sku; }
+    String getSupplier() { return supplier; }
+    Long getCostPrice() { return costPrice; }
+    String getBinLocation() { return binLocation; }
+    Integer getReorderQuantity() { return reorderQuantity; }
+    Instant getLastRestockedAt() { return lastRestockedAt; }
+    String getNote() { return note; }
 }
