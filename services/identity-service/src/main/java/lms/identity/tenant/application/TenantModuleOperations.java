@@ -76,6 +76,16 @@ public class TenantModuleOperations {
         return tenants.findById(tenantId).map(t -> new TenantBrief(t.id(), t.code(), t.name()));
     }
 
+    /** Tên/mã của nhiều tenant bằng một truy vấn (tenant không tồn tại thì không có khóa); tránh N+1 khi dựng danh sách. */
+    public java.util.Map<UUID, TenantBrief> briefs(java.util.Collection<UUID> tenantIds) {
+        java.util.Map<UUID, TenantBrief> out = new java.util.HashMap<>();
+        if (tenantIds.isEmpty()) return out;
+        for (Tenant t : tenants.findAllByIds(tenantIds)) {
+            out.put(t.id(), new TenantBrief(t.id(), t.code(), t.name()));
+        }
+        return out;
+    }
+
     /** Module đang bật, theo thứ tự enum. */
     public List<String> enabledModules(UUID tenantId) {
         return modules.findByTenant(tenantId).enabled().stream().map(ModuleCode::name).toList();

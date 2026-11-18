@@ -5,7 +5,9 @@ import lms.identity.department.application.CreateDepartmentUseCase;
 import lms.identity.department.application.GetDepartmentUseCase;
 import lms.identity.department.application.ListDepartmentsUseCase;
 import lms.identity.department.application.UpdateDepartmentUseCase;
+import lms.cache.RequestCache;
 import lms.identity.department.domain.DepartmentRepository;
+import lms.identity.department.infrastructure.cache.CachedDepartmentUseCases;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -14,18 +16,18 @@ import org.springframework.context.annotation.Configuration;
 public class DepartmentBeanConfiguration {
 
     @Bean
-    CreateDepartmentUseCase createDepartmentUseCase(DepartmentRepository repository) {
-        return new CreateDepartmentUseCase(repository);
+    CreateDepartmentUseCase createDepartmentUseCase(DepartmentRepository repository, RequestCache cache) {
+        return new CachedDepartmentUseCases.EvictingCreate(repository, cache);
     }
 
     @Bean
-    UpdateDepartmentUseCase updateDepartmentUseCase(DepartmentRepository repository) {
-        return new UpdateDepartmentUseCase(repository);
+    UpdateDepartmentUseCase updateDepartmentUseCase(DepartmentRepository repository, RequestCache cache) {
+        return new CachedDepartmentUseCases.EvictingUpdate(repository, cache);
     }
 
     @Bean
-    ChangeDepartmentStatusUseCase changeDepartmentStatusUseCase(DepartmentRepository repository) {
-        return new ChangeDepartmentStatusUseCase(repository);
+    ChangeDepartmentStatusUseCase changeDepartmentStatusUseCase(DepartmentRepository repository, RequestCache cache) {
+        return new CachedDepartmentUseCases.EvictingChangeStatus(repository, cache);
     }
 
     @Bean
@@ -34,7 +36,7 @@ public class DepartmentBeanConfiguration {
     }
 
     @Bean
-    ListDepartmentsUseCase listDepartmentsUseCase(DepartmentRepository repository) {
-        return new ListDepartmentsUseCase(repository);
+    ListDepartmentsUseCase listDepartmentsUseCase(DepartmentRepository repository, RequestCache cache) {
+        return new CachedDepartmentUseCases.CachedList(repository, cache);
     }
 }

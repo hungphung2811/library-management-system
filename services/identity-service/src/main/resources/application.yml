@@ -24,8 +24,21 @@ spring:
     consumer:
       group-id: identity-service
       auto-offset-reset: latest
+  # Cache request (cache-common): timeout ngắn để Redis chết không làm chậm request
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 200ms
+      connect-timeout: 200ms
+      repositories:
+        enabled: false
 
 management:
+  health:
+    # Redis chỉ là cache phụ: Redis chết không được làm identity-service DOWN
+    redis:
+      enabled: false
   endpoints:
     web:
       exposure:

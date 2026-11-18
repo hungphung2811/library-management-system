@@ -11,6 +11,7 @@ import jakarta.persistence.Table;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.TenantId;
 import lms.tenant.TenantContext;
 
@@ -40,7 +41,9 @@ class RoleJpaEntity {
     @Column(name = "signup_default", nullable = false)
     private boolean signupDefault;
 
+    // @BatchSize: nạp role_permissions của nhiều role bằng một câu "role_id in (...)" thay vì mỗi role một câu (N+1)
     @ElementCollection(fetch = FetchType.EAGER)
+    @BatchSize(size = 32)
     @CollectionTable(name = "role_permissions", joinColumns = @JoinColumn(name = "role_id"))
     @Column(name = "permission_code", nullable = false)
     private Set<String> permissionCodes = new HashSet<>();

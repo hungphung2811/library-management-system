@@ -22,13 +22,15 @@ import lms.identity.tenant.application.TenantCreationOptions;
 import lms.identity.user.application.CreateUserRequest;
 import lms.identity.user.application.EnsureReaderCardUseCase;
 import lms.identity.user.application.EnsureUserUseCase;
+import lms.identity.user.domain.ReaderPersonalInfo;
+import lms.identity.user.domain.UserPersonalInfo;
 import lms.tenant.TenantContext;
 
 /**
  * Seed phần identity của dữ liệu demo (ADR-0018): tenant {@code demo} (LENDING + SALES, id tất định
  * {@link DemoIds#tenant()}), một hợp đồng hiệu lực sắp hết hạn, quản trị viên tenant, thủ thư, quản lý cửa hàng và độc
  * giả, tất cả với id từ {@link DemoPlan}. Idempotent theo khóa tự nhiên (mã tenant, id người dùng, tên hợp đồng, số
- * thẻ): chạy lại chỉ bổ sung phần thiếu, không cập nhật phần đã có. Chỉ dùng use case sẵn có của các context (kèm vài
+ * thẻ): chạy lại chỉ bổ sung phần thiếu; bản ghi đã có chỉ được điền các trường cá nhân còn null, không đè giá trị đã có. Chỉ dùng use case sẵn có của các context (kèm vài
  * lớp bọc "đảm bảo tồn tại"); event Kafka do các use case phát ra là event thật và được giữ.
  */
 public class SeedDemoIdentityUseCase {
@@ -80,6 +82,7 @@ public class SeedDemoIdentityUseCase {
         ensureTenant(tenantId, admin, password, counter);
         ensureContract(tenantId, plan.today(), counter);
         TenantContext.runAs(tenantId, () -> {
+            ensureUser.fillMissing(admin.id(), DemoPersonProfiles.staff(admin));
             ensureStaff(staffOf(plan, StaffRole.LIBRARIAN), LIBRARIAN_ROLE, password, counter);
             ensureStaff(staffOf(plan, StaffRole.STORE_MANAGER), STORE_MANAGER_ROLE, password, counter);
             for (ReaderPlan reader : plan.readers()) ensureReader(reader, plan.today(), password, counter);
@@ -121,6 +124,7 @@ public class SeedDemoIdentityUseCase {
         boolean created = ensureUser.execute(new CreateUserRequest(staff.id(), staff.username(), staff.fullName(),
                 staff.email(), null, password, false));
         counter.count(created);
+        ensureUser.fillMissing(staff.id(), DemoPersonProfiles.staff(staff));
         counter.count(assignRole.execute(staff.id(), roleName));
     }
 
@@ -128,8 +132,12 @@ public class SeedDemoIdentityUseCase {
         counter.count(ensureUser.execute(new CreateUserRequest(reader.id(), reader.username(), reader.fullName(),
                 reader.email(), null, password, false)));
         boolean lecturer = reader.index() % 6 == 5;
+        ReaderPersonalInfo info = DemoPersonProfiles.reader(reader, lecturer, today);
+        // thông tin cá nhân dùng chung cũng ghi vào users (chỉ điền trường còn null)
+        ensureUser.fillMissing(reader.id(), new UserPersonalInfo(info.phone(), info.dateOfBirth(), info.gender(),
+                info.address(), null, null, null));
         counter.count(ensureReaderCard.execute(reader.id(), reader.cardNo(), reader.fullName(), reader.email(),
-                lecturer, today.plusYears(1)));
+                lecturer, today.plusYears(1), info));
     }
 
     private static StaffPlan staffOf(DemoPlan plan, StaffRole role) {

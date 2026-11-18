@@ -2,6 +2,7 @@ package lms.identity.user.application;
 
 import java.time.LocalDate;
 import java.util.UUID;
+import lms.identity.user.domain.ReaderPersonalInfo;
 import lms.identity.user.domain.ReaderProfileRepository;
 import lms.identity.user.domain.ReaderType;
 
@@ -22,9 +23,25 @@ public class EnsureReaderCardUseCase {
     /** @return true nếu vừa cấp thẻ, false nếu người dùng đã có thẻ */
     public boolean execute(UUID userId, String cardNo, String fullName, String email, boolean lecturer,
                            LocalDate cardExpiryDate) {
-        if (profiles.existsByUserId(userId)) return false;
+        return execute(userId, cardNo, fullName, email, lecturer, cardExpiryDate, null);
+    }
+
+    /**
+     * Như trên; thẻ đã có thì chỉ điền các trường cá nhân còn thiếu từ {@code personalInfo} (không đè giá trị đã có),
+     * và vẫn trả false vì không cấp thẻ mới.
+     */
+    public boolean execute(UUID userId, String cardNo, String fullName, String email, boolean lecturer,
+                           LocalDate cardExpiryDate, ReaderPersonalInfo personalInfo) {
+        if (profiles.existsByUserId(userId)) {
+            if (personalInfo != null) {
+                profiles.findByUserId(userId).ifPresent(p -> {
+                    if (p.fillMissingPersonalInfo(personalInfo)) profiles.save(p);
+                });
+            }
+            return false;
+        }
         issueCard.execute(new IssueReaderCardCommand(userId, cardNo, fullName, email,
-                lecturer ? ReaderType.LECTURER : ReaderType.STUDENT, cardExpiryDate));
+                lecturer ? ReaderType.LECTURER : ReaderType.STUDENT, cardExpiryDate, null, null, personalInfo));
         return true;
     }
 }

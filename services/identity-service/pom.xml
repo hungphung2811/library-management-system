@@ -28,6 +28,15 @@
         </dependency>
         <dependency>
             <groupId>com.company</groupId>
+            <artifactId>cache-common</artifactId>
+        </dependency>
+        <dependency>
+            <!-- Cache request (cache-common): Lettuce tự nối lại; Redis chỉ là cache phụ -->
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.company</groupId>
             <artifactId>messaging-common</artifactId>
         </dependency>
         <dependency>

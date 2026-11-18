@@ -418,4 +418,29 @@ class UserManagementTest {
         issue.execute(new IssueReaderCardCommand(UUID.randomUUID(), "SV003", "Quầy", "q@x.vn", ReaderType.STUDENT, expiry));
         assertEquals(2, profiles.size());
     }
+
+    @Test
+    void taoVaSuaThongTinCaNhan() {
+        UserResponse created = create.execute(new CreateUserRequest(null, "carol", "Carol", "c@x.vn", null, null, null,
+                "0912 345 678", LocalDate.of(1992, 3, 4), lms.identity.user.domain.Gender.FEMALE, "Đà Nẵng", null,
+                "Thủ thư", "NV007"));
+        assertEquals("0912 345 678", created.phone());
+        assertEquals("NV007", created.employeeCode());
+        assertEquals("0912 345 678", store.get(0).personalInfo().phone());
+
+        // sửa không gửi trường cá nhân thì giữ nguyên
+        UserResponse same = update.execute(adminA, created.id(), new UpdateUserRequest("Carol", "c@x.vn", null));
+        assertEquals("Đà Nẵng", same.address());
+        assertEquals("Thủ thư", same.jobTitle());
+
+        // gửi một trường thì chỉ đổi trường đó và được lưu
+        UserResponse changed = update.execute(adminA, created.id(), new UpdateUserRequest("Carol", "c@x.vn", null,
+                null, null, null, "Huế", null, null, null));
+        assertEquals("Huế", changed.address());
+        assertEquals("0912 345 678", changed.phone());
+        assertEquals("Huế", store.get(0).personalInfo().address());
+
+        assertThrows(InvalidUserException.class, () -> create.execute(new CreateUserRequest(null, "dan", "Dan", "d@x.vn",
+                null, null, null, "abc", null, null, null, null, null, null)));
+    }
 }

@@ -1,6 +1,7 @@
 package lms.identity.user.application;
 
 import lms.identity.user.domain.DuplicateReaderException;
+import lms.identity.user.domain.ReaderPersonalInfo;
 import lms.identity.user.domain.ReaderProfile;
 import lms.identity.user.domain.ReaderProfileRepository;
 import lms.identity.user.domain.UserNotFoundException;
@@ -39,7 +40,7 @@ public class IssueReaderCardUseCase {
         UUID tenantId = TenantContext.require();
         LocalDate today = LocalDate.now(clock);
         ReaderProfile profile = ReaderProfile.issue(c.userId(), c.cardNo(), c.fullName(), c.email(),
-                c.readerType(), c.cardExpiryDate(), today);
+                c.readerType(), c.cardExpiryDate(), today, c.personalInfo());
         if (repository.existsByUserId(profile.userId())) {
             throw new DuplicateReaderException("Người dùng đã có thẻ độc giả: " + profile.userId());
         }
@@ -48,8 +49,10 @@ public class IssueReaderCardUseCase {
         }
         if (c.temporaryPassword() != null) {
             String username = c.username() == null || c.username().isBlank() ? profile.cardNo() : c.username();
+            ReaderPersonalInfo i = profile.personalInfo();
             createUser.execute(new CreateUserRequest(profile.userId(), username, profile.fullName(), profile.email(),
-                    null, c.temporaryPassword(), true));
+                    null, c.temporaryPassword(), true, i.phone(), i.dateOfBirth(), i.gender(), i.address(),
+                    null, null, null));
         } else if ((users.existsById(profile.userId()) || credentials.exists(profile.userId()))
                 && !users.hasMembership(profile.userId(), tenantId)) {
             throw new UserNotFoundException(profile.userId());

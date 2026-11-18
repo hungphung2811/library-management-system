@@ -10,6 +10,7 @@ import lms.api.identity.dto.UserDtos.IssueReaderCardRequest;
 import lms.api.identity.dto.UserDtos.RevokedSessionsView;
 import lms.api.identity.dto.UserDtos.ReaderProfileView;
 import lms.api.identity.dto.UserDtos.RenewReaderCardRequest;
+import lms.api.identity.dto.UserDtos.UpdateReaderProfileRequest;
 import lms.api.identity.dto.UserDtos.ResetPasswordRequest;
 import lms.api.identity.dto.UserDtos.SearchUsersQuery;
 import lms.api.identity.dto.UserDtos.UpdateUserRequest;
@@ -145,6 +146,12 @@ public class UserController {
                                                              @Valid @RequestBody IssueReaderCardRequest request) {
         ReaderProfileView created = users.issueReaderCard(userId, request);
         return ResponseEntity.created(URI.create("/api/users/" + userId + "/reader-profile")).body(created);
+    }
+
+    @PutMapping("/{userId}/reader-profile")
+    public ReaderProfileView updateReaderProfile(@PathVariable UUID userId,
+                                                 @Valid @RequestBody UpdateReaderProfileRequest request) {
+        return users.updateReaderProfile(userId, request);
     }
 
     @PutMapping("/{userId}/reader-profile/card-expiry")

@@ -19,6 +19,7 @@ public class User {
     private String fullName;
     private String email;
     private UserStatus status;
+    private UserPersonalInfo personalInfo = UserPersonalInfo.EMPTY;
 
     private User(UUID id, String username, String fullName, String email, UserStatus status) {
         if (id == null) throw new InvalidUserException("id không được null");
@@ -55,6 +56,26 @@ public class User {
         return new User(id, username, fullName, email, status);
     }
 
+    public static User restore(UUID id, String username, String fullName, String email, UserStatus status,
+                               UserPersonalInfo personalInfo) {
+        User u = new User(id, username, fullName, email, status);
+        u.personalInfo = personalInfo == null ? UserPersonalInfo.EMPTY : personalInfo;
+        return u;
+    }
+
+    /** Ghi đè các trường cá nhân khác null của {@code patch}; true nếu có thay đổi. */
+    public boolean mergePersonalInfo(UserPersonalInfo patch) {
+        UserPersonalInfo merged = personalInfo.merge(patch);
+        boolean changed = !merged.equals(personalInfo);
+        this.personalInfo = merged;
+        return changed;
+    }
+
+    /** Chỉ điền trường cá nhân đang null (seed idempotent); true nếu có thay đổi. */
+    public boolean fillMissingPersonalInfo(UserPersonalInfo defaults) {
+        return mergePersonalInfo(personalInfo.fillMissing(defaults));
+    }
+
     public void update(String newFullName, String newEmail) {
         applyProfile(newFullName, newEmail);
     }
@@ -82,4 +103,5 @@ public class User {
     public String fullName() { return fullName; }
     public String email() { return email; }
     public UserStatus status() { return status; }
+    public UserPersonalInfo personalInfo() { return personalInfo; }
 }

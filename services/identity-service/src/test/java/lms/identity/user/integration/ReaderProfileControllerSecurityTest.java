@@ -60,6 +60,7 @@ class ReaderProfileControllerSecurityTest {
     @MockitoBean IssueReaderCardUseCase issueCard;
     @MockitoBean GetReaderProfileUseCase getProfile;
     @MockitoBean RenewReaderCardUseCase renewCard;
+    @MockitoBean lms.identity.user.application.UpdateReaderProfileUseCase updateProfile;
     @MockitoBean ChangeReaderStatusUseCase changeStatus;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean PermissionKeyRegistrar permissionKeyRegistrar;
@@ -300,5 +301,58 @@ class ReaderProfileControllerSecurityTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"ACTIVE\"}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("READER_NOT_FOUND"));
+    }
+
+    // ---------- thông tin cá nhân (PUT /{userId}/reader-profile) ----------
+
+    @Test
+    void suaThongTinCaNhanCanKhoaReaderProfileControllerUpdateVaTraDuTruong() throws Exception {
+        String url = "/internal/users/" + readerId + "/reader-profile";
+        String body = "{\"phone\":\"0912 345 678\",\"faculty\":\"Khoa Kinh tế\",\"className\":\"KT-K22A\","
+                + "\"memberCode\":\"SV2100123\",\"gender\":\"FEMALE\",\"dateOfBirth\":\"2003-05-20\"}";
+        when(updateProfile.execute(eq(readerId), any())).thenReturn(new ReaderProfileResponse(readerId, "SV001",
+                "Nguyễn Văn A", "a@x.vn", ReaderType.STUDENT, EXPIRY, ReaderStatus.ACTIVE, true,
+                "0912 345 678", LocalDate.of(2003, 5, 20), lms.identity.user.domain.Gender.FEMALE, null,
+                "Khoa Kinh tế", "KT-K22A", "SV2100123", null));
+
+        mvc.perform(put(url).contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isUnauthorized());
+        mvc.perform(put(url).with(with("ReaderProfileController/get")).contentType(MediaType.APPLICATION_JSON)
+                .content(body)).andExpect(status().isForbidden());
+        mvc.perform(put(url).with(with("ReaderProfileController/update")).contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.phone").value("0912 345 678"))
+                .andExpect(jsonPath("$.faculty").value("Khoa Kinh tế"))
+                .andExpect(jsonPath("$.className").value("KT-K22A"))
+                .andExpect(jsonPath("$.memberCode").value("SV2100123"))
+                .andExpect(jsonPath("$.gender").value("FEMALE"))
+                .andExpect(jsonPath("$.dateOfBirth").value("2003-05-20"));
+    }
+
+    @Test
+    void suaThongTinCaNhanSaiDinhDangTra400() throws Exception {
+        String url = "/internal/users/" + readerId + "/reader-profile";
+        for (String bad : List.of("{\"phone\":\"abc123\"}", "{\"dateOfBirth\":\"2999-01-01\"}",
+                "{\"gender\":\"ROBOT\"}", "{\"className\":\"" + "x".repeat(51) + "\"}")) {
+            mvc.perform(put(url).with(admin()).contentType(MediaType.APPLICATION_JSON).content(bad))
+                    .andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(updateProfile);
+    }
+
+    @Test
+    void capTheNhanThongTinCaNhan() throws Exception {
+        when(issueCard.execute(any())).thenReturn(profile(ReaderStatus.ACTIVE));
+        mvc.perform(post("/internal/users/" + readerId + "/reader-profile").with(admin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(issueBody(",\"phone\":\"+84 912 345 678\",\"faculty\":\"Khoa CNTT\","
+                                + "\"memberCode\":\"SV01\",\"cardIssuedDate\":\"2029-01-01\"")))
+                .andExpect(status().isCreated());
+        ArgumentCaptor<IssueReaderCardCommand> cmd = ArgumentCaptor.forClass(IssueReaderCardCommand.class);
+        verify(issueCard).execute(cmd.capture());
+        org.junit.jupiter.api.Assertions.assertEquals("Khoa CNTT", cmd.getValue().personalInfo().faculty());
+        org.junit.jupiter.api.Assertions.assertEquals("+84 912 345 678", cmd.getValue().personalInfo().phone());
+        org.junit.jupiter.api.Assertions.assertEquals(LocalDate.of(2029, 1, 1),
+                cmd.getValue().personalInfo().cardIssuedDate());
     }
 }

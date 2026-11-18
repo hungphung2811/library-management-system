@@ -411,4 +411,36 @@ class UserControllerSecurityTest {
         mvc.perform(get("/internal/users/" + ID + "/sessions").with(admin()))
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("USER_NOT_FOUND"));
     }
+
+    @Test
+    void taoNguoiDungNhanThongTinCaNhanVaTraDuTruong() throws Exception {
+        when(create.execute(any())).thenReturn(new UserResponse(ID, "nva", "Nguyễn Văn A", "a@lib.vn", null,
+                UserStatus.ACTIVE, null, false, null, "0912345678", java.time.LocalDate.of(1990, 4, 2),
+                lms.identity.user.domain.Gender.MALE, "12 Nguyễn Trãi, Hà Nội", "https://cdn.x/a.png", "Thủ thư",
+                "NV001"));
+        String body = "{\"username\":\"nva\",\"fullName\":\"Nguyễn Văn A\",\"email\":\"a@lib.vn\","
+                + "\"phone\":\"0912345678\",\"dateOfBirth\":\"1990-04-02\",\"gender\":\"MALE\","
+                + "\"address\":\"12 Nguyễn Trãi, Hà Nội\",\"avatarUrl\":\"https://cdn.x/a.png\","
+                + "\"jobTitle\":\"Thủ thư\",\"employeeCode\":\"NV001\"}";
+        mvc.perform(json(post("/internal/users"), body).with(admin()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.phone").value("0912345678"))
+                .andExpect(jsonPath("$.dateOfBirth").value("1990-04-02"))
+                .andExpect(jsonPath("$.gender").value("MALE"))
+                .andExpect(jsonPath("$.avatarUrl").value("https://cdn.x/a.png"))
+                .andExpect(jsonPath("$.jobTitle").value("Thủ thư"))
+                .andExpect(jsonPath("$.employeeCode").value("NV001"));
+    }
+
+    @Test
+    void taoNguoiDungThongTinCaNhanSaiTra400() throws Exception {
+        String base = "\"username\":\"nva\",\"fullName\":\"A\",\"email\":\"a@lib.vn\"";
+        for (String extra : List.of("\"phone\":\"09x\"", "\"phone\":\"" + "1".repeat(21) + "\"",
+                "\"dateOfBirth\":\"2999-01-01\"", "\"gender\":\"X\"", "\"avatarUrl\":\"ftp://x/y.png\"",
+                "\"address\":\"" + "a".repeat(501) + "\"", "\"employeeCode\":\"" + "N".repeat(33) + "\"")) {
+            mvc.perform(json(post("/internal/users"), "{" + base + "," + extra + "}").with(admin()))
+                    .andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(create);
+    }
 }

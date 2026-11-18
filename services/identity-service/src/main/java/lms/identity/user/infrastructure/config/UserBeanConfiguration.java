@@ -19,6 +19,7 @@ import lms.identity.user.infrastructure.client.InProcessDepartmentLookupAdapter;
 import lms.identity.user.infrastructure.client.InProcessTenantMembershipAdapter;
 import lms.identity.user.application.FindReaderUserIdsByEmailUseCase;
 import lms.identity.user.application.GetReaderProfileUseCase;
+import lms.identity.user.application.UpdateReaderProfileUseCase;
 import lms.identity.user.application.IssueReaderCardUseCase;
 import lms.identity.user.application.RenewReaderCardUseCase;
 import lms.identity.user.domain.ReaderProfileRepository;
@@ -48,6 +49,11 @@ public class UserBeanConfiguration {
     @Bean
     RenewReaderCardUseCase renewReaderCardUseCase(ReaderProfileRepository repository, Clock clock) {
         return new RenewReaderCardUseCase(repository, clock);
+    }
+
+    @Bean
+    UpdateReaderProfileUseCase updateReaderProfileUseCase(ReaderProfileRepository repository, Clock clock) {
+        return new UpdateReaderProfileUseCase(repository, clock);
     }
 
     @Bean

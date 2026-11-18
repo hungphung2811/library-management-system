@@ -36,6 +36,8 @@ import lms.identity.tenant.domain.TenantStatus;
 import lms.identity.user.application.CreateUserRequest;
 import lms.identity.user.application.EnsureReaderCardUseCase;
 import lms.identity.user.application.EnsureUserUseCase;
+import lms.identity.user.domain.ReaderPersonalInfo;
+import lms.identity.user.domain.UserPersonalInfo;
 import lms.tenant.TenantContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -96,7 +98,7 @@ class SeedDemoIdentityUseCaseTest {
             return users.add(i.<CreateUserRequest>getArgument(0).id());
         });
         when(ensureCard.execute(any(UUID.class), anyString(), anyString(), anyString(), anyBoolean(),
-                any(LocalDate.class))).thenAnswer(i -> cards.add(i.getArgument(0)));
+                any(LocalDate.class), any(ReaderPersonalInfo.class))).thenAnswer(i -> cards.add(i.getArgument(0)));
         when(assignRole.execute(any(UUID.class), anyString()))
                 .thenAnswer(i -> roleGrants.add(i.getArgument(0) + "/" + i.getArgument(1)));
     }
@@ -204,5 +206,39 @@ class SeedDemoIdentityUseCaseTest {
         verify(manageContract, never()).create(any(UUID.class), any(ContractRequest.class), any(UUID.class));
         // tạo mới: nhân sự 2 + role 2 + (độc giả + thẻ)
         assertThat(result.created()).isEqualTo(1 + 2 + 2 * plan.readers().size());
+    }
+
+    @Test
+    void lanDau_dienThongTinCaNhanHopLeChoNhanSuVaDocGia() {
+        useCase().execute(plan, PASSWORD);
+
+        ArgumentCaptor<UserPersonalInfo> staffInfo = ArgumentCaptor.forClass(UserPersonalInfo.class);
+        for (UUID id : List.of(DemoIds.staff(0), DemoIds.staff(1), DemoIds.staff(2))) {
+            verify(ensureUser).fillMissing(eq(id), staffInfo.capture());
+        }
+        assertThat(staffInfo.getAllValues()).allSatisfy(i -> {
+            assertThat(i.phone()).isNotBlank();
+            assertThat(i.dateOfBirth()).isBefore(TODAY);
+            assertThat(i.gender()).isNotNull();
+            assertThat(i.address()).isNotBlank();
+            assertThat(i.jobTitle()).isNotBlank();
+            assertThat(i.employeeCode()).startsWith("NV");
+        });
+
+        ArgumentCaptor<ReaderPersonalInfo> readerInfo = ArgumentCaptor.forClass(ReaderPersonalInfo.class);
+        verify(ensureCard, times(plan.readers().size())).execute(any(UUID.class), anyString(), anyString(),
+                anyString(), anyBoolean(), any(LocalDate.class), readerInfo.capture());
+        assertThat(readerInfo.getAllValues()).allSatisfy(i -> {
+            assertThat(i.phone()).matches("^[0-9+ \\-]{1,20}$");
+            assertThat(i.dateOfBirth()).isBefore(TODAY);
+            assertThat(i.gender()).isNotNull();
+            assertThat(i.address()).isNotBlank();
+            assertThat(i.faculty()).isNotBlank();
+            assertThat(i.memberCode()).isNotBlank();
+            assertThat(i.cardIssuedDate()).isBefore(TODAY.plusYears(1));
+        });
+        // sinh viên có lớp, giảng viên (chỉ số 5, 11, 17, 23) có mã cán bộ và không có lớp
+        assertThat(readerInfo.getAllValues().stream().filter(i -> i.memberCode().startsWith("SV")).allMatch(i -> i.className() != null)).isTrue();
+        assertThat(readerInfo.getAllValues().stream().filter(i -> i.memberCode().startsWith("CB")).count()).isEqualTo(4);
     }
 }

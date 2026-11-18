@@ -1,9 +1,12 @@
 package lms.identity.user.application;
 
+import lms.identity.user.domain.Gender;
 import lms.identity.user.domain.TenantUser;
 import lms.identity.user.domain.User;
+import lms.identity.user.domain.UserPersonalInfo;
 import lms.identity.user.domain.UserStatus;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 import lms.tenant.TenantContext;
 
@@ -16,7 +19,15 @@ import lms.tenant.TenantContext;
  * false/null.
  */
 public record UserResponse(UUID id, String username, String fullName, String email, UUID departmentId, UserStatus status,
-                           UUID tenantId, boolean locked, Instant lockedUntil) {
+                           UUID tenantId, boolean locked, Instant lockedUntil,
+                           String phone, LocalDate dateOfBirth, Gender gender, String address, String avatarUrl,
+                           String jobTitle, String employeeCode) {
+
+    public UserResponse(UUID id, String username, String fullName, String email, UUID departmentId, UserStatus status,
+                        UUID tenantId, boolean locked, Instant lockedUntil) {
+        this(id, username, fullName, email, departmentId, status, tenantId, locked, lockedUntil,
+                null, null, null, null, null, null, null);
+    }
 
     public UserResponse(UUID id, String username, String fullName, String email, UUID departmentId, UserStatus status,
                         UUID tenantId) {
@@ -37,12 +48,15 @@ public record UserResponse(UUID id, String username, String fullName, String ema
     }
 
     public static UserResponse from(User u, UUID departmentId, UUID tenantId) {
-        return new UserResponse(u.id(), u.username(), u.fullName(), u.email(), departmentId, u.status(), tenantId);
+        UserPersonalInfo i = u.personalInfo();
+        return new UserResponse(u.id(), u.username(), u.fullName(), u.email(), departmentId, u.status(), tenantId,
+                false, null, i.phone(), i.dateOfBirth(), i.gender(), i.address(), i.avatarUrl(), i.jobTitle(),
+                i.employeeCode());
     }
 
     /** Bản sao có trạng thái khóa; lockedUntil null nghĩa là không bị khóa. */
     public UserResponse withLock(Instant lockedUntil) {
         return new UserResponse(id, username, fullName, email, departmentId, status, tenantId, lockedUntil != null,
-                lockedUntil);
+                lockedUntil, phone, dateOfBirth, gender, address, avatarUrl, jobTitle, employeeCode);
     }
 }

@@ -1,5 +1,7 @@
 package lms.identity.user.infrastructure.persistence;
 
+import lms.identity.user.domain.Gender;
+import lms.identity.user.domain.ReaderPersonalInfo;
 import lms.identity.user.domain.ReaderStatus;
 import lms.identity.user.domain.ReaderType;
 import jakarta.persistence.Column;
@@ -49,6 +51,27 @@ class ReaderProfileJpaEntity {
     @Column(nullable = false)
     private ReaderStatus status;
 
+    private String phone;
+
+    @Column(name = "date_of_birth")
+    private LocalDate dateOfBirth;
+
+    @Enumerated(EnumType.STRING)
+    private Gender gender;
+
+    private String address;
+
+    private String faculty;
+
+    @Column(name = "class_name")
+    private String className;
+
+    @Column(name = "member_code")
+    private String memberCode;
+
+    @Column(name = "card_issued_date")
+    private LocalDate cardIssuedDate;
+
     protected ReaderProfileJpaEntity() {
     }
 
@@ -64,6 +87,24 @@ class ReaderProfileJpaEntity {
         this.readerType = readerType;
         this.cardExpiryDate = cardExpiryDate;
         this.status = status;
+    }
+
+    ReaderProfileJpaEntity(UUID userId, String cardNo, String fullName, String email, ReaderType readerType,
+                           LocalDate cardExpiryDate, ReaderStatus status, ReaderPersonalInfo info) {
+        this(userId, cardNo, fullName, email, readerType, cardExpiryDate, status);
+        this.phone = info.phone();
+        this.dateOfBirth = info.dateOfBirth();
+        this.gender = info.gender();
+        this.address = info.address();
+        this.faculty = info.faculty();
+        this.className = info.className();
+        this.memberCode = info.memberCode();
+        this.cardIssuedDate = info.cardIssuedDate();
+    }
+
+    ReaderPersonalInfo personalInfo() {
+        return new ReaderPersonalInfo(phone, dateOfBirth, gender, address, faculty, className, memberCode,
+                cardIssuedDate);
     }
 
     UUID getUserId() { return userId; }

@@ -8,6 +8,10 @@ import lms.identity.user.application.IssueReaderCardRequest;
 import lms.identity.user.application.IssueReaderCardUseCase;
 import lms.identity.user.application.ReaderProfileResponse;
 import lms.identity.user.application.RenewReaderCardRequest;
+import lms.identity.user.application.UpdateReaderProfileRequest;
+import lms.identity.user.application.UpdateReaderProfileUseCase;
+import lms.identity.user.domain.ReaderPersonalInfo;
+import java.time.LocalDate;
 import lms.identity.user.application.RenewReaderCardUseCase;
 import lms.security.CurrentUser;
 import lms.security.permission.AuthenticatedOnly;
@@ -33,9 +37,12 @@ public class ReaderProfileController {
     private final GetReaderProfileUseCase getProfile;
     private final RenewReaderCardUseCase renewCard;
     private final ChangeReaderStatusUseCase changeStatus;
+    private final UpdateReaderProfileUseCase updateProfile;
 
     public ReaderProfileController(IssueReaderCardUseCase issueCard, GetReaderProfileUseCase getProfile,
-                                   RenewReaderCardUseCase renewCard, ChangeReaderStatusUseCase changeStatus) {
+                                   RenewReaderCardUseCase renewCard, ChangeReaderStatusUseCase changeStatus,
+                                   UpdateReaderProfileUseCase updateProfile) {
+        this.updateProfile = updateProfile;
         this.issueCard = issueCard;
         this.getProfile = getProfile;
         this.renewCard = renewCard;
@@ -59,8 +66,15 @@ public class ReaderProfileController {
                                                        @Valid @RequestBody IssueReaderCardRequest request) {
         ReaderProfileResponse response = issueCard.execute(new IssueReaderCardCommand(userId, request.cardNo(),
                 request.fullName(), request.email(), request.readerType(), request.cardExpiryDate(),
-                request.username(), request.temporaryPassword()));
+                request.username(), request.temporaryPassword(), personalInfoOf(request)));
         return ResponseEntity.created(URI.create("/internal/users/" + userId + "/reader-profile")).body(response);
+    }
+
+    /** Sửa thông tin cá nhân/học vụ (trường null giữ nguyên). Khóa tự sinh ReaderProfileController/update. */
+    @PutMapping("/{userId}/reader-profile")
+    public ReaderProfileResponse update(@PathVariable UUID userId,
+                                        @Valid @RequestBody UpdateReaderProfileRequest request) {
+        return updateProfile.execute(userId, request);
     }
 
     @PutMapping("/{userId}/reader-profile/card-expiry")
@@ -72,5 +86,10 @@ public class ReaderProfileController {
     public ReaderProfileResponse changeStatus(@PathVariable UUID userId,
                                               @Valid @RequestBody ChangeReaderStatusRequest request) {
         return changeStatus.execute(userId, request.status());
+    }
+
+    private static ReaderPersonalInfo personalInfoOf(IssueReaderCardRequest r) {
+        return ReaderPersonalInfo.of(r.phone(), r.dateOfBirth(), r.gender(), r.address(), r.faculty(), r.className(),
+                r.memberCode(), r.cardIssuedDate(), LocalDate.now());
     }
 }

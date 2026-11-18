@@ -11,6 +11,11 @@ public interface TenantRepository {
 
     Optional<Tenant> findById(UUID id);
 
+    /** Nạp theo lô (một câu lệnh); id không tồn tại bị bỏ qua, không bảo đảm thứ tự. */
+    default List<Tenant> findAllByIds(java.util.Collection<UUID> ids) {
+        return ids.stream().distinct().map(this::findById).flatMap(Optional::stream).toList();
+    }
+
     /**
      * Đọc để sửa: adapter thật khóa dòng (SELECT ... FOR UPDATE) cho tới hết transaction hiện tại, nên phải gọi
      * trong transaction; tránh hai thao tác đồng thời ghi đè lẫn nhau (ví dụ đổi tên làm status SUSPENDED về ACTIVE).

@@ -40,7 +40,8 @@ class UserPersistenceAdapter implements UserRepository {
         Instant now = Instant.now();
         Instant createdAt = jpa.findById(u.id()).map(UserJpaEntity::getCreatedAt).orElse(now);
         try {
-            jpa.saveAndFlush(new UserJpaEntity(u.id(), u.username(), u.fullName(), u.email(), u.status(), createdAt, now));
+            jpa.saveAndFlush(new UserJpaEntity(u.id(), u.username(), u.fullName(), u.email(), u.status(), createdAt, now,
+                    u.personalInfo()));
         } catch (DataIntegrityViolationException e) {
             // unique(username) hoặc unique(lower(email)): hai yêu cầu đồng thời
             throw DuplicateUserException.generic();
@@ -125,6 +126,7 @@ class UserPersistenceAdapter implements UserRepository {
     }
 
     private static User toDomain(UserJpaEntity e) {
-        return User.restore(e.getId(), e.getUsername(), e.getFullName(), e.getEmail(), e.getStatus());
+        return User.restore(e.getId(), e.getUsername(), e.getFullName(), e.getEmail(), e.getStatus(),
+                e.personalInfo());
     }
 }

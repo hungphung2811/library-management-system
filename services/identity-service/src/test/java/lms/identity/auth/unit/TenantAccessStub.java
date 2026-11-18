@@ -20,7 +20,9 @@ class TenantAccessStub implements TenantAccessPort {
     UUID department;
 
     TenantChoice choice() {
-        return new TenantChoice(TENANT, List.of(SUMMARY), department);
+        // TokenService lấy module từ choice.available() (ADR-0022), nên summary mang đúng module của stub
+        TenantSummary withModules = new TenantSummary(SUMMARY.id(), SUMMARY.code(), SUMMARY.name(), modules);
+        return new TenantChoice(TENANT, List.of(withModules), department);
     }
 
     @Override

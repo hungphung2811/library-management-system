@@ -18,14 +18,14 @@ class ReaderProfilePersistenceAdapter implements ReaderProfileRepository {
     @Override
     public ReaderProfile save(ReaderProfile p) {
         jpa.save(new ReaderProfileJpaEntity(p.userId(), p.cardNo(), p.fullName(), p.email(), p.readerType(),
-                p.cardExpiryDate(), p.status()));
+                p.cardExpiryDate(), p.status(), p.personalInfo()));
         return p;
     }
 
     @Override
     public Optional<ReaderProfile> findByUserId(UUID userId) {
         return jpa.findById(userId).map(e -> ReaderProfile.restore(e.getUserId(), e.getCardNo(), e.getFullName(),
-                e.getEmail(), e.getReaderType(), e.getCardExpiryDate(), e.getStatus()));
+                e.getEmail(), e.getReaderType(), e.getCardExpiryDate(), e.getStatus(), e.personalInfo()));
     }
 
     @Override

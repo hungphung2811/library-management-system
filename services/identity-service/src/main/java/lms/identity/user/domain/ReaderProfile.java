@@ -13,6 +13,7 @@ public class ReaderProfile {
     private final ReaderType readerType;
     private LocalDate cardExpiryDate;
     private ReaderStatus status;
+    private ReaderPersonalInfo personalInfo = ReaderPersonalInfo.EMPTY;
 
     private ReaderProfile(UUID userId, String cardNo, String fullName, String email, ReaderType readerType,
                           LocalDate cardExpiryDate, ReaderStatus status) {
@@ -41,9 +42,46 @@ public class ReaderProfile {
         return new ReaderProfile(userId, cardNo, fullName, email, readerType, cardExpiryDate, ReaderStatus.ACTIVE);
     }
 
+    /** Cấp thẻ mới kèm thông tin cá nhân tùy chọn; ngày cấp thẻ (nếu có) không được sau hạn thẻ. */
+    public static ReaderProfile issue(UUID userId, String cardNo, String fullName, String email,
+                                      ReaderType readerType, LocalDate cardExpiryDate, LocalDate today,
+                                      ReaderPersonalInfo personalInfo) {
+        ReaderProfile p = issue(userId, cardNo, fullName, email, readerType, cardExpiryDate, today);
+        p.applyPersonalInfo(personalInfo == null ? ReaderPersonalInfo.EMPTY : personalInfo);
+        return p;
+    }
+
     public static ReaderProfile restore(UUID userId, String cardNo, String fullName, String email,
                                         ReaderType readerType, LocalDate cardExpiryDate, ReaderStatus status) {
         return new ReaderProfile(userId, cardNo, fullName, email, readerType, cardExpiryDate, status);
+    }
+
+    public static ReaderProfile restore(UUID userId, String cardNo, String fullName, String email,
+                                        ReaderType readerType, LocalDate cardExpiryDate, ReaderStatus status,
+                                        ReaderPersonalInfo personalInfo) {
+        ReaderProfile p = new ReaderProfile(userId, cardNo, fullName, email, readerType, cardExpiryDate, status);
+        p.personalInfo = personalInfo == null ? ReaderPersonalInfo.EMPTY : personalInfo;
+        return p;
+    }
+
+    private void applyPersonalInfo(ReaderPersonalInfo info) {
+        if (info.cardIssuedDate() != null && info.cardIssuedDate().isAfter(cardExpiryDate)) {
+            throw new InvalidReaderException("Ngày cấp thẻ không được sau hạn thẻ");
+        }
+        this.personalInfo = info;
+    }
+
+    /** Ghi đè các trường khác null của {@code patch}; true nếu có thay đổi. */
+    public boolean mergePersonalInfo(ReaderPersonalInfo patch) {
+        ReaderPersonalInfo merged = personalInfo.merge(patch);
+        boolean changed = !merged.equals(personalInfo);
+        applyPersonalInfo(merged);
+        return changed;
+    }
+
+    /** Chỉ điền trường đang null (seed idempotent); true nếu có thay đổi. */
+    public boolean fillMissingPersonalInfo(ReaderPersonalInfo defaults) {
+        return mergePersonalInfo(personalInfo.fillMissing(defaults));
     }
 
     /** QĐ2: thẻ còn hạn (tính hết ngày hạn) và tài khoản không bị khóa. */
@@ -77,4 +115,5 @@ public class ReaderProfile {
     public ReaderType readerType() { return readerType; }
     public LocalDate cardExpiryDate() { return cardExpiryDate; }
     public ReaderStatus status() { return status; }
+    public ReaderPersonalInfo personalInfo() { return personalInfo; }
 }

@@ -245,23 +245,23 @@ class TokenServiceTenantTest {
 
     @Test
     void dangNhapPhatClaimModulesCuaTenantDaChon() {
-        when(tenants.selectForLogin(userId, "lib-a", false)).thenReturn(new TenantChoice(tenantA, List.of(summaryA)));
-        when(tenants.modules(tenantA)).thenReturn(List.of("LENDING", "SALES"));
+        TenantSummary withModules = new TenantSummary(tenantA, "lib-a", "Thư viện A", List.of("LENDING", "SALES"));
+        when(tenants.selectForLogin(userId, "lib-a", false)).thenReturn(new TenantChoice(tenantA, List.of(withModules)));
 
         service.issueFor(credential(false, false), "lib-a");
 
         assertThat(issued.get(0).modules()).containsExactly("LENDING", "SALES");
-        verify(tenants).modules(tenantA);
-        verify(tenants, never()).modules(tenantB);
+        // ADR-0022: module lấy từ choice.available(), không đọc lại
+        verify(tenants, never()).modules(any());
     }
 
     @Test
     void doiTenantPhatModulesCuaTenantDich() {
-        when(tenants.modules(tenantA)).thenReturn(List.of("LENDING"));
-        when(tenants.modules(tenantB)).thenReturn(List.of("SALES"));
+        TenantSummary a = new TenantSummary(tenantA, "lib-a", "Thư viện A", List.of("LENDING"));
+        TenantSummary b = new TenantSummary(tenantB, "lib-b", "Thư viện B", List.of("SALES"));
 
-        service.issueForTenant(credential(false, false), new TenantChoice(tenantA, List.of(summaryA, summaryB)));
-        service.issueForTenant(credential(false, false), new TenantChoice(tenantB, List.of(summaryA, summaryB)));
+        service.issueForTenant(credential(false, false), new TenantChoice(tenantA, List.of(a, b)));
+        service.issueForTenant(credential(false, false), new TenantChoice(tenantB, List.of(a, b)));
 
         assertThat(issued.get(0).modules()).containsExactly("LENDING");
         assertThat(issued.get(1).modules()).containsExactly("SALES");
@@ -279,8 +279,8 @@ class TokenServiceTenantTest {
 
     @Test
     void tokenPhaiDoiMatKhauVanMangModules() {
-        when(tenants.selectForLogin(userId, null, false)).thenReturn(new TenantChoice(tenantA, List.of(summaryA)));
-        when(tenants.modules(tenantA)).thenReturn(List.of("LENDING"));
+        TenantSummary withModules = new TenantSummary(tenantA, "lib-a", "Thư viện A", List.of("LENDING"));
+        when(tenants.selectForLogin(userId, null, false)).thenReturn(new TenantChoice(tenantA, List.of(withModules)));
 
         service.issueFor(credential(true, false));
 
@@ -293,8 +293,8 @@ class TokenServiceTenantTest {
         RefreshToken old = stored(RefreshToken.issueForTenant(userId, tenantB, "h-raw-old", now.minusSeconds(60),
                 Duration.ofDays(7)));
         when(credentials.findByUserId(userId)).thenReturn(Optional.of(credential(false, false)));
-        when(tenants.verify(userId, tenantB)).thenReturn(new TenantChoice(tenantB, List.of(summaryB)));
-        when(tenants.modules(tenantB)).thenReturn(List.of("LENDING", "SALES"));
+        TenantSummary withModules = new TenantSummary(tenantB, "lib-b", "Thư viện B", List.of("LENDING", "SALES"));
+        when(tenants.verify(userId, tenantB)).thenReturn(new TenantChoice(tenantB, List.of(withModules)));
 
         refresh().execute("raw-old");
 

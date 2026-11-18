@@ -67,6 +67,13 @@ class TenantPersistenceAdapter implements TenantRepository, TenantQueryRepositor
     }
 
     @Override
+    public List<Tenant> findAllByIds(Collection<UUID> ids) {
+        if (ids.isEmpty()) return List.of();
+        return jpa.findAllById(ids.stream().distinct().toList()).stream().map(TenantPersistenceAdapter::toDomain)
+                .toList();
+    }
+
+    @Override
     public Optional<Tenant> findByIdForUpdate(UUID id) {
         return jpa.findByIdForUpdate(id).map(TenantPersistenceAdapter::toDomain);
     }

@@ -33,6 +33,7 @@ public class CreateUserUseCase {
     public UserResponse execute(CreateUserRequest request) {
         UUID tenantId = TenantContext.require();
         User user = User.create(request.id(), request.username(), request.fullName(), request.email());
+        user.mergePersonalInfo(request.personalInfo(java.time.LocalDate.now()));
         UUID departmentId = request.departmentId();
         // departments chịu RLS/@TenantId: phòng ban của tenant khác không thấy nên cũng bị từ chối ở đây
         if (departmentId != null && !departments.existsActive(departmentId)) {

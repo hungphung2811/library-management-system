@@ -25,9 +25,15 @@ final class AccessibleTenants {
     static List<Tenant> of(UUID userId, TenantRepository tenants, MembershipRepository memberships) {
         record Joined(Membership membership, Tenant tenant) {
         }
-        return memberships.findActiveByUser(userId).stream()
-                .filter(Membership::isActive)
-                .map(m -> tenants.findById(m.tenantId()).filter(Tenant::isActive).map(t -> new Joined(m, t)))
+        List<Membership> active = memberships.findActiveByUser(userId).stream().filter(Membership::isActive).toList();
+        if (active.isEmpty()) return List.of();
+        // Nạp mọi tenant một lần (tránh N+1 theo số membership)
+        Map<UUID, Tenant> byId = new java.util.HashMap<>();
+        tenants.findAllByIds(active.stream().map(Membership::tenantId).toList())
+                .forEach(t -> byId.put(t.id(), t));
+        return active.stream()
+                .map(m -> Optional.ofNullable(byId.get(m.tenantId())).filter(Tenant::isActive)
+                        .map(t -> new Joined(m, t)))
                 .flatMap(Optional::stream)
                 .sorted(Comparator.comparing((Joined j) -> j.membership().joinedAt(),
                                 Comparator.nullsLast(Comparator.naturalOrder()))

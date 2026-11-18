@@ -5,6 +5,8 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Past;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -21,12 +23,34 @@ public final class UserDtos {
                                     @NotBlank @Size(min = 3, max = 100) String username,
                                     @NotBlank @Size(max = 255) String fullName,
                                     @NotBlank @Email @Size(max = 255) String email,
-                                    UUID departmentId) {
+                                    UUID departmentId,
+                                    @Size(max = 20) @Pattern(regexp = "^[0-9+ \\-]*$") String phone,
+                                    @Past LocalDate dateOfBirth,
+                                    String gender,
+                                    @Size(max = 500) String address,
+                                    @Size(max = 500) String avatarUrl,
+                                    @Size(max = 100) String jobTitle,
+                                    @Size(max = 32) String employeeCode) {
+
+        public CreateUserRequest(UUID id, String username, String fullName, String email, UUID departmentId) {
+            this(id, username, fullName, email, departmentId, null, null, null, null, null, null, null);
+        }
     }
 
     public record UpdateUserRequest(@NotBlank @Size(max = 255) String fullName,
                                     @NotBlank @Email @Size(max = 255) String email,
-                                    UUID departmentId) {
+                                    UUID departmentId,
+                                    @Size(max = 20) @Pattern(regexp = "^[0-9+ \\-]*$") String phone,
+                                    @Past LocalDate dateOfBirth,
+                                    String gender,
+                                    @Size(max = 500) String address,
+                                    @Size(max = 500) String avatarUrl,
+                                    @Size(max = 100) String jobTitle,
+                                    @Size(max = 32) String employeeCode) {
+
+        public UpdateUserRequest(String fullName, String email, UUID departmentId) {
+            this(fullName, email, departmentId, null, null, null, null, null, null, null);
+        }
     }
 
     public record ChangeStatusRequest(@NotBlank String status) {
@@ -49,7 +73,32 @@ public final class UserDtos {
                                          @NotBlank @Size(max = 255) String fullName,
                                          @NotBlank @Email @Size(max = 255) String email,
                                          @NotBlank String readerType,
-                                         @NotNull LocalDate cardExpiryDate) {
+                                         @NotNull LocalDate cardExpiryDate,
+                                         @Size(max = 20) @Pattern(regexp = "^[0-9+ \\-]*$") String phone,
+                                         @Past LocalDate dateOfBirth,
+                                         String gender,
+                                         @Size(max = 500) String address,
+                                         @Size(max = 150) String faculty,
+                                         @Size(max = 50) String className,
+                                         @Size(max = 32) String memberCode,
+                                         LocalDate cardIssuedDate) {
+
+        public IssueReaderCardRequest(String cardNo, String fullName, String email, String readerType,
+                                      LocalDate cardExpiryDate) {
+            this(cardNo, fullName, email, readerType, cardExpiryDate, null, null, null, null, null, null, null, null);
+        }
+    }
+
+    /** Sửa thông tin cá nhân/học vụ của độc giả; trường null giữ nguyên giá trị hiện có. */
+    public record UpdateReaderProfileRequest(
+            @Size(max = 20) @Pattern(regexp = "^[0-9+ \\-]*$") String phone,
+            @Past LocalDate dateOfBirth,
+            String gender,
+            @Size(max = 500) String address,
+            @Size(max = 150) String faculty,
+            @Size(max = 50) String className,
+            @Size(max = 32) String memberCode,
+            LocalDate cardIssuedDate) {
     }
 
     public record RenewReaderCardRequest(@NotNull LocalDate newExpiryDate) {
@@ -57,10 +106,19 @@ public final class UserDtos {
 
     /**
      * tenantId: tenant của dòng (ADR-0008); null khi service chưa trả. locked/lockedUntil: tài khoản đang bị khóa do
-     * đăng nhập sai nhiều lần (lockedUntil là thời điểm ISO-8601 hết khóa, null khi không bị khóa).
+     * đăng nhập sai nhiều lần (lockedUntil là thời điểm ISO-8601 hết khóa, null khi không bị khóa). phone ...
+     * employeeCode: thông tin cá nhân tùy chọn (null khi chưa có); gender là MALE | FEMALE | OTHER.
      */
     public record UserView(UUID id, String username, String fullName, String email, UUID departmentId, String status,
-                           UUID tenantId, boolean locked, Instant lockedUntil) {
+                           UUID tenantId, boolean locked, Instant lockedUntil,
+                           String phone, LocalDate dateOfBirth, String gender, String address, String avatarUrl,
+                           String jobTitle, String employeeCode) {
+
+        public UserView(UUID id, String username, String fullName, String email, UUID departmentId, String status,
+                        UUID tenantId, boolean locked, Instant lockedUntil) {
+            this(id, username, fullName, email, departmentId, status, tenantId, locked, lockedUntil,
+                    null, null, null, null, null, null, null);
+        }
 
         public UserView(UUID id, String username, String fullName, String email, UUID departmentId, String status,
                         UUID tenantId) {
@@ -121,6 +179,14 @@ public final class UserDtos {
     }
 
     public record ReaderProfileView(UUID userId, String cardNo, String fullName, String email, String readerType,
-                                    LocalDate cardExpiryDate, String status, boolean cardValid) {
+                                    LocalDate cardExpiryDate, String status, boolean cardValid,
+                                    String phone, LocalDate dateOfBirth, String gender, String address,
+                                    String faculty, String className, String memberCode, LocalDate cardIssuedDate) {
+
+        public ReaderProfileView(UUID userId, String cardNo, String fullName, String email, String readerType,
+                                 LocalDate cardExpiryDate, String status, boolean cardValid) {
+            this(userId, cardNo, fullName, email, readerType, cardExpiryDate, status, cardValid,
+                    null, null, null, null, null, null, null, null);
+        }
     }
 }

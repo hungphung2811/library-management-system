@@ -126,6 +126,12 @@ class DemoSeedIdentityIT {
         }
         assertThat(count("SELECT count(*) FROM reader_profiles WHERE tenant_id = ?", tenantId))
                 .isEqualTo(plan.readers().size());
+        // thông tin cá nhân: độc giả có điện thoại, khoa, mã SV/CB; nhân sự có chức danh
+        assertThat(count("SELECT count(*) FROM reader_profiles WHERE tenant_id = ? AND phone IS NOT NULL "
+                + "AND faculty IS NOT NULL AND member_code IS NOT NULL AND card_issued_date IS NOT NULL", tenantId))
+                .isEqualTo(plan.readers().size());
+        assertThat(count("SELECT count(*) FROM users WHERE id IN (?, ?, ?) AND job_title IS NOT NULL AND phone IS NOT NULL",
+                plan.staff().get(0).id(), plan.staff().get(1).id(), plan.staff().get(2).id())).isEqualTo(3);
 
         // role: admin tenant giữ role isAdmin, thủ thư LIBRARIAN, quản lý cửa hàng STORE_MANAGER
         assertThat(count("SELECT count(*) FROM user_roles ur JOIN roles r ON r.id = ur.role_id "

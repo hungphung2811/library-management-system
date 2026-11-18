@@ -4,8 +4,10 @@ import lms.identity.user.domain.DuplicateUserException;
 import lms.identity.user.domain.InvalidUserException;
 import lms.identity.user.domain.TenantUser;
 import lms.identity.user.domain.User;
+import lms.identity.user.domain.UserPersonalInfo;
 import lms.identity.user.domain.UserOperationNotAllowedException;
 import lms.identity.user.domain.UserRepository;
+import java.time.LocalDate;
 import java.util.Objects;
 import java.util.UUID;
 import lms.tenant.TenantContext;
@@ -44,11 +46,15 @@ public class UpdateUserUseCase {
         UUID tenantId = TenantContext.require();
         TenantUser current = guard.requireInTenant(id, tenantId);
         User user = current.user();
-        boolean profileChanged = user.profileDiffers(request.fullName(), request.email());
+        boolean nameOrEmailChanged = user.profileDiffers(request.fullName(), request.email());
+        UserPersonalInfo patch = request.personalInfo(LocalDate.now());
+        boolean personalChanged = !user.personalInfo().merge(patch).equals(user.personalInfo());
+        boolean profileChanged = nameOrEmailChanged || personalChanged;
         if (profileChanged && !id.equals(actorId)) {
             guard.requireAccountManageable(id);
         }
         user.update(request.fullName(), request.email());
+        user.mergePersonalInfo(patch);
 
         UUID after = request.departmentId();
         boolean departmentChanged = !Objects.equals(current.departmentId(), after);
@@ -57,7 +63,7 @@ public class UpdateUserUseCase {
             throw new InvalidUserException("Phòng ban không tồn tại hoặc đã ngừng hoạt động");
         }
         if (profileChanged) {
-            if (repository.existsByEmail(user.email(), id)) throw DuplicateUserException.generic();
+            if (nameOrEmailChanged && repository.existsByEmail(user.email(), id)) throw DuplicateUserException.generic();
             repository.save(user);
         }
         if (departmentChanged) {

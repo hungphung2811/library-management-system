@@ -99,10 +99,11 @@ public class ContractQueryUseCase {
         List<Contract> rows = contracts.findExpiring(now.plus(days, ChronoUnit.DAYS), now.minus(grace));
         Map<UUID, Long> paid = payments.paidByContracts(rows.stream().map(Contract::id).toList());
         LocalDate today = now.atZone(policy.zone()).toLocalDate();
-        Map<UUID, TenantBrief> briefs = new HashMap<>();
+        // Một truy vấn cho mọi tenant trong danh sách (không tra từng tenant một)
+        Map<UUID, TenantBrief> briefs = ops.briefs(rows.stream().map(Contract::tenantId).distinct().toList());
         List<ExpiringContractResponse> result = new ArrayList<>();
         for (Contract c : rows) {
-            TenantBrief tenant = briefs.computeIfAbsent(c.tenantId(), id -> ops.brief(id).orElse(null));
+            TenantBrief tenant = briefs.get(c.tenantId());
             LocalDate endDate = ContractPeriod.endDate(c.endsAt(), policy.zone());
             boolean inGrace = !now.isBefore(c.endsAt());
             result.add(new ExpiringContractResponse(c.id(), c.tenantId(), tenant == null ? null : tenant.code(),

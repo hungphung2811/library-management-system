@@ -79,8 +79,10 @@ public class AccessControlBeanConfiguration {
     }
 
     @Bean
-    RoleManagementUseCase roleManagementUseCase(AccessControlPersistenceAdapter persistence) {
-        return new RoleManagementUseCase(persistence, persistence, persistence, persistence);
+    RoleManagementUseCase roleManagementUseCase(AccessControlPersistenceAdapter persistence,
+                                                lms.cache.RequestCache cache) {
+        return new lms.identity.accesscontrol.infrastructure.cache.CachedRoleManagementUseCase(
+                persistence, persistence, persistence, persistence, cache);
     }
 
     @Bean

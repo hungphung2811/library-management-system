@@ -9,6 +9,7 @@ import lms.identity.auth.domain.RevokeReason;
 import lms.identity.auth.domain.TokenChannel;
 import lms.identity.auth.domain.UserCredential;
 import lms.identity.tenant.application.TenantChoice;
+import lms.identity.tenant.application.TenantSummary;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Collection;
@@ -183,7 +184,9 @@ public class TokenService {
         // từ chối, chỉ còn các endpoint chỉ cần đăng nhập, như đổi mật khẩu. Vẫn mang tenantId.
         // Module của tenant đã chọn (ADR-0009): đọc ở mọi đường cấp token (đăng nhập, làm mới, đổi tenant); phiên nền
         // tảng không có tenant thì không có claim. Bảng toàn cục, đọc bằng transaction ngắn của riêng nó (R20).
-        List<String> modules = tenantId != null ? tenantAccess.modules(tenantId) : null;
+        // Dữ liệu này đã có sẵn trong choice.available() (TenantSummary.modules = module đang bật, cùng nguồn với
+        // modules(tenantId)); chỉ đọc lại khi tenant không nằm trong danh sách (vd. platform admin làm thay tenant).
+        List<String> modules = tenantId != null ? modulesOf(tenantId, choice) : null;
         // Họ phiên quyết định MỘT chỗ này: đăng nhập thì phiên mới, xoay vòng thì chép phiên của token cũ
         String rawRefresh = codec.generate();
         String hash = codec.hash(rawRefresh);
@@ -211,6 +214,12 @@ public class TokenService {
         refreshTokens.rotate(replacedOrNull, refresh);
         return TokenResponse.bearer(accessToken.value(), rawRefresh, accessToken.expiresInSeconds(), mustChange,
                 tenantId, choice.available());
+    }
+
+    private List<String> modulesOf(UUID tenantId, TenantChoice choice) {
+        return choice.available().stream().filter(t -> tenantId.equals(t.id())).findFirst()
+                .map(TenantSummary::modules)
+                .orElseGet(() -> tenantAccess.modules(tenantId));
     }
 
     /**
