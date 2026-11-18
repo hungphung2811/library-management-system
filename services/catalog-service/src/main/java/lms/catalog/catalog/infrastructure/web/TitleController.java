@@ -1,6 +1,7 @@
 package lms.catalog.catalog.infrastructure.web;
 
 import lms.security.permission.CrossTenantReadable;
+import lms.security.permission.IntegrationScope;
 import lms.security.permission.StorefrontAccessible;
 import lms.catalog.catalog.application.GetTitlePreviewUseCase;
 import lms.catalog.catalog.application.LookupTitlesByKeywordUseCase;
@@ -95,6 +96,7 @@ public class TitleController {
     /** Tra nhiều đầu sách theo id (sales-service gọi bằng token người dùng chuyển tiếp). Khóa TitleController/lookup. */
     @PostMapping("/lookup")
     @StorefrontAccessible
+    @IntegrationScope("books:read")
     public List<lms.catalog.catalog.application.TitleLookupView> lookup(
             @Valid @RequestBody lms.catalog.catalog.application.LookupTitlesRequest request) {
         return lookupTitles.execute(request.ids());
@@ -115,6 +117,7 @@ public class TitleController {
      * Khóa TitleController/lookupByIsbn. KHÔNG @StorefrontAccessible: chỉ token người dùng được chuyển tiếp.
      */
     @PostMapping("/lookup-by-isbn")
+    @IntegrationScope("books:read")
     public List<TitleLookupView> lookupByIsbn(
             @Valid @RequestBody lms.catalog.catalog.application.LookupTitlesByIsbnRequest request) {
         return lookupByIsbn.execute(request.isbns());
@@ -135,6 +138,7 @@ public class TitleController {
     }
 
     @GetMapping("/{id}")
+    @IntegrationScope("books:read")
     public TitleResponse get(@PathVariable UUID id) {
         return getTitle.execute(id);
     }
