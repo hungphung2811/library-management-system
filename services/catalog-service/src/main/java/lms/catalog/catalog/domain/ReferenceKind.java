@@ -1,12 +1,14 @@
 package lms.catalog.catalog.domain;
 
-/** Bốn danh mục chuẩn theo tenant. Nhãn tiếng Việt dùng trong thông báo lỗi; code dùng làm mã lỗi. */
+/** Năm danh mục chuẩn theo tenant. Nhãn tiếng Việt dùng trong thông báo lỗi; code dùng làm mã lỗi. */
 public enum ReferenceKind {
     AUTHOR("tác giả", "AUTHOR", 255),
     PUBLISHER("nhà xuất bản", "PUBLISHER", 255),
     CATEGORY("thể loại", "CATEGORY", 255),
     /** Vị trí kệ: trường "tên" của danh mục chính là mã vị trí (API gọi là code). */
-    SHELF_LOCATION("vị trí kệ", "SHELF_LOCATION", 64);
+    SHELF_LOCATION("vị trí kệ", "SHELF_LOCATION", 64),
+    /** Bộ sách (ADR-0026): gom các tác phẩm có số tập (Harry Potter 1-7). */
+    SERIES("bộ sách", "SERIES", 255);
 
     private final String label;
     private final String code;

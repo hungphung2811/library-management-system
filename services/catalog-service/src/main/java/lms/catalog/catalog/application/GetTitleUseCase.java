@@ -11,6 +11,7 @@ public class GetTitleUseCase {
     private final TitleRepository repository;
     private final CopyAvailabilityQuery availability;
     private final TitleClassificationService classification;
+    private final TitleResponseAssembler assembler;
 
     public GetTitleUseCase(TitleRepository repository, CopyAvailabilityQuery availability) {
         this(repository, availability, null);
@@ -18,15 +19,23 @@ public class GetTitleUseCase {
 
     public GetTitleUseCase(TitleRepository repository, CopyAvailabilityQuery availability,
                            TitleClassificationService classification) {
+        this(repository, availability, classification, new TitleResponseAssembler(availability, classification, null));
+    }
+
+    public GetTitleUseCase(TitleRepository repository, CopyAvailabilityQuery availability,
+                           TitleClassificationService classification, TitleResponseAssembler assembler) {
         this.repository = repository;
         this.availability = availability;
         this.classification = classification;
+        this.assembler = assembler;
     }
 
     public TitleResponse execute(UUID id) {
         var title = repository.findById(id).orElseThrow(() -> new TitleNotFoundException(id));
-        long available = availability.countAvailable(List.of(id)).getOrDefault(id, 0L);
-        return classification == null ? TitleResponse.from(title, available)
-                : TitleResponse.from(title, available, classification.describe(title));
+        if (classification == null) {
+            long available = availability.countAvailable(List.of(id)).getOrDefault(id, 0L);
+            return TitleResponse.from(title, available);
+        }
+        return assembler.assemble(title);
     }
 }

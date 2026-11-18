@@ -27,6 +27,8 @@ import lms.catalog.catalog.domain.ReferenceRepository;
 import lms.catalog.catalog.domain.Title;
 import lms.catalog.catalog.domain.TitleBatchConflictException;
 import lms.catalog.catalog.domain.TitleRepository;
+import lms.catalog.catalog.domain.Work;
+import lms.catalog.catalog.domain.WorkRepository;
 import lms.catalog.inventory.application.PublishInventoryEventPort;
 import lms.catalog.inventory.application.RegisterCopiesInBatchUseCase;
 import lms.catalog.inventory.domain.BookCopy;
@@ -56,6 +58,7 @@ final class CatalogImportHarness {
 
     final FakeReferences references = new FakeReferences();
     final FakeTitles titles = new FakeTitles();
+    final FakeWorks works = new FakeWorks();
     final FakeCopies copiesRepo = new FakeCopies();
     final List<DomainEvent> events = new ArrayList<>();
     final List<String> audits = new ArrayList<>();
@@ -67,7 +70,7 @@ final class CatalogImportHarness {
             + result.skippedDuplicate() + "/" + result.failed());
     final ReferenceCachePort cache = evicted::add;
     final ReferenceChunkWriter referenceWriter = new ReferenceChunkWriter(references);
-    final TitleChunkWriter titleWriter = new TitleChunkWriter(titles, references, registerCopies);
+    final TitleChunkWriter titleWriter = new TitleChunkWriter(titles, works, references, registerCopies);
 
     final ReferenceImportHandler authors = new ReferenceImportHandler(ReferenceKind.AUTHOR,
             CatalogImportSchemas.authors(), references, referenceWriter, cache, audit);
@@ -77,7 +80,10 @@ final class CatalogImportHarness {
             CatalogImportSchemas.categories(), references, referenceWriter, cache, audit);
     final ReferenceImportHandler shelves = new ReferenceImportHandler(ReferenceKind.SHELF_LOCATION,
             CatalogImportSchemas.shelfLocations(), references, referenceWriter, cache, audit);
-    final TitleImportHandler titleHandler = new TitleImportHandler(titles, references, registerCopies, titleWriter, audit);
+    final ReferenceImportHandler series = new ReferenceImportHandler(ReferenceKind.SERIES,
+            CatalogImportSchemas.series(), references, referenceWriter, cache, audit);
+    final TitleImportHandler titleHandler = new TitleImportHandler(titles, works, references, registerCopies, titleWriter,
+            audit);
 
     final ImportLimits limits = ImportLimits.defaults();
     final ImportCommitExecutor executor = new ImportCommitExecutor(4);
@@ -288,6 +294,55 @@ final class CatalogImportHarness {
                 throw new TitleBatchConflictException(new RuntimeException("duplicate key"));
             }
             titles.forEach(this::seed);
+        }
+    }
+
+    /** Kho tác phẩm giả; đếm số lần tra theo lô để test chứng minh không N+1. */
+    static final class FakeWorks implements WorkRepository {
+        final Map<UUID, Work> byId = new LinkedHashMap<>();
+        final AtomicInteger findByIdsCalls = new AtomicInteger();
+        final AtomicInteger insertAllCalls = new AtomicInteger();
+
+        void seed(Work w) {
+            byId.put(w.id(), w);
+        }
+
+        @Override
+        public Work save(Work work) {
+            seed(work);
+            return work;
+        }
+
+        @Override
+        public synchronized void insertAll(Collection<Work> works) {
+            insertAllCalls.incrementAndGet();
+            works.forEach(this::seed);
+        }
+
+        @Override
+        public Optional<Work> findById(UUID id) {
+            return Optional.ofNullable(byId.get(id));
+        }
+
+        @Override
+        public List<Work> findByIds(Collection<UUID> ids) {
+            findByIdsCalls.incrementAndGet();
+            return ids.stream().map(byId::get).filter(java.util.Objects::nonNull).toList();
+        }
+
+        @Override
+        public void delete(UUID id) {
+            byId.remove(id);
+        }
+
+        @Override
+        public List<UUID> findIdsBySeries(UUID seriesId) {
+            return byId.values().stream().filter(w -> seriesId.equals(w.seriesId())).map(Work::id).toList();
+        }
+
+        @Override
+        public Page search(Criteria criteria, int page, int size) {
+            return new Page(List.of(), 0);
         }
     }
 

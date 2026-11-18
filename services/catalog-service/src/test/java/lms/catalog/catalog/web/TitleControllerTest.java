@@ -65,6 +65,8 @@ class TitleControllerTest {
     @MockitoBean lms.catalog.catalog.application.LookupTitlesByIsbnUseCase lookupByIsbn;
     @MockitoBean lms.catalog.catalog.application.GetTitlePreviewUseCase getPreview;
     @MockitoBean lms.catalog.catalog.application.UpdateTitlePreviewUseCase updatePreview;
+    @MockitoBean lms.catalog.catalog.application.MoveEditionToWorkUseCase moveEditionToWork;
+    @MockitoBean lms.catalog.inventory.application.PublishEditionWorkChangedUseCase editionEvents;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean PermissionKeyRegistrar permissionKeyRegistrar;
 

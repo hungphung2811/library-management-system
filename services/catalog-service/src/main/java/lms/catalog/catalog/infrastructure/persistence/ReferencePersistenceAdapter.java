@@ -31,13 +31,16 @@ class ReferencePersistenceAdapter implements ReferenceRepository {
     private final SpringDataPublisherRepository publishers;
     private final SpringDataCategoryRepository categories;
     private final SpringDataShelfLocationRepository shelves;
+    private final SpringDataSeriesRepository series;
 
     ReferencePersistenceAdapter(SpringDataAuthorRepository authors, SpringDataPublisherRepository publishers,
-                                SpringDataCategoryRepository categories, SpringDataShelfLocationRepository shelves) {
+                                SpringDataCategoryRepository categories, SpringDataShelfLocationRepository shelves,
+                                SpringDataSeriesRepository series) {
         this.authors = authors;
         this.publishers = publishers;
         this.categories = categories;
         this.shelves = shelves;
+        this.series = series;
     }
 
     @PersistenceContext
@@ -49,6 +52,7 @@ class ReferencePersistenceAdapter implements ReferenceRepository {
             case PUBLISHER -> publishers;
             case CATEGORY -> categories;
             case SHELF_LOCATION -> shelves;
+            case SERIES -> series;
         };
     }
 
@@ -59,6 +63,7 @@ class ReferencePersistenceAdapter implements ReferenceRepository {
             case PUBLISHER -> publishers.save(new PublisherJpaEntity(r));
             case CATEGORY -> categories.save(new CategoryJpaEntity(r));
             case SHELF_LOCATION -> shelves.save(new ShelfLocationJpaEntity(r));
+            case SERIES -> series.save(new SeriesJpaEntity(r));
         }
         // Đọc lại để trả bản có tenantId.
         return findById(r.kind(), r.id()).orElseThrow();
@@ -102,6 +107,7 @@ class ReferencePersistenceAdapter implements ReferenceRepository {
                     case PUBLISHER -> new PublisherJpaEntity(r);
                     case CATEGORY -> new CategoryJpaEntity(r);
                     case SHELF_LOCATION -> new ShelfLocationJpaEntity(r);
+                    case SERIES -> new SeriesJpaEntity(r);
                 });
             }
             em.flush();

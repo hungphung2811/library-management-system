@@ -18,6 +18,9 @@ import lms.catalog.catalog.application.TitleResponse;
 import lms.catalog.catalog.application.UpdateTitleCommand;
 import lms.catalog.catalog.application.UpdateTitleRequest;
 import lms.catalog.catalog.application.UpdateTitleUseCase;
+import lms.catalog.catalog.application.MoveEditionToWorkUseCase;
+import lms.catalog.catalog.application.WorkDtos.ChangeEditionWorkRequest;
+import lms.catalog.inventory.application.PublishEditionWorkChangedUseCase;
 import org.springframework.web.bind.annotation.PutMapping;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -46,13 +49,19 @@ public class TitleController {
     private final lms.catalog.catalog.application.LookupTitlesByIsbnUseCase lookupByIsbn;
     private final GetTitlePreviewUseCase getPreview;
     private final UpdateTitlePreviewUseCase updatePreview;
+    private final MoveEditionToWorkUseCase moveEditionToWork;
+    private final PublishEditionWorkChangedUseCase editionEvents;
 
     public TitleController(CreateTitleUseCase createTitle, GetTitleUseCase getTitle, SearchTitlesUseCase searchTitles,
                            UpdateTitleUseCase updateTitle,
                            lms.catalog.catalog.application.LookupTitlesUseCase lookupTitles,
                            LookupTitlesByKeywordUseCase lookupByKeyword,
                            GetTitlePreviewUseCase getPreview, UpdateTitlePreviewUseCase updatePreview,
-                           lms.catalog.catalog.application.LookupTitlesByIsbnUseCase lookupByIsbn) {
+                           lms.catalog.catalog.application.LookupTitlesByIsbnUseCase lookupByIsbn,
+                           MoveEditionToWorkUseCase moveEditionToWork,
+                           PublishEditionWorkChangedUseCase editionEvents) {
+        this.moveEditionToWork = moveEditionToWork;
+        this.editionEvents = editionEvents;
         this.lookupByIsbn = lookupByIsbn;
         this.lookupByKeyword = lookupByKeyword;
         this.getPreview = getPreview;
@@ -68,14 +77,16 @@ public class TitleController {
     public TitleResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateTitleRequest request) {
         return updateTitle.execute(new UpdateTitleCommand(
                 id, request.name(), request.author(), request.isbn(), request.coverPrice(),
-                request.publisherId(), request.categoryId(), request.authorIds(), request.extras()));
+                request.publisherId(), request.categoryId(), request.authorIds(), request.extras(),
+                request.partNumber(), request.partLabel()));
     }
 
     @PostMapping
     public ResponseEntity<TitleResponse> create(@Valid @RequestBody CreateTitleRequest request) {
         TitleResponse response = createTitle.execute(new CreateTitleCommand(
                 request.name(), request.author(), request.isbn(), request.coverPrice(),
-                request.publisherId(), request.categoryId(), request.authorIds(), request.extras()));
+                request.publisherId(), request.categoryId(), request.authorIds(), request.extras(),
+                request.workId(), request.partNumber(), request.partLabel()));
         return ResponseEntity.created(URI.create("/internal/books/" + response.id())).body(response);
     }
 
@@ -83,14 +94,19 @@ public class TitleController {
     @CrossTenantReadable
     public List<TitleResponse> search(SearchTitlesQuery query) {
         boolean available = Boolean.TRUE.equals(query.available());
+        if (query.workId() != null || query.seriesId() != null) {
+            return searchTitles.execute(query.keyword(), available, query.categoryId(), query.publisherId(),
+                    query.workId(), query.seriesId());
+        }
         if (query.categoryId() == null && query.publisherId() == null) {
             return searchTitles.execute(query.keyword(), available);
         }
         return searchTitles.execute(query.keyword(), available, query.categoryId(), query.publisherId());
     }
 
-    /** Bộ lọc tìm đầu sách; categoryId/publisherId (tùy chọn) khớp đúng id. */
-    public record SearchTitlesQuery(String keyword, Boolean available, UUID categoryId, UUID publisherId) {
+    /** Bộ lọc tìm ấn bản; categoryId/publisherId/workId/seriesId (tùy chọn) khớp đúng id. */
+    public record SearchTitlesQuery(String keyword, Boolean available, UUID categoryId, UUID publisherId, UUID workId,
+                                    UUID seriesId) {
     }
 
     /** Tra nhiều đầu sách theo id (sales-service gọi bằng token người dùng chuyển tiếp). Khóa TitleController/lookup. */
@@ -135,6 +151,17 @@ public class TitleController {
     public TitlePreviewResponse updatePreview(@PathVariable UUID id,
                                               @Valid @RequestBody UpdateTitlePreviewRequest request) {
         return updatePreview.execute(id, request.description(), request.previewText());
+    }
+
+    /**
+     * Đổi tác phẩm của ấn bản (ADR-0026): {@code {workId}} gắn vào tác phẩm có sẵn hoặc {@code {newWork: {...}}} tách ra
+     * tác phẩm mới. Khóa TitleController/changeWork. Sự kiện EditionWorkChangedEvent phát sau khi commit.
+     */
+    @PutMapping("/{id}/work")
+    public TitleResponse changeWork(@PathVariable UUID id, @Valid @RequestBody ChangeEditionWorkRequest request) {
+        MoveEditionToWorkUseCase.Result result = moveEditionToWork.execute(id, request);
+        editionEvents.execute(result.changes());
+        return result.title();
     }
 
     @GetMapping("/{id}")

@@ -134,6 +134,55 @@ class BookCopyAndAvailabilityTest {
     }
 
     @Test
+    void timLaiBanSaoDaMatChiDuocVeAvailableHoacDamaged() {
+        BookCopy toAvailable = BookCopy.restore(UUID.randomUUID(), UUID.randomUUID(), "R1", CopyStatus.LOST);
+        assertTrue(toAvailable.changeStatus(CopyStatus.AVAILABLE));
+        assertEquals(CopyStatus.AVAILABLE, toAvailable.status());
+        BookCopy toDamaged = BookCopy.restore(UUID.randomUUID(), UUID.randomUUID(), "R2", CopyStatus.LOST);
+        assertTrue(toDamaged.changeStatus(CopyStatus.DAMAGED));
+        assertEquals(CopyStatus.DAMAGED, toDamaged.status());
+        // không nới thêm: LOST không sang RESERVED; AVAILABLE/DAMAGED không sang LOST trực tiếp
+        BookCopy lost = BookCopy.restore(UUID.randomUUID(), UUID.randomUUID(), "R3", CopyStatus.LOST);
+        assertThrows(lms.catalog.inventory.domain.IllegalCopyTransitionException.class, () -> lost.changeStatus(CopyStatus.RESERVED));
+        BookCopy damaged = BookCopy.restore(UUID.randomUUID(), UUID.randomUUID(), "R4", CopyStatus.DAMAGED);
+        assertThrows(lms.catalog.inventory.domain.IllegalCopyTransitionException.class, () -> damaged.changeStatus(CopyStatus.LOST));
+        assertThrows(lms.catalog.inventory.domain.IllegalCopyTransitionException.class, () -> damaged.changeStatus(CopyStatus.RESERVED));
+    }
+
+    @Test
+    void hoanKhoanLostVeAvailablePhatEventKemWorkVaLanguage() {
+        UUID title = UUID.randomUUID();
+        UUID work = UUID.randomUUID();
+        FakeRepo repo = new FakeRepo() {
+            @Override
+            public Map<UUID, TitleWork> findTitleWorksByTitleIds(Collection<UUID> ids) {
+                return Map.of(title, new TitleWork(work, "vi"));
+            }
+        };
+        List<lms.common.kernel.DomainEvent> published = new ArrayList<>();
+        var change = new lms.catalog.inventory.application.ChangeCopyStatusUseCase(repo, published::add, java.time.Clock.systemUTC());
+        BookCopy copy = repo.save(BookCopy.restore(UUID.randomUUID(), title, "RL1", CopyStatus.LOST));
+
+        assertEquals(CopyStatus.AVAILABLE, change.execute(copy.id(), CopyStatus.AVAILABLE).status());
+        assertEquals(1, published.size());
+        var event = (lms.catalog.inventory.domain.CopyAvailableEvent) published.get(0);
+        assertEquals(work, event.workId());
+        assertEquals("vi", event.language());
+
+        // LOST -> DAMAGED không phát CopyAvailableEvent
+        BookCopy copy2 = repo.save(BookCopy.restore(UUID.randomUUID(), title, "RL2", CopyStatus.LOST));
+        assertEquals(CopyStatus.DAMAGED, change.execute(copy2.id(), CopyStatus.DAMAGED).status());
+        assertEquals(1, published.size());
+    }
+
+    @Test
+    void eventCuTuongThichNguocKhongCoLanguage() {
+        var e = new lms.catalog.inventory.domain.CopyAvailableEvent(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                java.time.Instant.now(), UUID.randomUUID());
+        assertEquals(null, e.language());
+    }
+
+    @Test
     void traCuuBanSaoTheoIdVaMaVach() {
         FakeRepo repo = new FakeRepo();
         BookCopy copy = repo.save(BookCopy.register(UUID.randomUUID(), "Q1"));

@@ -22,6 +22,7 @@ import lms.catalog.catalog.application.imports.TitleImportHandler;
 import lms.catalog.catalog.infrastructure.web.AuthorImportController;
 import lms.catalog.catalog.infrastructure.web.CategoryImportController;
 import lms.catalog.catalog.infrastructure.web.PublisherImportController;
+import lms.catalog.catalog.infrastructure.web.SeriesImportController;
 import lms.catalog.catalog.infrastructure.web.ShelfLocationImportController;
 import lms.catalog.catalog.infrastructure.web.TitleImportController;
 import lms.catalog.config.SecurityConfiguration;
@@ -47,12 +48,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 /**
- * Khóa phân quyền của 5 controller nhập catalog (ADR-0024 mục 4.1): upload và confirm là khóa
+ * Khóa phân quyền của 6 controller nhập catalog (ADR-0024 mục 4.1): upload và confirm là khóa
  * {@code <Lớp>ImportController/<method>} theo LỚP CON (không phải lớp cơ sở), các endpoint còn lại chỉ cần đăng nhập;
  * shelf-locations thuộc module LENDING. Kiểm khóa bật lại bằng {@code @TestPropertySource}.
  */
 @WebMvcTest({TitleImportController.class, AuthorImportController.class, PublisherImportController.class,
-        CategoryImportController.class, ShelfLocationImportController.class})
+        CategoryImportController.class, ShelfLocationImportController.class, SeriesImportController.class})
 @Import({SecurityConfiguration.class, PermissionAutoConfiguration.class})
 @TestPropertySource(properties = {"app.security.enabled=true", "lms.security.permission.enabled=true"})
 class CatalogImportControllerTest {
@@ -68,6 +69,7 @@ class CatalogImportControllerTest {
     @MockitoBean(name = "publisherImportHandler") ReferenceImportHandler publisherHandler;
     @MockitoBean(name = "categoryImportHandler") ReferenceImportHandler categoryHandler;
     @MockitoBean(name = "shelfLocationImportHandler") ReferenceImportHandler shelfHandler;
+    @MockitoBean(name = "seriesImportHandler") ReferenceImportHandler seriesHandler;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean PermissionKeyRegistrar registrar;
 
@@ -95,11 +97,11 @@ class CatalogImportControllerTest {
         return new MockMultipartFile("file", "a.xlsx", "application/octet-stream", new byte[] {1});
     }
 
-    /** {tên lớp, đường dẫn}: 5 loại theo ADR-0024 mục 3.4, tên controller KHÔNG được đổi. */
+    /** {tên lớp, đường dẫn}: 6 loại (ADR-0024 mục 3.4, thêm series ở ADR-0026), tên controller KHÔNG được đổi. */
     private static final String[][] TYPES = {
             {"TitleImportController", "titles"}, {"AuthorImportController", "authors"},
             {"PublisherImportController", "publishers"}, {"CategoryImportController", "categories"},
-            {"ShelfLocationImportController", "shelf-locations"}};
+            {"ShelfLocationImportController", "shelf-locations"}, {"SeriesImportController", "series"}};
 
     @Test
     void uploadVaConfirmDungKhoaTheoTenLopCon() throws Exception {
@@ -118,7 +120,8 @@ class CatalogImportControllerTest {
                 "AuthorImportController/upload", "AuthorImportController/confirm",
                 "PublisherImportController/upload", "PublisherImportController/confirm",
                 "CategoryImportController/upload", "CategoryImportController/confirm",
-                "ShelfLocationImportController/upload", "ShelfLocationImportController/confirm");
+                "ShelfLocationImportController/upload", "ShelfLocationImportController/confirm",
+                "SeriesImportController/upload", "SeriesImportController/confirm");
     }
 
     @Test

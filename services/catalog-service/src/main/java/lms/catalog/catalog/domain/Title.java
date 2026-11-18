@@ -10,6 +10,7 @@ public class Title {
 
     public static final int MAX_DESCRIPTION = 500;
     public static final int MAX_PREVIEW_TEXT = 2000;
+    public static final int MAX_PART_LABEL = 50;
 
     private final UUID id;
     private final String name;
@@ -30,10 +31,23 @@ public class Title {
     private final List<UUID> authorIds;
     /** Thông tin bổ sung tùy chọn (không bao giờ null; TitleExtras.EMPTY nếu chưa nhập). */
     private final TitleExtras extras;
+    /** Tác phẩm mà ấn bản này thuộc về (ADR-0026); null với ấn bản chưa gắn (dữ liệu cũ trước khi backfill/contract). */
+    private final UUID workId;
+    /** Số phần của tác phẩm in thành nhiều cuốn ("Phần 1/2"), tùy chọn. */
+    private final Integer partNumber;
+    /** Nhãn phần hiển thị ("Phần 1"), tùy chọn. */
+    private final String partLabel;
 
     private Title(UUID id, String name, String author, String isbn, BigDecimal coverPrice, UUID tenantId,
                   String description, String previewText, UUID publisherId, UUID categoryId, List<UUID> authorIds,
                   TitleExtras extras) {
+        this(id, name, author, isbn, coverPrice, tenantId, description, previewText, publisherId, categoryId,
+                authorIds, extras, null, null, null);
+    }
+
+    private Title(UUID id, String name, String author, String isbn, BigDecimal coverPrice, UUID tenantId,
+                  String description, String previewText, UUID publisherId, UUID categoryId, List<UUID> authorIds,
+                  TitleExtras extras, UUID workId, Integer partNumber, String partLabel) {
         if (id == null) throw new InvalidTitleException("id không được null");
         if (name == null || name.isBlank()) throw new InvalidTitleException("Tên sách không được để trống");
         if (author == null || author.isBlank()) throw new InvalidTitleException("Tác giả không được để trống");
@@ -50,6 +64,15 @@ public class Title {
         this.categoryId = categoryId;
         this.authorIds = authorIds == null ? List.of() : List.copyOf(authorIds);
         this.extras = extras == null ? TitleExtras.EMPTY : extras;
+        if (partNumber != null && partNumber <= 0) throw new InvalidTitleException("Số phần phải > 0");
+        String label = partLabel == null ? null : Normalizer.normalize(partLabel, Normalizer.Form.NFC).strip();
+        if (label != null && label.isEmpty()) label = null;
+        if (label != null && label.codePointCount(0, label.length()) > MAX_PART_LABEL) {
+            throw new InvalidTitleException("Nhãn phần tối đa " + MAX_PART_LABEL + " ký tự");
+        }
+        this.workId = workId;
+        this.partNumber = partNumber;
+        this.partLabel = label;
     }
 
     public static Title create(String name, String author, String isbn, BigDecimal coverPrice) {
@@ -86,22 +109,56 @@ public class Title {
                 categoryId, authorIds, extras);
     }
 
+    /** Dựng lại từ DB kèm tác phẩm và nhãn phần (ADR-0026). */
+    public static Title restore(UUID id, String name, String author, String isbn, BigDecimal coverPrice, UUID tenantId,
+                                String description, String previewText, UUID publisherId, UUID categoryId,
+                                List<UUID> authorIds, TitleExtras extras, UUID workId, Integer partNumber,
+                                String partLabel) {
+        return new Title(id, name, author, isbn, coverPrice, tenantId, description, previewText, publisherId,
+                categoryId, authorIds, extras, workId, partNumber, partLabel);
+    }
+
+    /** Bản đã gắn vào tác phẩm khác (cùng id, giữ các trường khác). */
+    public Title withWork(UUID workId) {
+        return new Title(id, name, author, isbn, coverPrice, tenantId, description, previewText, publisherId,
+                categoryId, authorIds, extras, workId, partNumber, partLabel);
+    }
+
+    /** Bản đã thay nhãn phần (null/null = bỏ). */
+    public Title withPart(Integer partNumber, String partLabel) {
+        return new Title(id, name, author, isbn, coverPrice, tenantId, description, previewText, publisherId,
+                categoryId, authorIds, extras, workId, partNumber, partLabel);
+    }
+
+    /**
+     * Bản mang trường cấp tác phẩm lấy từ work (thể loại, tác giả chuẩn, bộ sách + số tập): giá trị hiển thị/ghi gương
+     * ở giai đoạn chuyển tiếp (ADR-0026 mục 4.3). {@code series} null thì bỏ cả số tập.
+     */
+    public Title withWorkLevel(UUID categoryId, List<UUID> authorIds, String series, Integer seriesNumber) {
+        TitleExtras x = extras;
+        TitleExtras merged = new TitleExtras(x.subtitle(), x.publicationYear(), x.edition(), x.language(),
+                x.pageCount(), x.format(), x.translator(), series, series == null ? null : seriesNumber,
+                x.coverImageUrl(), x.tags());
+        return new Title(id, name, author, isbn, coverPrice, tenantId, description, previewText, publisherId,
+                categoryId, authorIds, merged, workId, partNumber, partLabel);
+    }
+
     /** Bản đã thay thông tin bổ sung (cùng id, giữ các trường khác); null nghĩa là xóa hết. */
     public Title withExtras(TitleExtras extras) {
         return new Title(id, name, author, isbn, coverPrice, tenantId, description, previewText, publisherId,
-                categoryId, authorIds, extras);
+                categoryId, authorIds, extras, workId, partNumber, partLabel);
     }
 
     /** Bản đã thay phân loại chuẩn (cùng id, giữ các trường khác). Đã kiểm tồn tại ở use case. */
     public Title withClassification(UUID publisherId, UUID categoryId, List<UUID> authorIds) {
         return new Title(id, name, author, isbn, coverPrice, tenantId, description, previewText, publisherId,
-                categoryId, authorIds, extras);
+                categoryId, authorIds, extras, workId, partNumber, partLabel);
     }
 
     /** Bản đã sửa (cùng id): thay name/author/isbn/coverPrice, kiểm quy tắc như khi tạo; giữ mô tả, đoạn đọc thử và phân loại. */
     public Title update(String name, String author, String isbn, BigDecimal coverPrice) {
         return new Title(id, name, author, isbn, coverPrice, tenantId, description, previewText, publisherId,
-                categoryId, authorIds, extras);
+                categoryId, authorIds, extras, workId, partNumber, partLabel);
     }
 
     /**
@@ -112,7 +169,8 @@ public class Title {
     public Title withPreview(String description, String previewText) {
         return new Title(id, name, author, isbn, coverPrice, tenantId,
                 normalizeText(description, MAX_DESCRIPTION, "Mô tả"),
-                normalizeText(previewText, MAX_PREVIEW_TEXT, "Đoạn đọc thử"), publisherId, categoryId, authorIds, extras);
+                normalizeText(previewText, MAX_PREVIEW_TEXT, "Đoạn đọc thử"), publisherId, categoryId, authorIds, extras,
+                workId, partNumber, partLabel);
     }
 
     static String normalizeText(String raw, int max, String field) {
@@ -141,5 +199,8 @@ public class Title {
     public UUID categoryId() { return categoryId; }
     public List<UUID> authorIds() { return authorIds; }
     public TitleExtras extras() { return extras; }
+    public UUID workId() { return workId; }
+    public Integer partNumber() { return partNumber; }
+    public String partLabel() { return partLabel; }
     public boolean hasPreview() { return previewText != null; }
 }

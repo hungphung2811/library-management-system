@@ -9,7 +9,10 @@ import java.util.Set;
 import java.util.UUID;
 import lms.catalog.catalog.application.imports.TitleRows.RefLookups;
 import lms.catalog.catalog.application.imports.TitleRows.TitleDraft;
+import lms.catalog.catalog.domain.ReferenceKind;
 import lms.catalog.catalog.domain.ReferenceRepository;
+import lms.catalog.catalog.domain.Work;
+import lms.catalog.catalog.domain.WorkRepository;
 import lms.catalog.catalog.domain.Title;
 import lms.catalog.catalog.domain.TitleRepository;
 import lms.catalog.inventory.application.CopyDraft;
@@ -39,8 +42,11 @@ public class TitleChunkWriter {
     private final TitleRepository titles;
     private final ReferenceRepository references;
     private final RegisterCopiesInBatchUseCase copies;
+    private final WorkRepository works;
 
-    public TitleChunkWriter(TitleRepository titles, ReferenceRepository references, RegisterCopiesInBatchUseCase copies) {
+    public TitleChunkWriter(TitleRepository titles, WorkRepository works, ReferenceRepository references,
+                            RegisterCopiesInBatchUseCase copies) {
+        this.works = works;
         this.titles = titles;
         this.references = references;
         this.copies = copies;
@@ -84,6 +90,9 @@ public class TitleChunkWriter {
         Map<String, UUID> newIds = new HashMap<>();
         Set<String> failedIsbns = new HashSet<>();
         List<Title> toInsert = new ArrayList<>();
+        List<Work> newWorks = new ArrayList<>();
+        Map<String, Work> workByIsbn = new HashMap<>(); // ISBN ghi trong chunk này -> tác phẩm của ấn bản đó
+        DbTargets dbTargets = DbTargets.load(drafts.values(), titles, works, references);
         for (Map.Entry<Integer, TitleDraft> e : drafts.entrySet()) {
             int i = e.getKey();
             ImportRow row = chunk.get(i);
@@ -100,11 +109,24 @@ public class TitleChunkWriter {
                 if (isbn != null) failedIsbns.add(isbn);
                 continue;
             }
-            Title t = TitleRows.classified(d, refs);
+            Placed placed;
+            try {
+                placed = placeInWork(d, TitleRows.classified(d, refs), refs, workByIsbn, dbTargets, failedIsbns);
+            } catch (RowProblem p) {
+                outcomes[i] = failed(row, p.toIssue());
+                if (isbn != null) failedIsbns.add(isbn);
+                continue;
+            }
+            Title t = placed.title();
+            if (placed.created() != null) newWorks.add(placed.created());
             toInsert.add(t);
-            if (isbn != null) newIds.put(isbn, t.id());
+            if (isbn != null) {
+                newIds.put(isbn, t.id());
+                workByIsbn.put(isbn, placed.work());
+            }
             outcomes[i] = RowOutcome.created(row);
         }
+        if (!newWorks.isEmpty()) works.insertAll(newWorks);
         if (!toInsert.isEmpty()) titles.insertAll(toInsert);
 
         List<NewCopy> newCopies = new ArrayList<>();
@@ -158,6 +180,75 @@ public class TitleChunkWriter {
             }
         }
         return new Outcome(ChunkResult.of(List.of(outcomes)), created);
+    }
+
+    /** Ấn bản đã gắn tác phẩm; {@code created} khác null khi tác phẩm là tác phẩm MỚI tạo cho dòng này. */
+    private record Placed(Title title, Work work, Work created) {
+    }
+
+    /** Ấn bản đích của cột sameWorkAsIsbn đã có trong DB (kể cả vừa ghi ở chunk trước): tra theo lô, không theo dòng. */
+    private record DbTargets(Map<String, Title> titles, Map<UUID, Work> works, Map<UUID, String> seriesNames) {
+
+        static DbTargets load(java.util.Collection<TitleDraft> drafts, TitleRepository titles, WorkRepository works,
+                              ReferenceRepository references) {
+            Set<String> isbns = new HashSet<>();
+            for (TitleDraft d : drafts) if (d.work().sameWorkAsIsbn() != null) isbns.add(d.work().sameWorkAsIsbn());
+            if (isbns.isEmpty()) return new DbTargets(Map.of(), Map.of(), Map.of());
+            Map<String, Title> byIsbn = new HashMap<>();
+            for (Title t : titles.findByIsbns(isbns)) byIsbn.put(t.isbn(), t);
+            Set<UUID> workIds = new HashSet<>();
+            for (Title t : byIsbn.values()) if (t.workId() != null) workIds.add(t.workId());
+            Map<UUID, Work> byId = new HashMap<>();
+            if (!workIds.isEmpty()) for (Work w : works.findByIds(workIds)) byId.put(w.id(), w);
+            Set<UUID> seriesIds = new HashSet<>();
+            for (Work w : byId.values()) if (w.seriesId() != null) seriesIds.add(w.seriesId());
+            Map<UUID, String> names = new HashMap<>();
+            if (!seriesIds.isEmpty()) {
+                for (var r : references.findByIds(ReferenceKind.SERIES, seriesIds)) names.put(r.id(), r.name());
+            }
+            return new DbTargets(byIsbn, byId, names);
+        }
+    }
+
+    /**
+     * Gắn ấn bản vào tác phẩm. Không có sameWorkAsIsbn: tạo tác phẩm mới 1:1 từ trường của dòng. Có: dùng tác phẩm của ấn bản
+     * đích (ghi trong chunk này hoặc đã có trong DB), ấn bản mang trường cấp tác phẩm của nó (ghi gương cột cũ, mục 4.3).
+     */
+    private Placed placeInWork(TitleDraft d, Title classified, RefLookups refs, Map<String, Work> workByIsbn,
+                               DbTargets db, Set<String> failedIsbns) {
+        String same = d.work().sameWorkAsIsbn();
+        if (same == null) {
+            Work work = TitleRows.newWork(d, classified, refs);
+            String seriesName = work.seriesId() == null ? null
+                    : refs.series().get(lms.catalog.catalog.domain.Reference.keyOf(d.seriesName())).name();
+            Title t = classified.withWorkLevel(work.categoryId(), work.authorIds(), seriesName, work.seriesNumber())
+                    .withWork(work.id());
+            return new Placed(t, work, work);
+        }
+        Work target = workByIsbn.get(same);
+        String seriesName = null;
+        if (target != null) {
+            seriesName = target.seriesId() == null ? null : seriesNameOf(target.seriesId(), refs, db);
+        } else {
+            Title dbTitle = db.titles().get(same);
+            target = dbTitle == null || dbTitle.workId() == null ? null : db.works().get(dbTitle.workId());
+            if (target == null) {
+                boolean rowFailed = failedIsbns.contains(same) || dbTitle == null;
+                throw new RowProblem("sameWorkAsIsbn", rowFailed ? WorkRefResolver.ROW_INVALID : WorkRefResolver.NOT_FOUND,
+                        "Không gắn được vào tác phẩm của ấn bản ISBN " + same);
+            }
+            seriesName = target.seriesId() == null ? null : seriesNameOf(target.seriesId(), refs, db);
+        }
+        Title t = classified.withWork(target.id())
+                .withWorkLevel(target.categoryId(), target.authorIds(), seriesName, target.seriesNumber());
+        return new Placed(t, target, null);
+    }
+
+    private static String seriesNameOf(UUID seriesId, RefLookups refs, DbTargets db) {
+        String name = db.seriesNames().get(seriesId);
+        if (name != null) return name;
+        for (var r : refs.series().values()) if (r.id().equals(seriesId)) return r.name();
+        return null;
     }
 
     private static RowOutcome failed(ImportRow row, RowIssue issue) {

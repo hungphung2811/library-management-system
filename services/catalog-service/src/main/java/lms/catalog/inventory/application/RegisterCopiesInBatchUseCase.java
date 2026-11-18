@@ -105,10 +105,21 @@ public class RegisterCopiesInBatchUseCase {
      */
     public int publishAvailable(Collection<CreatedCopy> created) {
         Instant now = Instant.now(clock);
+        // Một truy vấn titleId -> workId cho cả lô (không theo từng bản sao, ADR-0026 3.2)
+        java.util.Map<UUID, BookCopyRepository.TitleWork> works;
+        try {
+            works = repository.findTitleWorksByTitleIds(created.stream().map(CreatedCopy::titleId).distinct().toList());
+        } catch (RuntimeException e) {
+            // best-effort (ADR-0001): thiếu workId thì consumer rơi về hàng đợi theo titleId như event cũ
+            log.warn("Không tra được workId cho lô CopyAvailableEvent: phát không kèm workId", e);
+            works = java.util.Map.of();
+        }
         int attempted = 0;
         for (CreatedCopy c : created) {
             long start = System.nanoTime();
-            eventPort.publish(new CopyAvailableEvent(UUID.randomUUID(), c.copyId(), c.titleId(), now));
+            BookCopyRepository.TitleWork w = works.get(c.titleId());
+            eventPort.publish(new CopyAvailableEvent(UUID.randomUUID(), c.copyId(), c.titleId(), now,
+                    w == null ? null : w.workId(), w == null ? null : w.language()));
             attempted++;
             if (System.nanoTime() - start > SLOW_PUBLISH_NANOS) {
                 log.warn("Kafka chậm hoặc không khả dụng: bỏ phát {} sự kiện CopyAvailableEvent còn lại của lô (best-effort)",

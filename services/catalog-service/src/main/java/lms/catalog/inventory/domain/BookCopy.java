@@ -96,6 +96,7 @@ public class BookCopy {
      * Đổi trạng thái theo vòng đời mượn/trả (UC06-UC08). Idempotent: đã ở trạng thái đích thì không làm gì.
      * Bảng chuyển hợp lệ: LOANED từ AVAILABLE/RESERVED; AVAILABLE từ LOANED/RESERVED/DAMAGED (trả về, nhả giữ, sửa xong);
      * RESERVED từ AVAILABLE/LOANED (giữ chỗ, hoặc hoàn tác một lần mượn lỗi); DAMAGED và LOST chỉ từ LOANED.
+     * Ngoại lệ duy nhất: LOST -> AVAILABLE/DAMAGED (hoàn khoản khi tìm lại sách đã báo mất, circulation duyệt).
      * @return true nếu trạng thái thực sự đổi.
      */
     public boolean changeStatus(CopyStatus target) {
@@ -103,9 +104,11 @@ public class BookCopy {
         if (status == target) return false;
         boolean allowed = switch (target) {
             case LOANED -> status == CopyStatus.AVAILABLE || status == CopyStatus.RESERVED;
-            case AVAILABLE -> status == CopyStatus.LOANED || status == CopyStatus.RESERVED || status == CopyStatus.DAMAGED;
+            case AVAILABLE -> status == CopyStatus.LOANED || status == CopyStatus.RESERVED || status == CopyStatus.DAMAGED
+                    || status == CopyStatus.LOST;
             case RESERVED -> status == CopyStatus.AVAILABLE || status == CopyStatus.LOANED;
-            case DAMAGED, LOST -> status == CopyStatus.LOANED;
+            case DAMAGED -> status == CopyStatus.LOANED || status == CopyStatus.LOST;
+            case LOST -> status == CopyStatus.LOANED;
         };
         if (!allowed) throw new IllegalCopyTransitionException(status, target);
         status = target;

@@ -22,6 +22,9 @@ import lms.catalog.catalog.domain.ReferenceRepository;
 import lms.catalog.catalog.domain.Title;
 import lms.catalog.catalog.domain.TitleExtras;
 import lms.catalog.catalog.domain.TitleRepository;
+import lms.catalog.catalog.domain.Work;
+import lms.catalog.catalog.domain.WorkKind;
+import lms.catalog.catalog.domain.WorkRepository;
 import lms.catalog.catalog.infrastructure.demo.CatalogDemoSeedStep;
 import lms.catalog.inventory.domain.BookCopy;
 import lms.catalog.inventory.domain.BookCopyRepository;
@@ -45,8 +48,10 @@ class DemoSeedStepsTest {
 
     final FakeReferences references = new FakeReferences();
     final FakeTitles titles = new FakeTitles();
+    final FakeWorks works = new FakeWorks();
     final FakeCopies copies = new FakeCopies(titles);
-    final CatalogDemoSeedStep catalogStep = new CatalogDemoSeedStep(references, titles, TransactionOperations.withoutTransaction());
+    final CatalogDemoSeedStep catalogStep = new CatalogDemoSeedStep(references, titles, works,
+            TransactionOperations.withoutTransaction());
     final InventoryDemoSeedStep inventoryStep = new InventoryDemoSeedStep(copies, TransactionOperations.withoutTransaction());
 
     {
@@ -148,7 +153,9 @@ class DemoSeedStepsTest {
         assertThat(t.publisherId()).isNotNull();
         assertThat(t.authorIds()).hasSize(1);
         assertThat(first.created()).isEqualTo(
-                references.rows.values().stream().mapToInt(Map::size).sum() + PLAN.titles().size());
+                references.rows.values().stream().mapToInt(Map::size).sum() + PLAN.works().size()
+                        + PLAN.titles().size());
+        assertThat(t.workId()).isEqualTo(p.workId());
 
         DemoSeedStep.SeedResult second = catalogStep.run(context(PLAN));
         assertThat(second.created()).isZero();
@@ -298,7 +305,7 @@ class DemoSeedStepsTest {
         DemoSeedStep.SeedResult c = inventoryStep.run(context(PLAN));
 
         assertThat(t.created()).isZero();
-        assertThat(t.skipped()).isEqualTo(refCount + titleCount);
+        assertThat(t.skipped()).isEqualTo(refCount + works.rows.size() + titleCount);
         assertThat(c).isEqualTo(DemoSeedStep.SeedResult.of(0, copyCount));
         assertThat(titles.rows).hasSize(titleCount);
         assertThat(copies.rows).hasSize(copyCount);
@@ -364,6 +371,108 @@ class DemoSeedStepsTest {
         assertThat(copies.rows).hasSize(copyCount);
     }
 
+    // ---- Mô hình tác phẩm - ấn bản (ADR-0026) ----
+
+    @Test
+    void taoTacPhamBoSachVaGanMoiAnBanVaoDungTacPham() {
+        catalogStep.run(context(PLAN));
+
+        assertThat(works.rows).hasSize(PLAN.works().size());
+        assertThat(references.rows.get(ReferenceKind.SERIES)).hasSize(PLAN.series().size());
+        for (DemoPlan.WorkPlan w : PLAN.works()) {
+            Work work = works.rows.get(w.id());
+            assertThat(work).as(w.title()).isNotNull();
+            assertThat(work.title()).isEqualTo(w.title());
+            assertThat(work.originalTitle()).isEqualTo(w.originalTitle());
+            assertThat(work.originalLanguage()).isEqualTo(w.originalLanguage());
+            assertThat(work.kind().name()).isEqualTo(w.kind().name());
+            assertThat(work.categoryId()).isNotNull();
+            assertThat(work.authorIds()).hasSize(1);
+            assertThat(work.seriesNumber()).isEqualTo(w.seriesNumber());
+            assertThat(work.seriesLabel()).isEqualTo(w.seriesLabel());
+            if (w.seriesIndex() != null) {
+                Reference series = references.rows.get(ReferenceKind.SERIES).get(work.seriesId());
+                assertThat(series.name()).isEqualTo(PLAN.series().get(w.seriesIndex()).name());
+            } else {
+                assertThat(work.seriesId()).isNull();
+            }
+            w.editionIds().forEach(id -> assertThat(titles.rows.get(id).workId()).isEqualTo(w.id()));
+        }
+        // 64 ấn bản gốc: tác phẩm 1:1 đúng công thức backfill md5 của migration (LegacyIds)
+        for (int i = 0; i < 64; i++) {
+            UUID titleId = PLAN.titles().get(i).id();
+            assertThat(titles.rows.get(titleId).workId()).isEqualTo(lms.catalog.catalog.domain.LegacyIds.workIdOfTitle(titleId));
+        }
+        // nhiều ấn bản, bộ hộp, tập có phần
+        assertThat(works.rows.values().stream().filter(w -> w.kind() == WorkKind.COLLECTION)).hasSize(1);
+        assertThat(titles.rows.values().stream().filter(t -> t.workId().equals(PLAN.titles().get(21).workId())))
+                .hasSizeGreaterThanOrEqualTo(3);
+        assertThat(titles.rows.values().stream().filter(t -> t.partNumber() != null).map(Title::partNumber))
+                .containsExactlyInAnyOrder(1, 2);
+    }
+
+    @Test
+    void dongBoSachBackfillCungTenDuocDungLaiKhongTaoTrung() {
+        // môi trường đã backfill: bộ "Harry Potter" có id md5, ấn bản và tác phẩm 1:1 đã có (work_id đã đặt)
+        UUID legacySeries = lms.catalog.catalog.domain.LegacyIds.seriesId(TENANT, Reference.keyOf("Harry Potter"));
+        references.rows.get(ReferenceKind.SERIES).put(legacySeries,
+                Reference.restore(legacySeries, ReferenceKind.SERIES, null, "Harry Potter", null, null, true,
+                        lms.catalog.catalog.domain.ReferenceExtras.EMPTY));
+        DemoPlan.TitlePlan hp1 = PLAN.titles().get(21);
+        works.rows.put(hp1.workId(), Work.restore(hp1.workId(), null, hp1.name(), null, null, hp1.author(), null, null,
+                legacySeries, 1, null, WorkKind.SINGLE, List.of()));
+
+        catalogStep.run(context(PLAN));
+
+        assertThat(references.rows.get(ReferenceKind.SERIES)).hasSize(PLAN.series().size());
+        assertThat(references.rows.get(ReferenceKind.SERIES)).containsKey(legacySeries);
+        Work hp = works.rows.get(hp1.workId());
+        assertThat(hp.seriesId()).isEqualTo(legacySeries);
+        // điền trường còn null (tên gốc, nhãn tập, tác giả chuẩn) nhưng không đè trường đã có
+        assertThat(hp.originalTitle()).isEqualTo("Harry Potter and the Philosopher's Stone");
+        assertThat(hp.originalLanguage()).isEqualTo("en");
+        assertThat(hp.seriesLabel()).isEqualTo("Tập 1");
+        assertThat(hp.categoryId()).isNotNull();
+        assertThat(hp.authorIds()).hasSize(1);
+        assertThat(works.rows).hasSize(PLAN.works().size());
+    }
+
+    @Test
+    void tacPhamDaCoKhongBiDeTruongNguoiDungDaSua() {
+        catalogStep.run(context(PLAN));
+        DemoPlan.WorkPlan w = PLAN.works().get(21);
+        Work cur = works.rows.get(w.id());
+        works.rows.put(w.id(), cur.update("Tên đã sửa tay", "Original sửa tay", "fr", cur.author(), "Mô tả riêng",
+                cur.categoryId(), cur.seriesId(), cur.seriesNumber(), "Nhãn riêng", cur.kind(), cur.authorIds()));
+
+        DemoSeedStep.SeedResult r = catalogStep.run(context(PLAN));
+
+        Work after = works.rows.get(w.id());
+        assertThat(after.title()).isEqualTo("Tên đã sửa tay");
+        assertThat(after.originalTitle()).isEqualTo("Original sửa tay");
+        assertThat(after.originalLanguage()).isEqualTo("fr");
+        assertThat(after.seriesLabel()).isEqualTo("Nhãn riêng");
+        assertThat(r.created()).isZero();
+    }
+
+    @Test
+    void anBanBackfillThieuTacPhamHoacNhanPhanDuocDienChiMotLan() {
+        // ấn bản đã đủ extras (seed bản trước) nhưng chưa có work_id/nhãn phần
+        catalogStep.run(context(PLAN));
+        DemoPlan.TitlePlan part = PLAN.titles().get(23);
+        Title cur = titles.rows.get(part.id());
+        titles.rows.put(part.id(), Title.restore(cur.id(), cur.name(), cur.author(), cur.isbn(), cur.coverPrice(), null,
+                null, null, cur.publisherId(), cur.categoryId(), cur.authorIds(), cur.extras(), null, null, null));
+
+        DemoSeedStep.SeedResult first = catalogStep.run(context(PLAN));
+        assertThat(first.created()).isEqualTo(1);
+        assertThat(titles.rows.get(part.id()).workId()).isEqualTo(part.workId());
+        assertThat(titles.rows.get(part.id()).partNumber()).isEqualTo(1);
+        assertThat(titles.rows.get(part.id()).partLabel()).isEqualTo("Phần 1/2");
+
+        assertThat(catalogStep.run(context(PLAN)).created()).isZero();
+    }
+
     private Set<UUID> idsWithStatus(CopyStatus status) {
         return copies.rows.values().stream().filter(c -> c.status() == status).map(BookCopy::id).collect(Collectors.toSet());
     }
@@ -410,6 +519,46 @@ class DemoSeedStepsTest {
 
         @Override
         public List<Reference> options(ReferenceKind kind, String keyword, int limit) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<Reference> findByNameKeys(ReferenceKind kind, Collection<String> nameKeys) {
+            return rows.get(kind).values().stream().filter(r -> nameKeys.contains(r.nameKey())).toList();
+        }
+    }
+
+    static class FakeWorks implements WorkRepository {
+        final Map<UUID, Work> rows = new LinkedHashMap<>();
+
+        @Override
+        public Work save(Work work) {
+            rows.put(work.id(), work);
+            return work;
+        }
+
+        @Override
+        public Optional<Work> findById(UUID id) {
+            return Optional.ofNullable(rows.get(id));
+        }
+
+        @Override
+        public List<Work> findByIds(Collection<UUID> ids) {
+            return ids.stream().map(rows::get).filter(java.util.Objects::nonNull).toList();
+        }
+
+        @Override
+        public void delete(UUID id) {
+            rows.remove(id);
+        }
+
+        @Override
+        public List<UUID> findIdsBySeries(UUID seriesId) {
+            return rows.values().stream().filter(w -> seriesId.equals(w.seriesId())).map(Work::id).toList();
+        }
+
+        @Override
+        public Page search(Criteria criteria, int page, int size) {
             throw new UnsupportedOperationException();
         }
     }

@@ -39,6 +39,7 @@ public final class CachedReferenceUseCases {
             case PUBLISHER -> "catalog.publishers";
             case CATEGORY -> "catalog.categories";
             case SHELF_LOCATION -> "catalog.shelf-locations";
+            case SERIES -> "catalog.series";
         };
     }
 

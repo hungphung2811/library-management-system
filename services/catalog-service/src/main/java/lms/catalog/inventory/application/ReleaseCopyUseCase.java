@@ -24,12 +24,20 @@ public class ReleaseCopyUseCase {
         this.clock = clock;
     }
 
+    /** Tác phẩm và ngôn ngữ của ấn bản để gắn vào sự kiện (một truy vấn nhẹ). */
+    private BookCopyRepository.TitleWork workOf(UUID titleId) {
+        BookCopyRepository.TitleWork w = repository.findTitleWorksByTitleIds(java.util.List.of(titleId)).get(titleId);
+        return w == null ? new BookCopyRepository.TitleWork(null, null) : w;
+    }
+
     @Transactional
     public void execute(UUID copyId) {
         repository.findById(copyId).ifPresent((BookCopy copy) -> {
             if (copy.release()) {
                 repository.save(copy);
-                eventPort.publish(new CopyAvailableEvent(UUID.randomUUID(), copy.id(), copy.titleId(), Instant.now(clock)));
+                BookCopyRepository.TitleWork work = workOf(copy.titleId());
+                eventPort.publish(new CopyAvailableEvent(UUID.randomUUID(), copy.id(), copy.titleId(),
+                        Instant.now(clock), work.workId(), work.language()));
             }
         });
     }

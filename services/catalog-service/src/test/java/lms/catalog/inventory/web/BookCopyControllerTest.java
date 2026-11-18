@@ -200,10 +200,10 @@ class BookCopyControllerTest {
     @Test
     void doiTrangThaiSaiVongDoiTra409() throws Exception {
         UUID id = UUID.randomUUID();
-        when(changeStatus.execute(id, CopyStatus.AVAILABLE))
-                .thenThrow(new IllegalCopyTransitionException(CopyStatus.LOST, CopyStatus.AVAILABLE));
+        when(changeStatus.execute(id, CopyStatus.RESERVED))
+                .thenThrow(new IllegalCopyTransitionException(CopyStatus.LOST, CopyStatus.RESERVED));
         mvc.perform(put("/internal/book-copies/" + id + "/status").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"status\":\"AVAILABLE\"}").with(admin()))
+                        .content("{\"status\":\"RESERVED\"}").with(admin()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("COPY_STATUS_CONFLICT"));
     }

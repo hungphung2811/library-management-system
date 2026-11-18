@@ -34,7 +34,7 @@ class TitlePersistenceAdapter implements TitleRepository {
     public Title save(Title title) {
         TitleJpaEntity entity = new TitleJpaEntity(title.id(), title.name(), title.author(), title.isbn(), title.coverPrice(),
                 title.description(), title.previewText(), title.publisherId(), title.categoryId())
-                .withExtras(title.extras());
+                .withExtras(title.extras()).withWork(title.workId(), title.partNumber(), title.partLabel());
         jpa.save(entity);
         // Đồng bộ bảng nối title_authors (xóa rồi ghi lại theo thứ tự); bulk delete tự flush để dòng titles đã có trước.
         titleAuthors.deleteByTitleId(title.id());
@@ -96,7 +96,8 @@ class TitlePersistenceAdapter implements TitleRepository {
         try {
             for (Title t : titles) {
                 em.persist(new TitleJpaEntity(t.id(), t.name(), t.author(), t.isbn(), t.coverPrice(), t.description(),
-                        t.previewText(), t.publisherId(), t.categoryId()).withExtras(t.extras()));
+                        t.previewText(), t.publisherId(), t.categoryId()).withExtras(t.extras())
+                        .withWork(t.workId(), t.partNumber(), t.partLabel()));
             }
             em.flush();
             for (Title t : titles) {
@@ -115,6 +116,30 @@ class TitlePersistenceAdapter implements TitleRepository {
         return isbns.isEmpty() ? List.of() : toDomains(jpa.findByIsbnIn(isbns));
     }
 
+    @Override
+    public List<Title> findByWorkIds(Collection<UUID> workIds) {
+        return workIds.isEmpty() ? List.of() : toDomains(jpa.findByWorkIdInOrderByNameAscIdAsc(workIds));
+    }
+
+    @Override
+    public void mirrorWorkFields(UUID workId, UUID categoryId, String series, Integer seriesNumber,
+                                 List<UUID> authorIds) {
+        jpa.mirrorWorkFields(workId, categoryId, series, seriesNumber);
+        List<UUID> titleIds = jpa.findIdsByWorkId(workId);
+        if (titleIds.isEmpty()) return;
+        titleAuthors.deleteByTitleIdIn(titleIds);
+        for (UUID titleId : titleIds) {
+            for (int i = 0; i < authorIds.size(); i++) {
+                titleAuthors.save(new TitleAuthorJpaEntity(titleId, authorIds.get(i), i));
+            }
+        }
+    }
+
+    @Override
+    public int moveToWork(Collection<UUID> fromWorkIds, UUID toWorkId) {
+        return fromWorkIds.isEmpty() ? 0 : jpa.moveToWork(fromWorkIds, toWorkId);
+    }
+
     /** Dựng domain cho cả loạt, nạp tác giả chuẩn bằng một truy vấn. */
     private List<Title> toDomains(List<TitleJpaEntity> rows) {
         if (rows.isEmpty()) return List.of();
@@ -128,6 +153,7 @@ class TitlePersistenceAdapter implements TitleRepository {
 
     private static Title toDomain(TitleJpaEntity e, List<UUID> authorIds) {
         return Title.restore(e.getId(), e.getName(), e.getAuthor(), e.getIsbn(), e.getCoverPrice(), e.getTenantId(),
-                e.getDescription(), e.getPreviewText(), e.getPublisherId(), e.getCategoryId(), authorIds, e.toExtras());
+                e.getDescription(), e.getPreviewText(), e.getPublisherId(), e.getCategoryId(), authorIds, e.toExtras(),
+                e.getWorkId(), e.getPartNumber(), e.getPartLabel());
     }
 }

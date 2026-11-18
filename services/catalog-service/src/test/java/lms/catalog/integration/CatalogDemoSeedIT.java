@@ -10,9 +10,11 @@ import java.time.LocalDate;
 import java.util.UUID;
 import lms.catalog.catalog.domain.ReferenceRepository;
 import lms.catalog.catalog.domain.TitleRepository;
+import lms.catalog.catalog.domain.WorkRepository;
 import lms.catalog.catalog.infrastructure.demo.CatalogDemoSeedStep;
 import lms.catalog.inventory.domain.BookCopyRepository;
 import lms.catalog.inventory.infrastructure.demo.InventoryDemoSeedStep;
+import lms.demo.plan.DemoIds;
 import lms.demo.plan.DemoPlan;
 import lms.demo.runner.DemoSeedContext;
 import lms.demo.runner.DemoSeedStep;
@@ -61,6 +63,8 @@ class CatalogDemoSeedIT {
     @Autowired
     TitleRepository titles;
     @Autowired
+    WorkRepository works;
+    @Autowired
     BookCopyRepository copies;
     @Autowired
     TransactionOperations tx;
@@ -78,7 +82,7 @@ class CatalogDemoSeedIT {
         UUID demo = UUID.randomUUID();
         DemoPlan plan = DemoPlan.generate(LocalDate.now());
         DemoSeedContext context = new DemoSeedContext(demo, plan, "x", Clock.systemDefaultZone());
-        DemoSeedStep catalogStep = new CatalogDemoSeedStep(references, titles, tx);
+        DemoSeedStep catalogStep = new CatalogDemoSeedStep(references, titles, works, tx);
         DemoSeedStep inventoryStep = new InventoryDemoSeedStep(copies, tx);
 
         DemoSeedStep.SeedResult t1 = TenantContext.callAs(demo, () -> catalogStep.run(context));
@@ -91,12 +95,26 @@ class CatalogDemoSeedIT {
         assertThat(count("SELECT count(*) FROM book_copies" + of)).isEqualTo(plan.copies().size()).isGreaterThanOrEqualTo(150);
         assertThat(count("SELECT count(*) FROM title_authors" + of)).isEqualTo(plan.titles().size());
         assertThat(count("SELECT count(*) FROM categories" + of)).isEqualTo(8);
+        // mô hình tác phẩm - ấn bản (ADR-0026): mọi ấn bản gắn một tác phẩm, 64 ấn bản gốc là tác phẩm 1:1 id md5
+        assertThat(count("SELECT count(*) FROM works" + of)).isEqualTo(plan.works().size());
+        assertThat(count("SELECT count(*) FROM series" + of)).isEqualTo(plan.series().size());
+        assertThat(count("SELECT count(*) FROM work_authors" + of)).isEqualTo(plan.works().size());
+        assertThat(count("SELECT count(*) FROM titles" + of + " AND work_id IS NULL")).isZero();
+        assertThat(count("SELECT count(*) FROM titles" + of + " AND work_id = md5('lms-work:' || id::text)::uuid"))
+                .isEqualTo(plan.titles().stream().filter(t -> t.workId().equals(DemoIds.legacyWork(t.id()))).count())
+                .isGreaterThanOrEqualTo(64);
+        assertThat(count("SELECT count(*) FROM works" + of + " AND kind = 'COLLECTION'")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM works w WHERE w.tenant_id = '" + demo
+                + "' AND (SELECT count(*) FROM titles t WHERE t.work_id = w.id) >= 2")).isGreaterThanOrEqualTo(4);
+        assertThat(count("SELECT count(*) FROM titles" + of + " AND part_number IS NOT NULL")).isEqualTo(2);
         for (DemoPlan.CopyStatus s : DemoPlan.CopyStatus.values()) {
             long expected = plan.copies().stream().filter(x -> x.status() == s).count();
             assertThat(count("SELECT count(*) FROM book_copies" + of + " AND status = '" + s + "'")).isEqualTo(expected);
         }
         assertThat(count("SELECT count(*) FROM titles WHERE tenant_id <> '" + demo + "'")).isZero();
 
+        long worksBefore = count("SELECT count(*) FROM works");
+        long seriesBefore = count("SELECT count(*) FROM series");
         long titlesBefore = count("SELECT count(*) FROM titles");
         long copiesBefore = count("SELECT count(*) FROM book_copies");
         DemoSeedStep.SeedResult t2 = TenantContext.callAs(demo, () -> catalogStep.run(context));
@@ -105,6 +123,8 @@ class CatalogDemoSeedIT {
         assertThat(c2.created()).isZero();
         assertThat(c2.skipped()).isEqualTo(plan.copies().size());
         assertThat(count("SELECT count(*) FROM titles")).isEqualTo(titlesBefore);
+        assertThat(count("SELECT count(*) FROM works")).isEqualTo(worksBefore);
+        assertThat(count("SELECT count(*) FROM series")).isEqualTo(seriesBefore);
         assertThat(count("SELECT count(*) FROM book_copies")).isEqualTo(copiesBefore);
 
         // RLS: tenant khác không thấy dữ liệu demo; vai trò app không có tenant thì không thấy dòng nào

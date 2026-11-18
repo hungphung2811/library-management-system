@@ -87,6 +87,16 @@ class TitleJpaEntity {
     @Column(name = "tags")
     private List<String> tags;
 
+    /** Tác phẩm của ấn bản (ADR-0026); NULL ở pha expand với dữ liệu chưa gắn. FK kép (work_id, tenant_id) do DB giữ. */
+    @Column(name = "work_id")
+    private UUID workId;
+
+    @Column(name = "part_number")
+    private Integer partNumber;
+
+    @Column(name = "part_label", length = 50)
+    private String partLabel;
+
     protected TitleJpaEntity() {
     }
 
@@ -122,6 +132,13 @@ class TitleJpaEntity {
         return this;
     }
 
+    TitleJpaEntity withWork(UUID workId, Integer partNumber, String partLabel) {
+        this.workId = workId;
+        this.partNumber = partNumber;
+        this.partLabel = partLabel;
+        return this;
+    }
+
     TitleExtras toExtras() {
         return new TitleExtras(subtitle, publicationYear, edition, language, pageCount, format, translator, series,
                 seriesNumber, coverImageUrl, tags);
@@ -137,4 +154,7 @@ class TitleJpaEntity {
     String getPreviewText() { return previewText; }
     UUID getPublisherId() { return publisherId; }
     UUID getCategoryId() { return categoryId; }
+    UUID getWorkId() { return workId; }
+    Integer getPartNumber() { return partNumber; }
+    String getPartLabel() { return partLabel; }
 }

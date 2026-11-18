@@ -13,6 +13,7 @@ import lms.catalog.catalog.application.imports.TitleRows.TitleDraft;
 import lms.catalog.catalog.domain.ReferenceRepository;
 import lms.catalog.catalog.domain.TitleBatchConflictException;
 import lms.catalog.catalog.domain.TitleRepository;
+import lms.catalog.catalog.domain.WorkRepository;
 import lms.catalog.inventory.application.CopyDraft;
 import lms.catalog.inventory.application.CopyWriteConflictException;
 import lms.catalog.inventory.application.RegisterCopiesInBatchUseCase;
@@ -40,13 +41,15 @@ public class TitleImportHandler implements ImportHandler {
 
     private final ImportSchema schema = CatalogImportSchemas.titles();
     private final TitleRepository titles;
+    private final WorkRepository works;
     private final ReferenceRepository references;
     private final RegisterCopiesInBatchUseCase copies;
     private final TitleChunkWriter writer;
     private final ImportAuditPort audit;
 
-    public TitleImportHandler(TitleRepository titles, ReferenceRepository references,
+    public TitleImportHandler(TitleRepository titles, WorkRepository works, ReferenceRepository references,
                               RegisterCopiesInBatchUseCase copies, TitleChunkWriter writer, ImportAuditPort audit) {
+        this.works = works;
         this.titles = titles;
         this.references = references;
         this.copies = copies;
@@ -137,6 +140,15 @@ public class TitleImportHandler implements ImportHandler {
             if (isbn != null) fileTitleStatus.put(isbn, row.status());
         }
 
+        // 3b. Cùng tác phẩm với ISBN khác (ADR-0026): gắn vào tác phẩm có sẵn/của dòng khác, hoặc lỗi tham chiếu
+        WorkRefResolver.resolve(out, drafts, firstByIsbn, invalidIsbns, refs, titles, works);
+        for (Map.Entry<Integer, TitleDraft> e : drafts.entrySet()) {
+            String isbn = e.getValue().title().isbn();
+            if (isbn != null && firstByIsbn.get(isbn) != null && firstByIsbn.get(isbn).equals(e.getKey())) {
+                fileTitleStatus.put(isbn, out.get(e.getKey()).status());
+            }
+        }
+
         // 4. Bản sao
         Map<Integer, CopyDraft> copyDrafts = new HashMap<>();
         Set<String> barcodes = new HashSet<>();
@@ -218,8 +230,10 @@ public class TitleImportHandler implements ImportHandler {
         }
         List<List<ImportRow>> chunks = new ArrayList<>();
         List<ImportRow> current = new ArrayList<>();
-        for (ImportRow r : validRows) {
-            if (CatalogImportSchemas.SHEET_COPIES.equals(r.sheet())) continue;
+        List<ImportRow> titleRows = new ArrayList<>();
+        for (ImportRow r : validRows) if (!CatalogImportSchemas.SHEET_COPIES.equals(r.sheet())) titleRows.add(r);
+        // Dòng đích của "cùng tác phẩm với ISBN" ghi trước dòng trỏ tới nó (chunk chạy tuần tự, mỗi chunk một giao dịch)
+        for (ImportRow r : WorkRefResolver.orderParentsFirst(titleRows)) {
             current.add(r);
             String isbn = r.value("isbn").strip();
             List<ImportRow> attached = isbn.isEmpty() ? null : copiesByIsbn.remove(isbn);

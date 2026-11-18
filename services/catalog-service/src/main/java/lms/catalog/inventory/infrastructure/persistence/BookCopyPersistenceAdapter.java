@@ -64,7 +64,8 @@ class BookCopyPersistenceAdapter implements BookCopyRepository {
 
     private static CopyDetails toDetails(SpringDataBookCopyRepository.DetailsRow r) {
         return new CopyDetails(r.getId(), r.getTitleId(), r.getTitleName(), r.getBarcode(),
-                CopyStatus.valueOf(r.getStatus()), r.getCoverPrice(), r.getShelfLocationId(), r.getShelfLocationCode());
+                CopyStatus.valueOf(r.getStatus()), r.getCoverPrice(), r.getShelfLocationId(), r.getShelfLocationCode(),
+                r.getPurchasePrice(), r.getConditionGrade(), r.getConditionNote());
     }
 
     @Override
@@ -72,7 +73,7 @@ class BookCopyPersistenceAdapter implements BookCopyRepository {
         if (ids.isEmpty()) return List.of();
         return jpa.findLookupRows(TenantContext.require(), ids).stream()
                 .map(r -> new CopyLookupItem(r.getId(), r.getTitleId(), r.getTitleName(), r.getIsbn(), r.getBarcode(),
-                        CopyStatus.valueOf(r.getStatus())))
+                        CopyStatus.valueOf(r.getStatus()), r.getWorkId()))
                 .toList();
     }
 
@@ -132,6 +133,30 @@ class BookCopyPersistenceAdapter implements BookCopyRepository {
     public Map<UUID, Long> countByTitleIds(Collection<UUID> titleIds, CopyStatus status) {
         Map<UUID, Long> result = new HashMap<>();
         jpa.countByTitleIds(titleIds, status).forEach(row -> result.put(row.getTitleId(), row.getCnt()));
+        return result;
+    }
+
+    @Override
+    public List<WorkLanguageCount> countByWorkIds(Collection<UUID> workIds, CopyStatus status) {
+        if (workIds.isEmpty()) return List.of();
+        return jpa.countByWorkIds(workIds, status.name()).stream()
+                .map(r -> new WorkLanguageCount(r.getWorkId(), r.getLanguage(), r.getCnt())).toList();
+    }
+
+    @Override
+    public Map<UUID, UUID> findWorkIdsByTitleIds(Collection<UUID> titleIds) {
+        Map<UUID, UUID> result = new HashMap<>();
+        if (titleIds.isEmpty()) return result;
+        jpa.findWorkIdsByTitleIds(titleIds).forEach(r -> result.put(r.getTitleId(), r.getWorkId()));
+        return result;
+    }
+
+    @Override
+    public Map<UUID, TitleWork> findTitleWorksByTitleIds(Collection<UUID> titleIds) {
+        Map<UUID, TitleWork> result = new HashMap<>();
+        if (titleIds.isEmpty()) return result;
+        jpa.findTitleWorksByTitleIds(titleIds)
+                .forEach(r -> result.put(r.getTitleId(), new TitleWork(r.getWorkId(), r.getLanguage())));
         return result;
     }
 

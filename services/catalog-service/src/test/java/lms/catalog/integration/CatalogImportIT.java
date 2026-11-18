@@ -82,6 +82,7 @@ class CatalogImportIT {
     @Autowired @Qualifier("authorImportHandler") ReferenceImportHandler authors;
     @Autowired @Qualifier("categoryImportHandler") ReferenceImportHandler categories;
     @Autowired @Qualifier("shelfLocationImportHandler") ReferenceImportHandler shelves;
+    @Autowired @Qualifier("seriesImportHandler") ReferenceImportHandler series;
     @Autowired TitleImportHandler titles;
     @Autowired EntityManagerFactory emf;
     @MockitoBean JwtDecoder jwtDecoder;
@@ -208,7 +209,8 @@ class CatalogImportIT {
         var result = TenantContext.callAs(tenant, () -> titles.commitChunk(ctx(), chunk));
         assertThat(result.outcomes()).hasSize(2 * n);
         assertThat(result.outcomes()).allMatch(o -> o.status() == lms.imports.core.OutcomeStatus.CREATED);
-        assertThat(st.getEntityInsertCount()).isEqualTo(2L * n);
+        // ấn bản + bản sao + một tác phẩm 1:1 cho mỗi ấn bản (ADR-0026)
+        assertThat(st.getEntityInsertCount()).isEqualTo(3L * n);
         return st.getPrepareStatementCount();
     }
 
@@ -226,6 +228,37 @@ class CatalogImportIT {
         assertThat(result.outcomes()).extracting(o -> o.status()).containsExactly(
                 lms.imports.core.OutcomeStatus.SKIPPED_DUPLICATE, lms.imports.core.OutcomeStatus.CREATED);
         assertThat(count("select count(*) from titles where tenant_id = '" + tenant + "' and isbn like 'RACE-%'")).isEqualTo(2);
+    }
+
+    @Test
+    void boSachVaAnBanCungTacPhamGhiDungTrongDbThatVoiRls() throws Exception {
+        byte[] seriesFile = lms.catalog.catalog.unit.CatalogImportRows.single(CatalogImportSchemas.series(), List.of(
+                row("name", "Bộ IT")));
+        ImportViews.SessionView ss = TenantContext.callAs(tenant, () -> workflow.upload(series, actor, "s.xlsx", seriesFile));
+        assertThat(confirmAndWait(series, ss.importId()).result().created()).isEqualTo(1);
+
+        // dòng trỏ đứng TRƯỚC dòng đích để kiểm thứ tự ghi; ấn bản 3 gắn vào ấn bản đã có trong DB sau khi 1 và 2 ghi xong
+        byte[] file = lms.catalog.catalog.unit.CatalogImportRows.xlsx(CatalogImportSchemas.titles(), Map.of("DauSach", List.of(
+                row("isbn", "W-2", "name", "HP ebook", "author", "R", "coverPrice", 1, "sameWorkAsIsbn", "W-1",
+                        "format", "EBOOK", "partNumber", 2, "partLabel", "Phần 2"),
+                row("isbn", "W-1", "name", "HP bìa mềm", "author", "R", "coverPrice", 1, "series", "bộ it",
+                        "seriesNumber", 3, "workTitle", "HP tập 3", "originalLanguage", "en"))));
+        ImportViews.SessionView s = TenantContext.callAs(tenant, () -> workflow.upload(titles, actor, "t.xlsx", file));
+        assertThat(s.totals().valid()).isEqualTo(2);
+        ImportViews.SessionView done = confirmAndWait(titles, s.importId());
+        assertThat(done.result().created()).isEqualTo(2);
+
+        assertThat(count("select count(*) from works w join titles t on t.work_id = w.id and t.tenant_id = w.tenant_id "
+                + "where w.tenant_id = '" + tenant + "' and t.isbn like 'W-%' and w.title = 'HP tập 3' "
+                + "and w.series_number = 3 and w.original_language = 'en'")).isEqualTo(2);
+        assertThat(count("select count(distinct work_id) from titles where tenant_id = '" + tenant + "' and isbn like 'W-%'"))
+                .isEqualTo(1);
+        assertThat(count("select count(*) from works where tenant_id = '" + tenant + "'")).isEqualTo(1);
+        assertThat(count("select count(*) from titles t join series s on s.id = (select series_id from works where id = t.work_id) "
+                + "where t.tenant_id = '" + tenant + "' and t.isbn like 'W-%' and s.name = 'Bộ IT' "
+               )).isEqualTo(2);
+        assertThat(count("select count(*) from titles where tenant_id = '" + tenant + "' and isbn = 'W-2' and part_number = 2 "
+                + "and part_label = 'Phần 2'")).isEqualTo(1);
     }
 
     @Test

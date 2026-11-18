@@ -67,7 +67,7 @@ final class ReferenceRows {
                     ImportValues.text(row, "address"));
             case SHELF_LOCATION -> ReferenceExtras.shelf(ImportValues.text(row, "floor"),
                     ImportValues.text(row, "zone"), ImportValues.integer(row, "capacity"));
-            case CATEGORY -> ReferenceExtras.EMPTY;
+            case CATEGORY, SERIES -> ReferenceExtras.EMPTY;
         };
     }
 }

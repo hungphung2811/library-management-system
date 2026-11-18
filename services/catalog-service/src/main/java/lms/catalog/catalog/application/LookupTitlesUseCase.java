@@ -16,9 +16,15 @@ import java.util.UUID;
 public class LookupTitlesUseCase {
 
     private final TitleRepository repository;
+    private final WorkService workService;
 
     public LookupTitlesUseCase(TitleRepository repository) {
+        this(repository, null);
+    }
+
+    public LookupTitlesUseCase(TitleRepository repository, WorkService workService) {
         this.repository = repository;
+        this.workService = workService;
     }
 
     public List<TitleLookupView> execute(List<UUID> ids) {
@@ -36,6 +42,8 @@ public class LookupTitlesUseCase {
         for (Title t : repository.findByIds(distinct)) {
             found.put(t.id(), t);
         }
-        return distinct.stream().map(found::get).filter(Objects::nonNull).map(TitleLookupView::from).toList();
+        List<Title> ordered = distinct.stream().map(found::get).filter(Objects::nonNull).toList();
+        return workService == null ? ordered.stream().map(TitleLookupView::from).toList()
+                : workService.lookupViews(ordered);
     }
 }

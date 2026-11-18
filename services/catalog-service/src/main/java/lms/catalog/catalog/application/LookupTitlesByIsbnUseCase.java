@@ -15,9 +15,15 @@ import java.util.Objects;
 public class LookupTitlesByIsbnUseCase {
 
     private final TitleRepository repository;
+    private final WorkService workService;
 
     public LookupTitlesByIsbnUseCase(TitleRepository repository) {
+        this(repository, null);
+    }
+
+    public LookupTitlesByIsbnUseCase(TitleRepository repository, WorkService workService) {
         this.repository = repository;
+        this.workService = workService;
     }
 
     public List<TitleLookupView> execute(List<String> isbns) {
@@ -41,6 +47,8 @@ public class LookupTitlesByIsbnUseCase {
         for (Title t : repository.findByIsbns(distinct)) {
             byIsbn.put(t.isbn(), t);
         }
-        return distinct.stream().map(byIsbn::get).filter(Objects::nonNull).map(TitleLookupView::from).toList();
+        List<Title> ordered = distinct.stream().map(byIsbn::get).filter(Objects::nonNull).toList();
+        return workService == null ? ordered.stream().map(TitleLookupView::from).toList()
+                : workService.lookupViews(ordered);
     }
 }

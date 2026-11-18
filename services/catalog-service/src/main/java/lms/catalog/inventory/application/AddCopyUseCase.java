@@ -23,6 +23,12 @@ public class AddCopyUseCase {
         this.clock = clock;
     }
 
+    /** Tác phẩm và ngôn ngữ của ấn bản để gắn vào sự kiện (một truy vấn nhẹ). */
+    private BookCopyRepository.TitleWork workOf(UUID titleId) {
+        BookCopyRepository.TitleWork w = repository.findTitleWorksByTitleIds(java.util.List.of(titleId)).get(titleId);
+        return w == null ? new BookCopyRepository.TitleWork(null, null) : w;
+    }
+
     @Transactional
     public CopyResponse execute(AddCopyCommand command) {
         if (!repository.titleExists(command.titleId())) {
@@ -35,7 +41,9 @@ public class AddCopyUseCase {
         }
         ShelfLocationCheck.require(repository, command.shelfLocationId(), null);
         BookCopy saved = repository.save(copy);
-        eventPort.publish(new CopyAvailableEvent(UUID.randomUUID(), saved.id(), saved.titleId(), Instant.now(clock)));
+        BookCopyRepository.TitleWork work = workOf(saved.titleId());
+        eventPort.publish(new CopyAvailableEvent(UUID.randomUUID(), saved.id(), saved.titleId(), Instant.now(clock),
+                work.workId(), work.language()));
         return CopyResponse.from(saved, ShelfLocationCheck.code(repository, saved.shelfLocationId()));
     }
 }

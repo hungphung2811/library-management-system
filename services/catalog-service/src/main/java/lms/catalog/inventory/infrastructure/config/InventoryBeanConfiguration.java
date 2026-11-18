@@ -8,6 +8,7 @@ import lms.catalog.inventory.application.GetCopyUseCase;
 import lms.catalog.inventory.application.HoldCopyUseCase;
 import lms.catalog.inventory.application.ListCopiesUseCase;
 import lms.catalog.inventory.application.MoveCopyShelfLocationUseCase;
+import lms.catalog.inventory.application.PublishEditionWorkChangedUseCase;
 import lms.catalog.inventory.application.ReleaseCopyUseCase;
 import lms.catalog.inventory.application.UpdateCopyAcquisitionUseCase;
 import lms.catalog.inventory.domain.BookCopyRepository;
@@ -67,6 +68,12 @@ public class InventoryBeanConfiguration {
     RegisterCopiesInBatchUseCase registerCopiesInBatchUseCase(BookCopyRepository repository,
                                                               KafkaInventoryEventPublisher publisher, Clock clock) {
         return new RegisterCopiesInBatchUseCase(repository, publisher, clock);
+    }
+
+    @Bean
+    PublishEditionWorkChangedUseCase publishEditionWorkChangedUseCase(KafkaInventoryEventPublisher publisher,
+                                                                      Clock clock) {
+        return new PublishEditionWorkChangedUseCase(publisher, clock);
     }
 
     @Bean

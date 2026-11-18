@@ -12,6 +12,7 @@ import lms.catalog.catalog.application.imports.TitleImportHandler;
 import lms.catalog.catalog.infrastructure.web.AuthorImportController;
 import lms.catalog.catalog.infrastructure.web.CategoryImportController;
 import lms.catalog.catalog.infrastructure.web.PublisherImportController;
+import lms.catalog.catalog.infrastructure.web.SeriesImportController;
 import lms.catalog.catalog.infrastructure.web.ShelfLocationImportController;
 import lms.catalog.catalog.infrastructure.web.TitleController;
 import lms.catalog.catalog.infrastructure.web.TitleImportController;
@@ -34,12 +35,14 @@ import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 /**
- * Đối chiếu V31__import_permissions.sql (10 khóa import catalog + TitleController/lookupByIsbn) với controller THẬT của
+ * Đối chiếu V31__import_permissions.sql (10 khóa import catalog + TitleController/lookupByIsbn) và
+ * V36__series_import_permissions.sql (SeriesImportController/upload, confirm) với controller THẬT của
  * catalog-service: khóa, HTTP method, đường dẫn BFF (/internal/imports/x thành /api/catalog/imports/x), service_name.
  * Đổi tên lớp/method hoặc đổi đường dẫn mà không cập nhật migration (hoặc ngược lại) làm test này fail.
  */
 @WebMvcTest({TitleImportController.class, AuthorImportController.class, PublisherImportController.class,
-        CategoryImportController.class, ShelfLocationImportController.class, TitleController.class})
+        CategoryImportController.class, ShelfLocationImportController.class, SeriesImportController.class,
+        TitleController.class})
 @Import({SecurityConfiguration.class, PermissionAutoConfiguration.class})
 @TestPropertySource(properties = {"app.security.enabled=true", "lms.security.permission.enabled=true"})
 class ImportPermissionSeedMatchesCatalogCodeTest {
@@ -56,6 +59,7 @@ class ImportPermissionSeedMatchesCatalogCodeTest {
     @MockitoBean(name = "publisherImportHandler") ReferenceImportHandler publisherHandler;
     @MockitoBean(name = "categoryImportHandler") ReferenceImportHandler categoryHandler;
     @MockitoBean(name = "shelfLocationImportHandler") ReferenceImportHandler shelfHandler;
+    @MockitoBean(name = "seriesImportHandler") ReferenceImportHandler seriesHandler;
     @MockitoBean lms.catalog.catalog.application.CreateTitleUseCase createTitle;
     @MockitoBean lms.catalog.catalog.application.GetTitleUseCase getTitle;
     @MockitoBean lms.catalog.catalog.application.SearchTitlesUseCase searchTitles;
@@ -65,6 +69,8 @@ class ImportPermissionSeedMatchesCatalogCodeTest {
     @MockitoBean lms.catalog.catalog.application.LookupTitlesByIsbnUseCase lookupByIsbn;
     @MockitoBean lms.catalog.catalog.application.GetTitlePreviewUseCase getPreview;
     @MockitoBean lms.catalog.catalog.application.UpdateTitlePreviewUseCase updatePreview;
+    @MockitoBean lms.catalog.catalog.application.MoveEditionToWorkUseCase moveEditionToWork;
+    @MockitoBean lms.catalog.inventory.application.PublishEditionWorkChangedUseCase editionEvents;
     @MockitoBean JwtDecoder jwtDecoder;
     @MockitoBean PermissionKeyRegistrar registrar;
 
@@ -88,18 +94,20 @@ class ImportPermissionSeedMatchesCatalogCodeTest {
 
     @Test
     void seedKeysMatchTheRealCatalogControllers() throws Exception {
-        var found = new PathMatchingResourcePatternResolver()
-                .getResources("classpath*:db/migration/identity/V31__import_permissions.sql");
-        assertThat(found).hasSize(1);
-        String sql;
-        try (var in = found[0].getInputStream()) {
-            sql = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-        }
         Map<String, String> seeded = new TreeMap<>();
-        Matcher m = ROW.matcher(sql);
-        while (m.find()) seeded.put(m.group(1), m.group(2) + " " + m.group(3).replaceAll("\\{[^}/]+}", "{}"));
+        for (String file : new String[] {"V31__import_permissions.sql", "V36__series_import_permissions.sql"}) {
+            var found = new PathMatchingResourcePatternResolver()
+                    .getResources("classpath*:db/migration/identity/" + file);
+            assertThat(found).as(file).hasSize(1);
+            String sql;
+            try (var in = found[0].getInputStream()) {
+                sql = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            }
+            Matcher m = ROW.matcher(sql);
+            while (m.find()) seeded.put(m.group(1), m.group(2) + " " + m.group(3).replaceAll("\\{[^}/]+}", "{}"));
+        }
         Map<String, String> actual = actual();
-        assertThat(actual).hasSize(11);
+        assertThat(actual).hasSize(13); // 11 của V31 + SeriesImportController/upload, confirm của V36
         assertThat(seeded).isEqualTo(actual);
     }
 }

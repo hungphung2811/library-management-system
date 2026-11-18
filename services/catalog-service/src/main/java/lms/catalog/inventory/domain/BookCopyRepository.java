@@ -31,6 +31,37 @@ public interface BookCopyRepository {
 
     Set<UUID> findTitleIdsHavingStatus(CopyStatus status);
 
+    /** Một dòng đếm bản sao theo tác phẩm và ngôn ngữ của ấn bản ({@code language} null = ấn bản chưa khai ngôn ngữ). */
+    record WorkLanguageCount(UUID workId, String language, long count) {
+    }
+
+    /**
+     * Số bản sao ở trạng thái cho trước theo (tác phẩm, ngôn ngữ ấn bản): một truy vấn cho cả tập tác phẩm (ADR-0026 3.2).
+     * Ấn bản chưa gắn tác phẩm (work_id NULL) không xuất hiện.
+     */
+    default List<WorkLanguageCount> countByWorkIds(Collection<UUID> workIds, CopyStatus status) {
+        return List.of();
+    }
+
+    /** Id tác phẩm của các ấn bản (titleId -> workId), một truy vấn; ấn bản chưa gắn tác phẩm thì vắng. */
+    default Map<UUID, UUID> findWorkIdsByTitleIds(Collection<UUID> titleIds) {
+        return Map.of();
+    }
+
+    /** Tác phẩm và ngôn ngữ của một ấn bản (cả hai có thể null). */
+    record TitleWork(UUID workId, String language) {
+    }
+
+    /**
+     * Tác phẩm và ngôn ngữ của các ấn bản (titleId -> TitleWork), một truy vấn cho cả tập (không N+1). Mặc định suy từ
+     * {@link #findWorkIdsByTitleIds} với language null để tương thích các bản cài đặt cũ.
+     */
+    default Map<UUID, TitleWork> findTitleWorksByTitleIds(Collection<UUID> titleIds) {
+        Map<UUID, TitleWork> result = new java.util.HashMap<>();
+        findWorkIdsByTitleIds(titleIds).forEach((t, w) -> result.put(t, new TitleWork(w, null)));
+        return result;
+    }
+
     /** Tra theo lô: bản sao cùng tenant kèm tên/ISBN đầu sách; id không có hoặc khác tenant thì vắng. */
     default List<CopyLookupItem> findLookupByIds(Collection<UUID> ids) {
         return List.of();

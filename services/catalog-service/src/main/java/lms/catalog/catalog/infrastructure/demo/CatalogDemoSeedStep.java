@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import lms.catalog.catalog.domain.Reference;
 import lms.catalog.catalog.domain.ReferenceExtras;
@@ -14,13 +15,18 @@ import lms.catalog.catalog.domain.Title;
 import lms.catalog.catalog.domain.TitleExtras;
 import lms.catalog.catalog.domain.TitleFormat;
 import lms.catalog.catalog.domain.TitleRepository;
+import lms.catalog.catalog.domain.Work;
+import lms.catalog.catalog.domain.WorkKind;
+import lms.catalog.catalog.domain.WorkRepository;
 import lms.demo.plan.DemoIds;
 import lms.demo.plan.DemoPlan;
 import lms.demo.plan.DemoPlan.AuthorPlan;
 import lms.demo.plan.DemoPlan.PublisherPlan;
+import lms.demo.plan.DemoPlan.SeriesPlan;
 import lms.demo.plan.DemoPlan.ShelfPlan;
 import lms.demo.plan.DemoPlan.StockItemPlan;
 import lms.demo.plan.DemoPlan.TitlePlan;
+import lms.demo.plan.DemoPlan.WorkPlan;
 import lms.demo.runner.DemoSeedContext;
 import lms.demo.runner.DemoSeedStep;
 import org.slf4j.Logger;
@@ -30,7 +36,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionOperations;
 
 /**
- * Seed demo (ADR-0018) cho context catalog: thể loại, tác giả chuẩn và đầu sách theo {@link DemoPlan}.
+ * Seed demo (ADR-0018) cho context catalog: thể loại, tác giả chuẩn, bộ sách, tác phẩm và ấn bản (đầu sách) theo {@link DemoPlan}
+ * (mô hình tác phẩm - ấn bản - bản sao, ADR-0026). Thứ tự ghi theo khóa ngoại: danh mục (kể cả bộ sách) rồi tác phẩm rồi ấn bản.
+ * 64 ấn bản gốc giữ nguyên id và là tác phẩm 1:1 có id {@code md5('lms-work:'||id)} (khớp backfill của migration V10, nên môi
+ * trường đã seed từ trước chỉ được điền thêm); bộ sách đã có cùng tên (backfill, id md5) được dùng lại thay vì tạo trùng. Tác phẩm,
+ * ấn bản, bộ sách đã có chỉ được điền các trường còn null (không đè giá trị người dùng đã sửa).
  * Ghi qua repository của chính context dưới {@code TenantContext} của tenant demo (do runner đặt), nên @TenantId và RLS
  * của vai trò catalog_app vẫn áp dụng. Không phát event Kafka. Dùng id tất định ({@link DemoIds}) để chạy lại không nhân đôi:
  * mục đã có (theo id) thì bỏ qua. Ngoại lệ có điều kiện: đầu sách demo đã seed từ bản cũ (chưa có thông tin bổ sung nào) được
@@ -49,11 +59,14 @@ public class CatalogDemoSeedStep implements DemoSeedStep {
 
     private final ReferenceRepository references;
     private final TitleRepository titles;
+    private final WorkRepository works;
     private final TransactionOperations tx;
 
-    public CatalogDemoSeedStep(ReferenceRepository references, TitleRepository titles, TransactionOperations tx) {
+    public CatalogDemoSeedStep(ReferenceRepository references, TitleRepository titles, WorkRepository works,
+                               TransactionOperations tx) {
         this.references = references;
         this.titles = titles;
+        this.works = works;
         this.tx = tx;
     }
 
@@ -113,6 +126,25 @@ public class CatalogDemoSeedStep implements DemoSeedStep {
             if (saveReference(ReferenceKind.SHELF_LOCATION, s.id(), s.code(), x)) created++; else skipped++;
         }
 
+        // Bộ sách: dùng lại bộ cùng tên đã có (backfill từ titles.series có id md5), chỉ tạo bộ còn thiếu.
+        Map<String, UUID> seriesIds = new LinkedHashMap<>();
+        Map<String, Reference> existingSeries = references.findByNameKeys(ReferenceKind.SERIES,
+                plan.series().stream().map(x -> Reference.keyOf(x.name())).toList()).stream()
+                .collect(java.util.stream.Collectors.toMap(Reference::nameKey, r -> r, (a, b) -> a));
+        for (SeriesPlan sp : plan.series()) {
+            Reference found = existingSeries.get(Reference.keyOf(sp.name()));
+            UUID id = found != null ? found.id() : sp.id();
+            seriesIds.put(sp.name(), id);
+            if (saveReference(ReferenceKind.SERIES, id, sp.name(), ReferenceExtras.EMPTY)) created++; else skipped++;
+        }
+
+        // Tác phẩm (trước ấn bản vì titles.work_id có khóa ngoại tới works)
+        for (WorkPlan w : plan.works()) {
+            UUID seriesId = w.seriesIndex() == null ? null : seriesIds.get(plan.series().get(w.seriesIndex()).name());
+            if (saveWork(w, categoryIds.get(w.category()), seriesId, List.of(authorIds.get(w.author())))) created++;
+            else skipped++;
+        }
+
         Map<UUID, Long> prices = new HashMap<>();
         for (StockItemPlan s : plan.stockItems()) {
             prices.put(s.titleId(), s.unitPrice());
@@ -125,10 +157,21 @@ public class CatalogDemoSeedStep implements DemoSeedStep {
             TitleExtras extras = extrasOf(t);
             Title current = titles.findById(t.id()).orElse(null);
             if (current != null) {
+                Title updated = current;
                 if (current.extras().isEmpty() && !extras.isEmpty()) {
                     // Đầu sách seed từ bản cũ: làm mới một lần, giữ id/ISBN/giá bìa/mô tả; sau đó extras khác rỗng nên chỉ bỏ qua.
-                    titles.save(current.update(t.name(), t.author(), current.isbn(), current.coverPrice())
-                            .withClassification(publisherId, categoryId, authors).withExtras(extras));
+                    updated = current.update(t.name(), t.author(), current.isbn(), current.coverPrice())
+                            .withClassification(publisherId, categoryId, authors).withExtras(extras);
+                }
+                // Mô hình tác phẩm: chỉ điền khi còn trống (ấn bản backfill đã có work_id thì giữ nguyên)
+                if (updated.workId() == null) {
+                    updated = updated.withWork(t.workId());
+                }
+                if (updated.partNumber() == null && t.partNumber() != null) {
+                    updated = updated.withPart(t.partNumber(), t.partLabel());
+                }
+                if (updated != current) {
+                    titles.save(updated);
                     created++;
                 } else {
                     skipped++;
@@ -142,10 +185,42 @@ public class CatalogDemoSeedStep implements DemoSeedStep {
             }
             long price = prices.getOrDefault(t.id(), BASE_COVER_PRICE + (t.index() % 7) * 10_000L);
             titles.save(Title.restore(t.id(), t.name(), t.author(), t.isbn(), BigDecimal.valueOf(price), null,
-                    null, null, publisherId, categoryId, authors, extras));
+                    null, null, publisherId, categoryId, authors, extras, t.workId(), t.partNumber(), t.partLabel()));
             created++;
         }
         return SeedResult.of(created, skipped);
+    }
+
+    /**
+     * Tạo tác phẩm theo kế hoạch, hoặc điền các trường còn null của tác phẩm đã có (cùng id).
+     *
+     * @return true nếu vừa tạo hoặc vừa điền thêm, false nếu đã đủ
+     */
+    private boolean saveWork(WorkPlan w, UUID categoryId, UUID seriesId, List<UUID> authors) {
+        Work current = works.findById(w.id()).orElse(null);
+        if (current == null) {
+            works.save(Work.restore(w.id(), null, w.title(), w.originalTitle(), w.originalLanguage(), w.author(), null,
+                    categoryId, seriesId, w.seriesNumber(), w.seriesLabel(), WorkKind.valueOf(w.kind().name()), authors));
+            return true;
+        }
+        UUID mergedSeries = first(current.seriesId(), seriesId);
+        Integer mergedNumber = mergedSeries == null ? null : first(current.seriesNumber(), w.seriesNumber());
+        Work merged = current.update(current.title(), first(current.originalTitle(), w.originalTitle()),
+                first(current.originalLanguage(), w.originalLanguage()), current.author(), current.description(),
+                first(current.categoryId(), categoryId), mergedSeries, mergedNumber,
+                mergedSeries == null ? null : first(current.seriesLabel(), w.seriesLabel()), current.kind(),
+                current.authorIds().isEmpty() ? authors : current.authorIds());
+        if (sameWork(current, merged)) return false;
+        works.save(merged);
+        return true;
+    }
+
+    private static boolean sameWork(Work a, Work b) {
+        return Objects.equals(a.originalTitle(), b.originalTitle())
+                && Objects.equals(a.originalLanguage(), b.originalLanguage())
+                && Objects.equals(a.categoryId(), b.categoryId()) && Objects.equals(a.seriesId(), b.seriesId())
+                && Objects.equals(a.seriesNumber(), b.seriesNumber()) && Objects.equals(a.seriesLabel(), b.seriesLabel())
+                && Objects.equals(a.authorIds(), b.authorIds());
     }
 
     private static TitleExtras extrasOf(TitlePlan t) {

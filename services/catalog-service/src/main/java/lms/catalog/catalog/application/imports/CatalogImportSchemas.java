@@ -7,7 +7,7 @@ import lms.imports.core.ImportSchema;
 import lms.imports.core.SheetSpec;
 
 /**
- * Schema cột của 5 loại nhập catalog (ADR-0024 mục 3.4.1-3.4.3). Cột lấy từ entity/domain thật; độ dài tối đa khớp
+ * Schema cột của 6 loại nhập catalog (ADR-0024 mục 3.4.1-3.4.3). Cột lấy từ entity/domain thật; độ dài tối đa khớp
  * domain ({@code Reference}, {@code ReferenceExtras}, {@code TitleExtras}, {@code CopyAcquisition}). Tên sheet và
  * khóa cột là hợp đồng với FE/file mẫu: không đổi sau khi phát hành.
  */
@@ -18,9 +18,19 @@ public final class CatalogImportSchemas {
     public static final String PUBLISHERS = "publishers";
     public static final String CATEGORIES = "categories";
     public static final String SHELF_LOCATIONS = "shelf-locations";
+    /** Bộ sách (ADR-0026): loại tham chiếu thứ sáu. */
+    public static final String SERIES = "series";
+
+    /**
+     * Phiên bản mẫu {@code titles}: 1 = mẫu cũ (một sheet cột phẳng), 2 = thêm cột cấp tác phẩm (ADR-0026 mục 3.8). Bộ đọc
+     * file không kiểm phiên bản (chỉ kiểm {@code type} ở sheet _meta), cột theo tên và cột tùy chọn vắng mặt là trống, nên
+     * file mẫu v1 vẫn upload được.
+     */
+    public static final int TITLES_TEMPLATE_VERSION = 2;
 
     public static final String SHEET_TITLES = "DauSach";
     public static final String SHEET_COPIES = "BanSao";
+    public static final String SHEET_SERIES = "BoSach";
 
     private CatalogImportSchemas() {
     }
@@ -72,6 +82,12 @@ public final class CatalogImportSchemas {
                 typed("capacity", "Sức chứa", false, ColumnType.INTEGER, "200", "Từ 1 đến 100000")));
     }
 
+    public static ImportSchema series() {
+        return ImportSchema.single(SERIES, 1, SHEET_SERIES, List.of(
+                text("name", "Tên bộ sách", true, 255, "Harry Potter", "Tên duy nhất trong thư viện (không phân biệt hoa thường)"),
+                text("description", "Mô tả", false, 500, "", "Tối đa 500 ký tự")));
+    }
+
     public static ImportSchema titles() {
         SheetSpec titles = new SheetSpec(SHEET_TITLES, false, List.of(
                 text("isbn", "ISBN", false, 0, "9786041234567",
@@ -90,8 +106,20 @@ public final class CatalogImportSchemas {
                 typed("pageCount", "Số trang", false, ColumnType.INTEGER, "300", "Từ 1 đến 20000"),
                 ColumnSpec.enumeration("format", "Định dạng", false, List.of("PAPERBACK", "HARDCOVER", "EBOOK")),
                 text("translator", "Dịch giả", false, 255, "", ""),
-                text("series", "Bộ sách", false, 255, "", ""),
+                text("series", "Bộ sách", false, 255, "",
+                        "Tên bộ sách đã có và đang hoạt động (nhập loại series trước); không tự tạo"),
                 typed("seriesNumber", "Tập", false, ColumnType.INTEGER, "", "Lớn hơn 0, chỉ khi có bộ sách"),
+                text("seriesLabel", "Nhãn tập", false, 50, "",
+                        "Cấp tác phẩm: nhãn tùy chọn của tập, ví dụ Ngoại truyện (tối đa 50)"),
+                typed("partNumber", "Số phần", false, ColumnType.INTEGER, "",
+                        "Cấp ấn bản: số phần của tập in thành nhiều cuốn (lớn hơn 0)"),
+                text("partLabel", "Nhãn phần", false, 50, "", "Cấp ấn bản: ví dụ Phần 1 (tối đa 50)"),
+                text("sameWorkAsIsbn", "Cùng tác phẩm với ISBN", false, 0, "",
+                        "ISBN của ấn bản đã có trong thư viện hoặc ở dòng khác của file; để trống = tác phẩm mới"),
+                text("workTitle", "Tên tác phẩm", false, 255, "",
+                        "Cấp tác phẩm: để trống thì dùng Tên sách. Dòng gắn vào tác phẩm có sẵn bỏ qua cột này"),
+                text("originalTitle", "Tên gốc", false, 255, "", "Cấp tác phẩm: tên bản gốc"),
+                text("originalLanguage", "Ngôn ngữ gốc", false, 8, "", "Cấp tác phẩm: 2-8 chữ cái thường (en, ja...)"),
                 text("coverImageUrl", "Ảnh bìa (URL)", false, 500, "", "URL http hoặc https"),
                 new ColumnSpec("tags", "Nhãn", false, ColumnType.LIST, 0, "tiểu thuyết;tuổi trẻ",
                         "Cách nhau bằng dấu ; (tối đa 10 nhãn, mỗi nhãn tối đa 50 ký tự)", List.of()),
@@ -110,6 +138,6 @@ public final class CatalogImportSchemas {
                 text("conditionNote", "Ghi chú tình trạng", false, 300, "", ""),
                 typed("lastInventoryDate", "Ngày kiểm kê", false, ColumnType.DATE, "",
                         "Không ở tương lai, không trước ngày nhập")));
-        return new ImportSchema(TITLES, 1, List.of(titles, copies));
+        return new ImportSchema(TITLES, TITLES_TEMPLATE_VERSION, List.of(titles, copies));
     }
 }

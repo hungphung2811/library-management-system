@@ -12,6 +12,10 @@ interface SpringDataTitleAuthorRepository extends JpaRepository<TitleAuthorJpaEn
 
     List<TitleAuthorJpaEntity> findByTitleIdInOrderBySortOrder(Collection<UUID> titleIds);
 
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from TitleAuthorJpaEntity t where t.titleId in :titleIds")
+    void deleteByTitleIdIn(@Param("titleIds") Collection<UUID> titleIds);
+
     /** Xóa hàng loạt thực thi ngay (flush trước, xóa context sau) để ghi lại cùng khóa không đụng dòng cũ. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from TitleAuthorJpaEntity t where t.titleId = :titleId")

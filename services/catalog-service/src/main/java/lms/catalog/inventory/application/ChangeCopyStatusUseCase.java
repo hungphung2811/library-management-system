@@ -27,13 +27,21 @@ public class ChangeCopyStatusUseCase {
         this.clock = clock;
     }
 
+    /** Tác phẩm và ngôn ngữ của ấn bản để gắn vào sự kiện (một truy vấn nhẹ). */
+    private BookCopyRepository.TitleWork workOf(UUID titleId) {
+        BookCopyRepository.TitleWork w = repository.findTitleWorksByTitleIds(java.util.List.of(titleId)).get(titleId);
+        return w == null ? new BookCopyRepository.TitleWork(null, null) : w;
+    }
+
     @Transactional
     public CopyResponse execute(UUID copyId, CopyStatus target) {
         BookCopy copy = repository.findByIdForUpdate(copyId).orElseThrow(() -> new CopyNotFoundException(copyId));
         if (copy.changeStatus(target)) {
             repository.save(copy);
             if (target == CopyStatus.AVAILABLE) {
-                eventPort.publish(new CopyAvailableEvent(UUID.randomUUID(), copy.id(), copy.titleId(), Instant.now(clock)));
+                BookCopyRepository.TitleWork work = workOf(copy.titleId());
+                eventPort.publish(new CopyAvailableEvent(UUID.randomUUID(), copy.id(), copy.titleId(),
+                        Instant.now(clock), work.workId(), work.language()));
             }
         }
         return CopyResponse.from(copy, ShelfLocationCheck.code(repository, copy.shelfLocationId()));
