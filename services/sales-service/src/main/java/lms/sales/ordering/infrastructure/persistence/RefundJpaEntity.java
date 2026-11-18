@@ -53,6 +53,10 @@ class RefundJpaEntity {
     @Column(name = "refunded_at")
     private Instant refundedAt;
 
+    /** Ca thu ngân của người đánh dấu đã hoàn (ADR-0030). */
+    @Column(name = "shift_id")
+    private UUID shiftId;
+
     @Version
     @Column(name = "version", nullable = false)
     private Long version;
@@ -77,6 +81,7 @@ class RefundJpaEntity {
         this.reference = r.reference();
         this.refundedBy = r.refundedBy();
         this.refundedAt = r.refundedAt();
+        this.shiftId = r.shiftId();
     }
 
     UUID getId() { return id; }
@@ -91,5 +96,6 @@ class RefundJpaEntity {
     Instant getCreatedAt() { return createdAt; }
     UUID getRefundedBy() { return refundedBy; }
     Instant getRefundedAt() { return refundedAt; }
+    UUID getShiftId() { return shiftId; }
     long getVersion() { return version; }
 }

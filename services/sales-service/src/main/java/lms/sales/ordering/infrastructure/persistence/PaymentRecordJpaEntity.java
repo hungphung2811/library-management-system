@@ -39,11 +39,15 @@ class PaymentRecordJpaEntity {
     @Column(name = "recorded_at", nullable = false, updatable = false)
     private Instant recordedAt;
 
+    /** Ca thu ngân nhận tiền (ADR-0030), null khi không gắn ca. */
+    @Column(name = "shift_id", updatable = false)
+    private UUID shiftId;
+
     protected PaymentRecordJpaEntity() {
     }
 
     PaymentRecordJpaEntity(UUID id, UUID orderId, long amount, String method, String reference, UUID recordedBy,
-                           Instant recordedAt) {
+                           Instant recordedAt, UUID shiftId) {
         this.tenantId = TenantContext.require();
         this.id = id;
         this.orderId = orderId;
@@ -52,6 +56,7 @@ class PaymentRecordJpaEntity {
         this.reference = reference;
         this.recordedBy = recordedBy;
         this.recordedAt = recordedAt;
+        this.shiftId = shiftId;
     }
 
     UUID getId() { return id; }
@@ -61,4 +66,5 @@ class PaymentRecordJpaEntity {
     String getReference() { return reference; }
     UUID getRecordedBy() { return recordedBy; }
     Instant getRecordedAt() { return recordedAt; }
+    UUID getShiftId() { return shiftId; }
 }

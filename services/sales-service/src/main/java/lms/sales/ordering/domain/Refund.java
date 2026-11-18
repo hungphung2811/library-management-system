@@ -21,11 +21,13 @@ public final class Refund {
     private final Instant createdAt;
     private UUID refundedBy;
     private Instant refundedAt;
+    /** Ca thu ngân của người đánh dấu đã hoàn (ADR-0030); null khi người đó không có ca mở. */
+    private UUID shiftId;
     private final long version;
 
     private Refund(UUID id, UUID tenantId, UUID orderId, RefundSource source, UUID returnId, Money amount,
                    RefundStatus status, PaymentMethod method, String reference, Instant createdAt,
-                   UUID refundedBy, Instant refundedAt, long version) {
+                   UUID refundedBy, Instant refundedAt, UUID shiftId, long version) {
         if (amount.isZero()) {
             throw SalesException.invalidPrice("Khoản hoàn phải lớn hơn 0");
         }
@@ -41,28 +43,42 @@ public final class Refund {
         this.createdAt = createdAt;
         this.refundedBy = refundedBy;
         this.refundedAt = refundedAt;
+        this.shiftId = shiftId;
         this.version = version;
     }
 
     public static Refund forCancellation(UUID tenantId, UUID orderId, Money amount, Instant now) {
         return new Refund(UUID.randomUUID(), tenantId, orderId, RefundSource.CANCELLATION, null, amount,
-                RefundStatus.PENDING, null, null, now, null, null, 0);
+                RefundStatus.PENDING, null, null, now, null, null, null, 0);
     }
 
     public static Refund forReturn(UUID tenantId, UUID orderId, UUID returnId, Money amount, Instant now) {
         return new Refund(UUID.randomUUID(), tenantId, orderId, RefundSource.RETURN, returnId, amount,
-                RefundStatus.PENDING, null, null, now, null, null, 0);
+                RefundStatus.PENDING, null, null, now, null, null, null, 0);
     }
 
     public static Refund restore(UUID id, UUID tenantId, UUID orderId, RefundSource source, UUID returnId,
                                  Money amount, RefundStatus status, PaymentMethod method, String reference,
                                  Instant createdAt, UUID refundedBy, Instant refundedAt, long version) {
+        return restore(id, tenantId, orderId, source, returnId, amount, status, method, reference, createdAt,
+                refundedBy, refundedAt, null, version);
+    }
+
+    public static Refund restore(UUID id, UUID tenantId, UUID orderId, RefundSource source, UUID returnId,
+                                 Money amount, RefundStatus status, PaymentMethod method, String reference,
+                                 Instant createdAt, UUID refundedBy, Instant refundedAt, UUID shiftId,
+                                 long version) {
         return new Refund(id, tenantId, orderId, source, returnId, amount, status, method, reference, createdAt,
-                refundedBy, refundedAt, version);
+                refundedBy, refundedAt, shiftId, version);
     }
 
     /** Chỉ từ PENDING; đã hoàn rồi thì 409 ORDER_STATE_CONFLICT. */
     public void markRefunded(PaymentMethod method, String reference, UUID by, Instant now) {
+        markRefunded(method, reference, by, now, null);
+    }
+
+    /** Như {@link #markRefunded(PaymentMethod, String, UUID, Instant)} kèm ca thu ngân của người đánh dấu (có thể null). */
+    public void markRefunded(PaymentMethod method, String reference, UUID by, Instant now, UUID shift) {
         if (status != RefundStatus.PENDING) {
             throw new SalesException(ErrorCode.ORDER_STATE_CONFLICT, "Khoản hoàn đã được xử lý");
         }
@@ -74,6 +90,7 @@ public final class Refund {
         this.reference = reference == null || reference.isBlank() ? null : reference.trim();
         this.refundedBy = by;
         this.refundedAt = now;
+        this.shiftId = shift;
     }
 
     public UUID id() { return id; }
@@ -88,5 +105,6 @@ public final class Refund {
     public Instant createdAt() { return createdAt; }
     public UUID refundedBy() { return refundedBy; }
     public Instant refundedAt() { return refundedAt; }
+    public UUID shiftId() { return shiftId; }
     public long version() { return version; }
 }

@@ -89,7 +89,7 @@ class SalesOrderPersistenceAdapter implements SalesOrderRepository {
         }
         for (PaymentRecord p : o.payments()) {
             em.persist(new PaymentRecordJpaEntity(p.id(), o.id(), p.amount().amount(), p.method().name(),
-                    p.reference(), p.recordedBy(), p.recordedAt()));
+                    p.reference(), p.recordedBy(), p.recordedAt(), p.shiftId()));
         }
     }
 
@@ -114,7 +114,7 @@ class SalesOrderPersistenceAdapter implements SalesOrderRepository {
         for (PaymentRecord p : o.payments()) {
             if (!existing.contains(p.id())) {
                 em.persist(new PaymentRecordJpaEntity(p.id(), o.id(), p.amount().amount(), p.method().name(),
-                        p.reference(), p.recordedBy(), p.recordedAt()));
+                        p.reference(), p.recordedBy(), p.recordedAt(), p.shiftId()));
             }
         }
     }
@@ -260,7 +260,7 @@ class SalesOrderPersistenceAdapter implements SalesOrderRepository {
                 .setParameter("ids", ids).getResultList()
                 .forEach(p -> payments.computeIfAbsent(p.getOrderId(), k -> new ArrayList<>()).add(new PaymentRecord(
                         p.getId(), Money.of(p.getAmount()), PaymentMethod.valueOf(p.getMethod()), p.getReference(),
-                        p.getRecordedBy(), p.getRecordedAt())));
+                        p.getRecordedBy(), p.getRecordedAt(), p.getShiftId())));
         return entities.stream().map(e -> toDomain(e, lines.getOrDefault(e.getId(), List.of()),
                 payments.getOrDefault(e.getId(), List.of()))).toList();
     }

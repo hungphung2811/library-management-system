@@ -11,6 +11,7 @@ import lms.sales.ordering.domain.SalesOrder;
 import lms.sales.shared.application.SalesAuditPort;
 import lms.sales.shared.domain.ErrorCode;
 import lms.sales.shared.domain.SalesException;
+import lms.sales.shift.application.ShiftAttributionPort;
 import lms.sales.stock.application.StockService;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +38,14 @@ public class PaymentIntentUseCases {
         this.stockService = stockService;
         this.audit = audit;
         this.clock = clock;
+    }
+
+    /** Ca thu ngân (ADR-0030): tiền thu tay vào ca của người bấm xác nhận. Mặc định không gắn ca (test cũ). */
+    private ShiftAttributionPort shifts = ShiftAttributionPort.NONE;
+
+    public PaymentIntentUseCases withShiftAttribution(ShiftAttributionPort port) {
+        this.shifts = port == null ? ShiftAttributionPort.NONE : port;
+        return this;
     }
 
     @Transactional(readOnly = true)
@@ -88,9 +97,11 @@ public class PaymentIntentUseCases {
                 .orElseThrow(() -> new SalesException(ErrorCode.ORDER_NOT_FOUND, "Không có đơn hàng"));
         Long tendered = cmd == null ? null : cmd.tenderedAmount();
         String ref = cmd == null ? null : cmd.transactionRef();
+        UUID shiftId = shifts.resolve(tenantId, actor, true); // ADR-0030: ca của người bấm; cờ bật mà chưa mở ca thì 409
         intent.confirmManual(order.paymentMethod(), ref, tendered, now);
         var record = order.settleAwaitingPayment(intent.transactionRef() != null ? intent.transactionRef()
                 : intent.reference(), actor, now);
+        order.assignPaymentShift(record.id(), shiftId);
         PaymentIntent savedIntent = intents.save(intent);
         SalesOrder saved = orders.save(order);
         stockService.fulfilAll(tenantId, actor, OrderWorkflowUseCases.stockLines(saved), "ORDER", saved.id());

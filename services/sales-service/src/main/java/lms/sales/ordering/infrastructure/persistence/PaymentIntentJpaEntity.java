@@ -62,6 +62,10 @@ class PaymentIntentJpaEntity {
     @Column(name = "transaction_ref")
     private String transactionRef;
 
+    /** Ca thu ngân của người tạo đơn lúc tạo lệnh (ADR-0030), không đổi sau đó. */
+    @Column(name = "shift_id", updatable = false)
+    private UUID shiftId;
+
     @Version
     @Column(name = "version", nullable = false)
     private Long version;
@@ -79,6 +83,7 @@ class PaymentIntentJpaEntity {
         this.qrPayload = i.qrPayload();
         this.expiresAt = i.expiresAt();
         this.createdAt = i.createdAt();
+        this.shiftId = i.shiftId();
         apply(i);
         // version để null: Hibernate khởi tạo 0 khi persist
     }
@@ -107,5 +112,6 @@ class PaymentIntentJpaEntity {
     Long getTenderedAmount() { return tenderedAmount; }
     Long getChangeDue() { return changeDue; }
     String getTransactionRef() { return transactionRef; }
+    UUID getShiftId() { return shiftId; }
     long getVersion() { return version == null ? 0 : version; }
 }

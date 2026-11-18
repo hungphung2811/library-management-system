@@ -408,6 +408,21 @@ public final class SalesOrder {
         return p;
     }
 
+    /**
+     * Gắn bản ghi thu {@code paymentId} vào ca thu ngân (ADR-0030). Chỉ dùng ngay sau khi bản ghi được tạo, trước khi
+     * lưu đơn; {@code shiftId} null thì không làm gì (tenant không dùng ca). Bản ghi không có trong đơn thì bỏ qua.
+     */
+    public void assignPaymentShift(UUID paymentId, UUID shiftId) {
+        if (shiftId == null) {
+            return;
+        }
+        for (int i = 0; i < payments.size(); i++) {
+            if (payments.get(i).id().equals(paymentId)) {
+                payments.set(i, payments.get(i).withShift(shiftId));
+            }
+        }
+    }
+
     /** Thu xong có phải xuất kho thật ngay không: POS có (hàng trao tại quầy), ONLINE không (giao/nhận sau). */
     public boolean fulfilsStockOnSettle() {
         return channel == OrderChannel.POS;

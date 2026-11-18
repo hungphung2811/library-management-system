@@ -19,6 +19,7 @@ import lms.sales.shared.application.TenantDirectoryPort;
 import lms.sales.shared.domain.ErrorCode;
 import lms.sales.shared.domain.Money;
 import lms.sales.shared.domain.SalesException;
+import lms.sales.shift.application.ShiftAttributionPort;
 import lms.sales.stock.application.CatalogLookupPort.CatalogTitle;
 import lms.sales.stock.application.SellableItem;
 import lms.sales.stock.application.StockLine;
@@ -48,6 +49,8 @@ public class CommitPosPendingOrderUseCase {
     private final Clock clock;
     private final Duration qrTtl;
     private final Duration manualTtl;
+    /** Ca thu ngân (ADR-0030): lệnh thanh toán ghi ca của người tạo đơn. Mặc định không gắn ca (test cũ). */
+    private ShiftAttributionPort shifts = ShiftAttributionPort.NONE;
 
     public CommitPosPendingOrderUseCase(SalesOrderRepository orders, PaymentIntentRepository intents,
                                         List<PaymentGatewayPort> gateways, StockService stockService,
@@ -67,6 +70,11 @@ public class CommitPosPendingOrderUseCase {
         this.clock = clock;
         this.qrTtl = qrTtl;
         this.manualTtl = manualTtl;
+    }
+
+    public CommitPosPendingOrderUseCase withShiftAttribution(ShiftAttributionPort port) {
+        this.shifts = port == null ? ShiftAttributionPort.NONE : port;
+        return this;
     }
 
     /** Đơn đã tạo trước đó (gửi lại cùng clientRequestId): trả đơn kèm lệnh thanh toán hiện có (nếu có). */
@@ -95,6 +103,8 @@ public class CommitPosPendingOrderUseCase {
                 && returns.findById(cmd.tenantId(), cmd.exchangeOfReturnId()).isEmpty()) {
             throw new SalesException(ErrorCode.RETURN_NOT_FOUND, "Không có phiếu trả để đổi hàng");
         }
+        // ADR-0030: cờ tenant bật mà người tạo đơn chưa mở ca thì 409 SHIFT_NOT_OPEN; tắt thì không đổi hành vi
+        UUID shiftId = shifts.resolve(cmd.tenantId(), cmd.userId(), true);
         SalesSettingsView settings = settingsUseCase.execute(cmd.tenantId());
         Map<UUID, SellableItem> items = stockService.sellableItems(cmd.tenantId(),
                 cmd.lines().stream().map(PlacePosOrderCommand.Line::titleId).distinct().toList());
@@ -124,7 +134,7 @@ public class CommitPosPendingOrderUseCase {
 
         if (order.grandTotal().isZero()) {
             // Không có gì để chờ: thu ngay (không lệnh thanh toán), trừ tồn trực tiếp như đơn POS cũ
-            order.settleAwaitingPayment(null, cmd.userId(), now);
+            order.assignPaymentShift(order.settleAwaitingPayment(null, cmd.userId(), now).id(), shiftId);
             stockService.sellAll(cmd.tenantId(), cmd.userId(), stockLines, "ORDER", order.id());
             SalesOrder saved = orders.save(order);
             tenants.touch(cmd.tenantId());
@@ -146,7 +156,7 @@ public class CommitPosPendingOrderUseCase {
                     expiresAt)).qrPayload();
         }
         PaymentIntent intent = intents.save(PaymentIntent.create(cmd.tenantId(), saved.id(), saved.grandTotal(),
-                reference, provider, qrPayload, now, expiresAt));
+                reference, provider, qrPayload, now, expiresAt, shiftId));
         tenants.touch(cmd.tenantId());
         audit(cmd, saved, now, intent);
         return new PosOrderResult(OrderResponse.from(saved), PaymentIntentResponse.from(intent, now));

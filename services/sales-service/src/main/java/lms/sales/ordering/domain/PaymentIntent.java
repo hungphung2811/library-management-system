@@ -27,7 +27,16 @@ public final class PaymentIntent {
     public record Snapshot(UUID id, UUID tenantId, UUID orderId, Money amount, String reference,
                            PaymentIntentStatus status, String provider, String providerTxnId, String qrPayload,
                            Instant expiresAt, Instant paidAt, Instant createdAt, long version,
-                           Long tenderedAmount, Long changeDue, String transactionRef) {
+                           Long tenderedAmount, Long changeDue, String transactionRef, UUID shiftId) {
+        /** Lệnh chưa gắn ca thu ngân (ADR-0030). */
+        public Snapshot(UUID id, UUID tenantId, UUID orderId, Money amount, String reference,
+                        PaymentIntentStatus status, String provider, String providerTxnId, String qrPayload,
+                        Instant expiresAt, Instant paidAt, Instant createdAt, long version,
+                        Long tenderedAmount, Long changeDue, String transactionRef) {
+            this(id, tenantId, orderId, amount, reference, status, provider, providerTxnId, qrPayload, expiresAt,
+                    paidAt, createdAt, version, tenderedAmount, changeDue, transactionRef, null);
+        }
+
         /** Lệnh chưa có thông tin thu tay (cổng tự xác nhận hoặc chưa thu). */
         public Snapshot(UUID id, UUID tenantId, UUID orderId, Money amount, String reference,
                         PaymentIntentStatus status, String provider, String providerTxnId, String qrPayload,
@@ -53,6 +62,8 @@ public final class PaymentIntent {
     private Long tenderedAmount;
     private Long changeDue;
     private String transactionRef;
+    /** Ca thu ngân của người tạo đơn lúc tạo lệnh (ADR-0030); cổng QR/MoMo chép sang bản ghi thu. */
+    private final UUID shiftId;
 
     private PaymentIntent(Snapshot s) {
         this.id = s.id();
@@ -71,11 +82,18 @@ public final class PaymentIntent {
         this.tenderedAmount = s.tenderedAmount();
         this.changeDue = s.changeDue();
         this.transactionRef = s.transactionRef();
+        this.shiftId = s.shiftId();
     }
 
     /** Lệnh mới ở PENDING. Số tiền phải dương, hạn phải sau thời điểm tạo. */
     public static PaymentIntent create(UUID tenantId, UUID orderId, Money amount, String reference, String provider,
                                        String qrPayload, Instant now, Instant expiresAt) {
+        return create(tenantId, orderId, amount, reference, provider, qrPayload, now, expiresAt, null);
+    }
+
+    /** Như {@link #create(UUID, UUID, Money, String, String, String, Instant, Instant)} kèm ca thu ngân (có thể null). */
+    public static PaymentIntent create(UUID tenantId, UUID orderId, Money amount, String reference, String provider,
+                                       String qrPayload, Instant now, Instant expiresAt, UUID shiftId) {
         if (amount == null || amount.amount() <= 0) {
             throw SalesException.invalidRequest("Số tiền thanh toán phải lớn hơn 0");
         }
@@ -86,7 +104,8 @@ public final class PaymentIntent {
             throw SalesException.invalidRequest("Hạn thanh toán phải sau thời điểm tạo");
         }
         return new PaymentIntent(new Snapshot(UUID.randomUUID(), tenantId, orderId, amount, reference,
-                PaymentIntentStatus.PENDING, provider, null, qrPayload, expiresAt, null, now, 0, null, null, null));
+                PaymentIntentStatus.PENDING, provider, null, qrPayload, expiresAt, null, now, 0, null, null, null,
+                shiftId));
     }
 
     public static PaymentIntent restore(Snapshot snapshot) {
@@ -214,6 +233,7 @@ public final class PaymentIntent {
     public Long tenderedAmount() { return tenderedAmount; }
     public Long changeDue() { return changeDue; }
     public String transactionRef() { return transactionRef; }
+    public UUID shiftId() { return shiftId; }
 
     @Override
     public String toString() {

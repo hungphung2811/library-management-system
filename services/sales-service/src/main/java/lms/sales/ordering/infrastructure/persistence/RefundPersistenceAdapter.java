@@ -94,6 +94,6 @@ class RefundPersistenceAdapter implements RefundRepository {
         return Refund.restore(e.getId(), e.getTenantId(), e.getOrderId(), RefundSource.valueOf(e.getSource()),
                 e.getReturnId(), Money.of(e.getAmount()), RefundStatus.valueOf(e.getStatus()),
                 e.getMethod() == null ? null : PaymentMethod.valueOf(e.getMethod()), e.getReference(),
-                e.getCreatedAt(), e.getRefundedBy(), e.getRefundedAt(), e.getVersion());
+                e.getCreatedAt(), e.getRefundedBy(), e.getRefundedAt(), e.getShiftId(), e.getVersion());
     }
 }

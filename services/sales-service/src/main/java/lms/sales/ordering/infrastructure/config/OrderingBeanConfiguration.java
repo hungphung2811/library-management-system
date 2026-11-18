@@ -31,6 +31,7 @@ import lms.sales.settings.application.GetSalesSettingsUseCase;
 import lms.sales.settings.application.OrderAbusePolicyUseCases;
 import lms.sales.shared.application.DocumentNumberPort;
 import lms.sales.shared.application.SalesAuditPort;
+import lms.sales.shift.application.ShiftAttributionPort;
 import lms.sales.shared.application.TenantDirectoryPort;
 import lms.sales.stock.application.CatalogLookupPort;
 import lms.sales.stock.application.StockService;
@@ -149,8 +150,8 @@ public class OrderingBeanConfiguration {
 
     @Bean
     RefundUseCases refundUseCases(RefundRepository refunds, SalesOrderRepository orders, SalesAuditPort audit,
-                                  Clock clock) {
-        return new RefundUseCases(refunds, orders, audit, clock);
+                                  Clock clock, ShiftAttributionPort shifts) {
+        return new RefundUseCases(refunds, orders, audit, clock).withShiftAttribution(shifts);
     }
 
     @Bean

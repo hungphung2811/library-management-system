@@ -86,6 +86,7 @@ public class ProcessPaymentWebhookUseCase {
         SalesOrder order = orders.findById(tenantId, intent.orderId())
                 .orElseThrow(() -> new SalesException(ErrorCode.ORDER_NOT_FOUND, "Không có đơn hàng"));
         PaymentRecord record = order.settleQrPayment(intent.reference(), now);
+        order.assignPaymentShift(record.id(), intent.shiftId()); // ADR-0030: tiền cổng vào ca của người tạo đơn
         // Lưu lệnh trước đơn: xung đột phiên bản (webhook trùng đồng thời, hoặc hủy cùng lúc) báo sớm, rollback cả tồn
         PaymentIntent savedIntent = intents.save(intent);
         SalesOrder saved = orders.save(order);

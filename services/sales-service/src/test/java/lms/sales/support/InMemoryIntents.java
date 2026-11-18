@@ -31,7 +31,7 @@ public final class InMemoryIntents implements PaymentIntentRepository {
         }
         PaymentIntent.Snapshot s = new PaymentIntent.Snapshot(i.id(), i.tenantId(), i.orderId(), i.amount(),
                 i.reference(), i.status(), i.provider(), i.providerTxnId(), i.qrPayload(), i.expiresAt(),
-                i.paidAt(), i.createdAt(), version, i.tenderedAmount(), i.changeDue(), i.transactionRef());
+                i.paidAt(), i.createdAt(), version, i.tenderedAmount(), i.changeDue(), i.transactionRef(), i.shiftId());
         rows.put(i.id(), s);
         saves++;
         return PaymentIntent.restore(s);

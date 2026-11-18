@@ -14,6 +14,7 @@ import lms.sales.shared.application.SalesAuditPort;
 import lms.sales.shared.domain.ErrorCode;
 import lms.sales.shared.domain.Money;
 import lms.sales.shared.domain.SalesException;
+import lms.sales.shift.application.ShiftAttributionPort;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -34,6 +35,14 @@ public class RefundUseCases {
         this.clock = clock;
     }
 
+    /** Ca thu ngân (ADR-0030): hoàn tiền vào ca của người đánh dấu. Mặc định không gắn ca (test cũ). */
+    private ShiftAttributionPort shifts = ShiftAttributionPort.NONE;
+
+    public RefundUseCases withShiftAttribution(ShiftAttributionPort port) {
+        this.shifts = port == null ? ShiftAttributionPort.NONE : port;
+        return this;
+    }
+
     @Transactional(readOnly = true)
     public PageResult<RefundResponse> search(UUID tenantId, RefundStatus status, int page, int size) {
         return refunds.search(tenantId, status, page, size).map(RefundResponse::from);
@@ -48,7 +57,9 @@ public class RefundUseCases {
             throw new SalesException(ErrorCode.ORDER_STATE_CONFLICT, "Khoản hoàn đã bị thay đổi bởi thao tác khác");
         }
         Instant now = clock.instant();
-        refund.markRefunded(method, reference, actor, now);
+        // ADR-0030: ca của người ghi nhận hoàn; hoàn TIỀN MẶT khi cờ tenant bật mà chưa mở ca thì 409 SHIFT_NOT_OPEN
+        UUID shiftId = shifts.resolve(tenantId, actor, method == PaymentMethod.CASH);
+        refund.markRefunded(method, reference, actor, now, shiftId);
         Refund saved = refunds.save(refund);
 
         SalesOrder order = orders.findById(tenantId, saved.orderId())

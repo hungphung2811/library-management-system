@@ -100,6 +100,7 @@ class PaymentIntentPersistenceAdapter implements PaymentIntentRepository {
         return PaymentIntent.restore(new PaymentIntent.Snapshot(e.getId(), e.getTenantId(), e.getOrderId(),
                 Money.of(e.getAmount()), e.getReference(), PaymentIntentStatus.valueOf(e.getStatus()),
                 e.getProvider(), e.getProviderTxnId(), e.getQrPayload(), e.getExpiresAt(), e.getPaidAt(),
-                e.getCreatedAt(), e.getVersion(), e.getTenderedAmount(), e.getChangeDue(), e.getTransactionRef()));
+                e.getCreatedAt(), e.getVersion(), e.getTenderedAmount(), e.getChangeDue(), e.getTransactionRef(),
+                e.getShiftId()));
     }
 }

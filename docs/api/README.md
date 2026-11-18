@@ -60,6 +60,8 @@ Quy tắc chọn nhanh:
 | `catalog-books.md`, `catalog-preview.md`, `catalog-lookup.md` | lms-api / catalog | `/api/books/**` |
 | `catalog-works-series.md` | catalog, lms-api (pha 2d) | `/api/works/**`, `/api/series/**`, `PUT /api/books/{id}/work`, trường mới của `/api/books`, `/api/book-copies/{id}` (kèm `/internal/works/**`, `/internal/series/**`) |
 | `sales.md` | lms-api | `/api/sales/**` |
+| `sales-shifts.md` (ADR-0030 gói B) | lms-api → sales-service: chốt ca thu ngân | `/api/sales/shifts/**`, `/api/sales/shift-settings` |
+| `sales-invoices.md` (ADR-0030 gói A) | lms-api → sales-service: hóa đơn VAT nội bộ; khách gửi yêu cầu qua customer-api | `/api/sales/invoices/**`, `/api/sales/orders/{id}/invoice(-request)`, `/api/sales/invoice-settings`, `PUT /public/t/{code}/orders/{orderId}/invoice-request` |
 | `platform-contracts.md` | identity (qua lms-api, platform admin) | `/api/platform/tenants/{id}/contracts`, `/api/platform/contracts/**` |
 | `tenant-contracts.md` | lms-api | `/api/contracts` |
 | `platform-storefront-origins.md` | identity (qua lms-api, platform admin) + hợp đồng identity cho customer-api (ADR-0013) | `/api/platform/tenants/{tenantId}/storefront-origins` |

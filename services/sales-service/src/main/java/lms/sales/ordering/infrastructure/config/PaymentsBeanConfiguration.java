@@ -21,6 +21,7 @@ import lms.sales.ordering.infrastructure.client.ThrottledPaymentGateway;
 import lms.sales.settings.application.GetSalesSettingsUseCase;
 import lms.sales.shared.application.DocumentNumberPort;
 import lms.sales.shared.application.SalesAuditPort;
+import lms.sales.shift.application.ShiftAttributionPort;
 import lms.sales.shared.application.TenantDirectoryPort;
 import lms.sales.stock.application.StockService;
 import org.springframework.beans.factory.ObjectProvider;
@@ -39,8 +40,9 @@ public class PaymentsBeanConfiguration {
 
     @Bean
     PaymentIntentUseCases paymentIntentUseCases(PaymentIntentRepository intents, SalesOrderRepository orders,
-                                                StockService stockService, SalesAuditPort audit, Clock clock) {
-        return new PaymentIntentUseCases(intents, orders, stockService, audit, clock);
+                                                StockService stockService, SalesAuditPort audit, Clock clock,
+                                                ShiftAttributionPort shifts) {
+        return new PaymentIntentUseCases(intents, orders, stockService, audit, clock).withShiftAttribution(shifts);
     }
 
     @Bean
@@ -139,9 +141,10 @@ public class PaymentsBeanConfiguration {
             StockService stockService, GetSalesSettingsUseCase settings, DocumentNumberPort numbers,
             SalesAuditPort audit, TenantDirectoryPort tenants, SalesReturnRepository returns, Clock clock,
             @Value("${app.payments.sandbox.intent-ttl-minutes:10}") long qrTtlMinutes,
-            @Value("${app.payments.manual.intent-ttl-minutes:10}") long manualTtlMinutes) {
+            @Value("${app.payments.manual.intent-ttl-minutes:10}") long manualTtlMinutes,
+            ShiftAttributionPort shifts) {
         return new CommitPosPendingOrderUseCase(orders, intents, gateways.orderedStream().toList(), stockService, settings,
                 numbers, audit, tenants, returns, clock, Duration.ofMinutes(qrTtlMinutes),
-                Duration.ofMinutes(manualTtlMinutes));
+                Duration.ofMinutes(manualTtlMinutes)).withShiftAttribution(shifts);
     }
 }
