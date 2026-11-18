@@ -1,6 +1,8 @@
 package lms.identity.apiclient.infrastructure.persistence;
 
 import jakarta.persistence.Column;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
@@ -21,6 +23,8 @@ class ApplicationCredentialJpaEntity {
     @Column(name = "tenant_id", nullable = false, updatable = false)
     private UUID tenantId;
 
+    // Cột CHAR(64) (V32): Hibernate validate đòi khai báo đúng kiểu JDBC CHAR, nếu không identity không khởi động được
+    @JdbcTypeCode(SqlTypes.CHAR)
     @Column(name = "secret_hash", nullable = false, updatable = false, length = 64)
     private String secretHash;
 

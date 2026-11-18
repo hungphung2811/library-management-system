@@ -13,6 +13,12 @@ public interface ApplicationRepository {
     /** Ghi (thêm hoặc cập nhật) cùng tập scope, flush ngay. Trùng tên trong tenant → APPLICATION_NAME_DUPLICATED. */
     Application save(Application application);
 
+    /**
+     * Tra theo id KHÔNG biết tenant (client_id của token endpoint OAuth2, bảng toàn cục); DELETED không trả về. Chỉ dùng
+     * cho xác thực client; mọi đường quản trị vẫn phải theo tenant.
+     */
+    Optional<Application> findVisibleById(UUID id);
+
     Optional<Application> findByIdAndTenant(UUID id, UUID tenantId);
 
     /** Như {@link #findByIdAndTenant} nhưng khóa dòng (SELECT ... FOR UPDATE) tới hết transaction hiện tại. */

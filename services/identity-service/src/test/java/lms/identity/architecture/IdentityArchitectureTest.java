@@ -83,7 +83,23 @@ class IdentityArchitectureTest {
                     "lms.identity.auth..", "lms.identity.accesscontrol..", "lms.identity.user..",
                     "lms.identity.department..");
 
-    /** Context nền/độc lập không phụ thuộc apiclient (auth sẽ dùng apiclient.application ở pha I2, thêm luật riêng khi đó). */
+    /**
+     * auth (token endpoint OAuth2 client_credentials, pha I2) chỉ được dùng API (tầng application) của apiclient, không
+     * đụng domain hay infrastructure của nó; chỉ adapter infrastructure.client của auth được gọi tầng đó (qua cổng).
+     */
+    @ArchTest
+    static final ArchRule authChiDungTangApplicationCuaApiclient = noClasses()
+            .that().resideInAPackage("lms.identity.auth..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "lms.identity.apiclient.domain..", "lms.identity.apiclient.infrastructure..");
+
+    /** Tầng application/domain của auth không biết apiclient: chỉ qua cổng (port) do infrastructure nối. */
+    @ArchTest
+    static final ArchRule authApplicationVaDomainKhongBietApiclient = noClasses()
+            .that().resideInAnyPackage("lms.identity.auth.application..", "lms.identity.auth.domain..")
+            .should().dependOnClassesThat().resideInAPackage("lms.identity.apiclient..");
+
+    /** Context nền/độc lập không phụ thuộc apiclient (auth chỉ qua cổng + adapter, xem hai luật ở trên). */
     @ArchTest
     static final ArchRule khongContextNenNaoPhuThuocApiclient = noClasses()
             .that().resideInAnyPackage("lms.identity.accesscontrol..", "lms.identity.user..",

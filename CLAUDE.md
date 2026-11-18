@@ -32,6 +32,7 @@ mvn -pl services/support-service -am spring-boot:run      # 8084, audit/thông b
 mvn -pl services/sales-service -am spring-boot:run        # 8087, bán hàng (module SALES, ADR-0010): tồn kho, đơn POS/online
 mvn -pl lms-api -am spring-boot:run                       # 8085, BFF: /api/** → /internal/** của các service
 mvn -pl customer-api -am spring-boot:run                  # 8088, BFF công khai: /public/** (cần identity, system-service)
+mvn -pl integration-api -am spring-boot:run               # 8089, BFF tích hợp máy-với-máy: /api/integration/v1/** (pha I2: chỉ /oauth/token + health; cần identity)
 ```
 
 - Profile dev tắt kiểm xác thực/phân quyền ở các service, nên không có JWT/tenant: ghi bảng tenant bị chặn (xem mục Multi-tenant), cần Bearer token. Muốn chạy kiểu production thêm `-Dspring-boot.run.profiles=prod`.
@@ -40,7 +41,7 @@ mvn -pl customer-api -am spring-boot:run                  # 8088, BFF công khai
 - Integration test (`*IT`, Testcontainers, cần Docker) mặc định bị Surefire bỏ qua; chạy bằng `-Dtest=<TênIT>`. Với Docker 29 thêm `-DargLine=-Dapi.version=1.44`, nếu không Testcontainers không tìm thấy Docker.
 - `OracleIT` chỉ chạy khi có `ORACLE_TEST_URL/USERNAME/PASSWORD` (dùng container `oracle-free` có sẵn, không tạo DB Oracle riêng).
 - Máy này không có `mvn` toàn cục; dùng Maven trong scratchpad nếu cần (thay `mvn` bằng đường dẫn Maven đó và đặt `JAVA_HOME`).
-- Cổng: identity 8081, catalog 8082, circulation 8083, support 8084, system 8086, sales 8087, customer-api 8088. FE chỉ gọi qua nginx (8080) → `lms-api` (BFF, 8085); BFF gọi service qua `/internal/**`. FE storefront/khách chưa đăng nhập gọi `/public/**` → `customer-api` (xem mục dưới).
+- Cổng: identity 8081, catalog 8082, circulation 8083, support 8084, system 8086, sales 8087, customer-api 8088, integration-api 8089 (profile compose `integration`, chạy tay như customer-api; `/api/integration/**` qua nginx, xem `docs/api/integration-api.md`). FE chỉ gọi qua nginx (8080) → `lms-api` (BFF, 8085); BFF gọi service qua `/internal/**`. FE storefront/khách chưa đăng nhập gọi `/public/**` → `customer-api` (xem mục dưới).
 
 ## Kiến trúc
 

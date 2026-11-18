@@ -1,7 +1,10 @@
 package lms.identity.auth.infrastructure.config;
 
 import lms.identity.auth.application.ChangePasswordUseCase;
+import lms.identity.apiclient.application.AuthenticateClientUseCase;
+import lms.identity.auth.application.IssueClientTokenUseCase;
 import lms.identity.auth.application.IssueStorefrontTokenUseCase;
+import lms.identity.auth.infrastructure.client.InProcessClientAuthenticationAdapter;
 import lms.identity.auth.infrastructure.client.InProcessStorefrontTenantAdapter;
 import lms.identity.tenant.application.ResolveStorefrontTenantUseCase;
 import lms.identity.auth.application.GetCredentialInfoUseCase;
@@ -124,6 +127,20 @@ public class AuthBeanConfiguration {
                                                             @Value("${lms.identity.storefront.token-ttl:PT5M}")
                                                             Duration ttl) {
         return new IssueStorefrontTokenUseCase(tenants, issuer, ttl);
+    }
+
+    /** Token endpoint OAuth2 client_credentials (SaaS API Authentication pha I2); TTL mặc định 5 phút (Q10). */
+    @Bean
+    InProcessClientAuthenticationAdapter clientAuthenticationAdapter(AuthenticateClientUseCase authenticate) {
+        return new InProcessClientAuthenticationAdapter(authenticate);
+    }
+
+    @Bean
+    IssueClientTokenUseCase issueClientTokenUseCase(InProcessClientAuthenticationAdapter clients,
+                                                    JwtTokenIssuer issuer,
+                                                    @Value("${lms.identity.integration.token-ttl:PT5M}")
+                                                    Duration ttl) {
+        return new IssueClientTokenUseCase(clients, issuer, ttl);
     }
 
     /** Tự đăng ký công khai (ADR-0010 B2.1): tenant từ storefront (ACTIVE + SALES), role signup_default. */

@@ -75,6 +75,12 @@ class ApplicationPersistenceAdapter implements ApplicationRepository {
     }
 
     @Override
+    public Optional<Application> findVisibleById(UUID id) {
+        return jpa.findById(id).filter(e -> !ApplicationStatus.DELETED.name().equals(e.getStatus()))
+                .map(e -> toDomain(e, scopesOf(List.of(e.getId()))));
+    }
+
+    @Override
     public Optional<Application> findByIdAndTenant(UUID id, UUID tenantId) {
         return jpa.findVisible(id, tenantId).map(e -> toDomain(e, scopesOf(List.of(e.getId()))));
     }

@@ -9,21 +9,28 @@ import lms.identity.apiclient.domain.ApplicationException.Reason;
  * {@code customers:*} có trong danh mục nhưng bị từ chối khi cấp ({@link #grantable()} = false) tới khi có quyết định.
  */
 public enum ApplicationScope {
-    BOOKS_READ("books:read", true),
-    BOOKS_WRITE("books:write", false),
-    INVENTORY_READ("inventory:read", true),
-    INVENTORY_WRITE("inventory:write", false),
-    ORDERS_READ("orders:read", true),
-    ORDERS_WRITE("orders:write", false),
-    CUSTOMERS_READ("customers:read", false),
-    CUSTOMERS_WRITE("customers:write", false);
+    BOOKS_READ("books:read", true, null),
+    BOOKS_WRITE("books:write", false, null),
+    INVENTORY_READ("inventory:read", true, "SALES"),
+    INVENTORY_WRITE("inventory:write", false, "SALES"),
+    ORDERS_READ("orders:read", true, "SALES"),
+    ORDERS_WRITE("orders:write", false, "SALES"),
+    CUSTOMERS_READ("customers:read", false, null),
+    CUSTOMERS_WRITE("customers:write", false, null);
 
     private final String code;
     private final boolean grantable;
+    private final String requiredModule;
 
-    ApplicationScope(String code, boolean grantable) {
+    ApplicationScope(String code, boolean grantable, String requiredModule) {
         this.code = code;
         this.grantable = grantable;
+        this.requiredModule = requiredModule;
+    }
+
+    /** Mã module của tenant phải đang bật để scope này vào được token (null = catalog lõi, không cần module). */
+    public String requiredModule() {
+        return requiredModule;
     }
 
     public String code() {

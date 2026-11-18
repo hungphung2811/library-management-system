@@ -36,6 +36,9 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/internal/permissions/registrations").permitAll()
                         // Cấp token dịch vụ storefront cho customer-api (ADR-0011): bí mật riêng STOREFRONT_CLIENT_SECRET
                         .requestMatchers(HttpMethod.POST, "/internal/storefront/access-tokens").permitAll()
+                        // Token endpoint OAuth2 client_credentials cho backend tenant (qua integration-api): đúng một đường dẫn,
+                        // xác thực bằng client_id/client_secret trong controller
+                        .requestMatchers(HttpMethod.POST, "/internal/oauth2/token").permitAll()
 
                         .requestMatchers(HttpMethod.POST, "/internal/auth/login", "/internal/auth/refresh",
                                 "/internal/auth/logout").permitAll()

@@ -31,6 +31,7 @@ import lms.identity.tenant.application.ResolveStorefrontTenantUseCase;
 import lms.identity.tenant.application.SearchTenantsUseCase;
 import lms.identity.tenant.application.SetTenantStatusUseCase;
 import lms.identity.tenant.application.SwitchTenantUseCase;
+import lms.identity.tenant.application.TenantAvailabilityQuery;
 import lms.identity.tenant.application.TenantAccountPort;
 import lms.identity.tenant.application.TenantRoleProvisioningPort;
 import lms.identity.tenant.application.TransactionalRunner;
@@ -69,6 +70,12 @@ public class TenantBeanConfiguration {
                                                                   TenantModuleRepository modules,
                                                                   StorefrontOriginRepository origins) {
         return new ResolveStorefrontTenantUseCase(tenants, modules, origins);
+    }
+
+    /** Trạng thái + module của tenant theo id cho token endpoint OAuth2 client_credentials (pha I2). */
+    @Bean
+    TenantAvailabilityQuery tenantAvailabilityQuery(TenantRepository tenants, TenantModuleRepository modules) {
+        return new TenantAvailabilityQuery(tenants, modules);
     }
 
     // ---- origin storefront theo tenant (ADR-0013) ----

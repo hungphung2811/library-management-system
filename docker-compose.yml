@@ -1,5 +1,5 @@
 # Hạ tầng local. Chạy service bằng IDE/Maven (profile dev) hoặc dùng profile "apps".
-# Cổng nội bộ: identity 8081, catalog 8082, circulation 8083, support 8084, lms-api 8085, system 8086, sales 8087, customer-api 8088.
+# Cổng nội bộ: identity 8081, catalog 8082, circulation 8083, support 8084, lms-api 8085, system 8086, sales 8087, customer-api 8088, integration-api 8089 (profile integration).
 #   docker compose up -d                          -> postgres, kafka, redis
 #   docker compose --profile apps up -d --build   -> thêm nginx, lms-api, system-service, các service (KHÔNG gồm support-service)
 #   docker compose --profile apps --profile support up -d --build   -> bật thêm support-service (audit, thông báo)
@@ -389,6 +389,42 @@ services:
     expose:
       - "8088"
 
+  # BFF tích hợp máy-với-máy cho backend của tenant (SAAS_API_AUTHENTICATION_DESIGN D2, pha I2): hiện chỉ có
+  # POST /api/integration/v1/oauth/token (chuyển tiếp tới identity) và health. Không DB/Redis. KHÔNG bật mặc định: chỉ chạy
+  # khi có profile `integration` (docker compose --profile apps --profile integration up -d --build). Ra ngoài qua nginx
+  # (/api/integration/**). Cần identity-service (JWKS + token endpoint).
+  integration-api:
+    profiles: [integration]
+    mem_limit: ${JVM_MEM_LIMIT:-768m}
+    build:
+      context: .
+      dockerfile: integration-api/Dockerfile
+    environment:
+      # Mặc định tiết kiệm RAM; chỉnh từng phần bằng JVM_XMX, JVM_MAX_METASPACE, JVM_CODE_CACHE, JVM_EXTRA_OPTS hoặc ghi đè cả chuỗi bằng JAVA_TOOL_OPTIONS.
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xmx${JVM_XMX:-256m} -XX:MaxMetaspaceSize=${JVM_MAX_METASPACE:-192m} -XX:ReservedCodeCacheSize=${JVM_CODE_CACHE:-64m} -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:CICompilerCount=1 ${JVM_EXTRA_OPTS:-}}
+      SERVER_TOMCAT_THREADS_MAX: ${TOMCAT_THREADS_MAX:-20}
+      IDENTITY_SERVICE_URL: http://identity-service:8081
+      JWT_JWK_SET_URI: http://identity-service:8081/.well-known/jwks.json
+      # iss bắt buộc khớp identity (auth.jwt.issuer, mặc định library-auth-service).
+      JWT_ISSUER: ${JWT_ISSUER:-library-auth-service}
+      # Mặc định dev như customer-api. Profile prod là fail-fast khi JWT_JWK_SET_URI trỏ localhost/rỗng hoặc JWT_ISSUER rỗng
+      # (StartupConfigurationCheck): production đặt INTEGRATION_API_PROFILE=prod.
+      SPRING_PROFILES_ACTIVE: ${INTEGRATION_API_PROFILE:-dev}
+    # identity-service thuộc profile apps/core: required false để profile `integration` đứng một mình vẫn hợp lệ.
+    depends_on:
+      identity-service:
+        condition: service_started
+        required: false
+    healthcheck:
+      # Chỉ kiểm tiến trình integration-api, KHÔNG kiểm JWKS/identity (tránh vòng lặp khởi động lại khi identity chậm).
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8089/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 40s
+    expose:
+      - "8089"
+
   # Cổng vào duy nhất ra host (8080): CORS, header bảo mật, giới hạn tốc độ đăng nhập, chặn /internal. Cấu hình ở infrastructure/nginx.
   nginx:
     profiles: [apps, core]
@@ -404,6 +440,9 @@ services:
       identity-service:
         condition: service_started
       customer-api:
+        condition: service_started
+        required: false
+      integration-api:
         condition: service_started
         required: false
       circulation-service:

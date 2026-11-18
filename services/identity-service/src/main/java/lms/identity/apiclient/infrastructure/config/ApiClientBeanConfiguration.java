@@ -4,6 +4,7 @@ import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import lms.identity.apiclient.application.ApplicationPolicy;
+import lms.identity.apiclient.application.AuthenticateClientUseCase;
 import lms.identity.apiclient.application.CreateApplicationUseCase;
 import lms.identity.apiclient.application.ManageApplicationDomainsUseCase;
 import lms.identity.apiclient.application.ManageApplicationUseCase;
@@ -16,6 +17,7 @@ import lms.identity.apiclient.domain.ApplicationRepository;
 import lms.identity.contract.application.GetMyContractsUseCase;
 import lms.identity.tenant.application.ManageApplicationOriginsUseCase;
 import lms.identity.tenant.application.PublishPlatformEventPort;
+import lms.identity.tenant.application.TenantAvailabilityQuery;
 import lms.identity.tenant.application.TransactionalRunner;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -57,6 +59,16 @@ public class ApiClientBeanConfiguration {
                                                       Clock clock) {
         return new CreateApplicationUseCase(applications, history, events, contracts, tenantTransactionalRunner,
                 policy, applicationSecureRandom, clock);
+    }
+
+    /** Xác thực client của token endpoint OAuth2 client_credentials (pha I2). */
+    @Bean
+    AuthenticateClientUseCase authenticateClientUseCase(ApplicationRepository applications,
+                                                        ApplicationCredentialRepository credentials,
+                                                        TenantAvailabilityQuery tenantAvailability,
+                                                        TransactionalRunner tenantTransactionalRunner, Clock clock) {
+        return new AuthenticateClientUseCase(applications, credentials, tenantAvailability,
+                tenantTransactionalRunner, clock);
     }
 
     @Bean

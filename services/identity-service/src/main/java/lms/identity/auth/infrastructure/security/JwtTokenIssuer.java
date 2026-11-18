@@ -1,5 +1,6 @@
 package lms.identity.auth.infrastructure.security;
 
+import lms.identity.auth.application.ClientTokenIssuerPort;
 import lms.identity.auth.application.ServiceTokenIssuerPort;
 import lms.identity.auth.application.TokenIssuerPort;
 import lms.security.JwtClaims;
@@ -15,7 +16,7 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 
 /** Phát hành access token RS256 chứa roles, permissions, departmentId, tenantId và platformAdmin (khi có). */
-public class JwtTokenIssuer implements TokenIssuerPort, ServiceTokenIssuerPort {
+public class JwtTokenIssuer implements TokenIssuerPort, ServiceTokenIssuerPort, ClientTokenIssuerPort {
 
     private final JwtEncoder encoder;
     private final String keyId;
@@ -105,6 +106,32 @@ public class JwtTokenIssuer implements TokenIssuerPort, ServiceTokenIssuerPort {
                 .claim(JwtClaims.TENANT_ID, claims.tenantId().toString())
                 .claim(JwtClaims.MODULES, claims.modules())
                 .claim(JwtClaims.PERMISSIONS, List.of())
+                .build();
+        JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).keyId(keyId).build();
+        String token = encoder.encode(JwtEncoderParameters.from(header, set)).getTokenValue();
+        return new IssuedToken(token, claims.ttl().toSeconds());
+    }
+
+    /**
+     * Token tích hợp (client_credentials): aud lms-integration, sub = client_id = application_id, scope (chuỗi cách nhau
+     * dấu cách), tenantId, modules, jti. Không roles, username, admin, platformAdmin, svc, sid, permissions.
+     */
+    @Override
+    public IssuedToken issueClient(ClientClaims claims) {
+        Instant now = clock.instant();
+        String applicationId = claims.applicationId().toString();
+        JwtClaimsSet set = JwtClaimsSet.builder()
+                .issuer(issuer)
+                .subject(applicationId)
+                .audience(List.of(JwtClaims.AUDIENCE_INTEGRATION))
+                .id(UUID.randomUUID().toString())
+                .issuedAt(now)
+                .expiresAt(now.plus(claims.ttl()))
+                .claim(JwtClaims.CLIENT_ID, applicationId)
+                .claim(JwtClaims.APPLICATION_ID, applicationId)
+                .claim(JwtClaims.TENANT_ID, claims.tenantId().toString())
+                .claim(JwtClaims.SCOPE, String.join(" ", claims.scopes()))
+                .claim(JwtClaims.MODULES, claims.modules())
                 .build();
         JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).keyId(keyId).build();
         String token = encoder.encode(JwtEncoderParameters.from(header, set)).getTokenValue();

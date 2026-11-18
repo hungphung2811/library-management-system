@@ -1,5 +1,6 @@
 package lms.identity.apiclient.domain;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -15,6 +16,12 @@ public interface ApplicationCredentialRepository {
 
     /** Nạp theo lô cho danh sách (một câu lệnh). */
     List<ApplicationCredential> findByApplications(Collection<UUID> applicationIds);
+
+    /**
+     * Ghi lần dùng gần nhất bằng MỘT câu UPDATE có điều kiện ACTIVE (không ghi đè trạng thái: thu hồi chạy đồng thời
+     * không bị hồi sinh bởi bản đọc cũ). Dùng cho token endpoint.
+     */
+    void touchLastUsed(UUID credentialId, Instant at);
 
     /** Credential theo id VÀ Application (id của Application khác: rỗng). */
     Optional<ApplicationCredential> findByIdAndApplication(UUID credentialId, UUID applicationId);

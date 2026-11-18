@@ -26,7 +26,7 @@ Quy tắc chọn nhanh:
 ## 3. Không được gọi
 
 - `/internal/**` và `/.well-known/**`: nginx luôn trả `404`, không phải API cho FE.
-- Cổng trực tiếp của service: identity 8081, catalog 8082, circulation 8083, support 8084, lms-api 8085, system 8086, sales 8087, customer-api 8088. Chỉ nginx (8080) được publish ra host, các cổng này chỉ có trong mạng compose.
+- Cổng trực tiếp của service: identity 8081, catalog 8082, circulation 8083, support 8084, lms-api 8085, system 8086, sales 8087, customer-api 8088, integration-api 8089. Chỉ nginx (8080) được publish ra host, các cổng này chỉ có trong mạng compose.
 - `/actuator/**` của `customer-api` (nginx không route).
 - Các đường dẫn chỉ có trong tài liệu dạng "đề xuất" (đánh dấu ⚠️ ĐỀ XUẤT) chưa có code: đừng tích hợp thật.
 
@@ -64,6 +64,7 @@ Quy tắc chọn nhanh:
 | `platform-storefront-origins.md` | identity (qua lms-api, platform admin) + hợp đồng identity cho customer-api (ADR-0013) | `/api/platform/tenants/{tenantId}/storefront-origins` |
 | `tenant-storefront-origins.md` | lms-api (tenant admin, chỉ xem) | `GET /api/storefront-origins` |
 | `applications.md` | lms-api (tenant admin) + identity (platform admin): Application, scope, domain, credential (ADR-0027, pha P1) | `/api/applications/**`, `/api/platform/tenants/{tenantId}/applications/**` |
+| `integration-api.md` | integration-api (qua nginx, chuyển tới identity): token OAuth2 client_credentials cho backend tenant (ADR-0027, pha I2) | `POST /api/integration/v1/oauth/token` |
 | `dashboard-reports.md` | lms-api (gộp catalog, circulation, sales; tổng quan nền tảng ở identity) | `/api/dashboard/**`, `/api/reports/**`, `GET /api/platform/dashboard/overview` |
 | `storefront-kham-pha.md` | ⚠️ đề xuất, chưa có code (ADR-0019): customer-api + lms-api | `/public/t/{code}/books?sort&inStock`, `/public/t/{code}/books/suggestions`, `/public/t/{code}/banners`, `/api/sales/banners/**` |
 | Các file còn lại (`identity-*`, `circulation.md`, `notifications.md`, `menu.md`...) | lms-api | `/api/**` |

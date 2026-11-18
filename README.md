@@ -9,6 +9,7 @@ Kiến trúc: Microservices + DDD + Hexagonal + Clean Architecture + RBAC.
 |---|---|
 | `infrastructure/nginx/` | Nginx: cổng vào duy nhất (8080): CORS, header bảo mật, giới hạn tốc độ đăng nhập, chặn `/internal` |
 | `lms-api/` | BFF: service duy nhất đưa API ra cho FE (cổng 8085, nội bộ), gọi các service qua API `/internal/**` |
+| `integration-api/` | BFF tích hợp máy-với-máy cho backend của tenant (cổng 8089, nội bộ, không DB, profile compose `integration`): pha I2 chỉ có `POST /api/integration/v1/oauth/token` (OAuth2 client_credentials, chuyển tới identity) và health; xem `docs/api/integration-api.md` |
 | `customer-api/` | BFF thứ hai, công khai cho khách (cổng 8088, nội bộ, không DB): trang giới thiệu, form liên hệ, đăng nhập storefront; FE gọi `/public/**` qua nginx (ADR-0011) |
 | `services/` | 4 microservice lõi và `sales-service` (module bán hàng, ADR-0010), mỗi service một database riêng, cộng `system-service` (runner Flyway tập trung, giữ mọi file SQL) |
 | `shared-libraries/common-kernel` | Contract dùng chung (`DomainEvent`, `ErrorResponse`) |
@@ -143,7 +144,8 @@ phụ thuộc (`depends_on`) và chờ `system-service` healthy trước khi kh�
 | sales-service | 8087 | postgres, system-service, kafka | `docker compose --profile apps up -d --build sales-service` |
 | lms-api (BFF) | 8085 | identity-service, catalog-service (và các thứ chúng cần) | `docker compose --profile apps up -d --build lms-api` |
 | customer-api (BFF công khai) | 8088 | identity-service, system-service (và các thứ chúng cần) | `docker compose --profile apps up -d --build customer-api` |
-| nginx | 8080 (publish ra host) | lms-api, customer-api, identity, circulation, support | `docker compose --profile apps up -d --build nginx` |
+| integration-api (BFF tích hợp, profile `integration`) | 8089 | identity-service | `docker compose --profile apps --profile integration up -d --build integration-api` |
+| nginx | 8080 (publish ra host) | lms-api, customer-api, integration-api, identity, circulation, support | `docker compose --profile apps up -d --build nginx` |
 
 Thao tác thường dùng (thay `catalog-service` bằng service cần thao tác):
 
@@ -229,6 +231,7 @@ mvn -pl services/catalog-service -am spring-boot:run       # profile dev, securi
 mvn -pl services/circulation-service -am spring-boot:run   # profile dev, security tắt (đặt trước vẫn cần Bearer token để biết người gọi)
 mvn -pl services/sales-service -am spring-boot:run         # cổng 8087, profile dev, security tắt (module bán hàng, cần system-service chạy trước)
 mvn -pl customer-api -am spring-boot:run                   # cổng 8088, BFF công khai /public/** (cần identity, system-service)
+mvn -pl integration-api -am spring-boot:run                # cổng 8089, BFF tích hợp /api/integration/v1/** (cần identity)
 mvn test                                    # unit + ArchUnit + WebMvc test
 ```
 

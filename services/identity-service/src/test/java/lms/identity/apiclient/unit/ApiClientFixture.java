@@ -111,6 +111,11 @@ class ApiClientFixture {
         }
 
         @Override
+        public Optional<Application> findVisibleById(UUID id) {
+            return Optional.ofNullable(rows.get(id)).filter(a -> a.status() != ApplicationStatus.DELETED);
+        }
+
+        @Override
         public Optional<Application> findByIdAndTenant(UUID id, UUID tenantId) {
             return Optional.ofNullable(rows.get(id))
                     .filter(a -> a.tenantId().equals(tenantId) && a.status() != ApplicationStatus.DELETED);
@@ -156,6 +161,16 @@ class ApiClientFixture {
         public ApplicationCredential save(ApplicationCredential c) {
             rows.put(c.id(), c);
             return c;
+        }
+
+        @Override
+        public void touchLastUsed(UUID credentialId, java.time.Instant at) {
+            ApplicationCredential c = rows.get(credentialId);
+            if (c != null && c.status() == lms.identity.apiclient.domain.CredentialStatus.ACTIVE) {
+                rows.put(credentialId, ApplicationCredential.restore(c.id(), c.applicationId(), c.tenantId(),
+                        c.secretHash(), c.secretHint(), c.status(), c.createdAt(), c.createdBy(), c.expiresAt(), at,
+                        c.revokedAt(), c.revokedBy(), c.revokeReason()));
+            }
         }
 
         @Override

@@ -131,6 +131,9 @@ lms:
       # ADR-0013: origin storefront theo tenant. http chỉ cho localhost/127.0.0.1 trừ khi bật cờ (staging không TLS)
       max-origins-per-tenant: 10
       allow-http-origins: ${STOREFRONT_ALLOW_HTTP_ORIGINS:false}
+    # Token tích hợp OAuth2 client_credentials (SaaS API Authentication pha I2, Q10): TTL access token
+    integration:
+      token-ttl: ${INTEGRATION_TOKEN_TTL:PT5M}
 
   # Hợp đồng thuê dịch vụ theo tenant (ADR-0012): múi giờ nghiệp vụ, ân hạn sau ngày kết thúc, mốc nhắc hạn (ngày),
   # job vòng đời mỗi giờ (phút 7). Tắt job: lms.contract.job.enabled=false.

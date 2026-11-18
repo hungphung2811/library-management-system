@@ -29,6 +29,11 @@ class ApplicationCredentialPersistenceAdapter implements ApplicationCredentialRe
     }
 
     @Override
+    public void touchLastUsed(UUID credentialId, java.time.Instant at) {
+        jpa.touchLastUsed(credentialId, at);
+    }
+
+    @Override
     public List<ApplicationCredential> findByApplication(UUID applicationId) {
         return jpa.findByApplication(applicationId).stream().map(ApplicationCredentialPersistenceAdapter::toDomain)
                 .toList();
