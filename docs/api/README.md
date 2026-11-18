@@ -64,6 +64,7 @@ Quy tắc chọn nhanh:
 | `platform-storefront-origins.md` | identity (qua lms-api, platform admin) + hợp đồng identity cho customer-api (ADR-0013) | `/api/platform/tenants/{tenantId}/storefront-origins` |
 | `tenant-storefront-origins.md` | lms-api (tenant admin, chỉ xem) | `GET /api/storefront-origins` |
 | `applications.md` | lms-api (tenant admin) + identity (platform admin): Application, scope, domain, credential (ADR-0027, pha P1) | `/api/applications/**`, `/api/platform/tenants/{tenantId}/applications/**` |
+| `public-api-v1.md` | customer-api (qua nginx): Public API v1 cho website tenant, nhận diện bằng header `X-Site-Key` (ADR-0027, pha P2) | `/api/public/v1/{books,banners,sessions,orders}/**` |
 | `integration-api.md` | integration-api (qua nginx, chuyển tới identity): token OAuth2 client_credentials cho backend tenant (ADR-0027, pha I2) | `POST /api/integration/v1/oauth/token` |
 | `dashboard-reports.md` | lms-api (gộp catalog, circulation, sales; tổng quan nền tảng ở identity) | `/api/dashboard/**`, `/api/reports/**`, `GET /api/platform/dashboard/overview` |
 | `storefront-kham-pha.md` | ⚠️ đề xuất, chưa có code (ADR-0019): customer-api + lms-api | `/public/t/{code}/books?sort&inStock`, `/public/t/{code}/books/suggestions`, `/public/t/{code}/banners`, `/api/sales/banners/**` |

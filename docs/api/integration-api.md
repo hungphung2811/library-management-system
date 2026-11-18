@@ -166,7 +166,7 @@ curl -sS -H "Authorization: Bearer $TOKEN" "$ORIGIN/api/integration/v1/orders?st
 
 ### 9.2. Bộ đếm sử dụng
 
-Cùng lượt với giới hạn: `INCR lms:usage:v1:t:{tenantId}:a:{applicationId}:{yyyyMMdd}` (ngày UTC, TTL 35 ngày), đếm mọi request tới endpoint dữ liệu (kể cả bị từ chối vì 429). Chỉ ghi, **chưa có API đọc** (pha I5, thống kê ở portal).
+Cùng lượt với giới hạn: `INCR lms:usage:v1:t:{tenantId}:a:{applicationId}:{yyyyMMdd}` (ngày UTC, TTL 35 ngày), đếm mọi request tới endpoint dữ liệu (kể cả bị từ chối vì 429). Chỉ là **tổng yêu cầu mỗi ngày** (không tách thành công/lỗi hay theo nhóm endpoint). Đọc qua identity `GET /api/applications/{id}/usage?from&to` (tối đa 31 ngày, `docs/api/applications.md` mục "Thống kê sử dụng"). Bộ đếm chỉ chạy khi giới hạn tốc độ bật.
 
 ### 9.3. Log truy cập
 
@@ -177,3 +177,16 @@ integration-access correlationId=... jti=... tenantId=... applicationId=... meth
 ```
 
 `route` là **mẫu** đường dẫn (không có id thật, không có query); request không có token hợp lệ ghi `jti`, `tenantId`, `applicationId` là `-`. Không log thân, header `Authorization`, secret hay token. `X-Correlation-Id` (do client gửi nếu hợp lệ, nếu không sinh mới) được trả lại ở header phản hồi và chuyển sang catalog/sales.
+
+## 10. Thu hồi token tức thời (pha I5, tùy chọn)
+
+Mặc định (cờ tắt) token đã cấp **còn dùng được tối đa 5 phút** (TTL) sau khi tạm ngưng/xóa Application hoặc thu hồi credential; thu hồi credential có hiệu lực ngay với lần xin token kế tiếp. Muốn rút ngắn, bật `app.integration.revocation.enabled` (`INTEGRATION_REVOCATION_ENABLED=true`, mặc định `false`, cần Redis) ở **integration-api**, và cùng biến ở **identity** để identity ghi dấu. Hai nguồn từ chối (một lượt `MGET`, chạy sau xác thực token và trước giới hạn tốc độ; request bị từ chối không đếm vào hạn mức):
+
+| Khóa Redis | Ai ghi | Ý nghĩa |
+|---|---|---|
+| `lms:revoked:v1:jti:{jti}` | vận hành (`SET key 1 EX <giây còn lại của token>`) | denylist một token cụ thể; tồn tại là bị thu hồi |
+| `lms:revoked:v1:app:{applicationId}` | identity (sau commit) khi **tạm ngưng**, **xóa** Application hoặc thu hồi credential **`COMPROMISED`** | giá trị = giây epoch; token của application có `iat` nhỏ hơn giá trị này bị từ chối. TTL mặc định 1 giờ (`lms.identity.integration.revocation.marker-ttl`, phải lớn hơn `token-ttl`) |
+
+- Token bị thu hồi nhận `401 UNAUTHORIZED` (thân và `WWW-Authenticate: Bearer` như token không hợp lệ, không nói lý do).
+- **Fail-open**: Redis lỗi hoặc chậm thì request vẫn được xử lý, log WARN một dòng rồi tạm bỏ qua Redis 5 giây (như giới hạn tốc độ). Phía identity cũng best-effort: Redis lỗi chỉ log WARN, thao tác quản trị vẫn thành công.
+- Giới hạn đã biết: (1) token không mang `credentialId` nên dấu là theo cả Application, vì vậy thu hồi `COMPROMISED` làm mất hiệu lực cả token đã cấp từ credential còn lại (client xin lại token là được); (2) không có endpoint ghi denylist `jti` (chưa cần; dùng `redis-cli`); (3) dấu chỉ ghi sau commit nên nếu identity chết giữa chừng thì không có dấu (quay về TTL 5 phút); (4) Application đã bị tạm ngưng rồi kích hoạt lại: token cấp trước thời điểm tạm ngưng vẫn bị từ chối đến hết TTL của token, xin token mới là dùng được.

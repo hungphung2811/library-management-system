@@ -34,6 +34,8 @@ Căn cứ: customer-api-data-authorization A1, A18, mục 5.3 phương án C. Đ
 - `lms-api` (`ChannelAudienceFilter`) trả `401` cho token có `aud` chứa `lms-integration` (như `lms-storefront`). customer-api đã từ chối vì bắt buộc `lms-storefront`.
 - Ở các service, `PermissionInterceptor` chỉ cho token này vào endpoint có `@IntegrationScope("<scope>")` và scope nằm trong claim `scope` (chuỗi cách nhau bằng dấu cách); còn lại `403 FORBIDDEN`/`TENANT_REQUIRED`/`MODULE_NOT_ENABLED`/`INSUFFICIENT_SCOPE`. Danh sách đóng đang gắn (pha I3): catalog `TitleController/get|lookup|lookupByIsbn` (`books:read`), sales `StockItemController/search|get` (`inventory:read`), `SalesOrderController/search|get` (`orders:read`); contact/notes/receipt và mọi endpoint ghi KHÔNG gắn.
 - Mọi access token do identity phát (nhân viên, storefront, svc) thêm claim `jti` (UUID); FE không cần đổi.
+- **JWKS hai khóa (xoay khóa ký, pha I5)**: `GET /.well-known/jwks.json` mặc định có MỘT khóa (khóa đang ký). Trong cửa sổ xoay khóa, đặt `AUTH_JWT_PREVIOUS_PUBLIC_KEY` (PEM X.509 của khóa CŨ) thì JWKS trả hai khóa: khóa đang ký trước, khóa cũ sau, mỗi khóa có `kid` riêng (thumbprint). Chỉ có thành phần công khai. Token luôn được ký bằng khóa hiện tại; khóa cũ chỉ để xác minh token đã phát. Mọi resource server (các service, lms-api, customer-api, integration-api) dùng `jwk-set-uri` nên chọn khóa theo `kid` của token, không phải đổi gì; identity tự dùng cùng tập khóa này cho decoder của nó. PEM cũ sai hoặc trùng khóa đang ký thì identity không khởi động (thông điệp nêu tên biến). Resource server cache JWKS (Nimbus mặc định 5 phút) nên khóa mới có hiệu lực xác minh sau tối đa chừng đó. Quy trình đầy đủ: `docs/architecture/JWT_KEY_ROTATION.md`.
+- JWKS vẫn **không** mở ra internet: nginx giữ chặn `/.well-known/` (Q11); các service lấy trực tiếp từ identity trong mạng nội bộ.
 
 ## Việc của customer-api (agent khác)
 
@@ -44,3 +46,7 @@ Căn cứ: customer-api-data-authorization A1, A18, mục 5.3 phương án C. Đ
 ## Việc của FE
 
 Token storefront không dùng được ở ứng dụng nhân viên (`/api/**` trả 401) và ngược lại. Lưu riêng, không dùng chung `localStorage` với app nhân viên.
+
+## Token dịch vụ `svc` cấp theo site key (Public Site Key, pha P2)
+
+`POST /internal/storefront/access-tokens` với `{siteKey}` (thay cho `{tenantCode}`) cấp token `svc` như cũ (TTL 5 phút, `permissions` rỗng, không `aud`) và **thêm claim `application_id`** (id Application kiểu `PUBLIC_SITE`). Token cấp theo `{tenantCode}` không có claim này. Claim chỉ để ghi nhận/truy vết; quyền vẫn do `@StorefrontAccessible` và module quyết. Chi tiết ở `docs/api/public-api-v1.md` mục 7.

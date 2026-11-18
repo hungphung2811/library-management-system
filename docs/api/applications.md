@@ -8,7 +8,7 @@ Mọi đường dẫn tương đối so với `<ORIGIN>` (nginx 8080 -> lms-api)
 
 | Nhóm | Cơ chế | Khóa |
 |---|---|---|
-| Tenant admin (`/api/applications/**`) | Khóa động ADR-0003 `ApplicationController/<method>`; role `is_admin` đi qua sẵn, role thường cần được gán khóa (tự đăng ký lần đầu endpoint được gọi) | `list`, `get`, `create`, `update`, `delete`, `replaceScopes`, `createCredential`, `revokeCredential`, `rotateSiteKey`, `listDomains`, `addDomain`, `removeDomain`, `history` |
+| Tenant admin (`/api/applications/**`) | Khóa động ADR-0003 `ApplicationController/<method>`; role `is_admin` đi qua sẵn, role thường cần được gán khóa (tự đăng ký lần đầu endpoint được gọi) | `list`, `get`, `create`, `update`, `delete`, `replaceScopes`, `createCredential`, `revokeCredential`, `rotateSiteKey`, `listDomains`, `addDomain`, `removeDomain`, `history`, `usage` |
 | Platform admin (`/api/platform/tenants/{tenantId}/applications/**`) | `@PlatformAdminOnly` (không dùng khóa), tenant lấy từ đường dẫn | n/a |
 
 Tên controller/method là khóa quyền: không đổi. Không token `401`; token không `tenantId` ở API tenant `403 TENANT_REQUIRED`; thiếu khóa `403`.
@@ -38,10 +38,26 @@ Tên controller/method là khóa quyền: không đổi. Không token `401`; tok
 | POST | `/api/applications/{id}/domains` | `{ origin }` | `201` origin; chuẩn hóa/kiểm như ADR-0013 |
 | DELETE | `/api/applications/{id}/domains/{domainId}` | | `204` |
 | GET | `/api/applications/{id}/history` | | `200 [{ id, credentialId, action, detail, actorId, occurredAt }]` mới nhất trước (tối đa 200) |
+| GET | `/api/applications/{id}/usage?from&to` | | `200 UsageReport` (xem mục "Thống kê sử dụng"); khóa động `ApplicationController/usage` |
 
 `ApplicationSummary`: `id, name, kind, status, siteKey, rateLimitPerMinute, scopes[], usableCredentials, createdAt, updatedAt`. `ApplicationDetail`: `id, clientId, name, kind, status, siteKey, rateLimitPerMinute, scopes[], credentials[], createdAt, createdBy, updatedAt, updatedBy`. `CredentialView`: `id, secretHint, status (ACTIVE|REVOKED), usable, createdAt, createdBy, expiresAt, lastUsedAt, revokedAt, revokeReason`. Không có trường nào chứa secret hay hash ngoài phản hồi tạo credential.
 
 Domain: dùng lại bảng và luật origin của ADR-0013 (chuẩn hóa chữ thường/punycode, bỏ cổng mặc định, không path/wildcard, `http` chỉ localhost, UNIQUE toàn hệ thống, tối đa 10 origin mỗi tenant gồm cả origin cấp tenant). Chỉ cho `PUBLIC_SITE` ACTIVE. Domain allowlist chỉ là CORS, không phải xác thực. Origin trùng với tenant khác trả `409 ORIGIN_DUPLICATED` **không** lộ tenant chủ.
+
+## Thống kê sử dụng (Developer Portal, pha I5)
+
+`GET /api/applications/{id}/usage?from=yyyy-MM-dd&to=yyyy-MM-dd` (và bản platform `/api/platform/tenants/{tenantId}/applications/{id}/usage`). Đọc bộ đếm Redis mà integration-api ghi (`lms:usage:v1:t:{tenant}:a:{app}:{yyyyMMdd}`); identity đọc, không ghi.
+
+- `from`, `to`: ngày ISO (UTC), gồm cả hai đầu, cả hai tùy chọn. Thiếu `to` = hôm nay (UTC); thiếu `from` = 30 ngày kết thúc ở `to`. Tối đa **31 ngày** (`from`..`to` gồm 31 ngày là hợp lệ, 32 là `400 INVALID_APPLICATION`); `from` sau `to` cũng `400`; ngày sai định dạng `400`.
+- Bộ đếm giữ 35 ngày: ngày cũ hơn trả `0` (không phân biệt được với "không có request").
+- Phản hồi `200`: `{ applicationId, from, to, totalRequests, days: [{ date, totalRequests }] }` (mỗi ngày trong khoảng đều có mặt, ngày không có dữ liệu là `0`).
+- ⚠️ Chỉ có **tổng yêu cầu mỗi ngày**. Bộ đếm hiện không tách thành công/lỗi (2xx/4xx/5xx) hay theo nhóm endpoint nên API **không** trả các số đó (chưa có, không ước lượng). Đếm cả request bị `429`; chỉ đếm khi integration-api bật giới hạn tốc độ (`INTEGRATION_RATE_LIMIT_ENABLED=true`), vì bộ đếm chạy cùng lượt Lua của bộ giới hạn.
+- Application của tenant khác (hoặc không tồn tại): `404 APPLICATION_NOT_FOUND` cùng thân. Redis lỗi: `503 USAGE_UNAVAILABLE` (không trả số `0` giả).
+- Thêm khóa quyền mới `ApplicationController/usage` (tự đăng ký lần đầu được gọi; role `is_admin` qua sẵn, role khác cần được gán). Không cần migration.
+
+## Thu hồi tức thời (tùy chọn)
+
+Mặc định token đã cấp còn dùng được tối đa **5 phút** (TTL) sau khi tạm ngưng/xóa Application hoặc thu hồi credential (đã chấp nhận ở thiết kế). Bật `INTEGRATION_REVOCATION_ENABLED=true` ở **cả identity và integration-api** thì: tạm ngưng Application, xóa Application và thu hồi credential với `reason = COMPROMISED` ghi dấu `lms:revoked:v1:app:{applicationId}` vào Redis (sau commit, best-effort), và integration-api trả `401` cho mọi token của Application đó cấp trước thời điểm ấy. Thu hồi credential `MANUAL`/`ROTATED` **không** ghi dấu (xoay vòng bình thường, token đã cấp hết hạn tự nhiên). Chi tiết ở `docs/api/integration-api.md` mục 10.
 
 ## Endpoint platform admin
 
@@ -49,7 +65,7 @@ Domain: dùng lại bảng và luật origin của ADR-0013 (chuẩn hóa chữ 
 
 | Method | Đường dẫn | Ra |
 |---|---|---|
-| GET | `.../applications`, `.../applications/{id}`, `.../applications/{id}/history` | như trên, của tenant `{tenantId}` |
+| GET | `.../applications`, `.../applications/{id}`, `.../applications/{id}/history`, `.../applications/{id}/usage?from&to` | như trên, của tenant `{tenantId}` |
 | POST | `.../applications/{id}/suspension` | `200 ApplicationDetail` (`409 APPLICATION_NOT_ACTIVE` nếu không ACTIVE) |
 | POST | `.../applications/{id}/reactivation` | `200 ApplicationDetail` (`409 APPLICATION_NOT_SUSPENDED`) |
 | DELETE | `.../applications/{id}` | `204` (xóa mềm như trên) |
@@ -64,6 +80,7 @@ Platform admin không tạo Application và không cấp credential hộ tenant.
 | 404 | `APPLICATION_NOT_FOUND`, `CREDENTIAL_NOT_FOUND`, `APPLICATION_DOMAIN_NOT_FOUND` |
 | 409 | `CONTRACT_REQUIRED`, `KIND_MISMATCH`, `APPLICATION_NAME_DUPLICATED`, `APPLICATION_LIMIT_EXCEEDED`, `CREDENTIAL_LIMIT_EXCEEDED`, `CREDENTIAL_NOT_ACTIVE`, `APPLICATION_NOT_ACTIVE`, `APPLICATION_NOT_SUSPENDED`, `ORIGIN_DUPLICATED`, `ORIGIN_LIMIT_EXCEEDED` |
 | 422 | `SCOPE_NOT_GRANTABLE` |
+| 503 | `USAGE_UNAVAILABLE` (chỉ endpoint `usage`) |
 
 ## Ghi chú cho FE
 
