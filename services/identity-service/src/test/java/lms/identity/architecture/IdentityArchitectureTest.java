@@ -47,7 +47,7 @@ class IdentityArchitectureTest {
             .that().resideInAPackage("lms.identity.tenant..")
             .should().dependOnClassesThat().resideInAnyPackage(
                     "lms.identity.auth..", "lms.identity.accesscontrol..", "lms.identity.user..",
-                    "lms.identity.department..", "lms.identity.contract..");
+                    "lms.identity.department..", "lms.identity.contract..", "lms.identity.apiclient..");
 
     /** contract (ADR-0012) chỉ được dùng API (tầng application) của tenant, không đụng domain hay infrastructure. */
     @ArchTest
@@ -56,13 +56,39 @@ class IdentityArchitectureTest {
             .should().dependOnClassesThat().resideInAnyPackage(
                     "lms.identity.tenant.domain..", "lms.identity.tenant.infrastructure..");
 
-    /** contract không biết auth, accesscontrol, user hay department. */
+    /** contract không biết auth, accesscontrol, user, department hay apiclient. */
     @ArchTest
     static final ArchRule contractKhongBietCacContextKhac = noClasses()
             .that().resideInAPackage("lms.identity.contract..")
             .should().dependOnClassesThat().resideInAnyPackage(
                     "lms.identity.auth..", "lms.identity.accesscontrol..", "lms.identity.user..",
+                    "lms.identity.department..", "lms.identity.apiclient..");
+
+    /**
+     * apiclient (SaaS API Authentication, Application/credential/scope) chỉ được dùng API (tầng application) của tenant
+     * và contract (kiểm hợp đồng ACTIVE cho Application INTEGRATION), không đụng domain hay infrastructure của chúng.
+     */
+    @ArchTest
+    static final ArchRule apiclientChiDungTangApplicationCuaTenantVaContract = noClasses()
+            .that().resideInAPackage("lms.identity.apiclient..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "lms.identity.tenant.domain..", "lms.identity.tenant.infrastructure..",
+                    "lms.identity.contract.domain..", "lms.identity.contract.infrastructure..");
+
+    /** apiclient không biết auth, accesscontrol, user hay department. */
+    @ArchTest
+    static final ArchRule apiclientKhongBietCacContextKhac = noClasses()
+            .that().resideInAPackage("lms.identity.apiclient..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "lms.identity.auth..", "lms.identity.accesscontrol..", "lms.identity.user..",
                     "lms.identity.department..");
+
+    /** Context nền/độc lập không phụ thuộc apiclient (auth sẽ dùng apiclient.application ở pha I2, thêm luật riêng khi đó). */
+    @ArchTest
+    static final ArchRule khongContextNenNaoPhuThuocApiclient = noClasses()
+            .that().resideInAnyPackage("lms.identity.accesscontrol..", "lms.identity.user..",
+                    "lms.identity.department..")
+            .should().dependOnClassesThat().resideInAPackage("lms.identity.apiclient..");
 
     /** Không context nào khác phụ thuộc vào contract (job/recorder nối vào qua cổng của tenant). */
     @ArchTest

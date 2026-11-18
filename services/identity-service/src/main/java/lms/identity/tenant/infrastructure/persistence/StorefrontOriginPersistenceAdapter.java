@@ -82,11 +82,11 @@ class StorefrontOriginPersistenceAdapter implements StorefrontOriginRepository {
 
     private static TenantStorefrontOriginJpaEntity toEntity(StorefrontOriginEntry e) {
         return new TenantStorefrontOriginJpaEntity(e.id(), e.tenantId(), e.origin(), e.enabled(), e.createdAt(),
-                e.createdBy(), e.updatedAt(), e.updatedBy());
+                e.createdBy(), e.updatedAt(), e.updatedBy(), e.applicationId());
     }
 
     private static StorefrontOriginEntry toDomain(TenantStorefrontOriginJpaEntity e) {
         return new StorefrontOriginEntry(e.getId(), e.getTenantId(), e.getOrigin(), e.isEnabled(), e.getCreatedAt(),
-                e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy());
+                e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getApplicationId());
     }
 }

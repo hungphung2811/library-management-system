@@ -39,11 +39,15 @@ class TenantStorefrontOriginJpaEntity {
     @Column(name = "updated_by")
     private UUID updatedBy;
 
+    /** Null = áp cho mọi Application kiểu website của tenant (V32). */
+    @Column(name = "application_id")
+    private UUID applicationId;
+
     protected TenantStorefrontOriginJpaEntity() {
     }
 
     TenantStorefrontOriginJpaEntity(UUID id, UUID tenantId, String origin, boolean enabled, Instant createdAt,
-                                    UUID createdBy, Instant updatedAt, UUID updatedBy) {
+                                    UUID createdBy, Instant updatedAt, UUID updatedBy, UUID applicationId) {
         this.id = id;
         this.tenantId = tenantId;
         this.origin = origin;
@@ -52,6 +56,7 @@ class TenantStorefrontOriginJpaEntity {
         this.createdBy = createdBy;
         this.updatedAt = updatedAt;
         this.updatedBy = updatedBy;
+        this.applicationId = applicationId;
     }
 
     UUID getId() { return id; }
@@ -62,4 +67,5 @@ class TenantStorefrontOriginJpaEntity {
     UUID getCreatedBy() { return createdBy; }
     Instant getUpdatedAt() { return updatedAt; }
     UUID getUpdatedBy() { return updatedBy; }
+    UUID getApplicationId() { return applicationId; }
 }

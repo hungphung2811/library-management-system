@@ -28,12 +28,17 @@ public class TenantStorefrontOrigins {
      * @throws StorefrontOriginLimitExceededException nếu đã đủ số tối đa
      */
     public StorefrontOriginEntry add(StorefrontOrigin origin, UUID actor, Instant at) {
+        return add(origin, null, actor, at);
+    }
+
+    /** Như {@link #add(StorefrontOrigin, UUID, Instant)} nhưng gắn origin với một Application của tenant (có thể null). */
+    public StorefrontOriginEntry add(StorefrontOrigin origin, UUID applicationId, UUID actor, Instant at) {
         if (entries.stream().anyMatch(e -> e.origin().equals(origin.value()))) {
             throw new StorefrontOriginDuplicatedException("Origin đã có trong tenant này: " + origin.value(), tenantId);
         }
         if (entries.size() >= max) throw new StorefrontOriginLimitExceededException(max);
         StorefrontOriginEntry created = new StorefrontOriginEntry(UUID.randomUUID(), tenantId, origin.value(), true, at,
-                actor, at, actor);
+                actor, at, actor, applicationId);
         entries.add(created);
         return created;
     }

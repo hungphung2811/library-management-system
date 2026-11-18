@@ -113,6 +113,15 @@ public class TenantBeanConfiguration {
         return new RemoveStorefrontOriginUseCase(tenants, origins, events, tenantTransactionalRunner, policy);
     }
 
+    /** Domain allowlist của Application (SaaS API Authentication P1): dùng chung luật và kho origin của ADR-0013. */
+    @Bean
+    lms.identity.tenant.application.ManageApplicationOriginsUseCase manageApplicationOriginsUseCase(
+            TenantRepository tenants, StorefrontOriginRepository origins, PublishPlatformEventPort events,
+            TransactionalRunner tenantTransactionalRunner, StorefrontOriginPolicy policy) {
+        return new lms.identity.tenant.application.ManageApplicationOriginsUseCase(tenants, origins, events,
+                tenantTransactionalRunner, policy);
+    }
+
     @Bean
     ListMyStorefrontOriginsUseCase listMyStorefrontOriginsUseCase(StorefrontOriginRepository origins) {
         return new ListMyStorefrontOriginsUseCase(origins);
