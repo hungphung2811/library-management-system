@@ -3,9 +3,7 @@ package lms.support.notification.unit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.time.Clock;
 import java.util.UUID;
-import lms.support.notification.application.CreateNotificationUseCase;
 import lms.support.notification.application.ListMyNotificationsUseCase;
 import lms.support.notification.infrastructure.messaging.ContractExpiringConsumer;
 import lms.tenant.TenantContext;
@@ -15,10 +13,9 @@ import org.junit.jupiter.api.Test;
 /** T4 (ADR-0012): một thông báo mỗi người nhận, giao lại không nhân bản, thiếu tenant bị bỏ qua, cách ly theo tenant. */
 class ContractExpiringConsumerTest {
 
-    private final InMemoryNotifications store = new InMemoryNotifications();
-    private final ContractExpiringConsumer consumer = new ContractExpiringConsumer(new ObjectMapper(),
-            new CreateNotificationUseCase(store, Clock.systemUTC()));
-    private final ListMyNotificationsUseCase list = new ListMyNotificationsUseCase(store);
+    private final NotificationKit kit = new NotificationKit();
+    private final ContractExpiringConsumer consumer = new ContractExpiringConsumer(new ObjectMapper(), kit.enqueue);
+    private final ListMyNotificationsUseCase list = new ListMyNotificationsUseCase(kit.inApp);
     private final UUID tenantA = UUID.randomUUID();
     private final UUID tenantB = UUID.randomUUID();
     private final UUID admin1 = UUID.randomUUID();

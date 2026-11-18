@@ -20,6 +20,13 @@ public interface ReaderProfileRepository {
         return found;
     }
 
+    /** Hồ sơ theo lô (một truy vấn) trong tenant hiện tại; id không có hồ sơ bị bỏ qua. Mặc định tra từng id; bản JPA ghi đè. */
+    default java.util.List<ReaderProfile> findByUserIds(java.util.Collection<UUID> userIds) {
+        java.util.List<ReaderProfile> out = new java.util.ArrayList<>();
+        for (UUID id : userIds) findByUserId(id).ifPresent(out::add);
+        return out;
+    }
+
     /** userId của các hồ sơ có email này (không phân biệt hoa thường). */
     java.util.List<UUID> findUserIdsByEmail(String email);
 }

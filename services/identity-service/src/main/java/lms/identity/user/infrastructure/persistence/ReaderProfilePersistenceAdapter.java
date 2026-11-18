@@ -29,6 +29,15 @@ class ReaderProfilePersistenceAdapter implements ReaderProfileRepository {
     }
 
     @Override
+    public java.util.List<ReaderProfile> findByUserIds(java.util.Collection<UUID> userIds) {
+        if (userIds.isEmpty()) return java.util.List.of();
+        // @TenantId của Hibernate lọc theo tenant của phiên; RLS lọc thêm ở DB
+        return jpa.findAllById(userIds).stream().map(e -> ReaderProfile.restore(e.getUserId(), e.getCardNo(),
+                e.getFullName(), e.getEmail(), e.getReaderType(), e.getCardExpiryDate(), e.getStatus(),
+                e.personalInfo())).toList();
+    }
+
+    @Override
     public boolean existsByUserId(UUID userId) {
         return jpa.existsById(userId);
     }

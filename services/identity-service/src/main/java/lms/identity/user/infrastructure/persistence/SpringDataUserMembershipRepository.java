@@ -12,4 +12,6 @@ interface SpringDataUserMembershipRepository
     long countByUserId(UUID userId);
 
     List<UserMembershipJpaEntity> findByTenantIdAndUserIdIn(UUID tenantId, Collection<UUID> userIds);
+
+    List<UserMembershipJpaEntity> findByTenantIdAndStatusAndUserIdIn(UUID tenantId, String status, Collection<UUID> userIds);
 }

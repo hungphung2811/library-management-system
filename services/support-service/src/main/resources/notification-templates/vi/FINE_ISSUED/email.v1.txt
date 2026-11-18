@@ -1,0 +1,5 @@
+Bạn có khoản phạt mới
+Chào {{recipient_name}},
+
+{{tenant_name}} vừa ghi nhận cho bạn một khoản phạt {{amount}} ({{reason}}).
+Vui lòng liên hệ thư viện để được hướng dẫn thanh toán.

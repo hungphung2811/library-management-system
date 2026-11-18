@@ -26,6 +26,16 @@ spring:
     consumer:
       group-id: support-service
       auto-offset-reset: earliest
+  # SMTP của provider EMAIL (ADR-0030): mặc định Mailpit của docker-compose (localhost:1025, thư không ra ngoài)
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.connectiontimeout: 3000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
 
 database:
   # true: lỗi mở connection critical làm app dừng. LOG_DB là connection phụ nên chỉ ghi nhận FAILED.
@@ -50,6 +60,10 @@ database:
         backoff: 500ms
 
 management:
+  health:
+    # SMTP chết không được làm service DOWN: lỗi gửi chỉ thành lượt thử lại của delivery
+    mail:
+      enabled: false
   endpoints:
     web:
       exposure:
@@ -77,6 +91,10 @@ app:
       identity-events: identity-events
       # Bản tóm tắt audit của sales-service (ADR-0010 mục 2.6); data không chứa dữ liệu cá nhân
       sales-events: ${SALES_EVENTS_TOPIC:sales.events}
+      # Phạt mới (FineIssuedEvent): chỉ để gửi thông báo, audit không nghe topic này
+      fine-events: fine.events
+      # Người nhận trực tiếp (khách lẻ) mang email trong payload: KHÔNG thêm vào AuditEventConsumer (audit lưu thô vào Mongo)
+      notification-direct: notification.direct
 
 # Middleware phân quyền theo endpoint (security-common): khóa Controller/method được đăng ký về identity-service
 lms:
@@ -90,3 +108,23 @@ lms:
   # tenant-common: TenantContext theo claim tenantId, Hibernate @TenantId và RLS (app.tenant_id)
   tenant:
     enabled: true
+  # Thông báo theo sự kiện + provider (ADR-0030, gói C). Mọi giá trị ghi đè được bằng biến môi trường.
+  notification:
+    # Bí mật riêng gọi identity POST /internal/notification-recipients/lookup (KHÔNG dùng INTERNAL_API_KEY); trống = không tra được người nhận
+    client-secret: ${NOTIFICATION_CLIENT_SECRET:}
+    email:
+      from: ${NOTIFICATION_EMAIL_FROM:no-reply@lms.local}
+    dispatch:
+      enabled: ${NOTIFICATION_DISPATCH_ENABLED:true}
+      interval-ms: 5000
+      initial-delay-ms: 10000
+    batch-size: 50
+    # Dòng SENDING không đổi quá thời hạn này (instance chết giữa chừng) được đưa lại RETRY
+    stuck-after: PT5M
+    # Thử lại: lần đầu rồi tối đa 5 lần thử lại; hết lượt thì DEAD
+    retry:
+      delays: PT1M,PT5M,PT30M,PT2H,PT6H
+    rate:
+      per-tenant-per-minute: 60
+      global-per-minute: 600
+    retention-days: 180

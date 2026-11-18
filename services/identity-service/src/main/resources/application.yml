@@ -181,3 +181,8 @@ lms:
     refresh-cleanup:
       cron: "0 30 3 * * *"
       batch-size: 1000
+
+  # Thông báo theo sự kiện (ADR-0030): bí mật riêng của support-service để tra email người nhận qua
+  # POST /internal/notification-recipients/lookup (KHÔNG dùng INTERNAL_API_KEY). Bỏ trống = từ chối mọi lời gọi.
+  notification:
+    client-secret: ${NOTIFICATION_CLIENT_SECRET:}

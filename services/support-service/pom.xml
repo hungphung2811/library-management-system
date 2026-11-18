@@ -71,6 +71,11 @@
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka</artifactId>
         </dependency>
+        <!-- Provider EMAIL của thông báo theo sự kiện (ADR-0030); phiên bản do Spring Boot BOM quản lý -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
         <!-- Migration do system-service chạy; Flyway và script (jar system-service) chỉ dùng trong IT -->
         <dependency>
             <groupId>org.flywaydb</groupId>

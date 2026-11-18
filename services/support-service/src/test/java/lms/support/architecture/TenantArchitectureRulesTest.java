@@ -14,5 +14,7 @@ class TenantArchitectureRulesTest {
 
     @ArchTest
     static final ArchRule khongCoNativeQueryChuaRa = TenantArchitectureRules.noUnreviewedNativeQueries(
-            "SpringDataAuditLogRepository", "SpringDataNotificationRepository");
+            "SpringDataAuditLogRepository", "SpringDataNotificationRepository",
+            // ADR-0030: chèn "nếu chưa có" theo khóa khử trùng (RLS WITH CHECK chặn khác tenant) và danh sách tenant không RLS
+            "SpringDataDeliveryRepository", "SpringDataTenantRegistryRepository");
 }

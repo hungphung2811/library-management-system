@@ -1,0 +1,5 @@
+Hóa đơn {{invoice_no}} đã được phát hành
+Chào {{recipient_name}},
+
+{{tenant_name}} đã phát hành hóa đơn số {{invoice_no}} cho đơn hàng {{order_no}}, tổng giá trị {{grand_total}}, ngày {{issued_at}}.
+Vui lòng liên hệ cửa hàng nếu bạn cần bản in hoặc điều chỉnh thông tin hóa đơn.

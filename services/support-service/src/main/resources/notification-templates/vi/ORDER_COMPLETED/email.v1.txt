@@ -1,0 +1,4 @@
+Đơn hàng {{order_no}} đã hoàn tất
+Chào {{recipient_name}},
+
+Đơn hàng {{order_no}} của bạn tại {{tenant_name}} đã hoàn tất. Cảm ơn bạn đã tin tưởng và mua hàng.

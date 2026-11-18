@@ -24,6 +24,27 @@ class NotificationArchitectureTest {
             .should().dependOnClassesThat().resideInAnyPackage("lms.support.notification.infrastructure..",
                     "lms.database..");
 
+    /** ADR-0030: use case chỉ biết cổng; SMTP, Kafka, HTTP, JSON là việc của infrastructure. */
+    @ArchTest
+    static final ArchRule applicationKhongBietSmtpKafkaHttpVaJson = noClasses()
+            .that().resideInAPackage("lms.support.notification.application..")
+            .should().dependOnClassesThat().resideInAnyPackage("org.springframework.mail..", "jakarta.mail..",
+                    "org.eclipse.angus..", "org.springframework.kafka..", "org.springframework.web..",
+                    "org.springframework.http..", "com.fasterxml..");
+
+    /** Cài đặt provider (kênh gửi ra ngoài) chỉ nằm ở infrastructure, đăng ký qua NotificationProviderRegistry. */
+    @ArchTest
+    static final ArchRule providerChiCaiDatODatInfrastructure = com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes()
+            .that().implement(lms.support.notification.application.NotificationProvider.class)
+            .should().resideInAPackage("lms.support.notification.infrastructure..");
+
+    /** Mọi controller thông báo nằm ở infrastructure.web và không gọi thẳng cổng lưu trữ hay provider. */
+    @ArchTest
+    static final ArchRule controllerKhongDungProviderVaCongLuuTru = noClasses()
+            .that().resideInAPackage("lms.support.notification.infrastructure.web..")
+            .should().dependOnClassesThat().resideInAnyPackage("lms.support.notification.infrastructure.persistence..",
+                    "lms.support.notification.infrastructure.email..", "lms.support.notification.infrastructure.client..");
+
     @ArchTest
     static final ArchRule khongCoVongLapGiuaCacTangCuaNotification =
             slices().matching("lms.support.notification.(*)..").should().beFreeOfCycles();

@@ -1,0 +1,6 @@
+Đơn hàng {{order_no}} đã được thanh toán
+Chào {{recipient_name}},
+
+{{tenant_name}} đã nhận được khoản thanh toán {{grand_total}} cho đơn hàng {{order_no}}.
+
+Cảm ơn bạn đã mua hàng tại {{tenant_name}}.

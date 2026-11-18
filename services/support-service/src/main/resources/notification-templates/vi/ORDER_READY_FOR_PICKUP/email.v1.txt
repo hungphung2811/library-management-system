@@ -1,0 +1,5 @@
+Đơn hàng {{order_no}} đã sẵn sàng để nhận tại quầy
+Chào {{recipient_name}},
+
+Đơn hàng {{order_no}} của bạn tại {{tenant_name}} đã sẵn sàng để nhận tại quầy.
+Vui lòng mang theo mã đơn hàng khi đến nhận.

@@ -1,0 +1,5 @@
+Sách bạn mượn sắp đến hạn trả
+Chào {{recipient_name}},
+
+Bạn đang mượn {{item_count}} cuốn tại {{tenant_name}}, hạn trả là {{due_date}} (còn {{days_before}} ngày).
+Vui lòng trả hoặc gia hạn đúng hạn để tránh phát sinh phí phạt.

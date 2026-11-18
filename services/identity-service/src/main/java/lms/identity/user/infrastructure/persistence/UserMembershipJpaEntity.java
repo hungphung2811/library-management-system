@@ -31,6 +31,10 @@ class UserMembershipJpaEntity {
     @Column(name = "department_id")
     private UUID departmentId;
 
+    /** ACTIVE hoặc DISABLED (tenant_memberships.status). */
+    @Column(name = "status")
+    private String status;
+
     /** Hồ sơ người dùng (chỉ đọc), để lọc/sắp xếp theo thông tin người dùng khi tìm theo membership. */
     @jakarta.persistence.ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @jakarta.persistence.JoinColumn(name = "user_id", insertable = false, updatable = false)
@@ -42,6 +46,7 @@ class UserMembershipJpaEntity {
     UUID getUserId() { return userId; }
     UUID getTenantId() { return tenantId; }
     UUID getDepartmentId() { return departmentId; }
+    String getStatus() { return status; }
     UserJpaEntity getUser() { return user; }
 
     static class Key implements Serializable {

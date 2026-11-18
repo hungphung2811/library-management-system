@@ -41,7 +41,10 @@ public final class TenantArchitectureRules {
             // giữ trong danh sách như sổ đăng ký bảng toàn cục.
             "applications", "application_credentials", "application_scopes", "application_history",
             // ADR-0011: nội dung và yêu cầu liên hệ cấp nền tảng của system-service (không thuộc tenant nào)
-            "cms_pages", "cms_contact_requests");
+            "cms_pages", "cms_contact_requests",
+            // ADR-0030 D8: danh sách tenant đã từng có thông báo của support-service (chỉ id tenant, không chứa dữ liệu tenant;
+            // dispatcher lặp qua đây rồi chạy từng tenant trong TenantContext.runAs, giống sales_tenants/known_tenants)
+            "notification_tenants");
 
     private static final String SPRING_QUERY = "org.springframework.data.jpa.repository.Query";
 

@@ -1,0 +1,4 @@
+Đơn hàng {{order_no}} đang được giao
+Chào {{recipient_name}},
+
+Đơn hàng {{order_no}} của bạn tại {{tenant_name}} đã được bàn giao cho đơn vị vận chuyển và đang trên đường giao đến bạn.

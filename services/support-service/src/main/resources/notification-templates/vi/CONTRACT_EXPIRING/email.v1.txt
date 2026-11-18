@@ -1,0 +1,5 @@
+Hợp đồng thuê dịch vụ sắp hết hạn
+Chào {{recipient_name}},
+
+Hợp đồng thuê dịch vụ {{contract_name}} của {{tenant_name}} sẽ hết hạn vào {{end_date}} (còn khoảng {{days}} ngày).
+Vui lòng liên hệ để gia hạn nhằm không gián đoạn dịch vụ.

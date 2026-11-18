@@ -21,6 +21,14 @@ public interface UserRepository {
     /** Chỉ những người có membership (mọi trạng thái) ở tenantId trong số ids; id khác bị bỏ qua. Không có dữ liệu liên hệ cần dùng. */
     java.util.List<User> findAllInTenant(java.util.Collection<UUID> ids, UUID tenantId);
 
+    /**
+     * Như {@link #findAllInTenant} nhưng chỉ người có membership ACTIVE ở tenantId (dùng cho tra người nhận thông báo,
+     * ADR-0030 D5). Mặc định trả mọi membership; bản JPA ghi đè bằng lọc theo trạng thái.
+     */
+    default java.util.List<User> findAllActiveInTenant(java.util.Collection<UUID> ids, UUID tenantId) {
+        return findAllInTenant(ids, tenantId);
+    }
+
     boolean existsById(UUID id);
 
     /** Toàn cục, không phân biệt hoa thường (email là duy nhất toàn hệ thống). Mặc định rỗng; bản JPA ghi đè. */

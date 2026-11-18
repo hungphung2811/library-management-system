@@ -78,6 +78,12 @@ public class TenantBeanConfiguration {
         return new TenantAvailabilityQuery(tenants, modules);
     }
 
+    /** Tên hiển thị của tenant theo id, cho API tra người nhận thông báo (ADR-0030 D5). */
+    @Bean
+    lms.identity.tenant.application.TenantNameQuery tenantNameQuery(TenantRepository tenants) {
+        return new lms.identity.tenant.application.TenantNameQuery(tenants);
+    }
+
     // ---- origin storefront theo tenant (ADR-0013) ----
 
     @Bean

@@ -218,6 +218,16 @@ public class UserBeanConfiguration {
         return new lms.identity.user.application.LookupUsersUseCase(repository);
     }
 
+    /** Tra email + tên hiển thị người nhận thông báo cho support-service (ADR-0030 D5). */
+    @Bean
+    lms.identity.user.application.LookupNotificationRecipientsUseCase lookupNotificationRecipientsUseCase(
+            UserRepository users, ReaderProfileRepository readers,
+            lms.identity.tenant.application.TenantNameQuery tenantNames,
+            lms.identity.tenant.application.TransactionalRunner tenantTransactionalRunner) {
+        return new lms.identity.user.application.LookupNotificationRecipientsUseCase(users, readers, tenantNames,
+                tenantTransactionalRunner);
+    }
+
     @Bean
     GetUserDirectoryInfoUseCase getUserDirectoryInfoUseCase(UserRepository repository) {
         return new GetUserDirectoryInfoUseCase(repository);

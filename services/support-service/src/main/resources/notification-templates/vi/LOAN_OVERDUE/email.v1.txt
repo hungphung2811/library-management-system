@@ -1,0 +1,5 @@
+Sách bạn mượn đã quá hạn trả
+Chào {{recipient_name}},
+
+Bạn đang mượn {{item_count}} cuốn tại {{tenant_name}} đã quá hạn trả {{days_overdue}} ngày (hạn trả là {{due_date}}).
+Đây là lần nhắc thứ {{reminder_no}}/{{max_reminders}}. Vui lòng trả sách sớm để tránh phát sinh thêm phí phạt.

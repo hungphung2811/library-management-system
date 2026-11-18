@@ -1,0 +1,5 @@
+Sách bạn đặt trước đã sẵn sàng
+Chào {{recipient_name}},
+
+Sách bạn đặt trước tại {{tenant_name}} đã sẵn sàng để nhận, được giữ đến {{hold_until}}.
+Sau thời hạn này, lượt đặt trước có thể bị hủy.

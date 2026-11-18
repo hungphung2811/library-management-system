@@ -1,0 +1,5 @@
+Hoàn tiền cho đơn hàng {{order_no}} đã hoàn tất
+Chào {{recipient_name}},
+
+{{tenant_name}} đã hoàn tất hoàn tiền {{amount}} cho đơn hàng {{order_no}}.
+Thời gian tiền về tài khoản phụ thuộc vào đơn vị thanh toán của bạn.

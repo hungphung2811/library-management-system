@@ -1,0 +1,7 @@
+Đơn hàng {{order_no}} đã được tiếp nhận
+Chào {{recipient_name}},
+
+{{tenant_name}} đã tiếp nhận đơn hàng {{order_no}} của bạn với tổng giá trị {{grand_total}}.
+Chúng tôi sẽ thông báo cho bạn khi đơn hàng có cập nhật mới.
+
+Cảm ơn bạn đã mua hàng tại {{tenant_name}}.

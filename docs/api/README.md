@@ -69,6 +69,7 @@ Quy tắc chọn nhanh:
 | `integration-api.md` | integration-api (qua nginx, chuyển tới identity): token OAuth2 client_credentials cho backend tenant (ADR-0027, pha I2) | `POST /api/integration/v1/oauth/token` |
 | `dashboard-reports.md` | lms-api (gộp catalog, circulation, sales; tổng quan nền tảng ở identity) | `/api/dashboard/**`, `/api/reports/**`, `GET /api/platform/dashboard/overview` |
 | `storefront-kham-pha.md` | ⚠️ đề xuất, chưa có code (ADR-0019): customer-api + lms-api | `/public/t/{code}/books?sort&inStock`, `/public/t/{code}/books/suggestions`, `/public/t/{code}/banners`, `/api/sales/banners/**` |
+| `notifications.md` (mục "Thông báo theo sự kiện", ADR-0030 gói C) | lms-api → support-service | `/api/notifications/me/{preferences,deliveries}`, `/api/notification-deliveries/**`, `/api/notification-settings/channels`, `/api/notification-templates/**` |
 | Các file còn lại (`identity-*`, `circulation.md`, `notifications.md`, `menu.md`...) | lms-api | `/api/**` |
 
 ## 7. Chưa kiểm chứng

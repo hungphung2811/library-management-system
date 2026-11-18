@@ -1,0 +1,5 @@
+Đơn hàng {{order_no}} đã bị hủy
+Chào {{recipient_name}},
+
+Đơn hàng {{order_no}} của bạn tại {{tenant_name}} đã bị hủy ({{cancel_reason}}).
+Nếu bạn cần hỗ trợ, vui lòng liên hệ cửa hàng.

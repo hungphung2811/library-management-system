@@ -3,9 +3,7 @@ package lms.support.notification.unit;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.time.Clock;
 import java.util.UUID;
-import lms.support.notification.application.CreateNotificationUseCase;
 import lms.support.notification.application.ListMyNotificationsUseCase;
 import lms.support.notification.infrastructure.messaging.ReservationReadyConsumer;
 import lms.tenant.TenantContext;
@@ -14,10 +12,9 @@ import org.junit.jupiter.api.Test;
 
 class ReservationReadyConsumerTest {
 
-    private final InMemoryNotifications store = new InMemoryNotifications();
-    private final ReservationReadyConsumer consumer = new ReservationReadyConsumer(new ObjectMapper(),
-            new CreateNotificationUseCase(store, Clock.systemUTC()));
-    private final ListMyNotificationsUseCase list = new ListMyNotificationsUseCase(store);
+    private final NotificationKit kit = new NotificationKit();
+    private final ReservationReadyConsumer consumer = new ReservationReadyConsumer(new ObjectMapper(), kit.enqueue);
+    private final ListMyNotificationsUseCase list = new ListMyNotificationsUseCase(kit.inApp);
     private final UUID tenantA = UUID.randomUUID();
     private final UUID tenantB = UUID.randomUUID();
     private final UUID reader = UUID.randomUUID();

@@ -70,6 +70,14 @@ class UserPersistenceAdapter implements UserRepository {
     }
 
     @Override
+    public List<User> findAllActiveInTenant(java.util.Collection<UUID> ids, UUID tenantId) {
+        if (ids.isEmpty()) return List.of();
+        List<UUID> members = memberships.findByTenantIdAndStatusAndUserIdIn(tenantId, "ACTIVE", ids).stream()
+                .map(UserMembershipJpaEntity::getUserId).toList();
+        return jpa.findAllById(members).stream().map(UserPersistenceAdapter::toDomain).toList();
+    }
+
+    @Override
     public boolean existsById(UUID id) {
         return jpa.existsById(id);
     }
