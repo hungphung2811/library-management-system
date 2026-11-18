@@ -58,7 +58,27 @@ public enum ErrorCode {
     PAYMENT_NOT_SIMULATED(409),
     PAYMENT_GATEWAY_ERROR(502),
     INVALID_WEBHOOK_SIGNATURE(401),
-    CATALOG_UNAVAILABLE(503);
+    CATALOG_UNAVAILABLE(503),
+    // ===== ADR-0030 gói A: hóa đơn =====
+    INVOICE_NOT_FOUND(404),
+    /** Đơn chưa COMPLETED + PAID. */
+    ORDER_NOT_INVOICEABLE(409),
+    INVOICE_ALREADY_EXISTS(409),
+    INVOICE_STATE_CONFLICT(409),
+    /** Hóa đơn gốc đã có điều chỉnh nên không thay thế được. */
+    INVOICE_HAS_ADJUSTMENTS(409),
+    /** Chưa cấu hình tên pháp lý/MST người bán. */
+    INVOICE_SETTINGS_INCOMPLETE(409),
+    INVALID_TAX_CODE(400),
+    CANCEL_REASON_REQUIRED(400),
+    // ===== ADR-0030 gói B: chốt ca thu ngân =====
+    SHIFT_NOT_FOUND(404),
+    SHIFT_ALREADY_OPEN(409),
+    SHIFT_NOT_OPEN(409),
+    SHIFT_STATE_CONFLICT(409),
+    SHIFT_HAS_PENDING_PAYMENTS(409),
+    SHIFT_VARIANCE_REASON_REQUIRED(400),
+    REOPEN_REASON_REQUIRED(400);
 
     private final int httpStatus;
 

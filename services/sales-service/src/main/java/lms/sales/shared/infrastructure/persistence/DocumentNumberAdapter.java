@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 class DocumentNumberAdapter implements DocumentNumberPort {
 
-    private static final Map<String, String> PREFIX = Map.of(ORDER, "DH", RECEIPT, "PN", RETURN, "TH");
+    private static final Map<String, String> PREFIX = Map.of(ORDER, "DH", RECEIPT, "PN", RETURN, "TH", SHIFT, "CA");
 
     @PersistenceContext
     private EntityManager em;
@@ -33,6 +33,14 @@ class DocumentNumberAdapter implements DocumentNumberPort {
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public String next(UUID tenantId, String sequence) {
+        long value = nextValue(tenantId, sequence);
+        return PREFIX.getOrDefault(sequence, sequence.substring(0, Math.min(3, sequence.length())))
+                + "-" + String.format("%06d", value);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public long nextValue(UUID tenantId, String sequence) {
         int updated = bump(tenantId, sequence);
         if (updated == 0) {
             jdbc.update("INSERT INTO sales_counters (tenant_id, name, last_value) VALUES (?, ?, 0) "
@@ -42,11 +50,9 @@ class DocumentNumberAdapter implements DocumentNumberPort {
                 throw new IllegalStateException("Không tăng được bộ đếm " + sequence);
             }
         }
-        Long value = em.createQuery("select c.lastValue from SalesCounterJpaEntity c "
+        return em.createQuery("select c.lastValue from SalesCounterJpaEntity c "
                         + "where c.tenantId = :t and c.name = :n", Long.class)
                 .setParameter("t", tenantId).setParameter("n", sequence).getSingleResult();
-        return PREFIX.getOrDefault(sequence, sequence.substring(0, Math.min(3, sequence.length())))
-                + "-" + String.format("%06d", value);
     }
 
     private int bump(UUID tenantId, String sequence) {

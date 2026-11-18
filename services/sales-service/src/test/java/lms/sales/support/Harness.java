@@ -125,7 +125,17 @@ public final class Harness {
     public final GoodsReceiptRepository receiptRepo = new ReceiptAdapter();
     public final SalesSettingsPort settingsPort = new SettingsAdapter();
     public final SalesAuditPort auditPort = audits::add;
-    public final DocumentNumberPort numbers = (t, seq) -> seq.charAt(0) + "-" + sequences.merge(seq, 1, Integer::sum);
+    public final DocumentNumberPort numbers = new DocumentNumberPort() {
+        @Override
+        public String next(UUID t, String seq) {
+            return seq.charAt(0) + "-" + sequences.merge(seq, 1, Integer::sum);
+        }
+
+        @Override
+        public long nextValue(UUID t, String seq) {
+            return sequences.merge(seq, 1, Integer::sum);
+        }
+    };
     public final Map<UUID, CatalogLookupPort.CatalogPreview> catalogPreviews = new HashMap<>();
     public final CatalogLookupPort catalog = new CatalogLookupPort() {
         public Map<UUID, CatalogTitle> lookup(Collection<UUID> ids) {
