@@ -24,6 +24,8 @@ public final class DefaultMenus {
             new Entry("catalog", null, "Sách", "/catalog", null, 20, null, null),
             new Entry("catalog-barcode", "catalog", "Tra mã vạch", "/catalog/barcode", null, 10,
                     "BookCopyController/getByBarcode", null),
+            new Entry("catalog-works", "catalog", "Tác phẩm", "/catalog/works", null, 20,
+                    "WorkController/search", null),
             new Entry("circulation", null, "Mượn trả", "/circulation", null, 30, null, "LENDING"),
             new Entry("circulation-borrow", "circulation", "Lập phiếu mượn", "/circulation/borrow", null, 10,
                     "BorrowingController/borrow", "LENDING"),
@@ -37,7 +39,11 @@ public final class DefaultMenus {
                     "ReservationController/mine", "LENDING"),
             new Entry("circulation-fines", "circulation", "Phạt", "/circulation/fines", null, 60,
                     "FineController/byReader", "LENDING"),
-            new Entry("admin", null, "Quản trị", "/admin", null, 40, "AccessControlController/listRoles", null),
+            new Entry("circulation-compensation", "circulation", "Đền bù và mức hư hại", "/circulation/compensation",
+                    null, 70, "CompensationPolicyController/get", "LENDING"),
+            new Entry("circulation-fine-requests", "circulation", "Yêu cầu miễn giảm, hoàn phạt",
+                    "/circulation/fine-requests", null, 80, "FineAdjustmentController/list", "LENDING"),
+            new Entry("admin", null, "Quản trị", "/admin", null, 60, "AccessControlController/listRoles", null),
             new Entry("admin-users", "admin", "Người dùng", "/admin/users", null, 10, "UserController/search", null),
             new Entry("admin-roles", "admin", "Vai trò và quyền", "/admin/roles", null, 20,
                     "AccessControlController/listRoles", null),
@@ -67,8 +73,12 @@ public final class DefaultMenus {
                     "SupplierController/search", "SALES"),
             new Entry("sales-audit", "sales", "Nhật ký bán hàng", "/sales/audit", null, 60,
                     "SalesAuditController/search", "SALES"),
+            new Entry("sales-banners", "sales", "Banner cửa hàng", "/sales/banners", null, 65,
+                    "SalesBannerController/list", "SALES"),
             new Entry("sales-settings", "sales", "Cấu hình bán hàng", "/sales/settings", null, 70,
-                    "SalesSettingsController/get", "SALES"));
+                    "SalesSettingsController/get", "SALES"),
+            new Entry("reports", null, "Báo cáo", "/reports", null, 55,
+                    "LendingReportController/overdueBorrowingsCsv", null));
 
     private DefaultMenus() {}
 

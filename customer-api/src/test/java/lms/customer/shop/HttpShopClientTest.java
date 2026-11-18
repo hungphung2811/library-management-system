@@ -85,6 +85,70 @@ class HttpShopClientTest {
     }
 
     @Test
+    void cancellableChoDonChoThanhToanVaDonChoXacNhanChuaTra() {
+        // MockRestServiceServer: khai báo đủ kỳ vọng (theo thứ tự) TRƯỚC khi gọi, không thêm kỳ vọng sau khi đã có lời gọi
+        server.expect(requestTo("http://sales/internal/sales/shop/orders/" + orderId))
+                .andRespond(withSuccess(upstream("AWAITING_PAYMENT"), MediaType.APPLICATION_JSON));
+        server.expect(requestTo("http://sales/internal/sales/shop/orders/" + orderId))
+                .andRespond(withSuccess(upstream("PENDING_CONFIRMATION").replace("\"UNPAID\"", "\"PAID\""),
+                        MediaType.APPLICATION_JSON));
+        assertTrue(client.myOrder("t", orderId).cancellable());
+        // đơn chờ xác nhận nhưng đã trả tiền thì không hủy được
+        assertFalse(client.myOrder("t", orderId).cancellable());
+        server.verify();
+    }
+
+    @Test
+    void thanhToanChuyenTokenKhachVaChiLayTruongAllowlist() throws Exception {
+        server.expect(requestTo("http://sales/internal/sales/shop/orders/" + orderId + "/payment"))
+                .andExpect(method(HttpMethod.GET)).andExpect(header("Authorization", "Bearer user-token"))
+                .andRespond(withSuccess("{\"orderId\":\"" + orderId + "\",\"orderNo\":\"ON-1\","
+                        + "\"orderStatus\":\"AWAITING_PAYMENT\",\"paymentStatus\":\"UNPAID\",\"paymentMethod\":\"SEPAY\","
+                        + "\"tenantId\":\"t\",\"version\":2,"
+                        + "\"intent\":{\"status\":\"PENDING\",\"provider\":\"SEPAY\",\"qrPayload\":\"https://qr/x\","
+                        + "\"amount\":100,\"currency\":\"VND\",\"reference\":\"ON1\",\"expiresAt\":\"2026-11-17T01:15:00Z\","
+                        + "\"paidAt\":null,\"id\":\"i1\",\"providerTxnId\":\"tx\",\"transactionRef\":\"tr\","
+                        + "\"tenderedAmount\":5,\"changeDue\":0}}", MediaType.APPLICATION_JSON));
+        var view = client.orderPayment("user-token", orderId);
+        assertEquals(orderId, view.orderId());
+        assertEquals("SEPAY", view.paymentMethod());
+        assertEquals("PENDING", view.intent().status());
+        assertEquals("https://qr/x", view.intent().qrPayload());
+        assertEquals(100, view.intent().amount());
+        assertThat(json.writeValueAsString(view)).doesNotContain("tenantId", "version", "providerTxnId",
+                "transactionRef", "tenderedAmount", "changeDue", "\"id\"");
+        server.verify();
+    }
+
+    @Test
+    void thanhToanDonKhongQuaCongCoIntentNull() {
+        server.expect(requestTo("http://sales/internal/sales/shop/orders/" + orderId + "/payment"))
+                .andRespond(withSuccess("{\"orderId\":\"" + orderId + "\",\"orderNo\":\"ON-1\","
+                        + "\"orderStatus\":\"PENDING_CONFIRMATION\",\"paymentStatus\":\"UNPAID\","
+                        + "\"paymentMethod\":\"COD\",\"intent\":null}", MediaType.APPLICATION_JSON));
+        assertThat(client.orderPayment("t", orderId).intent()).isNull();
+        server.verify();
+    }
+
+    @Test
+    void phuongThucThanhToanChuyenTokenKhachVaBoTruongLa() throws Exception {
+        server.expect(requestTo("http://sales/internal/sales/shop/payment-options"))
+                .andExpect(method(HttpMethod.GET)).andExpect(header("Authorization", "Bearer user-token"))
+                .andRespond(withSuccess("{\"methods\":[{\"method\":\"COD\",\"fulfilments\":[\"DELIVERY\"],\"secret\":1},"
+                        + "{\"method\":\"SEPAY\",\"fulfilments\":[\"PICKUP\",\"DELIVERY\"],\"intentTtlMinutes\":15}],"
+                        + "\"deliveryFee\":30000,\"apiKey\":\"x\"}", MediaType.APPLICATION_JSON));
+        var view = client.paymentOptions("user-token");
+        assertEquals(2, view.methods().size());
+        assertEquals(30000, view.deliveryFee());
+        assertEquals(15, view.methods().get(1).intentTtlMinutes());
+        String out = json.writeValueAsString(view);
+        assertThat(out).doesNotContain("secret", "apiKey");
+        // COD không có intentTtlMinutes thì không xuất hiện
+        assertThat(json.readTree(out).get("methods").get(0).has("intentTtlMinutes")).isFalse();
+        server.verify();
+    }
+
+    @Test
     void danhSachGuiPageSizeVaTokenNguoiDung() {
         server.expect(org.springframework.test.web.client.match.MockRestRequestMatchers.queryParam("page", "0"))
                 .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.queryParam("size", "50"))

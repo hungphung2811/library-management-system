@@ -441,9 +441,9 @@ class MenuWebVisibilityTest {
                 .andExpect(jsonPath("$[0].code").value("home"))
                 .andExpect(jsonPath("$[2].code").value("circulation"));
         mvc.perform(get("/internal/menus/me").with(withModules(T1, true, "LENDING", "SALES")))
-                .andExpect(jsonPath("$.length()").value(5))
-                .andExpect(jsonPath("$[4].code").value("sales"))
-                .andExpect(jsonPath("$[4].children.length()").value(9));
+                .andExpect(jsonPath("$.length()").value(6))
+                .andExpect(jsonPath("$[3].code").value("sales"))
+                .andExpect(jsonPath("$[3].children.length()").value(10));
         mvc.perform(get("/internal/menus/me").with(withModules(T1, false, "SALES")))
                 .andExpect(jsonPath("$.length()").value(2));
         assertThat(repo.items).isEmpty();
@@ -475,7 +475,7 @@ class MenuWebVisibilityTest {
                 .andExpect(jsonPath("$.items.length()").value(DefaultMenus.ENTRIES.size()));
         // Sau khi chép: /me dùng dữ liệu của tenant, vẫn lọc theo module
         mvc.perform(get("/internal/menus/me").with(withModules(T1, true, "LENDING")))
-                .andExpect(jsonPath("$.length()").value(4));
+                .andExpect(jsonPath("$.length()").value(5));
         // Tenant khác không bị đụng
         mvc.perform(get("/internal/menus").with(admin(T2))).andExpect(jsonPath("$.usingDefaults").value(true));
     }

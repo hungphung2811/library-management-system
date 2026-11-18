@@ -277,6 +277,14 @@ class PublicV1ApiTest {
         verifyNoInteractions(shop);
     }
 
+    @Test
+    void datHangSepayBi400PaymentNotEnabledKhongGoiSales() throws Exception {
+        mvc.perform(post("/api/public/v1/orders").with(customer(tenantA)).header("X-Site-Key", KEY)
+                        .contentType(MediaType.APPLICATION_JSON).content(place().replace("BANK_TRANSFER", "SEPAY")))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("PAYMENT_NOT_ENABLED"));
+        verifyNoInteractions(shop);
+    }
+
     // ---------- T-P3: key thiếu/sai/ngưng cùng 404 cùng thân ----------
 
     @Test

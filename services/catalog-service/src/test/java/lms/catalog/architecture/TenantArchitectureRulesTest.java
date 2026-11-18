@@ -14,5 +14,5 @@ class TenantArchitectureRulesTest {
 
     @ArchTest
     static final ArchRule khongCoNativeQueryChuaRa = TenantArchitectureRules.noUnreviewedNativeQueries(
-            "SpringDataBookCopyRepository", "CatalogStatsQueryAdapter");
+            "SpringDataBookCopyRepository", "CatalogStatsQueryAdapter", "NewAuthorsQueryAdapter");
 }

@@ -7,6 +7,7 @@ import lms.customer.shop.client.ShopClient;
 import lms.customer.shop.dto.ShopDtos.CancelOrderRequest;
 import lms.customer.shop.dto.ShopDtos.OrderCountView;
 import lms.customer.shop.dto.ShopDtos.OrderPageView;
+import lms.customer.shop.dto.ShopDtos.OrderPaymentView;
 import lms.customer.shop.dto.ShopDtos.OrderView;
 import lms.customer.shop.dto.ShopDtos.PlaceOrderRequest;
 import lms.customer.storefront.Feature;
@@ -84,6 +85,14 @@ public class OrderController {
                                          Authentication authentication) {
         String token = token(code, authentication);
         return PublicCache.noStore(shop.myOrder(token, orderId(orderId)));
+    }
+
+    /** Mã QR và trạng thái thanh toán của đơn (ADR-0029 3.3); FE hỏi lại theo chu kỳ nên no-store. */
+    @GetMapping("/{orderId}/payment")
+    public ResponseEntity<OrderPaymentView> payment(@PathVariable String code, @PathVariable String orderId,
+                                                    Authentication authentication) {
+        String token = token(code, authentication);
+        return PublicCache.noStore(shop.orderPayment(token, orderId(orderId)));
     }
 
     @PostMapping("/{orderId}/cancellation")

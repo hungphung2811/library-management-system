@@ -16,6 +16,7 @@ Căn cứ: customer-api-data-authorization A1, A18, mục 5.3 phương án C. Đ
 - KHÔNG có `admin`, KHÔNG có `platformAdmin`, kể cả khi tài khoản có role admin hoặc là platform admin (nhân viên đăng nhập ở storefront nhận token hạn chế). Vẫn có `tenantId`, `modules`, `roles`. Phiên storefront bắt buộc có tenant (platform admin không tenant -> 401).
 - `permissions` chỉ gồm khóa thuộc ALLOWLIST cấu hình `lms.identity.token.storefront-permissions` (danh sách phân tách bằng dấu phẩy; mặc định `ShopController/*,TitleController/lookup,ReservationController/mine,ReservationController/cancel`, ADR-0023 mục 4): mục kết thúc `/*` khớp mọi khóa cùng controller, mục khác khớp chính xác. Mọi khóa khác của role (nhân viên, `StorefrontController/*`, quản trị role...) bị loại khỏi claim của token STOREFRONT, cả khi đăng nhập lẫn làm mới. Token kênh STAFF không bị lọc. Admin tenant muốn đặt hàng phải có role mang khóa `ShopController/*`. Cấu hình rỗng (`=`) nghĩa là không khóa nào.
 - Ký và JWKS không đổi.
+- ADR-0029 (thanh toán SePay cho website) KHÔNG đổi allowlist `storefront-permissions`: đặt/hủy đơn dùng lại `ShopController/placeOrder` và `ShopController/cancelMyOrder` (đã thuộc `ShopController/*`); hai endpoint đọc mới (`GET .../orders/{id}/payment`, `GET .../payment-options`) là `@AuthenticatedOnly`, không có khóa mới và không cần migration identity.
 
 ## Token kênh STAFF (lms-api)
 

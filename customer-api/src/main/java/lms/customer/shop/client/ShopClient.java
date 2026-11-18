@@ -4,6 +4,8 @@ import java.util.UUID;
 import lms.customer.shop.dto.ShopDtos.ContactRequestBody;
 import lms.customer.shop.dto.ShopDtos.OrderCountView;
 import lms.customer.shop.dto.ShopDtos.OrderPageView;
+import lms.customer.shop.dto.ShopDtos.OrderPaymentView;
+import lms.customer.shop.dto.ShopDtos.PaymentOptionsView;
 import lms.customer.shop.dto.ShopDtos.OrderView;
 import lms.customer.shop.dto.ShopDtos.PlaceOrderRequest;
 
@@ -23,6 +25,12 @@ public interface ShopClient {
     OrderCountView myOrderCounts(String userToken);
 
     OrderView myOrder(String userToken, UUID orderId);
+
+    /** Thanh toán của đơn ({@code GET /internal/sales/shop/orders/{id}/payment}, ADR-0029 3.1). */
+    OrderPaymentView orderPayment(String userToken, UUID orderId);
+
+    /** Phương thức thanh toán khả dụng ({@code GET /internal/sales/shop/payment-options}). */
+    PaymentOptionsView paymentOptions(String userToken);
 
     OrderView cancelMyOrder(String userToken, UUID orderId, String reason);
 

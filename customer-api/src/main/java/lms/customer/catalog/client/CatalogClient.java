@@ -6,6 +6,7 @@ import lms.customer.catalog.dto.BookDtos.SuggestionView;
 import lms.customer.catalog.dto.BookDtos.BookDetailView;
 import lms.customer.catalog.dto.BookDtos.BookPageView;
 import lms.customer.catalog.dto.BookDtos.BookPreviewView;
+import lms.customer.catalog.dto.BookDtos.BookSummaryView;
 
 /**
  * Cổng sang sales {@code /internal/sales/storefront/**} (StorefrontController). Luôn gọi bằng TOKEN DỊCH VỤ storefront
@@ -22,6 +23,12 @@ public interface CatalogClient {
      */
     BookPageView list(String serviceToken, String keyword, String sort, boolean inStock, String group, int page,
                       int size);
+
+    /**
+     * Thẻ sách theo danh sách id (1..20, không trùng) bằng MỘT lời gọi sales {@code items/by-ids}: giữ thứ tự {@code ids},
+     * id không còn bán bị bỏ qua.
+     */
+    List<BookSummaryView> byIds(String serviceToken, List<UUID> ids);
 
     /** Gợi ý tìm kiếm (ADR-0019): {@code q} đã trim và kiểm 2..50 ký tự, {@code limit} đã chặn 1..8 bởi người gọi. */
     List<SuggestionView> suggestions(String serviceToken, String q, int limit);

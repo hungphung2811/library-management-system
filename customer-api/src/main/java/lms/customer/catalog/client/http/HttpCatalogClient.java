@@ -63,11 +63,25 @@ public class HttpCatalogClient implements CatalogClient {
                 })
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + serviceToken).retrieve().body(UpstreamPage.class));
         List<UpstreamItem> items = body.items() == null ? List.of() : body.items();
-        return new BookPageView(items.stream().map(i -> new BookSummaryView(i.titleId(), i.name(), i.author(),
-                i.price(), i.inStock(), i.hasPreview(), i.subtitle(), i.publicationYear(), i.edition(), i.language(),
-                i.pageCount(), i.format(), i.translator(), i.series(), i.seriesNumber(), i.coverImageUrl(),
-                tags(i.tags()), i.workId(), i.workTitle(), i.variantCount(),
-                i.priceFrom())).toList(), body.page(), body.size(), body.total());
+        return new BookPageView(items.stream().map(HttpCatalogClient::summary).toList(), body.page(), body.size(),
+                body.total());
+    }
+
+    @Override
+    public List<BookSummaryView> byIds(String serviceToken, List<UUID> ids) {
+        String joined = ids.stream().map(UUID::toString).collect(java.util.stream.Collectors.joining(","));
+        List<UpstreamItem> body = call(() -> client.get()
+                .uri(b -> b.path("/internal/sales/storefront/items/by-ids").queryParam("ids", joined).build())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + serviceToken).retrieve()
+                .body(new ParameterizedTypeReference<List<UpstreamItem>>() { }));
+        return body.stream().filter(i -> i != null && i.titleId() != null).map(HttpCatalogClient::summary).toList();
+    }
+
+    private static BookSummaryView summary(UpstreamItem i) {
+        return new BookSummaryView(i.titleId(), i.name(), i.author(), i.price(), i.inStock(), i.hasPreview(),
+                i.subtitle(), i.publicationYear(), i.edition(), i.language(), i.pageCount(), i.format(),
+                i.translator(), i.series(), i.seriesNumber(), i.coverImageUrl(), tags(i.tags()), i.workId(),
+                i.workTitle(), i.variantCount(), i.priceFrom());
     }
 
     @Override

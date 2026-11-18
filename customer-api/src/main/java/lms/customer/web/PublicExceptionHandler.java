@@ -48,6 +48,7 @@ public class PublicExceptionHandler {
     static final Map<String, String> FORWARDED_CODES = Map.ofEntries(
             Map.entry("INSUFFICIENT_STOCK", "Không đủ hàng trong kho"),
             Map.entry("ORDER_NOT_FOUND", "Không tìm thấy đơn hàng"),
+            Map.entry("PAYMENT_NOT_ENABLED", "Phương thức thanh toán này hiện không khả dụng"),
             Map.entry("ORDER_STATE_CONFLICT", "Trạng thái đơn hàng không cho phép thao tác này"),
             Map.entry("CLIENT_REQUEST_CONFLICT", "Mã yêu cầu đã được dùng cho một đơn hàng khác"),
             Map.entry("IDEMPOTENCY_KEY_REUSED", "Mã yêu cầu này đã được dùng cho một đơn có nội dung khác"),
@@ -85,6 +86,7 @@ public class PublicExceptionHandler {
             "CONTACT_REQUEST_INVALID", "VALIDATION_FAILED",
             // sales: dữ liệu đơn sai (gồm clientRequestId không phải UUID) và mặt hàng không có/chưa đưa vào bán.
             "INVALID_REQUEST", "VALIDATION_FAILED",
+            "PAYMENT_INTENT_NOT_FOUND", "ORDER_NOT_FOUND",
             "STOCK_ITEM_NOT_FOUND", "BOOK_NOT_FOUND",
             "STOCK_ITEM_NOT_REGISTERED", "TITLE_NOT_AVAILABLE",
             // identity trả READER_NOT_FOUND khi người dùng chưa có thẻ; đổi tên để FE phân biệt với lỗi tài khoản.

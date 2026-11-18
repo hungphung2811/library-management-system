@@ -18,6 +18,7 @@ customer-api viết, không chép thông điệp nội bộ.
 | GET | `/public/t/{code}/books` | Danh mục sách đang bán (query `keyword?, page?, size?`, size tối đa 50) | `max-age=30, public` |
 | GET | `/public/t/{code}/books/{bookRef}` | Chi tiết sách | `max-age=30, public` |
 | GET | `/public/t/{code}/books/{bookRef}/preview` | Đoạn đọc thử | `max-age=60, public` |
+| GET | `/public/t/{code}/authors/featured` | Tác giả nổi bật `[{name}]`, tối đa 5 (xem mục dưới) | `max-age=60, public` |
 | POST | `/public/t/{code}/auth/signup` | Đăng ký tài khoản khách, 201 không thân | `no-store` |
 | POST | `/public/t/{code}/auth/login` | Đăng nhập khách theo tenant của đường dẫn | `no-store` |
 | POST | `/public/t/{code}/auth/refresh` | Làm mới phiên, identity kiểm token thuộc đúng cửa hàng (khuyến nghị) | `no-store` |
@@ -27,7 +28,9 @@ customer-api viết, không chép thông điệp nội bộ.
 | POST | `/public/t/{code}/orders` | Đặt hàng (cần đăng nhập) | `no-store` |
 | GET | `/public/t/{code}/orders` | Đơn của tôi (cần đăng nhập, `page?`, `size?` tối đa 50) | `no-store` |
 | GET | `/public/t/{code}/orders/{orderId}` | Một đơn của tôi (cần đăng nhập) | `no-store` |
-| POST | `/public/t/{code}/orders/{orderId}/cancellation` | Hủy đơn đang chờ xác nhận (cần đăng nhập) | `no-store` |
+| POST | `/public/t/{code}/orders/{orderId}/cancellation` | Hủy đơn đang chờ xác nhận hoặc đang chờ thanh toán (cần đăng nhập) | `no-store` |
+| GET | `/public/t/{code}/orders/{orderId}/payment` | Trạng thái thanh toán của đơn của tôi, kèm QR SePay (cần đăng nhập, ADR-0029, xem "Thanh toán online qua SePay") | `no-store` |
+| GET | `/public/t/{code}/payment-options` | Phương thức thanh toán cửa hàng đang mở (cần đăng nhập, ADR-0029) | `no-store` |
 | GET | `/public/t/{code}/me/borrowings` | Phiếu mượn của tôi (cần đăng nhập, module LENDING) | `no-store` |
 | GET | `/public/t/{code}/me/borrowings/{borrowingId}` | Một phiếu mượn của tôi | `no-store` |
 | GET | `/public/t/{code}/me/fines` | Phạt của tôi | `no-store` |
@@ -118,6 +121,14 @@ Phản hồi chỉ có các trường sau (test so tập tên trường); KHÔNG
 `bookRef` là UUID (chính là `titleId` khi đặt hàng). `price` là số nguyên VND. `bookRef` sai định dạng hoặc sách không có/không
 đang bán: `404 BOOK_NOT_FOUND`. Văn bản thuần: hiển thị bằng `textContent`, không `innerHTML`.
 
+#### Tác giả nổi bật
+
+`GET /public/t/{code}/authors/featured` -> `200 [{"name":"..."}]`, tối đa 5 phần tử, `Cache-Control: max-age=60, public`. Chỉ có trường `name` (không số lượng bán, doanh thu hay id). Cửa hàng không khả dụng: `404 SHOP_NOT_AVAILABLE` (module SHOP), không gọi catalog/sales. Thuật toán (cùng khoảng 90 ngày):
+1. Lấy tác giả có ấn bản mới trong 90 ngày từ catalog (`GET /internal/books/new-authors`, mới nhất trước); rỗng thì trả `[]`.
+2. Lấy 100 đầu sách bán chạy từ sales (`GET /internal/sales/storefront/top-sold`), tra tác giả bằng MỘT lời gọi lô `POST /internal/books/lookup`, cộng số lượng theo tác giả (so khớp bỏ khoảng trắng đầu/cuối và không phân biệt hoa thường).
+3. Kết quả là các tác giả của bước 1 xếp theo số lượng bán giảm dần, hòa theo thứ tự mới nhất trước, lấy 5; tác giả chưa bán được (số lượng 0) điền vào chỗ trống ở cuối. Trả tên hiển thị gốc từ catalog.
+Lỗi sales/catalog đi qua bộ xử lý lỗi chung (503 `SERVICE_UNAVAILABLE`), không hạ cấp.
+
 #### Gộp biến thể theo tác phẩm (ADR-0026, pha 2c)
 
 Chỉ THÊM, tương thích ngược; chi tiết ở `docs/api/sales.md` mục "Storefront gộp biến thể".
@@ -135,7 +146,7 @@ viên (thiếu `aud` lms-storefront) hoặc token dịch vụ: `401`. Token củ
 `POST /public/t/{code}/orders` body (chỉ các trường này; giá, giảm giá, phí ship, trạng thái, người dùng, tenant do server tính, trường lạ bị bỏ qua):
 
 ```json
-{"lines":[{"titleId":"<uuid>","quantity":1}],"fulfilment":"PICKUP|DELIVERY","paymentMethod":"BANK_TRANSFER|COD|CASH",
+{"lines":[{"titleId":"<uuid>","quantity":1}],"fulfilment":"PICKUP|DELIVERY","paymentMethod":"BANK_TRANSFER|COD|CASH|SEPAY",
  "recipient":{"name":"..","phone":"..","address":".."},"clientRequestId":"<uuid>"}
 ```
 
@@ -145,10 +156,26 @@ Phản hồi `201` + `Location`, đơn:
 
 `{id, orderNo, status, paymentStatus, paymentMethod, fulfilment, recipient{name,phone,address}, currency, subtotal, discountTotal,
 vatTotal, shippingFee, grandTotal, createdAt, confirmedAt, paidAt, completedAt, cancelledAt, lines[{titleId, titleName, quantity,
-unitPrice, lineTotal}], cancellable}`. `cancellable = (status == PENDING_CONFIRMATION)`.
+unitPrice, lineTotal}], cancellable}`. `cancellable = (status == AWAITING_PAYMENT) || (status == PENDING_CONFIRMATION && paymentStatus == UNPAID)` (ADR-0029; trước đây chỉ `status == PENDING_CONFIRMATION`). Đơn đã `PAID` thì `cancellable=false`: khách liên hệ cửa hàng.
 
 `GET /orders?page&size` trả `{items:[đơn], page, size, total}` (size tối đa 50). `POST /orders/{id}/cancellation` body tùy chọn
 `{reason?<=500}`: `409 ORDER_STATE_CONFLICT` nếu đã qua bước chờ xác nhận. Đơn của người khác hoặc id sai định dạng: `404 ORDER_NOT_FOUND`.
+
+#### Thanh toán online qua SePay (ADR-0029, ⚠️ đang cài đặt, chưa kiểm chứng)
+
+- `paymentMethod=SEPAY` đi được với `PICKUP` và `DELIVERY`; đơn trả về `status=AWAITING_PAYMENT`, `paymentStatus=UNPAID`, `shippingFee` đã chốt lúc đặt (phí cố định của cửa hàng, không đổi sau khi trả). Tắt cổng cho website: `400 PAYMENT_NOT_ENABLED` ("Phương thức thanh toán này hiện không khả dụng"). QR/MOMO/CARD: `400 VALIDATION_FAILED`.
+- `GET /public/t/{code}/orders/{orderId}/payment` trả `OrderPaymentView` (danh sách trường đóng, test so tập tên trường):
+  `{orderId, orderNo, orderStatus, paymentStatus, paymentMethod, intent}`; `intent` là `null` với đơn không qua cổng, còn lại
+  `{status: PENDING|PAID|EXPIRED|CANCELLED, provider: "SEPAY", qrPayload, amount, currency: "VND", reference, expiresAt, paidAt}`.
+  `qrPayload` (chuỗi VietQR, FE dựng ảnh QR) chỉ có khi `intent.status=PENDING`, trạng thái khác là `null`; `reference` luôn có (mã `LMS…` khách đưa cho cửa hàng khi khiếu nại). KHÔNG có `tenantId`, id lệnh, mã giao dịch cổng, `version`.
+- Quyền sở hữu: chỉ đơn của chính khách; đơn của người khác, không tồn tại hoặc `orderId` không phải UUID: `404 ORDER_NOT_FOUND` cùng thân (id sai định dạng không gọi sales). Token cửa hàng khác: `403 SHOP_SESSION_MISMATCH`. Phản hồi `Cache-Control: no-store`.
+- Thăm dò: FE gọi mỗi 3 giây khi lệnh còn `PENDING`, dừng khi trạng thái cuối, khi quá `expiresAt` hoặc tab bị ẩn. Mỗi lần gọi có thể làm sales hỏi cổng SePay, nhưng sales hãm (tối đa 1 lần/5 giây/lệnh) nên FE vẫn nhận phản hồi ngay từ DB. nginx giới hạn `public_poll` 2 yêu cầu/giây/IP, burst 10; vượt thì 429 do nginx, FE giãn nhịp.
+- Hạn thanh toán mặc định 15 phút (đồng thời là hạn giữ tồn); hết hạn đơn tự `CANCELLED` và tồn được nhả. Khách muốn đặt lại phải sinh `clientRequestId` mới (cùng khóa và cùng nội dung luôn trả đơn cũ, kể cả đã hết hạn/hủy).
+- Khi cổng báo đã nhận tiền: đơn thành `PENDING_CONFIRMATION` + `PAID` (nhân viên xác nhận/giao như đơn online thường).
+- `POST .../cancellation` với đơn `AWAITING_PAYMENT`: hủy đơn và lệnh, nhả tồn; nếu cổng vừa báo đã nhận tiền thì `409 ORDER_STATE_CONFLICT` (FE đọc lại đơn). Đơn đã `PAID`: `409 ORDER_STATE_CONFLICT`.
+- `GET /public/t/{code}/payment-options` trả `{methods:[{method, fulfilments[], intentTtlMinutes?}], deliveryFee}`; `SEPAY` chỉ có trong `methods` khi cửa hàng/hệ thống đã bật. FE dùng danh sách này để hiện lựa chọn thay vì tự đoán.
+- Cả hai route GET mới chỉ cần đăng nhập storefront (không có khóa phân quyền riêng, không đổi allowlist token, xem `token-audience.md`).
+- `/api/public/v1/orders` (ADR-0027): chưa hỗ trợ SEPAY, `paymentMethod=SEPAY` bị chặn `400 PAYMENT_NOT_ENABLED`.
 
 Mã lỗi nghiệp vụ thêm: `409 INSUFFICIENT_STOCK` (`details` chỉ có `titleId=<uuid>`, không có số tồn), `409 CLIENT_REQUEST_CONFLICT`,
 `409 TITLE_NOT_AVAILABLE`, `404 ORDER_NOT_FOUND`, `409 ORDER_STATE_CONFLICT`, `404 BOOK_NOT_FOUND`. `403 FORBIDDEN` có thông điệp cố định (không lộ tên khóa).
@@ -229,6 +256,7 @@ customer-api quyết CORS theo `Origin` và `{code}`; nginx chuyển nguyên `Or
 |---|---|---|
 | 400 | `VALIDATION_FAILED` | Body sai/thiếu/quá dài, JSON hỏng, `businessType` lạ, email sai. Không kèm giá trị bị từ chối; `details` chỉ có tên trường và quy tắc. Mã 400 `VALIDATION_ERROR` và `CONTACT_REQUEST_INVALID` của system-service cũng ra mã này (không có `details`) |
 | 400 | `CONSENT_REQUIRED` | Chưa đồng ý xử lý dữ liệu |
+| 400 | `PAYMENT_NOT_ENABLED` | Phương thức thanh toán (SEPAY) chưa được bật cho website, hoặc đặt SEPAY qua `/api/public/v1/orders` (ADR-0029) |
 | 413 | `PAYLOAD_TOO_LARGE` | Thân request lớn hơn 16 KB (kiểm theo `Content-Length` ở `/public/**`, trước khi đọc thân) |
 | 400 | `REQUEST_REJECTED` | Service phía sau từ chối bằng mã không nằm trong danh sách cho phép |
 | 401 | `LOGIN_FAILED` | Đăng nhập thất bại (gộp sai mật khẩu, không có tài khoản, không thuộc tenant, tài khoản bị khóa/vô hiệu) |
@@ -270,6 +298,7 @@ Mọi phản hồi lỗi có `Cache-Control: no-store`. Mã nghiệp vụ của 
 | `POST /public/t/{code}/auth/verify-email` và `/auth/resend-verification` | chưa có vùng riêng (hiện rơi vào `public_read`) | ⚠️ Đề xuất location regex `public_form` burst 5 trong `infrastructure/nginx/nginx.conf` (chưa thêm, file đang có thay đổi của phiên khác). Trần thật nằm ở identity: lượt thử sai theo OTP, giãn cách và trần gửi lại theo tài khoản |
 | `POST /public/t/{code}/contact-requests` | `public_form` | 5 yêu cầu/phút, burst 3 (thân tối đa 16 KB; nginx không thêm CORS) |
 | `POST /public/t/{code}/orders[/...]` | `public_order` | 20 yêu cầu/phút, burst 10 (chỉ tính POST, gồm hủy đơn; thân tối đa 64 KB). Lớp ngoài cùng theo IP; giới hạn theo khách và theo cửa hàng làm ở sales-service bằng Redis (`ORDER_RATE_LIMITED`) |
+| `GET /public/t/{code}/orders/{orderId}/payment` | `public_poll` | 2 yêu cầu/giây, burst 10 (theo IP, thăm dò thanh toán 3 giây/lần, ADR-0029; location đặt trước `/orders`). ⚠️ Số đề xuất, chưa đo |
 | `POST /public/t/{code}/auth/login` | `login` | 10 yêu cầu/phút, burst 5 (preflight OPTIONS cũng tính vào vùng này) |
 | Mọi `/public/t/{code}/**` | `public_tenant` | 50 yêu cầu/giây, burst 100 theo `{code}` (mọi IP cộng dồn, bảo vệ backend; mã sai dạng/chữ hoa dồn một khóa chung; số chờ đo P-O2) |
 

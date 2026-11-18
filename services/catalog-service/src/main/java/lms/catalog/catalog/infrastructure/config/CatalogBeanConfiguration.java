@@ -105,6 +105,12 @@ public class CatalogBeanConfiguration {
     }
 
     @Bean
+    lms.catalog.catalog.application.ListNewAuthorsUseCase listNewAuthorsUseCase(
+            lms.catalog.catalog.application.NewAuthorsQuery query) {
+        return new lms.catalog.catalog.application.ListNewAuthorsUseCase(query, java.time.Clock.systemUTC());
+    }
+
+    @Bean
     SearchTitlesUseCase searchTitlesUseCase(TitleRepository repository, CopyAvailabilityQuery availability,
                                             TitleResponseAssembler assembler, WorkRepository works) {
         return new SearchTitlesUseCase(repository, availability, assembler, works);

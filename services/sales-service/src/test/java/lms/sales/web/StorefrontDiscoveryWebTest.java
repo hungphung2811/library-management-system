@@ -142,4 +142,44 @@ class StorefrontDiscoveryWebTest {
         mvc.perform(get(B + "/suggestions?q=ab").with(withKey("StorefrontController/suggestions")))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    void byIdsGiuThuTuBoIdKhongBanVaGopTrung() throws Exception {
+        var svc = storefrontService(TENANT, List.of("SALES"));
+        UUID a = book("ByIds A", 10_000, 1);
+        UUID b = book("ByIds B", 20_000, 0);
+        UUID unknown = UUID.randomUUID();
+        mvc.perform(get(B + "/items/by-ids").param("ids", b + "," + unknown + "," + a + "," + b).with(svc))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].titleId").value(b.toString()))
+                .andExpect(jsonPath("$[0].inStock").value(false))
+                .andExpect(jsonPath("$[1].titleId").value(a.toString()))
+                .andExpect(jsonPath("$[1].inStock").value(true));
+    }
+
+    @Test
+    void byIdsSaiDinhDangHoacQua20LaInvalidRequest() throws Exception {
+        var svc = storefrontService(TENANT, List.of("SALES"));
+        mvc.perform(get(B + "/items/by-ids").param("ids", "khong-phai-uuid").with(svc))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+        mvc.perform(get(B + "/items/by-ids").with(svc)).andExpect(status().isBadRequest());
+        String many = java.util.stream.IntStream.range(0, 21).mapToObj(i -> UUID.randomUUID().toString())
+                .collect(java.util.stream.Collectors.joining(","));
+        mvc.perform(get(B + "/items/by-ids").param("ids", many).with(svc)).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+        String twenty = java.util.stream.IntStream.range(0, 20).mapToObj(i -> UUID.randomUUID().toString())
+                .collect(java.util.stream.Collectors.joining(","));
+        mvc.perform(get(B + "/items/by-ids").param("ids", twenty).with(svc)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void byIdsThieuModuleHoacTenantBiChan() throws Exception {
+        String id = UUID.randomUUID().toString();
+        mvc.perform(get(B + "/items/by-ids").param("ids", id).with(storefrontService(TENANT, List.of("LENDING"))))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("MODULE_NOT_ENABLED"));
+        mvc.perform(get(B + "/items/by-ids").param("ids", id).with(storefrontService(null, List.of("SALES"))))
+                .andExpect(status().isForbidden());
+    }
 }

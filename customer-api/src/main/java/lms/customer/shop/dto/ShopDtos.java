@@ -1,6 +1,7 @@
 package lms.customer.shop.dto;
 
 import jakarta.validation.Valid;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -30,7 +31,9 @@ public final class ShopDtos {
 
     /** Thanh toán đơn online (CARD không đặt online được). COD chỉ với DELIVERY, CASH chỉ với PICKUP (sales kiểm). */
     public enum PaymentMethod {
-        BANK_TRANSFER, COD, CASH
+        BANK_TRANSFER, COD, CASH,
+        /** Thanh toán online qua SePay (ADR-0029): đơn vào AWAITING_PAYMENT. Chỉ nhận ở /public/t/{code}; v1 từ chối. */
+        SEPAY
     }
 
     public record LineRequest(@NotNull UUID titleId, @NotNull @Min(1) Integer quantity) {
@@ -91,6 +94,28 @@ public final class ShopDtos {
 
     /** Số đơn của khách (huy hiệu header): {@code total} mọi trạng thái, {@code pending} đang chờ xác nhận. */
     public record OrderCountView(long total, long pending) {
+    }
+
+    /**
+     * Lệnh thanh toán của đơn (ADR-0029 3.1). ALLOWLIST: KHÔNG có tenantId, id lệnh, providerTxnId, transactionRef,
+     * tendered/changeDue, version. {@code qrPayload} chỉ có khi lệnh còn PENDING.
+     */
+    public record PaymentIntentView(String status, String provider, String qrPayload, long amount, String currency,
+                                    String reference, Instant expiresAt, Instant paidAt) {
+    }
+
+    /** Trạng thái thanh toán của một đơn; {@code intent} null với đơn không qua cổng thanh toán. */
+    public record OrderPaymentView(UUID orderId, String orderNo, String orderStatus, String paymentStatus,
+                                   String paymentMethod, PaymentIntentView intent) {
+    }
+
+    /** Một phương thức thanh toán khả dụng và các hình thức nhận hàng đi kèm. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record PaymentMethodOption(String method, List<String> fulfilments, Integer intentTtlMinutes) {
+    }
+
+    /** Phương thức thanh toán khả dụng và phí ship cố định của cửa hàng. */
+    public record PaymentOptionsView(List<PaymentMethodOption> methods, long deliveryFee) {
     }
 
     /** Chủ đề liên hệ (khớp ContactTopic của sales). */

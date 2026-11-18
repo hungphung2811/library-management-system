@@ -114,9 +114,10 @@ class DefaultMenusTest {
         assertThat(codes(getMy.execute(T1, viewer(false, Set.of("SalesOrderController/search"), "SALES"))))
                 .containsExactly("home", "catalog", "sales");
         List<MenuNode> both = getMy.execute(T1, viewer(true, Set.of(), "LENDING", "SALES"));
-        assertThat(codes(both)).containsExactly("home", "catalog", "circulation", "admin", "sales");
-        assertThat(codes(both.get(4).children())).containsExactly("sales-pos", "sales-orders", "sales-contacts",
-                "sales-refunds", "sales-stock", "sales-receipts", "sales-suppliers", "sales-audit", "sales-settings");
+        assertThat(codes(both)).containsExactly("home", "catalog", "circulation", "sales", "reports", "admin");
+        assertThat(codes(both.get(3).children())).containsExactly("sales-pos", "sales-orders", "sales-contacts",
+                "sales-refunds", "sales-stock", "sales-receipts", "sales-suppliers", "sales-audit", "sales-banners",
+                "sales-settings");
     }
 
     @Test
@@ -129,7 +130,7 @@ class DefaultMenusTest {
     @Test
     void adminBiLocModuleTrenBoMacDinh() {
         assertThat(codes(getMy.execute(T1, viewer(true, Set.of(), "LENDING")))).doesNotContain("sales");
-        assertThat(codes(getMy.execute(T1, viewer(true, Set.of())))).containsExactly("home", "catalog", "admin");
+        assertThat(codes(getMy.execute(T1, viewer(true, Set.of())))).containsExactly("home", "catalog", "reports", "admin");
     }
 
     @Test
@@ -193,6 +194,6 @@ class DefaultMenusTest {
     void sauKhiChepMeVoiAdminDungDuLieuTenantVaVanLocTheoModule() {
         init.execute(T1);
         assertThat(codes(getMy.execute(T1, viewer(true, Set.of(), "LENDING"))))
-                .containsExactly("home", "catalog", "circulation", "admin");
+                .containsExactly("home", "catalog", "circulation", "reports", "admin");
     }
 }

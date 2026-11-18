@@ -6,6 +6,7 @@ import lms.sales.reporting.application.SalesOrderReportPort;
 import lms.sales.reporting.application.SalesStatsQueryPort;
 import lms.sales.reporting.application.SalesStatsUseCases;
 import lms.sales.reporting.application.StockCsvReportUseCase;
+import lms.sales.reporting.application.StorefrontTopSoldUseCase;
 import lms.sales.settings.application.GetSalesSettingsUseCase;
 import lms.sales.stock.application.CatalogLookupPort;
 import lms.sales.stock.application.StockPort;
@@ -21,6 +22,11 @@ public class ReportingBeanConfiguration {
     SalesStatsUseCases salesStatsUseCases(SalesStatsQueryPort query, StockPort stock, GetSalesSettingsUseCase settings,
                                           CatalogLookupPort catalog, Clock clock) {
         return new SalesStatsUseCases(query, stock, settings, catalog, clock);
+    }
+
+    @Bean
+    StorefrontTopSoldUseCase storefrontTopSoldUseCase(SalesStatsQueryPort query, Clock clock) {
+        return new StorefrontTopSoldUseCase(query, clock);
     }
 
     @Bean

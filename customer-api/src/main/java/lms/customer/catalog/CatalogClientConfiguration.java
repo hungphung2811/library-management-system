@@ -1,5 +1,6 @@
 package lms.customer.catalog;
 
+import lms.customer.author.client.TopSoldClient;
 import lms.customer.catalog.client.CatalogClient;
 import lms.customer.catalog.client.http.HttpCatalogClient;
 import lms.customer.config.ServiceClients;
@@ -12,5 +13,10 @@ public class CatalogClientConfiguration {
     @Bean
     CatalogClient catalogClient(ServiceClients clients) {
         return new HttpCatalogClient(clients.create(ServiceClients.SALES, clients.urls().salesUrl()));
+    }
+
+    @Bean
+    FeaturedBooks featuredBooks(CatalogClient catalog, TopSoldClient sales) {
+        return new FeaturedBooks(catalog, sales);
     }
 }

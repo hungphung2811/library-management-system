@@ -43,8 +43,12 @@ public class SecurityConfiguration {
             AntPathRequestMatcher.antMatcher(HttpMethod.HEAD, "/public/t/*/books"),
             AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/public/t/*/books/suggestions"),
             AntPathRequestMatcher.antMatcher(HttpMethod.HEAD, "/public/t/*/books/suggestions"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/public/t/*/books/featured"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.HEAD, "/public/t/*/books/featured"),
             AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/public/t/*/banners"),
             AntPathRequestMatcher.antMatcher(HttpMethod.HEAD, "/public/t/*/banners"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/public/t/*/authors/featured"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.HEAD, "/public/t/*/authors/featured"),
             AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/public/t/*/books/*"),
             AntPathRequestMatcher.antMatcher(HttpMethod.HEAD, "/public/t/*/books/*"),
             AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/public/t/*/books/*/preview"),
@@ -67,6 +71,9 @@ public class SecurityConfiguration {
             AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/public/t/*/orders"),
             AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/public/t/*/orders/*"),
             AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/public/t/*/orders/*/cancellation"),
+            // Thanh toán online qua SePay (ADR-0029 3.3): xem QR/trạng thái thanh toán của đơn và các phương thức khả dụng
+            AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/public/t/*/orders/*/payment"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/public/t/*/payment-options"),
             // Liên hệ của khách gửi cửa hàng (ADR-0015); các phương thức khác trên đường dẫn này vẫn denyAll
             AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/public/t/*/contact-requests"),
             // Cổng độc giả (ADR-0023 2.5): danh sách đóng từng mẫu, KHÔNG dùng /public/t/*/me/**. Hủy đặt trước là POST.

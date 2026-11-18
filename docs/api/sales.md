@@ -171,6 +171,9 @@ Không có `ShopController/listItems` (thiết kế gốc 5.3): danh mục sách
 | GET `/internal/sales/storefront/items` | `StorefrontController/list` | query `{keyword?, page?, size?}` (size tối đa 50, mặc định 20); `{items[{titleId, name, author, price, inStock, hasPreview, subtitle, publicationYear, edition, language, pageCount, format, translator, series, seriesNumber, coverImageUrl, tags}], total, page, size}`; một truy vấn trang + một lời gọi lô tới catalog |
 | GET `/internal/sales/storefront/items/{titleId}` | `StorefrontController/get` | như mục danh sách + `description` (null nếu chưa nhập); không có `previewText`. Các trường bổ sung lấy từ catalog (`docs/api/catalog-title-extra-fields.md`), null/`tags` rỗng nếu chưa nhập |
 | GET `/internal/sales/storefront/items/{titleId}/preview` | `StorefrontController/preview` | `{titleId, name, previewText}` |
+| GET `/internal/sales/storefront/top-sold` | `StorefrontTopSoldController/topSold` | query `{days?, limit?}` (days mặc định 90, chặn 1..365; limit mặc định 100, chặn 1..100; giá trị lạ được chặn, không lỗi); mảng `[{titleId, quantity}]` sắp quantity giảm dần rồi titleId tăng dần |
+
+`top-sold` (customer-api ghép "tác giả nổi bật"): số lượng bán theo đầu sách của đơn đã thanh toán (`paid_at`) trong `days` ngày gần nhất tính cả hôm nay giờ VN, trừ phần đã có phiếu trả hàng (cùng truy vấn với `GET /internal/sales/reporting/top-titles`). Chỉ trả `titleId` và `quantity` (không tên sách, doanh thu, tenant). Controller nằm ở context reporting (không phải `StorefrontController`) để tránh vòng phụ thuộc slice stock/reporting, nên khóa quyền của người dùng thường là `StorefrontTopSoldController/topSold` (chưa seed vào identity; token dịch vụ storefront không cần khóa).
 
 Chỉ mặt hàng `active`; `price` = `sellingPrice` hoặc giá bìa làm tròn đồng; `inStock = available > 0`. KHÔNG bao giờ trả `onHand`, `reserved`, `available`, giá nhập, ngưỡng tồn, `tenant_id`, ISBN. Mặt hàng không có/không active: `404 STOCK_ITEM_NOT_FOUND`. `keyword` lọc theo tên/tác giả bằng `GET /internal/books/lookup?keyword=` của catalog (tối đa 200 đầu sách) rồi giao với mặt hàng đang bán. Lỗi catalog: `503 CATALOG_UNAVAILABLE`. Không có endpoint BFF `lms-api` cho nhóm này: `customer-api` gọi thẳng.
 
@@ -484,3 +487,43 @@ Không webhook, không cần địa chỉ công khai: mỗi lần FE gọi `GET 
 4. my.sepay.vn (Test mode) > Mô phỏng giao dịch: chọn tài khoản test, **Tiền vào**, số tiền **đúng bằng** số tiền đơn (tối thiểu 1.000), **nội dung chứa `reference`** (không phân biệt hoa thường). Lần thăm dò kế tiếp đơn thành `COMPLETED` + `PAID`.
 
 Không khớp thì lệnh giữ PENDING: sai số tiền, nội dung không chứa `reference`, hoặc giao dịch tạo trước lúc tạo lệnh. Một giao dịch SePay chỉ thanh toán một lệnh (mã `SEPAY-<id giao dịch>`, duy nhất theo tenant).
+
+## Thanh toán online cho website qua SePay (ADR-0029)
+
+⚠️ Đang cài đặt (S1 sales, C1 customer-api), chưa kiểm chứng bằng test chạy. Không đổi DB, không migration (V9/V15 đã mở `AWAITING_PAYMENT` và `SEPAY`), không khóa quyền mới.
+
+**Đặt đơn.** `POST /internal/sales/shop/orders` (khóa `ShopController/placeOrder`) nhận thêm `paymentMethod = "SEPAY"` (với `PICKUP` và `DELIVERY`). Đơn `ONLINE` được tạo ở `AWAITING_PAYMENT` + `UNPAID`, giữ tồn, kèm một lệnh `PaymentIntent` PENDING (provider `SEPAY`, `qrPayload` VietQR, `reference` `LMS…`, hạn `app.payments.online.intent-ttl-minutes`, mặc định 15 phút). Đơn giao hàng: phí ship cố định của tenant chốt ngay lúc đặt và nằm trong `grandTotal` (quyết định Q1). Tắt cờ website: `400 PAYMENT_NOT_ENABLED`; QR/MOMO/CARD vẫn `400 INVALID_REQUEST`. `ShopOrderView` KHÔNG đổi tập trường (chỉ có giá trị mới `status=AWAITING_PAYMENT`, `paymentMethod=SEPAY`).
+
+**`GET /internal/sales/shop/orders/{id}/payment`** (`@AuthenticatedOnly`, khóa dự kiến `ShopController/myOrderPayment` nhưng không kiểm khóa): trả `ShopPaymentView` (allowlist, record riêng):
+
+```
+{ orderId, orderNo, orderStatus, paymentStatus, paymentMethod,
+  intent: null | { status: PENDING|PAID|EXPIRED|CANCELLED, provider: "SEPAY",
+                   qrPayload, amount, currency: "VND", reference, expiresAt, paidAt } }
+```
+
+`qrPayload` chỉ có khi lệnh `PENDING`; `reference` luôn có; KHÔNG có `tenantId`, id lệnh, `providerTxnId`, `transactionRef`, `version`. Đơn của người khác hoặc không tồn tại: `404 ORDER_NOT_FOUND` cùng thân. Khi lệnh còn PENDING, lời gọi này làm sales hỏi SePay (qua bộ hãm: mỗi `reference` tối đa 1 lần/5 giây, toàn cục tối đa 2 lần/giây); khớp giao dịch thì lệnh `PAID`.
+
+**`GET /internal/sales/shop/payment-options`** (`@AuthenticatedOnly`): `{"methods":[{"method":"COD","fulfilments":["DELIVERY"]},{"method":"CASH","fulfilments":["PICKUP"]},{"method":"BANK_TRANSFER","fulfilments":["PICKUP","DELIVERY"]},{"method":"SEPAY","fulfilments":["PICKUP","DELIVERY"],"intentTtlMinutes":15}],"deliveryFee":<phí ship cố định>}`. `SEPAY` chỉ có khi `PAYMENTS_SEPAY_ENABLED` và `PAYMENTS_ONLINE_SEPAY_ENABLED` cùng bật. Không cache (đọc cài đặt tenant bằng bean gốc).
+
+**Hủy.** `POST /internal/sales/shop/orders/{id}/cancellation` (`ShopController/cancelMyOrder`, có sẵn): đơn `AWAITING_PAYMENT` được hủy cùng lệnh và nhả tồn, sales kiểm cổng một lần trước khi hủy; nếu cổng báo vừa nhận tiền thì ghi PAID và trả `409 ORDER_STATE_CONFLICT`. Khách KHÔNG tự hủy đơn đã `PAID` (`409 ORDER_STATE_CONFLICT`, liên hệ cửa hàng; quyết định Q2). Nhân viên hủy đơn đã PAID thì hệ thống tạo `Refund` như hiện nay. Hết hạn thanh toán: `ExpirePaymentIntentsJob` (60 giây/lần) kiểm cổng lần cuối rồi đặt lệnh `EXPIRED`, đơn `CANCELLED`, nhả tồn.
+
+**Trạng thái sau khi PAID.** Đơn online qua cổng thành `PENDING_CONFIRMATION` + `PAID` (KHÔNG `COMPLETED`, không trừ kho thật; tồn vẫn ở `reserved` tới lúc giao như đơn online thường), audit `ORDER_PAID`. Nhân viên xác nhận/giao tiếp như đơn online khác. `confirm` với đơn đã PAID: phí ship bị khóa, gửi phí khác phí hiện có thì `409 ORDER_STATE_CONFLICT`. Đơn `AWAITING_PAYMENT` đếm vào trần đơn chờ của khách (chống lạm dụng) nhưng KHÔNG vào thống kê CMS "đơn chờ xác nhận".
+
+**Cấu hình môi trường của sales-service** (khối dưới `app.payments`, không đặt secret trong repo):
+
+| Biến | Mặc định | Ghi chú |
+|---|---|---|
+| `PAYMENTS_SEPAY_ENABLED` | `false` | Bật bean cổng SePay (ADR-0028) |
+| `PAYMENTS_SEPAY_TOKEN` | rỗng | Token Test mode (my.sepay.vn > Test mode > API Access), bắt buộc khi bật, không commit |
+| `PAYMENTS_SEPAY_BANK_BIN`, `PAYMENTS_SEPAY_ACCOUNT_NO` | rỗng | Tài khoản ngân hàng Test mode, bắt buộc khi bật |
+| `PAYMENTS_SEPAY_ACCOUNT_NAME` | `LMS SEPAY TEST` | In vào VietQR |
+| `PAYMENTS_SEPAY_BANK_ACCOUNT_ID`, `PAYMENTS_SEPAY_ENDPOINT` | rỗng / sandbox | Như ADR-0028 |
+| `PAYMENTS_ONLINE_SEPAY_ENABLED` (mới) | `false` | Mở SEPAY cho website; chỉ có tác dụng khi bean SePay đã bật |
+| `PAYMENTS_ONLINE_INTENT_TTL_MINUTES` (mới) | `15` | Hạn lệnh và hạn giữ tồn của đơn online |
+| `PAYMENTS_SEPAY_MIN_QUERY_INTERVAL_MS` (mới) | `5000` | Hãm hỏi SePay theo lệnh |
+| `PAYMENTS_SEPAY_MAX_QPS` (mới) | `2` | Hãm hỏi SePay toàn cục (SePay giới hạn 3 yêu cầu/giây/IP) |
+
+**Cách thử (Test mode).** Mọi tenant dùng chung MỘT tài khoản SePay Test mode cấu hình toàn hệ thống (quyết định Q3; chỉ dev/thử, không bật kiểu này ở production). (1) Bật 4 biến đầu và `PAYMENTS_ONLINE_SEPAY_ENABLED=true`, khởi động lại sales-service. (2) Đăng nhập website, chọn "Chuyển khoản qua SePay" (từ `payment-options`), đặt đơn: trang hiện QR và mã `LMS…`. (3) my.sepay.vn (Test mode) > Mô phỏng giao dịch: đúng tài khoản Test mode, **Tiền vào**, số tiền **đúng bằng** `amount`, nội dung **chứa** `reference`. (4) Trong khoảng 3-8 giây (thăm dò 3 giây cộng hãm 5 giây) trang chuyển "Đã thanh toán", ở CMS đơn là `PENDING_CONFIRMATION` + `PAID`. Sai số tiền hoặc thiếu mã thì lệnh giữ PENDING rồi hết hạn sau 15 phút. Quét QR bằng app ngân hàng thật KHÔNG chuyển được tiền (tài khoản Test mode).
+
+⚠️ Giới hạn đã biết: tiền về sau khi lệnh đã hết hạn/hủy không được khớp tự động (cần job đối soát, chưa thiết kế); bộ hãm theo instance (hiện một instance sales).

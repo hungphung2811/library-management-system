@@ -203,6 +203,34 @@ public class StorefrontQueryUseCases {
         return new PageResult<>(pageEntries.stream().map(Entry::view).toList(), all.size(), p, s);
     }
 
+    /**
+     * Thẻ sách theo danh sách id (carousel "nổi bật"): một truy vấn mặt hàng đang bán + một lời gọi lô tới catalog (không
+     * N+1). Giữ thứ tự {@code ids}, id trùng gộp, bỏ qua id không còn bán hoặc không có giá hiệu lực. Chế độ EDITION.
+     */
+    public List<ItemView> listByIds(UUID tenantId, List<UUID> ids) {
+        List<UUID> distinct = ids == null ? List.of() : ids.stream().filter(Objects::nonNull).distinct().toList();
+        if (distinct.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, StorefrontRow> rows = stock.findStorefrontRows(tenantId, distinct);
+        if (rows.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, CatalogTitle> titles = catalog.lookup(distinct.stream().filter(rows::containsKey).toList());
+        List<ItemView> views = new ArrayList<>();
+        List<StorefrontRow> shownRows = new ArrayList<>();
+        for (UUID id : distinct) {
+            StorefrontRow r = rows.get(id);
+            CatalogTitle t = titles.get(id);
+            if (r != null && t != null && priceOf(r, t) != null) {
+                views.add(view(r, t));
+                shownRows.add(r);
+            }
+        }
+        healSnapshots(tenantId, shownRows, titles);
+        return views;
+    }
+
     public ItemDetailView get(UUID tenantId, UUID titleId) {
         StorefrontRow row = activeRow(tenantId, titleId);
         CatalogTitle t = catalog.lookup(List.of(titleId)).get(titleId);

@@ -3,6 +3,7 @@ package lms.sales.stock.infrastructure.web;
 import java.util.List;
 import java.util.UUID;
 import lms.sales.shared.application.PageResult;
+import lms.sales.shared.domain.SalesException;
 import lms.sales.shared.infrastructure.web.RequestSupport;
 import lms.sales.stock.application.StorefrontQueryUseCases;
 import lms.security.permission.RequiresModule;
@@ -34,6 +35,12 @@ public class StorefrontController {
     public record SuggestionQuery(String q, Integer limit) {
     }
 
+    static final int MAX_BY_IDS = 20;
+
+    /** {@code ids}: uuid phân tách bằng dấu phẩy, tối đa 20. */
+    public record ByIdsQuery(String ids) {
+    }
+
     private final StorefrontQueryUseCases storefront;
 
     public StorefrontController(StorefrontQueryUseCases storefront) {
@@ -51,6 +58,31 @@ public class StorefrontController {
     @GetMapping("/suggestions")
     public List<StorefrontQueryUseCases.SuggestionView> suggestions(SuggestionQuery query) {
         return storefront.suggest(RequestSupport.tenant(), query.q(), query.limit());
+    }
+
+    /** Thẻ sách theo danh sách id phân tách bằng dấu phẩy (tối đa 20), giữ thứ tự, bỏ id không còn bán. */
+    @GetMapping("/items/by-ids")
+    public List<StorefrontQueryUseCases.ItemView> byIds(ByIdsQuery query) {
+        return storefront.listByIds(RequestSupport.tenant(), parseIds(query.ids()));
+    }
+
+    static List<UUID> parseIds(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw SalesException.invalidRequest("ids là bắt buộc");
+        }
+        List<UUID> ids = new java.util.ArrayList<>();
+        for (String part : raw.split(",", -1)) {
+            try {
+                ids.add(UUID.fromString(part.trim()));
+            } catch (IllegalArgumentException e) {
+                throw SalesException.invalidRequest("ids chứa id sai định dạng");
+            }
+        }
+        List<UUID> distinct = ids.stream().distinct().toList();
+        if (distinct.size() > MAX_BY_IDS) {
+            throw SalesException.invalidRequest("ids tối đa " + MAX_BY_IDS + " id");
+        }
+        return distinct;
     }
 
     @GetMapping("/items/{titleId}")

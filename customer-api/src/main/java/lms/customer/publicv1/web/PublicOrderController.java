@@ -8,6 +8,7 @@ import lms.customer.shop.client.ShopClient;
 import lms.customer.shop.dto.ShopDtos.CancelOrderRequest;
 import lms.customer.shop.dto.ShopDtos.OrderPageView;
 import lms.customer.shop.dto.ShopDtos.OrderView;
+import lms.customer.shop.dto.ShopDtos.PaymentMethod;
 import lms.customer.shop.dto.ShopDtos.PlaceOrderRequest;
 import lms.customer.storefront.Feature;
 import lms.customer.storefront.ShopSessionGuard;
@@ -59,6 +60,11 @@ public class PublicOrderController {
                                            @Valid @RequestBody PlaceOrderRequest request,
                                            Authentication authentication) {
         String token = token(siteKey, authentication);
+        if (request.paymentMethod() == PaymentMethod.SEPAY) {
+            // ADR-0029 3.3: v1 chưa có endpoint xem QR, nên không cho tạo đơn chờ thanh toán
+            throw new PublicApiException(HttpStatus.BAD_REQUEST, "PAYMENT_NOT_ENABLED",
+                    "Phương thức thanh toán này hiện không khả dụng");
+        }
         OrderView order = shop.placeOrder(token, request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .location(URI.create("/api/public/v1/orders/" + order.id()))

@@ -9,6 +9,10 @@ import lms.customer.shop.dto.ShopDtos.ContactRequestBody;
 import lms.customer.shop.dto.ShopDtos.OrderLineView;
 import lms.customer.shop.dto.ShopDtos.OrderCountView;
 import lms.customer.shop.dto.ShopDtos.OrderPageView;
+import lms.customer.shop.dto.ShopDtos.OrderPaymentView;
+import lms.customer.shop.dto.ShopDtos.PaymentIntentView;
+import lms.customer.shop.dto.ShopDtos.PaymentMethodOption;
+import lms.customer.shop.dto.ShopDtos.PaymentOptionsView;
 import lms.customer.shop.dto.ShopDtos.OrderView;
 import lms.customer.shop.dto.ShopDtos.PlaceOrderRequest;
 import lms.customer.shop.dto.ShopDtos.RecipientView;
@@ -26,6 +30,7 @@ public class HttpShopClient implements ShopClient {
 
     /** Trạng thái duy nhất khách được hủy (sales kiểm lại; chỉ để FE biết có hiện nút hủy). */
     static final String CANCELLABLE_STATUS = "PENDING_CONFIRMATION";
+    static final String AWAITING_PAYMENT_STATUS = "AWAITING_PAYMENT";
 
     private final RestClient client;
 
@@ -71,6 +76,35 @@ public class HttpShopClient implements ShopClient {
     }
 
     @Override
+    public OrderPaymentView orderPayment(String userToken, UUID orderId) {
+        UpstreamPayment p = client.get().uri("/internal/sales/shop/orders/{id}/payment", orderId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken).retrieve().body(UpstreamPayment.class);
+        if (p == null || p.orderId() == null) {
+            throw PublicApiException.serviceUnavailable();
+        }
+        UpstreamIntent i = p.intent();
+        return new OrderPaymentView(p.orderId(), p.orderNo(), p.orderStatus(), p.paymentStatus(), p.paymentMethod(),
+                i == null ? null : new PaymentIntentView(i.status(), i.provider(), i.qrPayload(), i.amount(),
+                        i.currency(), i.reference(), i.expiresAt(), i.paidAt()));
+    }
+
+    @Override
+    public PaymentOptionsView paymentOptions(String userToken) {
+        UpstreamOptions body = client.get().uri("/internal/sales/shop/payment-options")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken).retrieve().body(UpstreamOptions.class);
+        if (body == null) {
+            throw PublicApiException.serviceUnavailable();
+        }
+        List<UpstreamOption> methods = body.methods() == null ? List.of() : body.methods();
+        return new PaymentOptionsView(
+                methods.stream().filter(m -> m != null && m.method() != null)
+                        .map(m -> new PaymentMethodOption(m.method(),
+                                m.fulfilments() == null ? List.of() : List.copyOf(m.fulfilments()),
+                                m.intentTtlMinutes())).toList(),
+                Math.max(0, body.deliveryFee()));
+    }
+
+    @Override
     public OrderView cancelMyOrder(String userToken, UUID orderId, String reason) {
         return view(client.post().uri("/internal/sales/shop/orders/{id}/cancellation", orderId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken)
@@ -82,6 +116,12 @@ public class HttpShopClient implements ShopClient {
         client.post().uri("/internal/sales/shop/contact-requests")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + userToken)
                 .body(ContactBody.from(request)).retrieve().toBodilessEntity();
+    }
+
+    /** Khách hủy được đơn chờ thanh toán, hoặc đơn chờ xác nhận mà chưa trả tiền (ADR-0029 3.3). */
+    static boolean cancellable(String status, String paymentStatus) {
+        return AWAITING_PAYMENT_STATUS.equals(status)
+                || (CANCELLABLE_STATUS.equals(status) && "UNPAID".equals(paymentStatus));
     }
 
     static OrderView view(UpstreamOrder o) {
@@ -96,7 +136,7 @@ public class HttpShopClient implements ShopClient {
                 o.paidAt(), o.completedAt(), o.cancelledAt(),
                 lines.stream().map(l -> new OrderLineView(l.titleId(), l.titleName(), l.quantity(), l.unitPrice(),
                         l.lineTotal())).toList(),
-                CANCELLABLE_STATUS.equals(o.status()));
+                cancellable(o.status(), o.paymentStatus()));
     }
 
     // ---------- Thân gửi sales (allowlist) ----------
@@ -145,6 +185,20 @@ public class HttpShopClient implements ShopClient {
     }
 
     // ---------- Phản hồi của sales (chỉ đọc các trường này) ----------
+
+    record UpstreamIntent(String status, String provider, String qrPayload, long amount, String currency,
+                          String reference, Instant expiresAt, Instant paidAt) {
+    }
+
+    record UpstreamPayment(UUID orderId, String orderNo, String orderStatus, String paymentStatus,
+                           String paymentMethod, UpstreamIntent intent) {
+    }
+
+    record UpstreamOption(String method, List<String> fulfilments, Integer intentTtlMinutes) {
+    }
+
+    record UpstreamOptions(List<UpstreamOption> methods, long deliveryFee) {
+    }
 
     record UpstreamCounts(long total, long pending) {
     }

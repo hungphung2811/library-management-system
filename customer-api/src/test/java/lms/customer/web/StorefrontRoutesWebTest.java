@@ -43,9 +43,14 @@ import lms.customer.shop.client.ShopClient;
 import lms.customer.shop.dto.ShopDtos.OrderLineView;
 import lms.customer.shop.dto.ShopDtos.OrderPageView;
 import lms.customer.shop.dto.ShopDtos.OrderView;
+import lms.customer.shop.dto.ShopDtos.OrderPaymentView;
+import lms.customer.shop.dto.ShopDtos.PaymentIntentView;
+import lms.customer.shop.dto.ShopDtos.PaymentMethodOption;
+import lms.customer.shop.dto.ShopDtos.PaymentOptionsView;
 import lms.customer.shop.dto.ShopDtos.PlaceOrderRequest;
 import lms.customer.shop.dto.ShopDtos.RecipientView;
 import lms.customer.shop.web.OrderController;
+import lms.customer.shop.web.PaymentOptionsController;
 import lms.customer.site.client.SiteClient;
 import lms.customer.site.web.SiteController;
 import lms.customer.storefront.ShopSessionGuard;
@@ -74,7 +79,7 @@ import org.springframework.web.client.HttpClientErrorException;
  * allowlist). ADR-0011 2.2, 2.4, 2.6, 2.9, 3.3; ADR-0013 2.4.
  */
 @WebMvcTest({SiteController.class, ShopController.class, AuthController.class, BookController.class,
-        OrderController.class})
+        OrderController.class, PaymentOptionsController.class})
 @Import({SecurityConfiguration.class, PublicExceptionHandler.class, ShopSessionGuard.class})
 class StorefrontRoutesWebTest {
 
@@ -306,6 +311,74 @@ class StorefrontRoutesWebTest {
         mvc.perform(get("/public/t/shop-a/orders/abc").with(customer(tenantA)))
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("ORDER_NOT_FOUND"));
         verify(shop, never()).myOrder(any(), any());
+    }
+
+    @Test
+    void thanhToanCuaDonCanDangNhapVaDungPhienCuaHang() throws Exception {
+        mvc.perform(get("/public/t/shop-a/orders/" + orderId + "/payment")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/public/t/shop-a/payment-options")).andExpect(status().isUnauthorized());
+        verifyNoInteractions(shop);
+        mvc.perform(get("/public/t/shop-a/orders/" + orderId + "/payment").with(customer(tenantB)))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("SHOP_SESSION_MISMATCH"));
+        mvc.perform(get("/public/t/shop-a/payment-options").with(customer(tenantB)))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("SHOP_SESSION_MISMATCH"));
+        verifyNoInteractions(shop);
+        // phương thức khác trên đường dẫn thanh toán vẫn đóng
+        mvc.perform(post("/public/t/shop-a/orders/" + orderId + "/payment").with(customer(tenantA)))
+                .andExpect(status().is4xxClientError());
+        verifyNoInteractions(shop);
+    }
+
+    @Test
+    void thanhToanCuaDonNoStoreVaChiCoTruongAllowlist() throws Exception {
+        when(shop.orderPayment("user-token", orderId)).thenReturn(new OrderPaymentView(orderId, "ON-1",
+                "AWAITING_PAYMENT", "UNPAID", "SEPAY", new PaymentIntentView("PENDING", "SEPAY", "https://qr/x", 100,
+                "VND", "ON1", Instant.parse("2026-11-17T01:15:00Z"), null)));
+        String json = mvc.perform(get("/public/t/shop-a/orders/" + orderId + "/payment").with(customer(tenantA)))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
+        JsonNode root = JSON.readTree(json);
+        Set<String> names = new TreeSet<>();
+        root.fieldNames().forEachRemaining(names::add);
+        assertThat(names).containsExactlyInAnyOrder("orderId", "orderNo", "orderStatus", "paymentStatus",
+                "paymentMethod", "intent");
+        Set<String> intent = new TreeSet<>();
+        root.get("intent").fieldNames().forEachRemaining(intent::add);
+        assertThat(intent).containsExactlyInAnyOrder("status", "provider", "qrPayload", "amount", "currency",
+                "reference", "expiresAt", "paidAt");
+        assertThat(json).doesNotContain("tenantId", "providerTxnId", "transactionRef", "tendered", "changeDue", "version");
+    }
+
+    @Test
+    void thanhToanCuaDonOrderIdSaiDinhDangLa404KhongGoiSales() throws Exception {
+        mvc.perform(get("/public/t/shop-a/orders/abc/payment").with(customer(tenantA)))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("ORDER_NOT_FOUND"));
+        verify(shop, never()).orderPayment(any(), any());
+    }
+
+    @Test
+    void loiThanhToanTheoDanhSachChoPhep() throws Exception {
+        when(shop.orderPayment(any(), any())).thenThrow(downstream(HttpStatus.NOT_FOUND,
+                "{\"code\":\"PAYMENT_INTENT_NOT_FOUND\",\"message\":\"nội bộ\"}"));
+        mvc.perform(get("/public/t/shop-a/orders/" + orderId + "/payment").with(customer(tenantA)))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("ORDER_NOT_FOUND"));
+        when(shop.placeOrder(any(), any())).thenThrow(downstream(HttpStatus.BAD_REQUEST,
+                "{\"code\":\"PAYMENT_NOT_ENABLED\",\"message\":\"nội bộ\"}"));
+        mvc.perform(post("/public/t/shop-a/orders").with(customer(tenantA)).contentType(MediaType.APPLICATION_JSON)
+                        .content(place().replace("BANK_TRANSFER", "SEPAY")))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("PAYMENT_NOT_ENABLED"))
+                .andExpect(jsonPath("$.message").value("Phương thức thanh toán này hiện không khả dụng"));
+    }
+
+    @Test
+    void phuongThucThanhToanChuyenTokenKhachVaNoStore() throws Exception {
+        when(shop.paymentOptions("user-token")).thenReturn(new PaymentOptionsView(
+                List.of(new PaymentMethodOption("SEPAY", List.of("PICKUP", "DELIVERY"), 15)), 30000));
+        mvc.perform(get("/public/t/shop-a/payment-options").with(customer(tenantA)))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.deliveryFee").value(30000))
+                .andExpect(jsonPath("$.methods[0].method").value("SEPAY"))
+                .andExpect(jsonPath("$.methods[0].intentTtlMinutes").value(15));
     }
 
     @Test

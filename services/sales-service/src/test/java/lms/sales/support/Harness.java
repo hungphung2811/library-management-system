@@ -580,7 +580,8 @@ public final class Harness {
         public long countPendingOnline(UUID t, UUID customer) {
             return orders.values().stream().filter(o -> customer.equals(o.customerUserId())
                     && o.channel() == lms.sales.ordering.domain.OrderChannel.ONLINE
-                    && o.status() == lms.sales.ordering.domain.OrderStatus.PENDING_CONFIRMATION).count();
+                    && (o.status() == lms.sales.ordering.domain.OrderStatus.PENDING_CONFIRMATION
+                    || o.status() == lms.sales.ordering.domain.OrderStatus.AWAITING_PAYMENT)).count();
         }
 
         public long countCancelledOnlineSince(UUID t, UUID customer, Instant since) {
