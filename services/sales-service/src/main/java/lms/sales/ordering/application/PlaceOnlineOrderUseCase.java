@@ -41,6 +41,7 @@ public class PlaceOnlineOrderUseCase {
         if (existing.isPresent()) {
             return replay(cmd, existing.get());
         }
+        commit.requirePaymentMethodAvailable(cmd.paymentMethod()); // từ chối sớm QR/MoMo, SEPAY khi tắt (ADR-0029)
         checkQuantities(cmd, policies.current(cmd.tenantId()));
         List<UUID> titleIds = cmd.lines().stream().map(PlaceOnlineOrderCommand.Line::titleId).distinct().toList();
         Map<UUID, CatalogTitle> titles = catalog.lookup(titleIds);

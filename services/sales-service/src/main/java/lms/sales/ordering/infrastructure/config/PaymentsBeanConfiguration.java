@@ -11,10 +11,13 @@ import lms.sales.ordering.application.PaymentIntentUseCases;
 import lms.sales.ordering.application.ProcessPaymentWebhookUseCase;
 import lms.sales.ordering.application.SalesOrderRepository;
 import lms.sales.ordering.application.SalesReturnRepository;
+import lms.sales.ordering.application.ShopPaymentUseCases;
 import lms.sales.ordering.application.SyncGatewayPaymentUseCase;
+import lms.sales.ordering.domain.PaymentIntent;
 import lms.sales.ordering.infrastructure.client.MomoPaymentGateway;
 import lms.sales.ordering.infrastructure.client.SepayPaymentGateway;
 import lms.sales.ordering.infrastructure.client.SimulatedPaymentGateway;
+import lms.sales.ordering.infrastructure.client.ThrottledPaymentGateway;
 import lms.sales.settings.application.GetSalesSettingsUseCase;
 import lms.sales.shared.application.DocumentNumberPort;
 import lms.sales.shared.application.SalesAuditPort;
@@ -47,11 +50,13 @@ public class PaymentsBeanConfiguration {
         return new ProcessPaymentWebhookUseCase(intents, orders, stockService, audit, clock);
     }
 
+    /** Hết hạn lệnh: hỏi cổng lần cuối trước khi đóng (ADR-0029 mục 2.3), best-effort. */
     @Bean
     ExpirePaymentIntentsUseCase expirePaymentIntentsUseCase(
             PaymentIntentRepository intents, PaymentIntentUseCases useCases, Clock clock,
+            SyncGatewayPaymentUseCase gatewaySync,
             @Value("${app.payments.expire-batch-size:100}") int batchSize) {
-        return new ExpirePaymentIntentsUseCase(intents, useCases, clock, batchSize);
+        return new ExpirePaymentIntentsUseCase(intents, useCases, clock, batchSize, gatewaySync);
     }
 
     @Bean
@@ -90,12 +95,35 @@ public class PaymentsBeanConfiguration {
             @Value("${app.payments.sepay.bank-bin}") String bankBin,
             @Value("${app.payments.sepay.account-no}") String accountNo,
             @Value("${app.payments.sepay.account-name:LMS SEPAY TEST}") String accountName,
-            @Value("${app.payments.sepay.bank-account-id:}") String bankAccountId) {
+            @Value("${app.payments.sepay.bank-account-id:}") String bankAccountId,
+            Clock clock,
+            @Value("${app.payments.sepay.min-query-interval-ms:5000}") long minQueryIntervalMs,
+            @Value("${app.payments.sepay.max-queries-per-second:2}") int maxQueriesPerSecond) {
         if (token.isBlank() || bankBin.isBlank() || accountNo.isBlank()) {
             throw new IllegalStateException("Bật app.payments.sepay thì phải đặt PAYMENTS_SEPAY_TOKEN, "
                     + "PAYMENTS_SEPAY_BANK_BIN và PAYMENTS_SEPAY_ACCOUNT_NO");
         }
-        return new SepayPaymentGateway(json, endpoint, token, bankBin, accountNo, accountName, bankAccountId);
+        // Bọc bộ hãm (ADR-0029 mục 2.4): SePay giới hạn 3 yêu cầu/giây theo IP của cả máy chủ
+        return new ThrottledPaymentGateway(
+                new SepayPaymentGateway(json, endpoint, token, bankBin, accountNo, accountName, bankAccountId),
+                clock, minQueryIntervalMs, maxQueriesPerSecond);
+    }
+
+    /**
+     * Thanh toán trực tuyến của đơn online (ADR-0029): khách xem trạng thái/hủy lệnh, danh sách phương thức. SEPAY cho
+     * website chỉ mở khi cờ {@code app.payments.online.sepay-enabled=true} VÀ cổng SePay có bean (mặc định tắt).
+     */
+    @Bean
+    ShopPaymentUseCases shopPaymentUseCases(
+            SalesOrderRepository orders, PaymentIntentRepository intents, SyncGatewayPaymentUseCase gatewaySync,
+            PaymentIntentUseCases intentUseCases, GetSalesSettingsUseCase settings, Clock clock,
+            ObjectProvider<PaymentGatewayPort> gateways,
+            @Value("${app.payments.online.sepay-enabled:false}") boolean sepayOnlineFlag,
+            @Value("${app.payments.online.intent-ttl-minutes:15}") int intentTtlMinutes) {
+        boolean sepayOnline = sepayOnlineFlag && gateways.orderedStream()
+                .anyMatch(g -> PaymentIntent.PROVIDER_SEPAY.equals(g.provider()));
+        return new ShopPaymentUseCases(orders, intents, gatewaySync, intentUseCases, settings, clock, sepayOnline,
+                intentTtlMinutes);
     }
 
     @Bean

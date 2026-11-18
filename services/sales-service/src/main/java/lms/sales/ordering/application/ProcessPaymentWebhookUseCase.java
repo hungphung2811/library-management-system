@@ -20,13 +20,17 @@ import org.springframework.transaction.annotation.Transactional;
  * Xử lý kết quả thanh toán do cổng báo (ADR-0020). Người gọi đã xác thực chữ ký và đặt TenantContext theo tenant của
  * lệnh trước khi vào đây (transaction mở sau đó nên RLS đúng tenant). Idempotent theo mã giao dịch: cùng
  * {@code providerTxnId} gửi lại trả kết quả cũ, không thu hai lần. Lệnh hết hạn/hủy bị từ chối bằng mã lỗi riêng; số tiền
- * lệch thì 400 và không đổi gì. Thành công: lệnh PAID, đơn COMPLETED + PAID kèm bản ghi thu (QR, mã tham chiếu), tồn
- * giữ chuyển thành xuất thật (FULFIL).
+ * lệch thì 400 và không đổi gì. Thành công: lệnh PAID, đơn POS COMPLETED + PAID kèm bản ghi thu (QR, mã tham chiếu), tồn
+ * giữ chuyển thành xuất thật (FULFIL). Đơn ONLINE (ADR-0029): PENDING_CONFIRMATION + PAID, KHÔNG xuất kho (tồn vẫn giữ).
  */
 public class ProcessPaymentWebhookUseCase {
 
     /** {@code status}: PAID (hoặc SUCCESS) là đã nhận tiền; giá trị khác (vd FAILED) chỉ được ghi nhận, không đổi gì. */
-    public record Command(String reference, long amount, String providerTxnId, String status) {
+    public record Command(String reference, long amount, String providerTxnId, String status, Instant transactionAt) {
+        /** Cổng không cho biết thời điểm giao dịch (webhook giả lập, MoMo). */
+        public Command(String reference, long amount, String providerTxnId, String status) {
+            this(reference, amount, providerTxnId, status, null);
+        }
     }
 
     public record Result(PaymentIntentResponse intent, boolean duplicate, boolean ignored) {
@@ -77,7 +81,7 @@ public class ProcessPaymentWebhookUseCase {
             throw new SalesException(ErrorCode.PAYMENT_INTENT_STATE_CONFLICT,
                     "Lệnh thanh toán đã được thanh toán bằng giao dịch khác");
         }
-        intent.markPaid(cmd.providerTxnId(), Money.of(cmd.amount()), now);
+        intent.markPaid(cmd.providerTxnId(), Money.of(cmd.amount()), now, cmd.transactionAt());
 
         SalesOrder order = orders.findById(tenantId, intent.orderId())
                 .orElseThrow(() -> new SalesException(ErrorCode.ORDER_NOT_FOUND, "Không có đơn hàng"));
@@ -85,10 +89,13 @@ public class ProcessPaymentWebhookUseCase {
         // Lưu lệnh trước đơn: xung đột phiên bản (webhook trùng đồng thời, hoặc hủy cùng lúc) báo sớm, rollback cả tồn
         PaymentIntent savedIntent = intents.save(intent);
         SalesOrder saved = orders.save(order);
-        stockService.fulfilAll(tenantId, null, OrderWorkflowUseCases.stockLines(saved), "ORDER", saved.id());
+        if (saved.fulfilsStockOnSettle()) {
+            stockService.fulfilAll(tenantId, null, OrderWorkflowUseCases.stockLines(saved), "ORDER", saved.id());
+        } // ONLINE (ADR-0029): hàng vẫn giữ (reserved) tới khi giao/nhận
 
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("orderNo", saved.orderNo());
+        data.put("channel", saved.channel().name());
         data.put("status", saved.status().name());
         data.put("paymentStatus", saved.paymentStatus().name());
         data.put("amount", record.amount().amount());

@@ -1,6 +1,7 @@
 package lms.sales.ordering.infrastructure.config;
 
 import java.time.Clock;
+import java.time.Duration;
 import lms.sales.ordering.application.AnonymizeWalkInBatchUseCase;
 import lms.sales.ordering.application.AntiAbuseService;
 import lms.sales.ordering.application.AnonymizeWalkInContactsUseCase;
@@ -21,7 +22,10 @@ import lms.sales.ordering.application.RefundUseCases;
 import lms.sales.ordering.application.ReturnQueryUseCases;
 import lms.sales.ordering.application.SalesOrderRepository;
 import lms.sales.ordering.application.SalesReturnRepository;
+import lms.sales.ordering.application.PaymentGatewayPort;
+import lms.sales.ordering.application.PaymentIntentRepository;
 import lms.sales.ordering.application.ShopOrderUseCases;
+import lms.sales.ordering.application.ShopPaymentUseCases;
 import lms.sales.ordering.application.WalkInAnonymizationPort;
 import lms.sales.settings.application.GetSalesSettingsUseCase;
 import lms.sales.settings.application.OrderAbusePolicyUseCases;
@@ -69,9 +73,16 @@ public class OrderingBeanConfiguration {
                                                       SalesAuditPort audit, TenantDirectoryPort tenants,
                                                       Clock clock, OrderAbusePolicyUseCases policies,
                                                       CustomerOrderLockPort customerLock,
-                                                      AntiAbuseService antiAbuse) {
+                                                      AntiAbuseService antiAbuse, PaymentIntentRepository intents,
+                                                      ObjectProvider<PaymentGatewayPort> gateways,
+                                                      @Value("${app.payments.online.sepay-enabled:false}")
+                                                      boolean sepayOnlineEnabled,
+                                                      @Value("${app.payments.online.intent-ttl-minutes:15}")
+                                                      long onlineIntentTtlMinutes) {
+        // Thanh toán trực tuyến (ADR-0029): SEPAY chỉ đặt được khi cờ bật và cổng SePay có bean, thiếu thì 400 PAYMENT_NOT_ENABLED
         return new CommitOnlineOrderUseCase(orders, stockService, settings, numbers, audit, tenants, clock, policies,
-                customerLock, antiAbuse);
+                customerLock, antiAbuse, intents, gateways.orderedStream().toList(), sepayOnlineEnabled,
+                Duration.ofMinutes(onlineIntentTtlMinutes));
     }
 
     /** Ngưỡng tỷ lệ hủy (%) của AntiAbuseService, cấu hình nền tảng (lms.sales.abuse.risk.*). */
@@ -112,8 +123,9 @@ public class OrderingBeanConfiguration {
     }
 
     @Bean
-    ShopOrderUseCases shopOrderUseCases(SalesOrderRepository orders, OrderWorkflowUseCases workflow) {
-        return new ShopOrderUseCases(orders, workflow);
+    ShopOrderUseCases shopOrderUseCases(SalesOrderRepository orders, OrderWorkflowUseCases workflow,
+                                        ShopPaymentUseCases payments) {
+        return new ShopOrderUseCases(orders, workflow, payments);
     }
 
     @Bean

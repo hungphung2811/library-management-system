@@ -178,7 +178,8 @@ class SalesOrderPersistenceAdapter implements SalesOrderRepository {
     @Transactional(readOnly = true)
     public long countPendingOnline(UUID tenantId, UUID customerUserId) {
         return em.createQuery("select count(o) from SalesOrderJpaEntity o where o.tenantId = :t "
-                        + "and o.customerUserId = :c and o.channel = 'ONLINE' and o.status = 'PENDING_CONFIRMATION'",
+                        + "and o.customerUserId = :c and o.channel = 'ONLINE' "
+                        + "and o.status in ('PENDING_CONFIRMATION', 'AWAITING_PAYMENT')",
                 Long.class).setParameter("t", tenantId).setParameter("c", customerUserId).getSingleResult();
     }
 

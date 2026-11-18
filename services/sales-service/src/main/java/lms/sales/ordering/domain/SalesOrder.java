@@ -245,6 +245,48 @@ public final class SalesOrder {
                 buildLines(drafts, result), List.of(), 0));
     }
 
+    /**
+     * Đơn online trả trước qua cổng (ADR-0029, chỉ SEPAY): AWAITING_PAYMENT + UNPAID, giữ hàng do lệnh thanh toán quyết
+     * định (reservationExpiresAt null). Khách trả trước nên số tiền chốt ngay lúc đặt: giao hàng thì phí ship
+     * {@code deliveryFee} (use case truyền phí cố định của tenant) nằm trong grandTotal, nhận tại cửa hàng thì phí 0.
+     * Hàng được giữ (reserved) bởi use case; thanh toán xong bằng {@link #settleAwaitingPayment}, hết hạn/hủy bằng
+     * {@link #cancelAwaitingPayment}.
+     */
+    public static SalesOrder placeOnlineAwaitingPayment(UUID tenantId, String orderNo, UUID customerUserId,
+                                                        Instant now, PaymentMethod method, Fulfilment fulfilment,
+                                                        Recipient recipient, List<LineDraft> drafts,
+                                                        PriceCalculator.TaxPolicy tax, UUID clientRequestId,
+                                                        String customerNote, Money deliveryFee, String requestHash) {
+        if (fulfilment == null || fulfilment == Fulfilment.COUNTER) {
+            throw SalesException.invalidRequest("Hình thức nhận hàng phải là nhận tại cửa hàng hoặc giao hàng");
+        }
+        if (method == null || !method.allowedOnlineGateway()) {
+            throw SalesException.invalidRequest("Phương thức thanh toán không hợp lệ cho thanh toán trực tuyến");
+        }
+        if (customerUserId == null) {
+            throw SalesException.invalidRequest("Đơn online cần khách đã đăng nhập");
+        }
+        if (recipient == null || isBlank(recipient.name()) || isBlank(recipient.phone())
+                || (fulfilment == Fulfilment.DELIVERY && isBlank(recipient.address()))) {
+            throw SalesException.invalidRequest("Thiếu thông tin người nhận");
+        }
+        if (drafts == null || drafts.isEmpty()) {
+            throw SalesException.invalidRequest("Đơn cần ít nhất một dòng");
+        }
+        Money fee = fulfilment == Fulfilment.DELIVERY && deliveryFee != null ? deliveryFee : Money.ZERO;
+        var result = calculate(drafts, null, tax, fee);
+        if (result.grandTotal().isZero()) {
+            throw SalesException.invalidRequest("Đơn 0 đồng không thanh toán qua cổng");
+        }
+        return new SalesOrder(new Snapshot(UUID.randomUUID(), tenantId, orderNo, OrderChannel.ONLINE,
+                OrderStatus.AWAITING_PAYMENT, PaymentStatus.UNPAID, method, customerUserId, null, null, fulfilment,
+                new Recipient(recipient.name().trim(), recipient.phone().trim(), blankToNull(recipient.address())),
+                tax.vatRate().bps(), tax.pricesIncludeVat(), result.subtotal(), result.discountTotal(),
+                result.vatTotal(), result.shippingFee(), result.grandTotal(), null, clientRequestId, null,
+                customerUserId, now, null, null, null, null, null, null, null, null, buildLines(drafts, result),
+                List.of(), 0, note(customerNote, "Ghi chú của khách"), null, null, null, requestHash));
+    }
+
     /** Như {@link #placeOnline} kèm ghi chú của khách (tối đa {@value #MAX_NOTE} ký tự, rỗng thì bỏ). */
     public static SalesOrder placeOnline(UUID tenantId, String orderNo, UUID customerUserId, Instant now,
                                          PaymentMethod method, Fulfilment fulfilment, Recipient recipient,
@@ -345,16 +387,30 @@ public final class SalesOrder {
         return order;
     }
 
-    /** Thu xong (cổng báo hoặc thu ngân xác nhận): AWAITING_PAYMENT sang COMPLETED + PAID, ghi bản ghi thu theo phương thức của đơn. */
+    /**
+     * Thu xong (cổng báo hoặc thu ngân xác nhận), ghi bản ghi thu theo phương thức của đơn. POS: AWAITING_PAYMENT sang
+     * COMPLETED + PAID (use case FULFIL tồn, xem {@link #fulfilsStockOnSettle}). ONLINE (ADR-0029): sang
+     * PENDING_CONFIRMATION + PAID, chưa hoàn tất, tồn vẫn giữ (reserved) tới khi giao/nhận như đơn online thường.
+     */
     public PaymentRecord settleAwaitingPayment(String reference, UUID by, Instant now) {
         requireAwaitingPayment();
         PaymentRecord p = new PaymentRecord(UUID.randomUUID(), grandTotal, paymentMethod, reference, by, now);
         payments.add(p);
         this.paymentStatus = PaymentStatus.PAID;
-        this.status = OrderStatus.COMPLETED;
         this.paidAt = now;
-        this.completedAt = now;
+        if (channel == OrderChannel.ONLINE) {
+            this.status = OrderStatus.PENDING_CONFIRMATION;
+            this.reservationExpiresAt = null; // đã trả tiền: không bị job hết hạn giữ hàng tự hủy
+        } else {
+            this.status = OrderStatus.COMPLETED;
+            this.completedAt = now;
+        }
         return p;
+    }
+
+    /** Thu xong có phải xuất kho thật ngay không: POS có (hàng trao tại quầy), ONLINE không (giao/nhận sau). */
+    public boolean fulfilsStockOnSettle() {
+        return channel == OrderChannel.POS;
     }
 
     /** Cổng QR báo đã nhận đủ tiền (người ghi: không có). */
@@ -378,7 +434,7 @@ public final class SalesOrder {
     }
 
     private void requireAwaitingPayment() {
-        if (channel != OrderChannel.POS || status != OrderStatus.AWAITING_PAYMENT) {
+        if (status != OrderStatus.AWAITING_PAYMENT) {
             throw stateConflict();
         }
     }
@@ -393,8 +449,15 @@ public final class SalesOrder {
         if (fulfilment == Fulfilment.PICKUP && !f.isZero()) {
             throw SalesException.invalidRequest("Nhận tại cửa hàng không có phí ship");
         }
-        this.shippingFee = f;
-        this.grandTotal = f.plus(sumLineTotals());
+        if (paymentStatus == PaymentStatus.PAID) {
+            // Đơn đã trả trước (ADR-0029): số tiền đã chốt lúc đặt, nhân viên không đổi phí ship
+            if (f.amount() != shippingFee.amount()) {
+                throw new SalesException(ErrorCode.ORDER_STATE_CONFLICT, "Đơn đã thanh toán, không đổi phí ship");
+            }
+        } else {
+            this.shippingFee = f;
+            this.grandTotal = f.plus(sumLineTotals());
+        }
         this.status = OrderStatus.CONFIRMED;
         this.confirmedAt = now;
         this.confirmedBy = by;
@@ -456,7 +519,7 @@ public final class SalesOrder {
     }
 
     /**
-     * Hủy đơn online. Khách chỉ hủy được khi PENDING_CONFIRMATION; nhân viên hủy được trước COMPLETED (kể cả giao
+     * Hủy đơn online. Khách chỉ hủy được khi PENDING_CONFIRMATION và UNPAID; nhân viên hủy được trước COMPLETED (kể cả giao
      * thất bại ở SHIPPING). Lý do bắt buộc. Trả về hệ quả tồn kho: RELEASE (đang giữ) hoặc RESTOCK (đã rời kho).
      */
     public StockEffect cancel(String reason, UUID by, Instant now, boolean byCustomer) {
@@ -464,7 +527,9 @@ public final class SalesOrder {
         if (reason == null || reason.isBlank()) {
             throw SalesException.reasonRequired();
         }
+        // Khách không tự hủy đơn đã thanh toán (ADR-0029, Q2): liên hệ cửa hàng. AWAITING_PAYMENT đi luồng hủy lệnh.
         boolean allowed = byCustomer ? status == OrderStatus.PENDING_CONFIRMATION
+                && paymentStatus == PaymentStatus.UNPAID
                 : status == OrderStatus.PENDING_CONFIRMATION || status == OrderStatus.CONFIRMED
                 || status == OrderStatus.READY_FOR_PICKUP || status == OrderStatus.SHIPPING;
         if (!allowed) {

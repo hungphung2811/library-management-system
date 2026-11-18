@@ -43,7 +43,7 @@ public interface SalesOrderRepository {
      */
     Optional<SalesOrder> findByIdSkipLocked(UUID tenantId, UUID id);
 
-    /** Số đơn ONLINE của khách đang PENDING_CONFIRMATION. */
+    /** Số đơn ONLINE của khách đang chờ: PENDING_CONFIRMATION hoặc AWAITING_PAYMENT (chờ thanh toán, ADR-0029). */
     long countPendingOnline(UUID tenantId, UUID customerUserId);
 
     /** Số đơn ONLINE khách đã đặt từ {@code since} (kể cả đã hủy: hủy rồi đặt lại vẫn tính). */

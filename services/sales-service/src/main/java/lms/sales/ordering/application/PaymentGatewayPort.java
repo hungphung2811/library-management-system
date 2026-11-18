@@ -33,8 +33,22 @@ public interface PaymentGatewayPort {
         return queryPayment(reference);
     }
 
-    /** Kết quả truy vấn: {@code paid} khi cổng báo thành công, kèm mã giao dịch và số tiền (đồng) của cổng. */
-    record GatewayPayment(boolean paid, String providerTxnId, long amount) {
+    /**
+     * Hỏi cổng lần cuối trước khi hủy/hết hạn lệnh (ADR-0029 mục 2.3): như {@link #queryPayment(String, long, Instant)}
+     * nhưng bộ hãm bỏ qua giới hạn theo từng lệnh (vẫn chịu hạn mức toàn cục). Mặc định giống bản thường.
+     */
+    default Optional<GatewayPayment> queryPaymentFinal(String reference, long amount, Instant notBefore) {
+        return queryPayment(reference, amount, notBefore);
+    }
+
+    /**
+     * Kết quả truy vấn: {@code paid} khi cổng báo thành công, kèm mã giao dịch, số tiền (đồng) và thời điểm giao dịch
+     * ({@code paidAt}, null nếu cổng không cho biết) của cổng.
+     */
+    record GatewayPayment(boolean paid, String providerTxnId, long amount, Instant paidAt) {
+        public GatewayPayment(boolean paid, String providerTxnId, long amount) {
+            this(paid, providerTxnId, amount, null);
+        }
     }
 
     record ChargeRequest(String reference, Money amount, Instant expiresAt) {

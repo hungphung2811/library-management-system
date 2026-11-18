@@ -19,6 +19,13 @@ public class SalesException extends RuntimeException {
         this.details = Map.copyOf(details);
     }
 
+    /** Giữ nguyên nhân gốc (chỉ để log máy lấy tên lớp, thông điệp trả FE không đổi). */
+    public SalesException(ErrorCode code, String message, Throwable cause) {
+        super(message, cause);
+        this.code = code;
+        this.details = Map.of();
+    }
+
     public ErrorCode code() {
         return code;
     }

@@ -55,6 +55,8 @@ public class OrderWorkflowUseCases {
         Money fee;
         if (shippingFee != null) {
             fee = Money.of(shippingFee);
+        } else if (o.paymentStatus() == lms.sales.ordering.domain.PaymentStatus.PAID) {
+            fee = o.shippingFee(); // đã trả trước (ADR-0029): phí ship đã chốt lúc đặt, không áp phí cố định lần nữa
         } else if (o.fulfilment() == lms.sales.ordering.domain.Fulfilment.DELIVERY) {
             fee = settings.execute(tenantId).fixedShippingMoney();
         } else {
@@ -143,6 +145,18 @@ public class OrderWorkflowUseCases {
     public OrderResponse cancel(UUID tenantId, UUID actor, UUID orderId, String reason, Long expectedVersion) {
         SalesOrder o = load(tenantId, orderId, expectedVersion);
         return cancelLoaded(tenantId, actor, o, reason, false);
+    }
+
+    /**
+     * Khách tự hủy đơn của chính mình (một transaction): đơn của người khác 404. Domain chỉ cho hủy khi
+     * PENDING_CONFIRMATION và UNPAID; đơn AWAITING_PAYMENT đi luồng hủy lệnh ({@link ShopPaymentUseCases}).
+     */
+    @Transactional
+    public ShopOrderResponse cancelOwnOrder(UUID tenantId, UUID customerUserId, UUID orderId, String reason) {
+        SalesOrder o = orders.findByIdAndCustomer(tenantId, orderId, customerUserId)
+                .orElseThrow(() -> new SalesException(ErrorCode.ORDER_NOT_FOUND, "Không có đơn hàng"));
+        OrderResponse r = cancelLoaded(tenantId, customerUserId, o, reason, true);
+        return new ShopOrderResponse(r, ShopOrderResponse.from(o).recipient());
     }
 
     /** Dùng chung với khách tự hủy (ShopOrderUseCases): cùng hệ quả tồn kho, khoản hoàn và audit. */

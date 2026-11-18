@@ -24,6 +24,8 @@ public interface SalesAuditPort {
         String ORDER_CREATED = "ORDER_CREATED";
         String ORDER_DISCOUNT_APPLIED = "ORDER_DISCOUNT_APPLIED";
         String ORDER_PAID = "ORDER_PAID";
+        /** Bất thường về tiền của lệnh thanh toán cổng (ADR-0029), tối đa một dòng cho mỗi (intent, anomalyType). */
+        String PAYMENT_ANOMALY = "PAYMENT_ANOMALY";
         String ORDER_CONFIRMED = "ORDER_CONFIRMED";
         String ORDER_READY_FOR_PICKUP = "ORDER_READY_FOR_PICKUP";
         String ORDER_SHIPPING = "ORDER_SHIPPING";

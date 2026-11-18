@@ -19,13 +19,21 @@ public class ExpirePaymentIntentsUseCase {
     private final PaymentIntentUseCases useCases;
     private final Clock clock;
     private final int batchSize;
+    /** Hỏi cổng lần cuối trước khi hết hạn (ADR-0029); null thì không hỏi. */
+    private final SyncGatewayPaymentUseCase gatewaySync;
 
     public ExpirePaymentIntentsUseCase(PaymentIntentRepository intents, PaymentIntentUseCases useCases, Clock clock,
                                        int batchSize) {
+        this(intents, useCases, clock, batchSize, null);
+    }
+
+    public ExpirePaymentIntentsUseCase(PaymentIntentRepository intents, PaymentIntentUseCases useCases, Clock clock,
+                                       int batchSize, SyncGatewayPaymentUseCase gatewaySync) {
         this.intents = intents;
         this.useCases = useCases;
         this.clock = clock;
         this.batchSize = batchSize;
+        this.gatewaySync = gatewaySync;
     }
 
     public int execute(UUID tenantId) {
@@ -33,6 +41,9 @@ public class ExpirePaymentIntentsUseCase {
         int expired = 0;
         for (UUID id : ids) {
             try {
+                if (settledByGateway(tenantId, id)) {
+                    continue; // cổng báo đã nhận tiền ngay trước giờ hết hạn: lệnh đã PAID, không hết hạn nữa
+                }
                 if (useCases.expireOne(tenantId, id)) {
                     expired++;
                 }
@@ -41,5 +52,13 @@ public class ExpirePaymentIntentsUseCase {
             }
         }
         return expired;
+    }
+
+    private boolean settledByGateway(UUID tenantId, UUID intentId) {
+        if (gatewaySync == null) {
+            return false;
+        }
+        return intents.findById(tenantId, intentId).map(i -> gatewaySync.settleBeforeClosing(tenantId, i))
+                .orElse(false);
     }
 }

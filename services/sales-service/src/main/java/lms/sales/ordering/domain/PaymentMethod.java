@@ -18,6 +18,14 @@ public enum PaymentMethod {
     }
 
     /**
+     * Cổng được phép cho đơn ONLINE (ADR-0029): danh sách tường minh, chỉ SEPAY. Không dùng {@link #isGateway()} cho kênh
+     * online để QR (giả lập) và MoMo vẫn bị từ chối.
+     */
+    public boolean allowedOnlineGateway() {
+        return this == SEPAY;
+    }
+
+    /**
      * POS nhận tiền mặt, chuyển khoản, thẻ (đã thu xong ngoài hệ thống) và QR (thu qua cổng thanh toán, đơn chỉ
      * thành PAID khi cổng xác nhận).
      */

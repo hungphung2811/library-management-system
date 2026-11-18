@@ -47,13 +47,20 @@ public class PaymentIntentUseCases {
     /** Thu ngân hủy lệnh còn PENDING. Hủy lại lệnh đã hủy thì trả nguyên trạng (idempotent); trạng thái khác thì 409. */
     @Transactional
     public PaymentIntentResponse cancel(UUID tenantId, UUID actor, UUID intentId) {
+        return cancel(tenantId, actor, intentId, null);
+    }
+
+    /** Như trên với lý do hủy của người gọi (khách hủy đơn online chờ thanh toán, ADR-0029); null/trống thì dùng lý do mặc định. */
+    @Transactional
+    public PaymentIntentResponse cancel(UUID tenantId, UUID actor, UUID intentId, String reason) {
         PaymentIntent intent = load(tenantId, intentId);
         Instant now = clock.instant();
         if (intent.status() == PaymentIntentStatus.CANCELLED) {
             return PaymentIntentResponse.from(intent, now);
         }
         intent.cancel();
-        release(tenantId, actor, intent, CANCEL_REASON, now, "CANCELLED");
+        release(tenantId, actor, intent, reason == null || reason.isBlank() ? CANCEL_REASON : reason, now,
+                "CANCELLED");
         return PaymentIntentResponse.from(intents.save(intent), now);
     }
 
@@ -126,6 +133,7 @@ public class PaymentIntentUseCases {
         stockService.releaseAll(tenantId, actor, OrderWorkflowUseCases.stockLines(saved), "ORDER", saved.id());
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("orderNo", saved.orderNo());
+        data.put("channel", saved.channel().name());
         data.put("status", saved.status().name());
         data.put("paymentStatus", saved.paymentStatus().name());
         data.put("stockEffect", "RELEASE");

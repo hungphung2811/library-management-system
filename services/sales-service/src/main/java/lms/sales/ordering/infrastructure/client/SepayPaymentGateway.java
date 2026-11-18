@@ -99,7 +99,7 @@ public class SepayPaymentGateway implements PaymentGatewayPort {
             if (at == null || (floor != null && at.isBefore(floor))) {
                 continue;
             }
-            return Optional.of(new GatewayPayment(true, ID_PREFIX + id, amount));
+            return Optional.of(new GatewayPayment(true, ID_PREFIX + id, amount, at));
         }
         return Optional.empty();
     }

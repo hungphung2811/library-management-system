@@ -103,7 +103,17 @@ public final class PaymentIntent {
      * sẽ chuyển EXPIRED và trả tồn); lệch số tiền thì 400 PAYMENT_AMOUNT_MISMATCH.
      */
     public void markPaid(String txnId, Money paidAmount, Instant now) {
-        if (status == PaymentIntentStatus.EXPIRED || isExpiredAt(now)) {
+        markPaid(txnId, paidAmount, now, null);
+    }
+
+    /**
+     * Như {@link #markPaid(String, Money, Instant)} kèm thời điểm giao dịch của cổng ({@code transactionAt}, ADR-0029
+     * mục 2.3): lệnh vẫn PENDING trong DB nhưng đồng hồ đã qua hạn thì vẫn nhận nếu giao dịch xảy ra TRƯỚC hạn (khách
+     * chuyển phút chót, lần dò sau mới thấy). Lệnh đã EXPIRED/CANCELLED trong DB vẫn bị từ chối.
+     */
+    public void markPaid(String txnId, Money paidAmount, Instant now, Instant transactionAt) {
+        boolean paidBeforeDeadline = transactionAt != null && transactionAt.isBefore(expiresAt);
+        if (status == PaymentIntentStatus.EXPIRED || (isExpiredAt(now) && !paidBeforeDeadline)) {
             throw new SalesException(ErrorCode.PAYMENT_INTENT_EXPIRED, "Lệnh thanh toán đã hết hạn");
         }
         if (status == PaymentIntentStatus.CANCELLED) {

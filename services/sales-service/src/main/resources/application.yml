@@ -101,6 +101,15 @@ app:
       account-no: ${PAYMENTS_SEPAY_ACCOUNT_NO:}
       account-name: ${PAYMENTS_SEPAY_ACCOUNT_NAME:LMS SEPAY TEST}
       bank-account-id: ${PAYMENTS_SEPAY_BANK_ACCOUNT_ID:}
+      # Bộ hãm lời gọi dò SePay (ADR-0029): mỗi lệnh tối đa 1 lần/khoảng này, toàn cục tối đa N lần/giây (SePay giới hạn 3/giây/IP)
+      min-query-interval-ms: ${PAYMENTS_SEPAY_MIN_QUERY_INTERVAL_MS:5000}
+      max-queries-per-second: ${PAYMENTS_SEPAY_MAX_QPS:2}
+    # Thanh toán trực tuyến cho website khách (ADR-0029): SEPAY chỉ mở khi cờ này bật VÀ cổng SePay ở trên bật. Mặc định tắt
+    # để bật SePay cho POS không tự mở tài khoản Test mode dùng chung ra mọi website tenant.
+    online:
+      sepay-enabled: ${PAYMENTS_ONLINE_SEPAY_ENABLED:false}
+      # Hạn thanh toán và giữ tồn của đơn online chờ thanh toán (phút)
+      intent-ttl-minutes: ${PAYMENTS_ONLINE_INTENT_TTL_MINUTES:15}
     # Thu tay tại quầy (CASH, CARD, BANK_TRANSFER, ADR-0021): lệnh chờ thu ngân xác nhận, hết hạn thì nhả tồn
     manual:
       intent-ttl-minutes: ${PAYMENTS_MANUAL_INTENT_TTL_MINUTES:10}
