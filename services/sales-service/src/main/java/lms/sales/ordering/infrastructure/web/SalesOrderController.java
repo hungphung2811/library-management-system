@@ -21,6 +21,7 @@ import lms.sales.ordering.domain.PaymentMethod;
 import lms.sales.ordering.domain.PaymentStatus;
 import lms.sales.shared.application.PageResult;
 import lms.sales.shared.infrastructure.web.RequestSupport;
+import lms.security.permission.IntegrationScope;
 import lms.security.permission.RequiresModule;
 import lms.security.permission.TenantModule;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -112,6 +113,7 @@ public class SalesOrderController {
     }
 
     @GetMapping
+    @IntegrationScope("orders:read")
     public PageResult<OrderView> search(OrderSearchQuery query) {
         return queries.search(RequestSupport.tenant(), new OrderQueryUseCases.SearchQuery(query.status(),
                         query.paymentStatus(), query.channel(), query.from(), query.to(), query.keyword(),
@@ -120,6 +122,7 @@ public class SalesOrderController {
     }
 
     @GetMapping("/{id}")
+    @IntegrationScope("orders:read")
     public OrderView get(@PathVariable UUID id) {
         return OrderView.from(queries.get(RequestSupport.tenant(), id));
     }

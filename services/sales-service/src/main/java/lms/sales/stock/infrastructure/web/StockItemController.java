@@ -18,6 +18,7 @@ import lms.sales.stock.application.StockItemView;
 import lms.sales.stock.application.UpdateStockItemPriceUseCase;
 import lms.sales.stock.domain.StockItemDetails;
 import lms.sales.stock.domain.StockMovement;
+import lms.security.permission.IntegrationScope;
 import lms.security.permission.RequiresModule;
 import lms.security.permission.TenantModule;
 import org.springframework.http.ResponseEntity;
@@ -152,12 +153,14 @@ public class StockItemController {
     }
 
     @GetMapping
+    @IntegrationScope("inventory:read")
     public PageResult<StockItemResponse> search(StockSearchQuery q) {
         return list.execute(RequestSupport.tenant(), Boolean.TRUE.equals(q.lowStockOnly()),
                 RequestSupport.page(q.page()), RequestSupport.size(q.size())).map(StockItemResponse::from);
     }
 
     @GetMapping("/{titleId}")
+    @IntegrationScope("inventory:read")
     public StockItemResponse get(@PathVariable UUID titleId) {
         return StockItemResponse.from(get.execute(RequestSupport.tenant(), titleId));
     }
