@@ -47,7 +47,7 @@ public class SupplierController {
         }
     }
 
-    static final String CACHE_NAMESPACE = "sales.suppliers";
+    public static final String CACHE_NAMESPACE = "sales.suppliers";
     private static final Duration CACHE_TTL = Duration.ofSeconds(30);
 
     /** Khóa cache: mọi đầu vào làm đổi kết quả (từ khóa, trang, cỡ trang đã chuẩn hóa). */

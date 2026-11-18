@@ -13,6 +13,16 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+    properties:
+      hibernate:
+        # Nhập Excel (ADR-0024 3.6): chèn mặt hàng/nhà cung cấp theo lô JDBC (id gán sẵn nên không cần SELECT)
+        jdbc.batch_size: 100
+        order_inserts: true
+  servlet:
+    multipart:
+      # Nhập Excel (ADR-0024): file tối đa 5 MB, cả request 6 MB (khớp nginx). Vượt thì 413 IMPORT_FILE_TOO_LARGE
+      max-file-size: 5MB
+      max-request-size: 6MB
   flyway:
     # Migration do system-service chạy tập trung (target sales); service chỉ validate schema (ddl-auto: validate)
     enabled: false

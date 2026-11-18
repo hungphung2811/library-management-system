@@ -35,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 class StockPersistenceAdapter implements StockPort {
 
     private static final int REPORT_TIMEOUT_MS = 20_000;
+    private static final int IN_LIMIT = 1_000;
 
     @PersistenceContext
     private EntityManager em;
@@ -94,6 +95,58 @@ class StockPersistenceAdapter implements StockPort {
             throw e;
         }
         return toDomain(entity);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.Set<UUID> titleIdsWithStockItem(UUID tenantId, Collection<UUID> titleIds) {
+        java.util.Set<UUID> out = new java.util.HashSet<>();
+        List<UUID> all = List.copyOf(new java.util.LinkedHashSet<>(titleIds));
+        for (int from = 0; from < all.size(); from += IN_LIMIT) {
+            out.addAll(em.createQuery("select s.titleId from StockItemJpaEntity s where s.tenantId = :t "
+                            + "and s.titleId in :ids", UUID.class).setParameter("t", tenantId)
+                    .setParameter("ids", all.subList(from, Math.min(all.size(), from + IN_LIMIT))).getResultList());
+        }
+        return out;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public java.util.Set<String> existingSkus(UUID tenantId, Collection<String> skus) {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        List<String> all = List.copyOf(new java.util.LinkedHashSet<>(skus));
+        for (int from = 0; from < all.size(); from += IN_LIMIT) {
+            out.addAll(em.createQuery("select s.sku from StockItemJpaEntity s where s.tenantId = :t "
+                            + "and s.sku in :skus", String.class).setParameter("t", tenantId)
+                    .setParameter("skus", all.subList(from, Math.min(all.size(), from + IN_LIMIT))).getResultList());
+        }
+        return out;
+    }
+
+    @Override
+    @Transactional
+    public void insertAll(List<StockItem> items) {
+        if (items.isEmpty()) {
+            return;
+        }
+        try {
+            for (StockItem item : items) {
+                StockItemJpaEntity entity = new StockItemJpaEntity(item.id(), item.titleId(), (int) item.onHand(),
+                        (int) item.reserved(), item.sellingPrice() == null ? null : item.sellingPrice().amount(),
+                        item.lowStockThreshold(), item.active());
+                applyDetails(entity, item.details());
+                em.persist(entity);
+            }
+            em.flush();
+        } catch (PersistenceException e) {
+            if (PersistenceErrors.isUniqueViolation(e, "uq_stock_items_tenant_sku")) {
+                throw new SalesException(ErrorCode.SKU_EXISTS, "SKU đã được dùng cho mặt hàng khác");
+            }
+            if (PersistenceErrors.isUniqueViolation(e, "uq_stock_items_tenant_title")) {
+                throw new SalesException(ErrorCode.STOCK_ITEM_EXISTS, "Đầu sách đã được đưa vào bán");
+            }
+            throw e;
+        }
     }
 
     @Override

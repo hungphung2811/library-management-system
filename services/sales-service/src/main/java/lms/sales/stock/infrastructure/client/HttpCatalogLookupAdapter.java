@@ -29,6 +29,7 @@ import org.springframework.web.client.RestClientException;
 public class HttpCatalogLookupAdapter implements CatalogLookupPort {
 
     static final int MAX_IDS_PER_CALL = 100;
+    static final int MAX_ISBNS_PER_CALL = 1_000;
     private static final Logger log = LoggerFactory.getLogger(HttpCatalogLookupAdapter.class);
 
     record TitleDto(UUID id, String name, String author, String isbn, BigDecimal coverPrice, String description,
@@ -48,6 +49,9 @@ public class HttpCatalogLookupAdapter implements CatalogLookupPort {
     record LookupRequest(List<UUID> ids) {
     }
 
+    record IsbnLookupRequest(List<String> isbns) {
+    }
+
     private final RestClient client;
 
     public HttpCatalogLookupAdapter(RestClient client) {
@@ -65,6 +69,40 @@ public class HttpCatalogLookupAdapter implements CatalogLookupPort {
             List<UUID> chunk = ids.subList(from, Math.min(from + MAX_IDS_PER_CALL, ids.size()));
             for (TitleDto t : call(chunk)) {
                 out.put(t.id(), t.toTitle());
+            }
+        }
+        return out;
+    }
+
+    /**
+     * POST /internal/books/lookup-by-isbn (ADR-0024): tối đa 1.000 ISBN mỗi lần gọi (catalog nhận tới 5.000), token người
+     * dùng chuyển tiếp. ISBN không thấy thì không có trong kết quả. Mọi lỗi gọi (kể cả 403 thiếu khóa) thành
+     * SalesException(CATALOG_UNAVAILABLE) để import báo lỗi rõ thay vì ghi sai.
+     */
+    @Override
+    public Map<String, CatalogTitle> lookupByIsbn(Collection<String> isbns) {
+        Map<String, CatalogTitle> out = new HashMap<>();
+        if (isbns == null || isbns.isEmpty()) {
+            return out;
+        }
+        List<String> all = new ArrayList<>(new LinkedHashSet<>(isbns));
+        for (int from = 0; from < all.size(); from += MAX_ISBNS_PER_CALL) {
+            List<String> chunk = all.subList(from, Math.min(from + MAX_ISBNS_PER_CALL, all.size()));
+            try {
+                RestClient.RequestBodySpec spec = client.post().uri("/internal/books/lookup-by-isbn");
+                addHeaders(spec);
+                TitleDto[] body = spec.body(new IsbnLookupRequest(List.copyOf(chunk))).retrieve()
+                        .body(TitleDto[].class);
+                if (body != null) {
+                    for (TitleDto t : body) {
+                        if (t.isbn() != null) {
+                            out.put(t.isbn().trim(), t.toTitle());
+                        }
+                    }
+                }
+            } catch (RestClientException e) {
+                log.warn("Không tra được ISBN ở catalog-service: {}", e.getMessage());
+                throw new SalesException(ErrorCode.CATALOG_UNAVAILABLE, "Không gọi được catalog-service");
             }
         }
         return out;

@@ -46,6 +46,39 @@ class SupplierPersistenceAdapter implements SupplierRepository {
 
     @Override
     @Transactional(readOnly = true)
+    public java.util.Set<String> existingLowerNames(UUID tenantId, java.util.Collection<String> lowerNames) {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        List<String> all = List.copyOf(new java.util.LinkedHashSet<>(lowerNames));
+        for (int from = 0; from < all.size(); from += 1_000) {
+            out.addAll(em.createQuery("select lower(s.name) from SupplierJpaEntity s where s.tenantId = :t "
+                            + "and lower(s.name) in :names", String.class).setParameter("t", tenantId)
+                    .setParameter("names", all.subList(from, Math.min(all.size(), from + 1_000))).getResultList());
+        }
+        return out;
+    }
+
+    @Override
+    @Transactional
+    public void insertAll(List<Supplier> suppliers) {
+        if (suppliers.isEmpty()) {
+            return;
+        }
+        try {
+            for (Supplier s : suppliers) {
+                em.persist(new SupplierJpaEntity(s.id(), s.name(), s.phone(), s.email(), s.address(), s.note(),
+                        s.active()));
+            }
+            em.flush();
+        } catch (PersistenceException e) {
+            if (PersistenceErrors.isUniqueViolation(e, "uq_suppliers_tenant_name")) {
+                throw new SalesException(ErrorCode.SUPPLIER_EXISTS, "Nhà cung cấp đã tồn tại");
+            }
+            throw e;
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Optional<Supplier> findById(UUID tenantId, UUID id) {
         return em.createQuery("select s from SupplierJpaEntity s where s.tenantId = :t and s.id = :id",
                         SupplierJpaEntity.class).setParameter("t", tenantId).setParameter("id", id)

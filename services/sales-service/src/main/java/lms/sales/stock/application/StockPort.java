@@ -47,6 +47,31 @@ public interface StockPort {
         return Optional.empty();
     }
 
+    /**
+     * Nhập Excel (ADR-0024): tập titleId đã là mặt hàng trong số {@code titleIds}, MỘT truy vấn mỗi 1.000 id. Mặc định
+     * qua {@link #findByTitleIds} cho bản giả test.
+     */
+    default java.util.Set<UUID> titleIdsWithStockItem(UUID tenantId, Collection<UUID> titleIds) {
+        return new java.util.HashSet<>(findByTitleIds(tenantId, titleIds).keySet());
+    }
+
+    /** Nhập Excel: tập SKU (đã chữ hoa) đang được dùng trong số {@code skus}, MỘT truy vấn mỗi 1.000 SKU. */
+    default java.util.Set<String> existingSkus(UUID tenantId, Collection<String> skus) {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        for (String sku : skus) {
+            findBySku(tenantId, sku).ifPresent(i -> out.add(sku));
+        }
+        return out;
+    }
+
+    /**
+     * Nhập Excel: chèn nhiều mặt hàng (tồn 0) trong transaction của caller, persist không merge, flush MỘT lần (JDBC
+     * batch). Vi phạm unique thì ném SalesException(STOCK_ITEM_EXISTS | SKU_EXISTS). Mặc định chèn từng cái.
+     */
+    default void insertAll(List<StockItem> items) {
+        items.forEach(this::insert);
+    }
+
     boolean tryApply(UUID tenantId, UUID titleId, long deltaOnHand, long deltaReserved);
 
     void append(StockMovement movement);

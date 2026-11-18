@@ -15,4 +15,26 @@ public interface SupplierRepository {
     boolean existsByName(UUID tenantId, String name, UUID excludeId);
 
     PageResult<Supplier> search(UUID tenantId, String keyword, int page, int size);
+
+    /**
+     * Nhập Excel (ADR-0024): tập tên (chữ thường) đã tồn tại trong số {@code lowerNames}, MỘT truy vấn mỗi 1.000 tên.
+     * Mặc định qua {@link #existsByName} cho bản giả test.
+     */
+    default java.util.Set<String> existingLowerNames(UUID tenantId, java.util.Collection<String> lowerNames) {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        for (String n : lowerNames) {
+            if (existsByName(tenantId, n, null)) {
+                out.add(n);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Nhập Excel: chèn nhiều nhà cung cấp mới (persist không SELECT), flush một lần. Trùng tên thì ném
+     * SalesException(SUPPLIER_EXISTS). Mặc định lưu từng cái.
+     */
+    default void insertAll(java.util.List<Supplier> suppliers) {
+        suppliers.forEach(this::save);
+    }
 }

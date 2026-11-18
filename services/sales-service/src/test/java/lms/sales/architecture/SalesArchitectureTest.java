@@ -25,6 +25,21 @@ class SalesArchitectureTest {
             .should().dependOnClassesThat().resideInAPackage("..infrastructure..")
             .allowEmptyShould(true);
 
+    /** ADR-0024: handler nhập Excel ở application chỉ dùng hợp đồng lms.imports.core (không engine/web/xlsx/redis). */
+    @ArchTest
+    static final ArchRule applicationChiDungImportCore = noClasses()
+            .that().resideInAPackage("..application..")
+            .should().dependOnClassesThat().resideInAnyPackage("lms.imports.engine..", "lms.imports.web..",
+                    "lms.imports.xlsx..", "lms.imports.redis..", "lms.imports.autoconfigure..")
+            .allowEmptyShould(true);
+
+    /** Domain không biết thư viện nhập. */
+    @ArchTest
+    static final ArchRule domainKhongBietImportCommon = noClasses()
+            .that().resideInAPackage("..domain..")
+            .should().dependOnClassesThat().resideInAPackage("lms.imports..")
+            .allowEmptyShould(true);
+
     /** Context chỉ dùng tầng application của context khác (ordering gọi stock.application/settings.application). */
     @ArchTest
     static final ArchRule contextChiDungTangApplicationCuaContextKhac = noClasses()

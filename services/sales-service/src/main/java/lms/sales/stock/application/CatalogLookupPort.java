@@ -20,6 +20,15 @@ public interface CatalogLookupPort {
         return List.of();
     }
 
+    /**
+     * Nhập Excel (ADR-0024): tra theo lô ISBN -> đầu sách (chỉ ISBN có trong catalog; khóa là ISBN đã trim đúng như
+     * catalog trả). Cần token người dùng chuyển tiếp (khóa {@code TitleController/lookupByIsbn}); lỗi catalog thì
+     * SalesException(CATALOG_UNAVAILABLE). Mặc định rỗng cho bản giả test.
+     */
+    default Map<String, CatalogTitle> lookupByIsbn(Collection<String> isbns) {
+        return Map.of();
+    }
+
     /** Mô tả và đoạn đọc thử của một đầu sách; không có thì rỗng. */
     default Optional<CatalogPreview> preview(UUID titleId) {
         return Optional.empty();

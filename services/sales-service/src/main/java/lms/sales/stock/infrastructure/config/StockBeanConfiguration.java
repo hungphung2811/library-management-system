@@ -3,6 +3,7 @@ package lms.sales.stock.infrastructure.config;
 import java.time.Clock;
 import java.time.Duration;
 import lms.sales.settings.application.GetSalesSettingsUseCase;
+import lms.cache.RequestCache;
 import lms.sales.shared.application.DocumentNumberPort;
 import lms.sales.shared.application.SalesAuditPort;
 import lms.sales.stock.application.AdjustStockUseCase;
@@ -22,6 +23,11 @@ import lms.sales.stock.application.StocktakeUseCase;
 import lms.sales.stock.application.SupplierRepository;
 import lms.sales.stock.application.SupplierUseCases;
 import lms.sales.stock.application.UpdateStockItemPriceUseCase;
+import lms.sales.stock.application.imports.StockItemImportExecutor;
+import lms.sales.stock.application.imports.StockItemImportHandler;
+import lms.sales.stock.application.imports.SupplierImportExecutor;
+import lms.sales.stock.application.imports.SupplierImportHandler;
+import lms.sales.stock.infrastructure.web.SupplierController;
 import lms.sales.stock.infrastructure.client.HttpCatalogLookupAdapter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -118,5 +124,32 @@ public class StockBeanConfiguration {
     lms.sales.stock.application.StorefrontQueryUseCases storefrontQueryUseCases(StockPort stock,
                                                                               CatalogLookupPort catalog) {
         return new lms.sales.stock.application.StorefrontQueryUseCases(stock, catalog);
+    }
+
+    // ===== Nhập Excel (ADR-0024): handler/executor là POJO, executor @Transactional đi qua proxy =====
+
+    @Bean
+    StockItemImportExecutor stockItemImportExecutor(StockPort stock, StockService stockService, SalesAuditPort audit,
+                                                    Clock clock) {
+        return new StockItemImportExecutor(stock, stockService, audit, clock);
+    }
+
+    @Bean
+    StockItemImportHandler stockItemImportHandler(CatalogLookupPort catalog, StockPort stock,
+                                                  StockItemImportExecutor executor) {
+        return new StockItemImportHandler(catalog, stock, executor);
+    }
+
+    @Bean
+    SupplierImportExecutor supplierImportExecutor(SupplierRepository suppliers, SalesAuditPort audit, Clock clock) {
+        return new SupplierImportExecutor(suppliers, audit, clock);
+    }
+
+    /** Sau confirm xóa cache nhà cung cấp của tenant (luồng nền đã ở trong TenantContext.runAs). */
+    @Bean
+    SupplierImportHandler supplierImportHandler(SupplierRepository suppliers, SupplierImportExecutor executor,
+                                                RequestCache cache) {
+        return new SupplierImportHandler(suppliers, executor,
+                () -> cache.evictNamespace(SupplierController.CACHE_NAMESPACE));
     }
 }
