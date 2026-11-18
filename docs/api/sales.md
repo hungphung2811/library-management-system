@@ -87,6 +87,20 @@ Phiếu in (`ReceiptResponse`): `{orderId, orderNo, issuedAt, currency, vatRateB
 
 Sau commit, mỗi dòng audit phát một bản tóm tắt lên topic `sales.events` (EventEnvelope, `tenantId` trong envelope): `eventType` `OrderCompleted` (đơn POS), `GoodsReceiptCreated|Confirmed|Cancelled`, `StockAdjusted`, `StocktakeRecorded`, `StockItemRegistered`, `PriceChanged`, `SettingsChanged`, `SupplierCreated|Updated`, `OrderDiscountApplied`; payload `{eventId, action, aggregateType, actorId, data}`, `data` chỉ gồm id/số tiền/số lượng/mã trạng thái, không có dữ liệu cá nhân. Nguồn chuẩn là bảng `sales_audit_log` (cột `published_at` giữ NULL cho tới khi có relay Outbox).
 
+**Làm giàu sự kiện đơn hàng (ADR-0030 gói D, chỉ thêm trường, `version` vẫn 1)**: với dòng audit có `aggregateType` là `SalesOrder`, `Refund` hoặc `Invoice`, `payload.data` của SỰ KIỆN được thêm các trường sau (khóa đã có trong `data` thì giữ nguyên, không ghi đè). Các trường này KHÔNG vào dòng `sales_audit_log` nên `GET /api/sales/audit-log` không đổi. Chỉ là id/mã/số tiền, không có email, điện thoại, tên, địa chỉ. Trường không có giá trị thì vắng mặt (không có giá trị `null`).
+
+| Trường | Áp dụng | Ý nghĩa |
+|---|---|---|
+| `customerUserId` | mọi sự kiện của đơn, hoàn tiền, hóa đơn | id tài khoản khách của đơn; vắng với khách lẻ và đơn POS không gắn tài khoản |
+| `orderNo` | như trên | số đơn |
+| `channel` | như trên | `POS` hoặc `ONLINE` |
+| `fulfilment` | như trên | `COUNTER`, `PICKUP` hoặc `DELIVERY` |
+| `grandTotal` | `aggregateType = SalesOrder` | tổng tiền của đơn (đồng, số nguyên) |
+| `cancelKind` | `OrderCancelled` | `CUSTOMER` (khách tự hủy đơn, hoặc khách hủy lệnh thanh toán đang chờ), `STAFF` (nhân viên hủy tay), `EXPIRED` (job hết hạn giữ hàng), `PAYMENT_TIMEOUT` (job hết hạn thanh toán) |
+| `issuedAt` | `InvoiceIssued` | thời điểm phát hành, ISO-8601 UTC (bằng `occurredAt` của sự kiện) |
+
+`RefundCompleted` đã có sẵn `amount` (số tiền hoàn) và `orderId`; `InvoiceIssued` đã có sẵn `invoiceId`, `invoiceNo`, `series`, `kind`, `orderId`, `grandTotal`. Đơn POS cũng phát `OrderCompleted` (phân biệt bằng `channel = POS`). Hợp đồng này là đầu vào của `NotificationEventMapper` ở support-service; không có thay đổi nào ở `/api/**`.
+
 ## Khác biệt so với DTO lms-api của B1.5 (đã xử lý ở B1.3 hoặc để bước sau)
 
 Đã sửa trực tiếp trong `lms-api/.../SalesDtos.java` (lệch tên trường nhỏ):
