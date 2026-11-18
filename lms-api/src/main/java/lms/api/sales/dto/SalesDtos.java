@@ -149,7 +149,7 @@ public final class SalesDtos {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record PosOrderRequest(
             @NotEmpty @Size(max = 100) List<@Valid PosOrderLineRequest> lines,
-            @NotNull @Pattern(regexp = "CASH|BANK_TRANSFER|CARD|QR") String paymentMethod,
+            @NotNull @Pattern(regexp = "CASH|BANK_TRANSFER|CARD|QR|MOMO") String paymentMethod,
             UUID customerUserId,
             @Valid WalkInRequest walkIn,
             @Valid DiscountRequest orderDiscount,
