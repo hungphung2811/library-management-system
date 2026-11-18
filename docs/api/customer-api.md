@@ -180,6 +180,16 @@ unitPrice, lineTotal}], cancellable}`. `cancellable = (status == AWAITING_PAYMEN
 Mã lỗi nghiệp vụ thêm: `409 INSUFFICIENT_STOCK` (`details` chỉ có `titleId=<uuid>`, không có số tồn), `409 CLIENT_REQUEST_CONFLICT`,
 `409 TITLE_NOT_AVAILABLE`, `404 ORDER_NOT_FOUND`, `409 ORDER_STATE_CONFLICT`, `404 BOOK_NOT_FOUND`. `403 FORBIDDEN` có thông điệp cố định (không lộ tên khóa).
 
+#### Yêu cầu xuất hóa đơn (ADR-0030 gói A; chi tiết ở `sales-invoices.md`)
+
+`PUT /public/t/{code}/orders/{orderId}/invoice-request` (cần đăng nhập storefront như các route `orders`; nginx: PUT không bị vùng `public_order`, chỉ `public_read`/`public_tenant`). Body (record allowlist, trường lạ bị bỏ qua, thông tin là dữ liệu cá nhân nên không bị log):
+
+```json
+{"buyer":{"name":"..","company":"..","taxCode":"..","address":"..","email":".."}}
+```
+
+Cần `name` hoặc `company`; có `taxCode` (10 chữ số, `10-3` hoặc 12 chữ số) thì cần `company` và `address`. Phản hồi `200 {"orderId":"<uuid>","status":"OPEN|FULFILLED"}`, `Cache-Control: no-store` (không lặp lại thông tin khách đã gửi). Gửi lại khi yêu cầu còn `OPEN` thì ghi đè. Chỉ đơn ONLINE của chính khách: đơn của người khác, đơn POS, không tồn tại hoặc `orderId` sai định dạng đều `404 ORDER_NOT_FOUND` cùng thân. Mã lỗi nghiệp vụ thêm (customer-api viết thông điệp): `400 INVALID_TAX_CODE` ("Mã số thuế không hợp lệ"), `409 INVOICE_ALREADY_EXISTS` (đã xuất hóa đơn, liên hệ cửa hàng để đổi), `409 ORDER_NOT_INVOICEABLE` (đơn đã hủy). Hóa đơn nội bộ chưa có giá trị pháp lý của hóa đơn điện tử. FE storefront gọi route này sau khi đặt đơn thành công (hai request, không nguyên tử: lỗi thì đơn vẫn có, khách gửi lại từ chi tiết đơn).
+
 ### Cổng độc giả `/public/t/{code}/me/**` (cần đăng nhập, ADR-0023)
 
 Cổng tự phục vụ của độc giả thư viện (phiếu mượn, phạt, đặt trước, thẻ). Dùng lại phiên STOREFRONT của
