@@ -13,9 +13,13 @@ import java.math.BigDecimal;
  *
  * @param finePerDay tiền phạt trễ mỗi cuốn mỗi ngày, số nguyên theo đơn vị tiền nhỏ nhất (VND)
  * @param graceDays  số ngày trễ đầu tiên được miễn phạt
+ * @param dueReminderDaysBefore        nhắc sắp đến hạn trước bao nhiêu ngày (ADR-0030 D11), 0 = tắt
+ * @param overdueReminderIntervalDays  chu kỳ nhắc quá hạn, tính theo ngày giữa hai lần nhắc
+ * @param overdueReminderMax           trần số lần nhắc quá hạn mỗi (phiếu, hạn trả), 0 = tắt
  */
 public record CirculationPolicy(int loanDays, int maxRenewals, int renewalDays, int maxActiveLoansPerReader,
-                                long finePerDay, int graceDays, int reservationHoldDays) {
+                                long finePerDay, int graceDays, int reservationHoldDays,
+                                int dueReminderDaysBefore, int overdueReminderIntervalDays, int overdueReminderMax) {
 
     public static final int DEFAULT_LOAN_DAYS = 14;
     public static final int DEFAULT_MAX_RENEWALS = 2;
@@ -24,6 +28,9 @@ public record CirculationPolicy(int loanDays, int maxRenewals, int renewalDays, 
     public static final long DEFAULT_FINE_PER_DAY = 5000;
     public static final int DEFAULT_GRACE_DAYS = 0;
     public static final int DEFAULT_RESERVATION_HOLD_DAYS = 3;
+    public static final int DEFAULT_DUE_REMINDER_DAYS_BEFORE = 2;
+    public static final int DEFAULT_OVERDUE_REMINDER_INTERVAL_DAYS = 3;
+    public static final int DEFAULT_OVERDUE_REMINDER_MAX = 3;
 
     public CirculationPolicy {
         range("Số ngày mượn", loanDays, 1, 365);
@@ -35,6 +42,16 @@ public record CirculationPolicy(int loanDays, int maxRenewals, int renewalDays, 
         }
         range("Số ngày ân hạn", graceDays, 0, 90);
         range("Số ngày giữ chỗ đặt trước", reservationHoldDays, 1, 30);
+        range("Số ngày nhắc trước hạn trả", dueReminderDaysBefore, 0, 30);
+        range("Chu kỳ nhắc quá hạn (ngày)", overdueReminderIntervalDays, 1, 30);
+        range("Số lần nhắc quá hạn tối đa", overdueReminderMax, 0, 20);
+    }
+
+    /** Dạng 7 trường (trước khi có cấu hình nhắc hạn): ba trường nhắc hạn lấy mặc định. */
+    public CirculationPolicy(int loanDays, int maxRenewals, int renewalDays, int maxActiveLoansPerReader,
+                             long finePerDay, int graceDays, int reservationHoldDays) {
+        this(loanDays, maxRenewals, renewalDays, maxActiveLoansPerReader, finePerDay, graceDays, reservationHoldDays,
+                DEFAULT_DUE_REMINDER_DAYS_BEFORE, DEFAULT_OVERDUE_REMINDER_INTERVAL_DAYS, DEFAULT_OVERDUE_REMINDER_MAX);
     }
 
     private static void range(String label, int value, int min, int max) {
@@ -45,7 +62,8 @@ public record CirculationPolicy(int loanDays, int maxRenewals, int renewalDays, 
 
     public static CirculationPolicy defaults() {
         return new CirculationPolicy(DEFAULT_LOAN_DAYS, DEFAULT_MAX_RENEWALS, DEFAULT_RENEWAL_DAYS,
-                DEFAULT_MAX_ACTIVE_LOANS, DEFAULT_FINE_PER_DAY, DEFAULT_GRACE_DAYS, DEFAULT_RESERVATION_HOLD_DAYS);
+                DEFAULT_MAX_ACTIVE_LOANS, DEFAULT_FINE_PER_DAY, DEFAULT_GRACE_DAYS, DEFAULT_RESERVATION_HOLD_DAYS,
+                DEFAULT_DUE_REMINDER_DAYS_BEFORE, DEFAULT_OVERDUE_REMINDER_INTERVAL_DAYS, DEFAULT_OVERDUE_REMINDER_MAX);
     }
 
     public BigDecimal finePerDayAmount() {

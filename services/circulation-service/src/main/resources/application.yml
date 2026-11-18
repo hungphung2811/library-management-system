@@ -64,6 +64,11 @@ app:
   reservation:
     # UC14: chạy đầu mỗi ngày (cron 6 trường)
     expire-cron: "0 5 0 * * *"
+  # Nhắc hạn trả (ADR-0030 D11): 07:00 giờ Việt Nam hằng ngày; "-" tắt lịch, reminder-enabled=false tắt hẳn bean
+  borrowing:
+    reminder-enabled: true
+    reminder-cron: "0 0 7 * * *"
+    reminder-zone: Asia/Ho_Chi_Minh
   # Mức phạt (QĐ3, QĐ4): đổi ở đây không cần sửa code. Hạn mức mượn theo loại độc giả nằm ở bảng borrow_rules.
   fine:
     late-fee-per-day: 5000

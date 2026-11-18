@@ -17,6 +17,9 @@ app:
   reservation:
     # "-" là giá trị tắt của Spring @Scheduled: ExpireReservationsJob (UC14) không chạy trong tiến trình seed
     expire-cron: "-"
+  borrowing:
+    # Cùng lý do: LoanReminderJob (nhắc hạn) không chạy trong tiến trình seed
+    reminder-cron: "-"
 
 lms:
   security:

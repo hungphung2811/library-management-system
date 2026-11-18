@@ -5,6 +5,9 @@ import lms.circulation.borrowing.application.CopyInventoryPort;
 import lms.circulation.borrowing.application.CopyReservationPort;
 import lms.circulation.borrowing.application.FineLedgerPort;
 import lms.circulation.borrowing.application.ListBorrowingsUseCase;
+import lms.circulation.borrowing.application.LoanReminderPort;
+import lms.circulation.borrowing.application.SendLoanReminderBatchUseCase;
+import lms.circulation.borrowing.application.SendLoanRemindersUseCase;
 import lms.circulation.borrowing.application.ReaderDirectoryPort;
 import lms.circulation.borrowing.application.ReportLostUseCase;
 import lms.circulation.borrowing.application.SearchBorrowingsUseCase;
@@ -154,6 +157,20 @@ public class BorrowingBeanConfiguration {
     @Bean
     GetBorrowingUseCase getBorrowingUseCase(BorrowingPersistenceAdapter persistence) {
         return new GetBorrowingUseCase(persistence);
+    }
+
+    /** Nhắc hạn trả (ADR-0030 D11): một transaction mỗi lô, phát đồng bộ trước khi commit. */
+    @Bean
+    SendLoanReminderBatchUseCase sendLoanReminderBatchUseCase(LoanReminderPort reminders,
+                                                              KafkaBorrowingEventPublisher publisher, Clock clock) {
+        return new SendLoanReminderBatchUseCase(reminders, publisher, clock);
+    }
+
+    /** Chính sách đọc bằng bean gốc GetCirculationPolicyUseCase (không qua cache). */
+    @Bean
+    SendLoanRemindersUseCase sendLoanRemindersUseCase(GetCirculationPolicyUseCase policies,
+                                                      SendLoanReminderBatchUseCase batches, Clock clock) {
+        return new SendLoanRemindersUseCase(policies, batches, clock, SendLoanRemindersUseCase.DEFAULT_BATCH_SIZE);
     }
 
     @Bean

@@ -43,6 +43,12 @@ class CirculationPolicyJpaEntity {
     private int graceDays;
     @Column(name = "reservation_hold_days", nullable = false)
     private int reservationHoldDays;
+    @Column(name = "due_reminder_days_before", nullable = false)
+    private int dueReminderDaysBefore;
+    @Column(name = "overdue_reminder_interval_days", nullable = false)
+    private int overdueReminderIntervalDays;
+    @Column(name = "overdue_reminder_max", nullable = false)
+    private int overdueReminderMax;
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
     @Column(name = "updated_by")
@@ -58,7 +64,8 @@ class CirculationPolicyJpaEntity {
     }
 
     void apply(int loanDays, int maxRenewals, int renewalDays, int maxActiveLoansPerReader, long finePerDay,
-               int graceDays, int reservationHoldDays, Instant updatedAt, UUID updatedBy) {
+               int graceDays, int reservationHoldDays, int dueReminderDaysBefore, int overdueReminderIntervalDays,
+               int overdueReminderMax, Instant updatedAt, UUID updatedBy) {
         this.loanDays = loanDays;
         this.maxRenewals = maxRenewals;
         this.renewalDays = renewalDays;
@@ -66,6 +73,9 @@ class CirculationPolicyJpaEntity {
         this.finePerDay = finePerDay;
         this.graceDays = graceDays;
         this.reservationHoldDays = reservationHoldDays;
+        this.dueReminderDaysBefore = dueReminderDaysBefore;
+        this.overdueReminderIntervalDays = overdueReminderIntervalDays;
+        this.overdueReminderMax = overdueReminderMax;
         this.updatedAt = updatedAt;
         this.updatedBy = updatedBy;
     }
@@ -78,6 +88,9 @@ class CirculationPolicyJpaEntity {
     long getFinePerDay() { return finePerDay; }
     int getGraceDays() { return graceDays; }
     int getReservationHoldDays() { return reservationHoldDays; }
+    int getDueReminderDaysBefore() { return dueReminderDaysBefore; }
+    int getOverdueReminderIntervalDays() { return overdueReminderIntervalDays; }
+    int getOverdueReminderMax() { return overdueReminderMax; }
     Instant getUpdatedAt() { return updatedAt; }
     UUID getUpdatedBy() { return updatedBy; }
 }

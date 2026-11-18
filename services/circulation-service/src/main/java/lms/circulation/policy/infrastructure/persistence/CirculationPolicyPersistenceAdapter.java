@@ -33,7 +33,8 @@ class CirculationPolicyPersistenceAdapter implements CirculationPolicyRepository
         CirculationPolicyJpaEntity entity = jpa.findAll().stream().findFirst()
                 .orElseGet(() -> new CirculationPolicyJpaEntity(UUID.randomUUID()));
         entity.apply(p.loanDays(), p.maxRenewals(), p.renewalDays(), p.maxActiveLoansPerReader(), p.finePerDay(),
-                p.graceDays(), p.reservationHoldDays(), now, updatedBy);
+                p.graceDays(), p.reservationHoldDays(), p.dueReminderDaysBefore(), p.overdueReminderIntervalDays(),
+                p.overdueReminderMax(), now, updatedBy);
         try {
             return toSnapshot(jpa.saveAndFlush(entity));
         } catch (OptimisticLockingFailureException e) {
@@ -48,6 +49,7 @@ class CirculationPolicyPersistenceAdapter implements CirculationPolicyRepository
     private static CirculationPolicySnapshot toSnapshot(CirculationPolicyJpaEntity e) {
         return new CirculationPolicySnapshot(new CirculationPolicy(e.getLoanDays(), e.getMaxRenewals(),
                 e.getRenewalDays(), e.getMaxActiveLoansPerReader(), e.getFinePerDay(), e.getGraceDays(),
-                e.getReservationHoldDays()), e.getVersion() + 1, e.getUpdatedAt(), e.getUpdatedBy());
+                e.getReservationHoldDays(), e.getDueReminderDaysBefore(), e.getOverdueReminderIntervalDays(),
+                e.getOverdueReminderMax()), e.getVersion() + 1, e.getUpdatedAt(), e.getUpdatedBy());
     }
 }
