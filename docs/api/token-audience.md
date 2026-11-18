@@ -26,6 +26,13 @@ Căn cứ: customer-api-data-authorization A1, A18, mục 5.3 phương án C. Đ
 
 `ChannelAudienceFilter`: token có `aud` chứa `lms-storefront` -> `401` (như token không hợp lệ). Cờ `lms.api.security.require-staff-audience` (mặc định `false`): khi `true` chỉ nhận token có `aud` chứa `lms-staff` (bật cùng lúc với cờ identity khi hết giai đoạn chuyển tiếp). Refresh token storefront gửi tới `POST /api/auth/refresh` -> identity trả 401 (lms-api không gửi `channel`).
 
+## Token kênh INTEGRATION (`aud = lms-integration`, chuẩn bị, chưa có endpoint cấp token)
+
+- Pha P0 của `docs/architecture/SAAS_API_AUTHENTICATION_DESIGN.md`: chỉ thêm nền. Chưa identity nào phát token loại này, nên không đổi hành vi hiện có.
+- `lms-api` (`ChannelAudienceFilter`) trả `401` cho token có `aud` chứa `lms-integration` (như `lms-storefront`). customer-api đã từ chối vì bắt buộc `lms-storefront`.
+- Ở các service, `PermissionInterceptor` chỉ cho token này vào endpoint có `@IntegrationScope("<scope>")` và scope nằm trong claim `scope` (chuỗi cách nhau bằng dấu cách); còn lại `403 FORBIDDEN`/`TENANT_REQUIRED`/`MODULE_NOT_ENABLED`/`INSUFFICIENT_SCOPE`.
+- Mọi access token do identity phát (nhân viên, storefront, svc) thêm claim `jti` (UUID); FE không cần đổi.
+
 ## Việc của customer-api (agent khác)
 
 1. Login: gửi `channel: "STOREFRONT"` + `tenantCode` từ đường dẫn. Refresh: `POST /internal/auth/refresh` với `channel: "STOREFRONT"` (logout không cần).
