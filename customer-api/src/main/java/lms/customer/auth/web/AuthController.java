@@ -5,7 +5,9 @@ import lms.customer.auth.client.AuthClient;
 import lms.customer.auth.dto.AuthDtos.IdentityTokenView;
 import lms.customer.auth.dto.AuthDtos.LoginRequest;
 import lms.customer.auth.dto.AuthDtos.RefreshRequest;
+import lms.customer.auth.dto.AuthDtos.ResendVerificationRequest;
 import lms.customer.auth.dto.AuthDtos.SessionView;
+import lms.customer.auth.dto.AuthDtos.VerifyEmailRequest;
 import lms.customer.auth.dto.AuthDtos.SignupRequest;
 import lms.customer.storefront.Feature;
 import lms.customer.storefront.StorefrontAccessCache;
@@ -50,6 +52,26 @@ public class AuthController {
         StorefrontAccess shop = storefronts.resolve(code).require(Feature.SHOP);
         auth.signup(shop.code(), request);
         return ResponseEntity.status(HttpStatus.CREATED).cacheControl(CacheControl.noStore()).build();
+    }
+
+    /**
+     * Xác minh email bằng OTP (audit A3). 204 hoặc một 400 EMAIL_VERIFICATION_FAILED cùng thân cho mọi lý do sai (không
+     * có tài khoản, OTP sai/hết hạn/hết lượt, đã xác minh).
+     */
+    @PostMapping("/t/{code}/auth/verify-email")
+    public ResponseEntity<Void> verifyEmail(@PathVariable String code, @Valid @RequestBody VerifyEmailRequest request) {
+        storefronts.resolve(code).require(Feature.SHOP);
+        auth.verifyEmail(request.username(), request.email(), request.otp());
+        return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
+    }
+
+    /** Gửi lại OTP: LUÔN 202 cùng thân rỗng (không lộ tài khoản, giãn cách hay trần theo ngày). */
+    @PostMapping("/t/{code}/auth/resend-verification")
+    public ResponseEntity<Void> resendVerification(@PathVariable String code,
+                                                   @Valid @RequestBody ResendVerificationRequest request) {
+        storefronts.resolve(code).require(Feature.SHOP);
+        auth.resendVerification(request.username(), request.email());
+        return ResponseEntity.accepted().cacheControl(CacheControl.noStore()).build();
     }
 
     @PostMapping("/t/{code}/auth/login")

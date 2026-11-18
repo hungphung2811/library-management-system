@@ -1,5 +1,6 @@
 package lms.identity.auth.application;
 
+import java.util.Optional;
 import java.util.UUID;
 import lms.identity.auth.domain.SignupNotAvailableException;
 import lms.identity.tenant.application.StorefrontTenant;
@@ -27,13 +28,21 @@ public class SignupUseCase {
     private final SignupAccountPort accounts;
     private final SignupRolePort roles;
     private final TransactionalRunner tx;
+    /** null hoặc tắt = hành vi cũ (tài khoản mới coi như đã xác minh email). */
+    private final EmailVerificationUseCase verification;
 
     public SignupUseCase(StorefrontTenantPort tenants, SignupAccountPort accounts, SignupRolePort roles,
                          TransactionalRunner tx) {
+        this(tenants, accounts, roles, tx, null);
+    }
+
+    public SignupUseCase(StorefrontTenantPort tenants, SignupAccountPort accounts, SignupRolePort roles,
+                         TransactionalRunner tx, EmailVerificationUseCase verification) {
         this.tenants = tenants;
         this.accounts = accounts;
         this.roles = roles;
         this.tx = tx;
+        this.verification = verification;
     }
 
     /** tenantCode: mã công khai của cửa hàng (customer-api lấy từ đường dẫn, không từ body của khách). */
@@ -50,12 +59,24 @@ public class SignupUseCase {
     public UUID execute(Command command) {
         StorefrontTenant tenant = tenants.resolve(command.tenantCode()).orElseThrow(SignupNotAvailableException::new);
         if (!tenant.modules().contains("SALES")) throw new SignupNotAvailableException();
-        return TenantContext.callAs(tenant.id(), () -> tx.inTransaction(() -> {
+        // Xác minh email (audit A3): tài khoản chưa xác minh + hash OTP ghi trong CÙNG transaction đăng ký; thư chỉ gửi sau commit.
+        Optional<EmailVerificationUseCase.Challenge>[] challenge = newHolder();
+        UUID id = TenantContext.callAs(tenant.id(), () -> tx.inTransaction(() -> {
             if (!roles.available()) throw new SignupNotAvailableException();
             UUID userId = accounts.register(command.username(), command.password(), command.fullName(),
                     command.email());
             roles.assignTo(userId);
+            if (verification != null) challenge[0] = verification.begin(userId, command.email());
             return userId;
         }));
+        if (challenge[0].isPresent()) verification.deliver(challenge[0].get());
+        return id;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Optional<EmailVerificationUseCase.Challenge>[] newHolder() {
+        Optional<EmailVerificationUseCase.Challenge>[] holder = new Optional[1];
+        holder[0] = Optional.empty();
+        return holder;
     }
 }

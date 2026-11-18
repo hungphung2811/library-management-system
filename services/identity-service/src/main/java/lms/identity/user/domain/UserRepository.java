@@ -23,6 +23,11 @@ public interface UserRepository {
 
     boolean existsById(UUID id);
 
+    /** Toàn cục, không phân biệt hoa thường (email là duy nhất toàn hệ thống). Mặc định rỗng; bản JPA ghi đè. */
+    default Optional<User> findByEmail(String email) {
+        return Optional.empty();
+    }
+
     /** Toàn cục (mọi tenant). */
     boolean existsByUsername(String username);
 

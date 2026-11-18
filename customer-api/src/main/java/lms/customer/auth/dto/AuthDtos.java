@@ -2,6 +2,7 @@ package lms.customer.auth.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lms.customer.web.NoControlChars;
 
@@ -32,6 +33,31 @@ public final class AuthDtos {
         @Override
         public String toString() {
             return "SignupRequest[***]";
+        }
+    }
+
+    /**
+     * Xác minh email: một trong {@code username}/{@code email} cùng OTP 6 chữ số. Không có trường tenant (lấy từ đường
+     * dẫn). Thiếu cả hai định danh thì identity trả cùng lỗi như OTP sai.
+     */
+    public record VerifyEmailRequest(
+            @Size(max = 100) @NoControlChars String username,
+            @Email @Size(max = 255) @NoControlChars String email,
+            @NotBlank @Pattern(regexp = "\\d{6}") String otp) {
+
+        @Override
+        public String toString() {
+            return "VerifyEmailRequest[***]";
+        }
+    }
+
+    public record ResendVerificationRequest(
+            @Size(max = 100) @NoControlChars String username,
+            @Email @Size(max = 255) @NoControlChars String email) {
+
+        @Override
+        public String toString() {
+            return "ResendVerificationRequest[***]";
         }
     }
 

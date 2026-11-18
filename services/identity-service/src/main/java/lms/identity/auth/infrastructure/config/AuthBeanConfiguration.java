@@ -154,9 +154,10 @@ public class AuthBeanConfiguration {
     /** Tự đăng ký công khai (ADR-0010 B2.1): tenant từ storefront (ACTIVE + SALES), role signup_default. */
     @Bean
     SignupUseCase signupUseCase(InProcessStorefrontTenantAdapter tenants, SelfRegisterUserUseCase selfRegister,
-                                SignupRoleUseCase signupRole, TransactionalRunner tx) {
+                                SignupRoleUseCase signupRole, TransactionalRunner tx,
+                                lms.identity.auth.application.EmailVerificationUseCase emailVerification) {
         return new SignupUseCase(tenants, new InProcessSignupAccountAdapter(selfRegister),
-                new InProcessSignupRoleAdapter(signupRole), tx);
+                new InProcessSignupRoleAdapter(signupRole), tx, emailVerification);
     }
 
     @Bean
@@ -173,8 +174,10 @@ public class AuthBeanConfiguration {
     @Bean
     LoginUseCase loginUseCase(AuthPersistenceAdapter persistence, BcryptPasswordHasher hasher, TokenService tokenService,
                               KafkaAuthEventPublisher publisher, Clock clock,
-                              InProcessTenantAccessAdapter tenantAccess) {
-        return new LoginUseCase(persistence, persistence, hasher, tokenService, publisher, clock, tenantAccess);
+                              InProcessTenantAccessAdapter tenantAccess,
+                              lms.identity.auth.application.EmailVerificationUseCase emailVerification) {
+        return new LoginUseCase(persistence, persistence, hasher, tokenService, publisher, clock, tenantAccess,
+                emailVerification);
     }
 
     @Bean
@@ -343,5 +346,57 @@ public class AuthBeanConfiguration {
                                                                lms.identity.auth.application.RevokeTenantUserSessionUseCase revokeSession) {
         return new InProcessAccountCredentialAdapter(register, info, resetPassword, unlock, revoke, listSessions,
                 revokeSession);
+    }
+
+    // ---- Xác minh email bằng OTP cho khách tự đăng ký (audit A3); ngưỡng ở lms.identity.email-verification.* ----
+
+    @Bean
+    lms.identity.auth.application.EmailVerificationPolicy emailVerificationPolicy(
+            @Value("${lms.identity.email-verification.enabled:true}") boolean enabled,
+            @Value("${lms.identity.email-verification.otp-ttl:PT10M}") Duration otpTtl,
+            @Value("${lms.identity.email-verification.max-attempts:5}") int maxAttempts,
+            @Value("${lms.identity.email-verification.resend-min-interval:PT60S}") Duration resendMinInterval,
+            @Value("${lms.identity.email-verification.max-sends-per-day:5}") int maxSendsPerDay) {
+        return new lms.identity.auth.application.EmailVerificationPolicy(enabled, otpTtl, maxAttempts,
+                resendMinInterval, maxSendsPerDay);
+    }
+
+    @Bean
+    lms.identity.auth.infrastructure.security.HmacOtpCodec hmacOtpCodec(
+            @Value("${lms.identity.email-verification.otp-secret:}") String secret) {
+        return new lms.identity.auth.infrastructure.security.HmacOtpCodec(secret);
+    }
+
+    @Bean
+    lms.identity.auth.infrastructure.persistence.EmailVerificationPersistenceAdapter emailVerificationPersistenceAdapter(
+            lms.identity.auth.infrastructure.persistence.EmailVerificationJpaRepository verifications,
+            lms.identity.auth.infrastructure.persistence.CredentialEmailStatusJpaRepository credentials) {
+        return new lms.identity.auth.infrastructure.persistence.EmailVerificationPersistenceAdapter(verifications,
+                credentials);
+    }
+
+    @Bean
+    lms.identity.auth.infrastructure.messaging.SmtpMailSender smtpMailSender(
+            org.springframework.beans.factory.ObjectProvider<org.springframework.mail.javamail.JavaMailSender> sender,
+            @Value("${lms.identity.email-verification.from:no-reply@lms.local}") String from) {
+        return new lms.identity.auth.infrastructure.messaging.SmtpMailSender(sender, from);
+    }
+
+    @Bean
+    lms.identity.auth.infrastructure.client.InProcessUserContactAdapter userContactAdapter(
+            lms.identity.user.application.GetUserContactUseCase contacts) {
+        return new lms.identity.auth.infrastructure.client.InProcessUserContactAdapter(contacts);
+    }
+
+    @Bean
+    lms.identity.auth.application.EmailVerificationUseCase emailVerificationUseCase(
+            lms.identity.auth.application.EmailVerificationPolicy policy,
+            lms.identity.auth.infrastructure.persistence.EmailVerificationPersistenceAdapter store,
+            lms.identity.auth.infrastructure.security.HmacOtpCodec codec,
+            lms.identity.auth.infrastructure.messaging.SmtpMailSender mail,
+            lms.identity.auth.infrastructure.client.InProcessUserContactAdapter contacts,
+            AuthPersistenceAdapter persistence, Clock clock) {
+        return new lms.identity.auth.application.EmailVerificationUseCase(policy, store, codec, mail, contacts,
+                persistence, clock);
     }
 }

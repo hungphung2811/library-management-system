@@ -47,6 +47,9 @@ public class SecurityConfiguration {
                         // quên mật khẩu: yêu cầu (luôn 202) và xác nhận bằng token một lần; chống lạm dụng ở nginx + theo tài khoản
                         .requestMatchers(HttpMethod.POST, "/internal/auth/password-reset-requests",
                                 "/internal/auth/password-reset-confirmations").permitAll()
+                        // xác minh email của khách tự đăng ký (OTP): công khai, luôn phản hồi như nhau; chống lạm dụng ở nginx + theo tài khoản
+                        .requestMatchers(HttpMethod.POST, "/internal/auth/email-verifications/confirm",
+                                "/internal/auth/email-verifications/resend").permitAll()
                         // đăng nhập ngoài (OIDC): trình duyệt chưa có token ở các bước này
                         .requestMatchers(HttpMethod.GET, "/internal/auth/external/providers",
                                 "/internal/auth/external/*/start", "/internal/auth/external/*/callback").permitAll()

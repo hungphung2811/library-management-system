@@ -104,16 +104,23 @@ class TenantMigrationIT {
         assertThat(member).containsExactlyInAnyOrder(
                 "TitleController/search", "TitleController/get", "BookCopyController/list",
                 "BorrowingController/borrow", "BorrowingController/renew",
-                "ReservationController/reserve", "ReservationController/mine", "ReservationController/cancel");
+                "ReservationController/reserve", "ReservationController/mine", "ReservationController/cancel",
+                // V34 (ADR-0026): mẫu MEMBER có thêm quyền đọc sách ba tầng (tác phẩm, bộ sách)
+                "WorkController/get", "WorkController/search",
+                "SeriesController/get", "SeriesController/search", "SeriesController/options");
 
         // Mẫu khớp từng role seed gốc (quyền hiệu lực không đổi). Sau V18 mẫu admin (SUPER_ADMIN) có thêm
         // khóa BorrowingController/getAny mà role admin seed không có (backfill chỉ gán role không phải admin,
         // role admin bỏ qua kiểm khóa): loại khóa này khỏi phép so.
+        // Các migration sau V9 (V34 sách ba tầng, V35 đền bù, V36 nhập bộ sách, V38 khóa catalog của người duyệt hoàn khoản)
+        // chỉ thêm khóa vào mẫu, không backfill role seed gốc: loại các khóa đó khỏi phép so.
+        String later = "%1$s.permission_code <> 'BorrowingController/getAny' AND %1$s.permission_code !~ '^(WorkController/.*"
+                + "|SeriesController/.*|SeriesImportController/.*|DamageLevelController/.*|CompensationPolicyController/.*"
+                + "|FineAdjustmentController/.*|FineRefundController/.*|BorrowingController/reportFound"
+                + "|TitleController/changeWork|BookCopyController/(get|changeStatus))$'";
         assertThat(column("SELECT t.name FROM role_templates t WHERE (t.module IS NULL OR t.module = 'LENDING') AND "
-                + "(SELECT count(*) FROM role_template_permissions p WHERE p.template_id = t.id "
-                + "AND p.permission_code <> 'BorrowingController/getAny') <> "
-                + "(SELECT count(*) FROM role_permissions r WHERE r.role_id = t.id "
-                + "AND r.permission_code <> 'BorrowingController/getAny')")).isEmpty();
+                + "(SELECT count(*) FROM role_template_permissions p WHERE p.template_id = t.id AND " + later.formatted("p") + ") <> "
+                + "(SELECT count(*) FROM role_permissions r WHERE r.role_id = t.id AND " + later.formatted("r") + ")")).isEmpty();
         assertThat(column("SELECT count(*)::text FROM role_template_permissions p "
                 + "JOIN role_templates t ON t.id = p.template_id WHERE t.name = 'LIBRARIAN' "
                 + "AND p.permission_code IN ('AccessControlController/assignRole', 'AuditLogController/search')"))

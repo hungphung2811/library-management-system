@@ -71,6 +71,18 @@ public class HttpAuthClient implements AuthClient {
     }
 
     @Override
+    public void verifyEmail(String username, String email, String otp) {
+        client.post().uri("/internal/auth/email-verifications/confirm")
+                .body(new VerifyEmailBody(username, email, otp)).retrieve().toBodilessEntity();
+    }
+
+    @Override
+    public void resendVerification(String username, String email) {
+        client.post().uri("/internal/auth/email-verifications/resend")
+                .body(new ResendVerificationBody(username, email)).retrieve().toBodilessEntity();
+    }
+
+    @Override
     public IdentityTokenView refresh(String refreshToken) {
         return refresh(refreshToken, null);
     }
@@ -92,6 +104,23 @@ public class HttpAuthClient implements AuthClient {
     }
 
     record LoginBody(String username, String password, String tenantCode, String channel) {
+    }
+
+    /** {@code null} bị bỏ khỏi JSON để identity chỉ thấy trường được dùng. */
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    record VerifyEmailBody(String username, String email, String otp) {
+        @Override
+        public String toString() {
+            return "VerifyEmailBody[***]";
+        }
+    }
+
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    record ResendVerificationBody(String username, String email) {
+        @Override
+        public String toString() {
+            return "ResendVerificationBody[***]";
+        }
     }
 
     record SignupBody(String tenantCode, String username, String password, String fullName, String email) {

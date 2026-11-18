@@ -91,6 +91,19 @@ public class AuthExceptionHandler {
     }
 
     /** Một mã chung cho mọi lý do không đăng ký được (ADR-0011 2.5): không lộ tenant nào có/không có tự đăng ký. */
+    /** Chỉ ném sau khi mật khẩu đúng và chỉ ở kênh storefront. */
+    @ExceptionHandler(lms.identity.auth.domain.EmailNotVerifiedException.class)
+    ResponseEntity<ErrorResponse> handleEmailNotVerified(lms.identity.auth.domain.EmailNotVerifiedException ex) {
+        return build(HttpStatus.FORBIDDEN, "EMAIL_NOT_VERIFIED", ex.getMessage());
+    }
+
+    /** Một mã và một thông điệp cho mọi lý do xác minh thất bại (không dò được tài khoản). */
+    @ExceptionHandler(lms.identity.auth.domain.InvalidEmailVerificationException.class)
+    ResponseEntity<ErrorResponse> handleInvalidEmailVerification(
+            lms.identity.auth.domain.InvalidEmailVerificationException ex) {
+        return build(HttpStatus.BAD_REQUEST, "EMAIL_VERIFICATION_FAILED", ex.getMessage());
+    }
+
     @ExceptionHandler(SignupNotAvailableException.class)
     ResponseEntity<ErrorResponse> handleSignupNotAvailable(SignupNotAvailableException ex) {
         return build(HttpStatus.FORBIDDEN, "SIGNUP_NOT_AVAILABLE", SignupNotAvailableException.MESSAGE);

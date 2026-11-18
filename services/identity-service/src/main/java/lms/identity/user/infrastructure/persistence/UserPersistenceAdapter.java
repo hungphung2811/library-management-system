@@ -75,6 +75,11 @@ class UserPersistenceAdapter implements UserRepository {
     }
 
     @Override
+    public Optional<User> findByEmail(String email) {
+        return jpa.findFirstByEmailIgnoreCase(email).map(UserPersistenceAdapter::toDomain);
+    }
+
+    @Override
     public boolean existsByUsername(String username) {
         return jpa.existsByUsername(username);
     }

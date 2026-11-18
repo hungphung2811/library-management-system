@@ -308,7 +308,8 @@ class UserImportIT {
     @Test
     void importPermissionsAreSeededByV31() {
         assertThat(count("SELECT count(*) FROM permissions WHERE code LIKE '%ImportController/%'"))
-                .isEqualTo(17L);
+                .isEqualTo(19L); // 17 khóa của V31 + SeriesImportController/upload|confirm của V36
+        assertThat(count("SELECT count(*) FROM permissions WHERE code LIKE 'SeriesImportController/%'")).isEqualTo(2L);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM permissions WHERE code = 'TitleController/lookupByIsbn'",
                 Long.class)).isEqualTo(1L);
         assertThat(count("SELECT count(*) FROM role_template_permissions WHERE permission_code = "

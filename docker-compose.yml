@@ -63,6 +63,14 @@ services:
     ports:
       - "6379:6379"
 
+  # Hộp thư giả cho dev/demo (mail KHÔNG ra ngoài): SMTP localhost:1025, xem thư ở http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit:latest
+    mem_limit: ${MAILPIT_MEM_LIMIT:-64m}
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
   # LOG_DB của support-service. Mongo đơn lẻ là đủ vì use case chỉ ghi/upsert từng document; muốn dùng
   # transaction của Mongo (MongoTransactionManager) thì phải chạy replica set.
   mongo:
@@ -169,6 +177,7 @@ services:
       AUTH_BOOTSTRAP_ADMIN_PASSWORD: ${AUTH_BOOTSTRAP_ADMIN_PASSWORD:-}
       AUTH_JWT_PRIVATE_KEY: ${AUTH_JWT_PRIVATE_KEY:-}
       AUTH_JWT_PUBLIC_KEY: ${AUTH_JWT_PUBLIC_KEY:-}
+      # Cửa sổ xoay khóa ký: khóa công khai CŨ (PEM) vẫn nằm trong JWKS; bỏ trống = một khóa (docs/architecture/JWT_KEY_ROTATION.md).
       AUTH_JWT_PREVIOUS_PUBLIC_KEY: ${AUTH_JWT_PREVIOUS_PUBLIC_KEY:-}
       # Thu hồi token integration tức thời (ghi dấu Redis; bật cùng INTEGRATION_REVOCATION_ENABLED ở integration-api).
       INTEGRATION_REVOCATION_ENABLED: ${INTEGRATION_REVOCATION_ENABLED:-false}
@@ -415,6 +424,7 @@ services:
       REDIS_PORT: "6379"
       INTEGRATION_RATE_LIMIT_ENABLED: ${INTEGRATION_RATE_LIMIT_ENABLED:-true}
       INTEGRATION_RATE_LIMIT_PER_MINUTE: ${INTEGRATION_RATE_LIMIT_PER_MINUTE:-600}
+      # Kiểm thu hồi token (denylist jti + dấu theo application) trong Redis; fail-open. Mặc định tắt.
       INTEGRATION_REVOCATION_ENABLED: ${INTEGRATION_REVOCATION_ENABLED:-false}
       JWT_JWK_SET_URI: http://identity-service:8081/.well-known/jwks.json
       # iss bắt buộc khớp identity (auth.jwt.issuer, mặc định library-auth-service).
@@ -427,6 +437,9 @@ services:
       identity-service:
         condition: service_started
         required: false
+      # Redis chỉ cho bộ đếm giới hạn tốc độ: chết thì fail-open, không chặn khởi động.
+      redis:
+        condition: service_started
     healthcheck:
       # Chỉ kiểm tiến trình integration-api, KHÔNG kiểm JWKS/identity (tránh vòng lặp khởi động lại khi identity chậm).
       test: ["CMD-SHELL", "curl -fsS http://localhost:8089/actuator/health || exit 1"]

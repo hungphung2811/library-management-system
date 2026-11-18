@@ -4,6 +4,7 @@ import lms.identity.auth.application.AuthDtos.TokenResponse;
 import lms.identity.auth.application.PasswordHasherPort;
 import lms.identity.auth.application.PublishAuthEventPort;
 import lms.identity.auth.application.SaveCredentialPort;
+import lms.identity.auth.domain.EmailNotVerifiedException;
 import lms.identity.auth.domain.InvalidCredentialsException;
 import lms.identity.auth.domain.TokenChannel;
 import lms.identity.auth.domain.UserCredential;
@@ -29,10 +30,19 @@ public class LoginUseCase {
     private final PublishAuthEventPort eventPort;
     private final Clock clock;
     private final TenantAccessPort tenantAccess;
+    /** null = không kiểm xác minh email (hành vi cũ). */
+    private final EmailVerificationUseCase emailVerification;
 
     public LoginUseCase(UserCredentialRepository repository, SaveCredentialPort savePort, PasswordHasherPort hasher,
                         TokenService tokenService, PublishAuthEventPort eventPort, Clock clock,
                         TenantAccessPort tenantAccess) {
+        this(repository, savePort, hasher, tokenService, eventPort, clock, tenantAccess, null);
+    }
+
+    public LoginUseCase(UserCredentialRepository repository, SaveCredentialPort savePort, PasswordHasherPort hasher,
+                        TokenService tokenService, PublishAuthEventPort eventPort, Clock clock,
+                        TenantAccessPort tenantAccess, EmailVerificationUseCase emailVerification) {
+        this.emailVerification = emailVerification;
         this.repository = repository;
         this.savePort = savePort;
         this.hasher = hasher;
@@ -95,6 +105,12 @@ public class LoginUseCase {
             publishUnderTenant(credential.pullEvents(), tenantAccess.lastTenant(credential.userId()),
                     credential.userId());
             throw new InvalidCredentialsException();
+        }
+
+        // Chỉ kênh storefront (khách tự đăng ký), và chỉ sau khi mật khẩu đã đúng: không lộ trạng thái cho người không có mật khẩu.
+        if (ch == TokenChannel.STOREFRONT && emailVerification != null
+                && !emailVerification.isVerified(credential.userId())) {
+            throw new EmailNotVerifiedException();
         }
 
         TokenResponse response = tokenService.issueFor(credential, tenantCodeOrNull, ch, client);

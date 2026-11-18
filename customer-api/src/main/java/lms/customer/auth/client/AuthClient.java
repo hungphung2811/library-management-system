@@ -22,6 +22,15 @@ public interface AuthClient {
      */
     void signup(String tenantCode, SignupRequest request);
 
+    /**
+     * Xác minh email bằng OTP (audit A3). Sai mọi lý do đều là 400 EMAIL_VERIFICATION_FAILED cùng thân (identity cũng
+     * vậy); {@code username} hoặc {@code email} (một trong hai) định danh tài khoản.
+     */
+    void verifyEmail(String username, String email, String otp);
+
+    /** Gửi lại OTP. Identity luôn 202 dù tài khoản có tồn tại hay không; BFF cũng luôn trả 202. */
+    void resendVerification(String username, String email);
+
     /** Làm mới phiên, không kiểm tenant (đường dẫn cũ {@code /public/auth/refresh}). */
     IdentityTokenView refresh(String refreshToken);
 

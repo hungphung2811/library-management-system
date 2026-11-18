@@ -67,6 +67,12 @@ public class UserBeanConfiguration {
     }
 
     @Bean
+    lms.identity.user.application.GetUserContactUseCase getUserContactUseCase(
+            lms.identity.user.domain.UserRepository repository) {
+        return new lms.identity.user.application.GetUserContactUseCase(repository);
+    }
+
+    @Bean
     DepartmentLookupPort departmentLookupPort(GetDepartmentUseCase getDepartment) {
         return new InProcessDepartmentLookupAdapter(getDepartment);
     }

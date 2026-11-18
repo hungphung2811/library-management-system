@@ -51,6 +51,9 @@ public class SecurityConfiguration {
             AntPathRequestMatcher.antMatcher(HttpMethod.HEAD, "/public/t/*/books/*/preview"),
             // Phiên khách theo cửa hàng
             AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/public/t/*/auth/signup"),
+            // Xác minh email bằng OTP của khách tự đăng ký (audit A3): công khai, identity phản hồi không lộ tài khoản
+            AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/public/t/*/auth/verify-email"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/public/t/*/auth/resend-verification"),
             AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/public/t/*/auth/login"),
             AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/public/t/*/auth/refresh"),
             AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/public/t/*/auth/logout"),

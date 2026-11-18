@@ -55,3 +55,53 @@ Role `signup_default` được cấp cho mọi người tự đăng ký công kh
 - Gọi `POST /internal/auth/signup` với body do BFF dựng từ record allowlist `{username, password, fullName, email}` + `tenantCode` từ đường dẫn. Không chuyển trường lạ.
 - Ánh xạ: `201` -> `201`; `403 SIGNUP_NOT_AVAILABLE`, `409 DUPLICATE_USERNAME`, `400 VALIDATION_FAILED` đã nằm trong allowlist lỗi; thông điệp do customer-api đặt, không chuyển nguyên.
 - Sau signup, login qua kênh STOREFRONT (xem `token-audience.md`).
+
+## Xác minh email bằng OTP (audit A3, migration V37)
+
+Chống đăng ký giả hàng loạt: tài khoản khách tự đăng ký phải xác minh email trước khi ĐĂNG NHẬP storefront. Căn cứ `docs/security/ORDER_ABUSE_AUDIT.md` A3.
+
+### Hành vi
+
+- Bật mặc định (`lms.identity.email-verification.enabled=true`, biến `EMAIL_VERIFICATION_ENABLED`). Tắt (`false`) thì hành vi cũ: tài khoản mới coi như đã xác minh, không tạo OTP, không gửi thư, không chặn đăng nhập.
+- `POST /internal/auth/signup` (hợp đồng ở trên KHÔNG đổi, vẫn `201` không thân): khi bật, tài khoản được tạo với `credentials.email_verified_at = NULL`, sinh OTP 6 chữ số, ghi hash OTP trong CÙNG transaction đăng ký, thư gửi SAU commit. Lỗi gửi thư không làm hỏng đăng ký (chỉ log tên lỗi); khách bấm gửi lại.
+- Tài khoản có từ trước (nhân viên, khách cũ) và mọi đường tạo tài khoản khác ngoài tự đăng ký có `email_verified_at` khác NULL (V37: `DEFAULT now()`), không ai bị khóa.
+- Đăng nhập kênh `STOREFRONT` của tài khoản chưa xác minh: `403 EMAIL_NOT_VERIFIED`, CHỈ sau khi tên đăng nhập và mật khẩu đã đúng (khóa/vô hiệu/sai mật khẩu vẫn trả mã cũ trước), nên không lộ trạng thái cho người không có mật khẩu. Kênh `STAFF` không bị ảnh hưởng.
+- Thư: văn bản thuần qua `JavaMailSender` (`spring.mail.host/port`, biến `MAIL_HOST`/`MAIL_PORT`, mặc định `localhost:1025` là Mailpit của docker-compose, xem thư ở `http://localhost:8025`; `MAIL_USERNAME`/`MAIL_PASSWORD` nếu SMTP cần xác thực; người gửi `EMAIL_VERIFICATION_FROM`). Health `mail` tắt để SMTP chết không làm identity DOWN.
+
+### `POST /internal/auth/email-verifications/confirm` (`@PublicEndpoint`)
+
+Body `{username?, email?, otp}`: một trong `username`/`email` (không phân biệt hoa thường), `otp` bắt buộc `<=12` ký tự.
+
+| HTTP | Khi |
+|---|---|
+| `204` | OTP đúng, chưa hết hạn, còn lượt: tài khoản được đánh dấu đã xác minh, OTP bị tiêu |
+| `400 EMAIL_VERIFICATION_FAILED` | MỘT mã và MỘT thông điệp ("Mã xác minh không đúng hoặc đã hết hạn") cho mọi lý do sai: không có tài khoản, thiếu định danh, đã xác minh, OTP sai, hết hạn, hết lượt thử, đã dùng |
+| `400 VALIDATION_FAILED` | Thiếu `otp` hoặc quá dài |
+
+Mỗi lần thử (kể cả sai) tăng `attempts` NGUYÊN TỬ trước khi so OTP; chạm `max-attempts` thì OTP vô hiệu (OTP đúng cũng bị từ chối) cho tới khi gửi lại.
+
+### `POST /internal/auth/email-verifications/resend` (`@PublicEndpoint`)
+
+Body `{username?, email?}`. LUÔN `202` không thân, kể cả: tài khoản không tồn tại, đã xác minh, bị vô hiệu, chưa đủ giãn cách, chạm trần theo ngày. Gửi lại sinh OTP mới (OTP cũ mất hiệu lực, `attempts` về 0).
+
+### Cấu hình (`lms.identity.email-verification.*`, mọi ngưỡng ở `application.yml`)
+
+| Khóa | Biến môi trường | Mặc định |
+|---|---|---|
+| `enabled` | `EMAIL_VERIFICATION_ENABLED` | `true` |
+| `otp-ttl` | `EMAIL_VERIFICATION_OTP_TTL` | `PT10M` |
+| `max-attempts` | `EMAIL_VERIFICATION_MAX_ATTEMPTS` | `5` |
+| `resend-min-interval` | `EMAIL_VERIFICATION_RESEND_INTERVAL` | `PT60S` |
+| `max-sends-per-day` | `EMAIL_VERIFICATION_MAX_SENDS_PER_DAY` | `5` (cửa sổ 24 giờ tính từ lần gửi đầu của cửa sổ, gồm cả lần lúc đăng ký) |
+| `otp-secret` | `EMAIL_VERIFICATION_OTP_SECRET` | rỗng. Khóa HMAC băm OTP; production PHẢI đặt (xem dưới) |
+| `from` | `EMAIL_VERIFICATION_FROM` | `no-reply@lms.local` |
+
+### Dữ liệu (V37)
+
+- `credentials.email_verified_at TIMESTAMPTZ NULL DEFAULT now()`: NULL = chưa xác minh. Entity `UserCredentialJpaEntity` KHÔNG ánh xạ cột này (lưu credential không ghi đè cờ); cờ chỉ đổi qua `CredentialEmailStatus` bằng UPDATE có điều kiện.
+- `email_verifications` (PK `user_id` -> `credentials`, một dòng OTP hiệu lực mỗi người): `otp_hash`, `otp_salt`, `expires_at`, `attempts`, `last_sent_at`, `sends_in_window`, `window_started_at`, `consumed_at`. Bảng toàn cục như `credentials`/`password_reset_tokens` (không `tenant_id`, không RLS).
+- OTP KHÔNG lưu thô: `HMAC-SHA256(key = EMAIL_VERIFICATION_OTP_SECRET, muối riêng || userId || OTP)`. OTP chỉ 10^6 khả năng nên băm không đủ chống rò DB; bảo vệ thật là bí mật cấu hình + trần lần thử + hạn ngắn. Để trống secret thì khóa là chính muối (chỉ còn băm có muối): không dùng ở production.
+
+### Vì sao chặn ở đăng nhập, không phải ở sales
+
+Token storefront do identity phát và customer-api/sales chỉ kiểm chữ ký. Thêm claim `emailVerified` thì sales (đang do phiên khác sửa, ngoài phạm vi) phải đọc claim, thêm cờ chính sách tenant và đổi hợp đồng đặt đơn. Chặn đăng nhập storefront bằng `EMAIL_NOT_VERIFIED` chỉ đụng identity + customer-api, không phá API hiện có, và đóng luôn mọi route cần token khách (đặt đơn, cổng độc giả). Đánh đổi: chưa có cờ theo tenant (bật/tắt toàn nền tảng); nếu cần cho phép tenant tự tắt thì thêm cờ chính sách ở bước sau.

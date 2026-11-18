@@ -10,6 +10,8 @@ interface SpringDataUserRepository extends JpaRepository<UserJpaEntity, UUID>, J
 
     boolean existsByUsername(String username);
 
+    java.util.Optional<UserJpaEntity> findFirstByEmailIgnoreCase(String email);
+
     @Query("select u.username from UserJpaEntity u where u.username in :usernames")
     java.util.List<String> findUsernamesIn(@Param("usernames") java.util.Collection<String> usernames);
 
