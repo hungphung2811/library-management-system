@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import lms.sales.invoicing.application.InvoiceAdjustmentPort;
 import lms.sales.ordering.domain.Disposition;
 import lms.sales.ordering.domain.Refund;
 import lms.sales.ordering.domain.ReturnLine;
@@ -51,6 +52,14 @@ public class CommitReturnUseCase {
         this.numbers = numbers;
         this.audit = audit;
         this.clock = clock;
+    }
+
+    /** Hóa đơn điều chỉnh khi trả hàng (ADR-0030 gói A). Mặc định không làm gì (test cũ, đơn không có hóa đơn). */
+    private InvoiceAdjustmentPort invoiceAdjustments = InvoiceAdjustmentPort.NONE;
+
+    public CommitReturnUseCase withInvoiceAdjustment(InvoiceAdjustmentPort port) {
+        this.invoiceAdjustments = port == null ? InvoiceAdjustmentPort.NONE : port;
+        return this;
     }
 
     @Transactional(readOnly = true)
@@ -119,6 +128,10 @@ public class CommitReturnUseCase {
             audit.record(new SalesAuditPort.AuditEntry(tenantId, SalesAuditPort.Actions.RETURN_LATE_APPROVED,
                     "SalesReturn", saved.id(), cmd.actor(), now, data));
         }
+        // ADR-0030: đơn có hóa đơn còn hiệu lực thì sinh hóa đơn điều chỉnh giảm trong cùng transaction
+        invoiceAdjustments.adjustForReturn(tenantId, order.id(), saved.id(), saved.lines().stream()
+                .map(l -> new InvoiceAdjustmentPort.ReturnedLine(l.orderLineId(), l.quantity(),
+                        l.refundAmount().amount())).toList(), cmd.actor(), now);
         return ReturnResponse.from(saved, refundId);
     }
 

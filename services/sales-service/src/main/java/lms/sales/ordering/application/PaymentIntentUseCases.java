@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import lms.sales.invoicing.application.InvoiceAutoIssuePort;
 import lms.sales.ordering.domain.PaymentIntent;
 import lms.sales.ordering.domain.PaymentIntentStatus;
 import lms.sales.ordering.domain.SalesOrder;
@@ -45,6 +46,14 @@ public class PaymentIntentUseCases {
 
     public PaymentIntentUseCases withShiftAttribution(ShiftAttributionPort port) {
         this.shifts = port == null ? ShiftAttributionPort.NONE : port;
+        return this;
+    }
+
+    /** Tự phát hành hóa đơn khi xác nhận thu (ADR-0030 gói A). Mặc định không làm gì (test cũ). */
+    private InvoiceAutoIssuePort invoiceAutoIssue = InvoiceAutoIssuePort.NONE;
+
+    public PaymentIntentUseCases withInvoiceAutoIssue(InvoiceAutoIssuePort port) {
+        this.invoiceAutoIssue = port == null ? InvoiceAutoIssuePort.NONE : port;
         return this;
     }
 
@@ -118,6 +127,7 @@ public class PaymentIntentUseCases {
         }
         audit.record(new SalesAuditPort.AuditEntry(tenantId, SalesAuditPort.Actions.ORDER_PAID, "SalesOrder",
                 saved.id(), actor, now, data));
+        invoiceAutoIssue.onOrderSettled(tenantId, saved.id(), actor); // ADR-0030: no-op khi tenant tắt tự phát hành
         return PaymentIntentResponse.from(savedIntent, now);
     }
 

@@ -2,6 +2,8 @@ package lms.sales.ordering.infrastructure.config;
 
 import java.time.Clock;
 import java.time.Duration;
+import lms.sales.invoicing.application.InvoiceAdjustmentPort;
+import lms.sales.invoicing.application.InvoiceAutoIssuePort;
 import lms.sales.ordering.application.AnonymizeWalkInBatchUseCase;
 import lms.sales.ordering.application.AntiAbuseService;
 import lms.sales.ordering.application.AnonymizeWalkInContactsUseCase;
@@ -119,8 +121,10 @@ public class OrderingBeanConfiguration {
     @Bean
     OrderWorkflowUseCases orderWorkflowUseCases(SalesOrderRepository orders, RefundRepository refunds,
                                                 StockService stockService, GetSalesSettingsUseCase settings,
-                                                SalesAuditPort audit, Clock clock) {
-        return new OrderWorkflowUseCases(orders, refunds, stockService, settings, audit, clock);
+                                                SalesAuditPort audit, Clock clock,
+                                                InvoiceAutoIssuePort invoiceAutoIssue) {
+        return new OrderWorkflowUseCases(orders, refunds, stockService, settings, audit, clock)
+                .withInvoiceAutoIssue(invoiceAutoIssue);
     }
 
     @Bean
@@ -133,8 +137,10 @@ public class OrderingBeanConfiguration {
     CommitReturnUseCase commitReturnUseCase(SalesOrderRepository orders, SalesReturnRepository returns,
                                             RefundRepository refunds, StockService stockService,
                                             GetSalesSettingsUseCase settings, DocumentNumberPort numbers,
-                                            SalesAuditPort audit, Clock clock) {
-        return new CommitReturnUseCase(orders, returns, refunds, stockService, settings, numbers, audit, clock);
+                                            SalesAuditPort audit, Clock clock,
+                                            InvoiceAdjustmentPort invoiceAdjustments) {
+        return new CommitReturnUseCase(orders, returns, refunds, stockService, settings, numbers, audit, clock)
+                .withInvoiceAdjustment(invoiceAdjustments);
     }
 
     @Bean

@@ -7,6 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import lms.sales.invoicing.application.InvoiceAutoIssuePort;
 import lms.sales.ordering.domain.Discount;
 import lms.sales.ordering.domain.OrderStatus;
 import lms.sales.ordering.domain.PaymentMethod;
@@ -46,6 +47,14 @@ public class OrderWorkflowUseCases {
         this.settings = settings;
         this.audit = audit;
         this.clock = clock;
+    }
+
+    /** Tự phát hành hóa đơn khi hoàn tất (ADR-0030 gói A). Mặc định không làm gì (test cũ). */
+    private InvoiceAutoIssuePort invoiceAutoIssue = InvoiceAutoIssuePort.NONE;
+
+    public OrderWorkflowUseCases withInvoiceAutoIssue(InvoiceAutoIssuePort port) {
+        this.invoiceAutoIssue = port == null ? InvoiceAutoIssuePort.NONE : port;
+        return this;
     }
 
     /** Xác nhận đơn; phí ship không gửi thì dùng phí cố định của tenant khi giao hàng, 0 khi nhận tại cửa hàng. */
@@ -134,6 +143,7 @@ public class OrderWorkflowUseCases {
             stockService.fulfilAll(tenantId, actor, stockLines(saved), "ORDER", saved.id());
         }
         record(saved, SalesAuditPort.Actions.ORDER_COMPLETED, actor, now, Map.of());
+        invoiceAutoIssue.onOrderSettled(tenantId, saved.id(), actor); // ADR-0030: no-op khi tenant tắt tự phát hành
         return OrderResponse.from(saved);
     }
 

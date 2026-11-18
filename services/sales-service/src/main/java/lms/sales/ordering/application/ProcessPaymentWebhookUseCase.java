@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import lms.sales.invoicing.application.InvoiceAutoIssuePort;
 import lms.sales.ordering.domain.PaymentIntent;
 import lms.sales.ordering.domain.PaymentIntentStatus;
 import lms.sales.ordering.domain.PaymentRecord;
@@ -49,6 +50,14 @@ public class ProcessPaymentWebhookUseCase {
         this.stockService = stockService;
         this.audit = audit;
         this.clock = clock;
+    }
+
+    /** Tự phát hành hóa đơn khi cổng báo đã thu (ADR-0030 gói A). Mặc định không làm gì (test cũ). */
+    private InvoiceAutoIssuePort invoiceAutoIssue = InvoiceAutoIssuePort.NONE;
+
+    public ProcessPaymentWebhookUseCase withInvoiceAutoIssue(InvoiceAutoIssuePort port) {
+        this.invoiceAutoIssue = port == null ? InvoiceAutoIssuePort.NONE : port;
+        return this;
     }
 
     /** Webhook của cổng giả lập (chỉ lệnh SIMULATED). */
@@ -106,6 +115,9 @@ public class ProcessPaymentWebhookUseCase {
         data.put("provider", savedIntent.provider());
         audit.record(new SalesAuditPort.AuditEntry(tenantId, SalesAuditPort.Actions.ORDER_PAID, "SalesOrder",
                 saved.id(), null, now, data));
+        if (saved.fulfilsStockOnSettle()) { // POS xong ngay: ADR-0030 tự phát hành hóa đơn (no-op khi tenant tắt)
+            invoiceAutoIssue.onOrderSettled(tenantId, saved.id(), null);
+        }
         return new Result(PaymentIntentResponse.from(savedIntent, now), false, false);
     }
 }

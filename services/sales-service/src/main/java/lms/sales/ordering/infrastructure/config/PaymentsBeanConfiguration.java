@@ -7,6 +7,7 @@ import lms.sales.ordering.application.CommitPosPendingOrderUseCase;
 import lms.sales.ordering.application.ExpirePaymentIntentsUseCase;
 import lms.sales.ordering.application.PaymentGatewayPort;
 import lms.sales.ordering.application.PaymentIntentRepository;
+import lms.sales.invoicing.application.InvoiceAutoIssuePort;
 import lms.sales.ordering.application.PaymentIntentUseCases;
 import lms.sales.ordering.application.ProcessPaymentWebhookUseCase;
 import lms.sales.ordering.application.SalesOrderRepository;
@@ -41,15 +42,18 @@ public class PaymentsBeanConfiguration {
     @Bean
     PaymentIntentUseCases paymentIntentUseCases(PaymentIntentRepository intents, SalesOrderRepository orders,
                                                 StockService stockService, SalesAuditPort audit, Clock clock,
-                                                ShiftAttributionPort shifts) {
-        return new PaymentIntentUseCases(intents, orders, stockService, audit, clock).withShiftAttribution(shifts);
+                                                ShiftAttributionPort shifts, InvoiceAutoIssuePort invoiceAutoIssue) {
+        return new PaymentIntentUseCases(intents, orders, stockService, audit, clock).withShiftAttribution(shifts)
+                .withInvoiceAutoIssue(invoiceAutoIssue);
     }
 
     @Bean
     ProcessPaymentWebhookUseCase processPaymentWebhookUseCase(PaymentIntentRepository intents,
                                                               SalesOrderRepository orders, StockService stockService,
-                                                              SalesAuditPort audit, Clock clock) {
-        return new ProcessPaymentWebhookUseCase(intents, orders, stockService, audit, clock);
+                                                              SalesAuditPort audit, Clock clock,
+                                                              InvoiceAutoIssuePort invoiceAutoIssue) {
+        return new ProcessPaymentWebhookUseCase(intents, orders, stockService, audit, clock)
+                .withInvoiceAutoIssue(invoiceAutoIssue);
     }
 
     /** Hết hạn lệnh: hỏi cổng lần cuối trước khi đóng (ADR-0029 mục 2.3), best-effort. */
