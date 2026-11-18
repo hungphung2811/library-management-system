@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.UUID;
+import lms.security.CallerIdentity;
 import lms.security.JwtClaims;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,6 +83,10 @@ public class PermissionInterceptor implements HandlerInterceptor {
             return false;
         }
         TenantModule module = resolved.requiredModule();
+        // Token integration (aud lms-integration) đặt trước mọi nhánh khác: chỉ endpoint @IntegrationScope, không bao giờ admin
+        if (isIntegrationToken(authentication)) {
+            return handleIntegrationToken(response, resolved, authentication);
+        }
         // ADR-0011: token dịch vụ storefront chỉ dùng được ở endpoint @StorefrontAccessible
         if (isServiceToken(authentication)) {
             return handleServiceToken(response, resolved, authentication);
@@ -155,6 +160,59 @@ public class PermissionInterceptor implements HandlerInterceptor {
             }
         }
         return true;
+    }
+
+    /**
+     * Token integration: không @IntegrationScope thì 403 FORBIDDEN (không nêu khóa nội bộ, kể cả endpoint
+     * {@code @AuthenticatedOnly}/{@code @PlatformAdminOnly}/{@code @StorefrontAccessible}); thiếu tenantId thì 403
+     * TENANT_REQUIRED; thiếu module thì 403 MODULE_NOT_ENABLED (không fallback token cũ); scope không nằm trong claim
+     * {@code scope} thì 403 INSUFFICIENT_SCOPE; còn lại cho qua, không đăng ký/kiểm khóa. Claim admin/platformAdmin
+     * (nếu có) bị bỏ qua hoàn toàn.
+     */
+    private boolean handleIntegrationToken(HttpServletResponse response, PermissionKeyResolver.Resolved resolved,
+                                           Authentication authentication) throws Exception {
+        String required = resolved.integrationScope();
+        if (required == null) {
+            reject(response, HttpServletResponse.SC_FORBIDDEN, "FORBIDDEN", "Token tích hợp không được dùng ở endpoint này");
+            return false;
+        }
+        if (!hasTenant(authentication)) {
+            reject(response, HttpServletResponse.SC_FORBIDDEN, "TENANT_REQUIRED", "Token không thuộc tenant nào");
+            return false;
+        }
+        TenantModule module = resolved.requiredModule();
+        if (module != null) {
+            Object claim = ((JwtAuthenticationToken) authentication).getToken().getClaim(JwtClaims.MODULES);
+            boolean has = false;
+            if (claim instanceof Collection<?> values) {
+                for (Object value : values) {
+                    if (module.name().equals(String.valueOf(value))) has = true;
+                }
+            }
+            if (!has) {
+                reject(response, HttpServletResponse.SC_FORBIDDEN, "MODULE_NOT_ENABLED", "Tenant chưa bật module " + module);
+                return false;
+            }
+        }
+        if (!hasScope(((JwtAuthenticationToken) authentication).getToken().getClaim(JwtClaims.SCOPE), required)) {
+            reject(response, HttpServletResponse.SC_FORBIDDEN, "INSUFFICIENT_SCOPE", "Token thiếu scope " + required);
+            return false;
+        }
+        return true;
+    }
+
+    /** Claim scope là chuỗi các scope cách nhau bằng khoảng trắng; so khớp nguyên từ, không so chuỗi con. */
+    private static boolean hasScope(Object claim, String required) {
+        if (!(claim instanceof String text)) return false;
+        for (String scope : text.trim().split("\\s+")) {
+            if (scope.equals(required)) return true;
+        }
+        return false;
+    }
+
+    private static boolean isIntegrationToken(Authentication authentication) {
+        return authentication instanceof JwtAuthenticationToken jwt
+                && CallerIdentity.hasAudience(jwt.getToken(), JwtClaims.AUDIENCE_INTEGRATION);
     }
 
     private static boolean isServiceToken(Authentication authentication) {

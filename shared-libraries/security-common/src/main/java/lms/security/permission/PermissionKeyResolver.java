@@ -19,13 +19,18 @@ public class PermissionKeyResolver {
 
     /** key và source chỉ có nghĩa khi mode là PERMISSION. */
     public record Resolved(Mode mode, String key, String source, String description, TenantModule requiredModule,
-                           boolean storefrontAccessible) {
+                           boolean storefrontAccessible, String integrationScope) {
+        public Resolved(Mode mode, String key, String source, String description, TenantModule requiredModule,
+                        boolean storefrontAccessible) {
+            this(mode, key, source, description, requiredModule, storefrontAccessible, null);
+        }
+
         public Resolved(Mode mode, String key, String source, String description, TenantModule requiredModule) {
-            this(mode, key, source, description, requiredModule, false);
+            this(mode, key, source, description, requiredModule, false, null);
         }
 
         public Resolved(Mode mode, String key, String source, String description) {
-            this(mode, key, source, description, null, false);
+            this(mode, key, source, description, null, false, null);
         }
     }
 
@@ -37,8 +42,17 @@ public class PermissionKeyResolver {
         Resolved base = resolveMode(handler);
         TenantModule module = requiredModule(handler);
         boolean storefront = storefrontAccessible(handler);
-        return module == null && !storefront ? base
-                : new Resolved(base.mode(), base.key(), base.source(), base.description(), module, storefront);
+        String scope = integrationScope(handler);
+        return module == null && !storefront && scope == null ? base
+                : new Resolved(base.mode(), base.key(), base.source(), base.description(), module, storefront, scope);
+    }
+
+    /** {@code @IntegrationScope} trên method thắng class; null nếu không có hoặc giá trị trống (cộng thêm, không đổi chế độ). */
+    private static String integrationScope(HandlerMethod handler) {
+        Class<?> type = ClassUtils.getUserClass(handler.getBeanType());
+        IntegrationScope onMethod = find(handler.getMethod(), IntegrationScope.class);
+        IntegrationScope found = onMethod != null ? onMethod : find(type, IntegrationScope.class);
+        return found == null || found.value().isBlank() ? null : found.value().trim();
     }
 
     /** ADR-0011: {@code @StorefrontAccessible} trên method hoặc class (cộng thêm, không đổi chế độ). */

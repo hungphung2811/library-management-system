@@ -46,4 +46,15 @@ public final class JwtClaims {
      * tenant, đổi mỗi lần đăng nhập. Token dịch vụ ({@link #SERVICE}) và token phát trước ADR-0017 không có claim này.
      */
     public static final String SESSION_ID = "sid";
+    /**
+     * aud của token tích hợp máy-với-máy (client_credentials, thiết kế SAAS_API_AUTHENTICATION_DESIGN D3). Token loại này
+     * chỉ dùng được ở endpoint {@code @IntegrationScope}, bị lms-api và customer-api từ chối, không bao giờ là admin.
+     */
+    public static final String AUDIENCE_INTEGRATION = "lms-integration";
+    /** Các scope được cấp, chuỗi cách nhau bằng dấu cách (RFC 8693/9068), ví dụ {@code "books:read orders:read"}. */
+    public static final String SCOPE = "scope";
+    /** Định danh client của token tích hợp (RFC 9068); bằng {@code sub} và id application. */
+    public static final String CLIENT_ID = "client_id";
+    /** Id application (UUID dạng chuỗi) đã xin token tích hợp hoặc site key của token storefront. */
+    public static final String APPLICATION_ID = "application_id";
 }
