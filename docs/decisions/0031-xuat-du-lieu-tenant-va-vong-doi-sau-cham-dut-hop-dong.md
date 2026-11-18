@@ -350,3 +350,45 @@ Kiểm thử bắt buộc (tester):
 3. Gói xuất có cần kèm tệp đính kèm (ảnh bìa, file nhập Excel) không? Mặc định: không (repo hiện chưa lưu tệp nhị phân của
    tenant ngoài DB; ⚠️ chưa kiểm hết).
 4. Thời hạn giữ chứng từ tài chính: chờ người dùng cung cấp theo tư vấn pháp lý; trước đó giữ vô hạn.
+
+## Phụ lục A. Hợp đồng exporter đã chốt (gói F2, 19/11/2026)
+
+Chốt để F1 (exporter từng service) và F2 (điều phối ở identity) làm song song. Chọn phương án "ZIP con" mà D3 khuyến nghị.
+
+**Endpoint** (mỗi service catalog, circulation, sales, support; system tùy chọn): `GET /internal/tenant-data/export`,
+`@TenantDataAccess`, không tham số query (tenant lấy duy nhất từ claim `tenantId` của token `svc = tenant-data`, đặt vào
+`TenantContext`; tuyệt đối không nhận `tenantId` từ query/header). Header gửi kèm: `Authorization: Bearer <token>`,
+`X-Correlation-Id`, `Accept: application/zip`.
+
+**Phản hồi thành công**: `200`, `Content-Type: application/zip`, thân là ZIP ghi theo luồng (không giữ cả gói trong RAM, đọc
+DB theo lô keyset), không `Content-Length`. Các entry ở gốc ZIP (không thư mục con):
+
+1. `<bảng>.csv` mỗi bảng một file: UTF-8 **có BOM**, phân tách dấu phẩy, bao trong dấu nháy kép khi cần (RFC 4180), dòng
+   đầu là tên cột, xuống dòng `\r\n`, cột JSON/mảng ghi dạng chuỗi JSON, thời điểm ISO-8601 UTC, boolean `true/false`,
+   giá trị null là ô rỗng. Tên bảng khớp `[a-z0-9_]+`. Bảng rỗng vẫn có file (chỉ dòng tiêu đề).
+2. `_meta.json` là entry **cuối cùng** (ghi sau khi đã đếm xong), UTF-8 không BOM:
+   `{"service":"catalog","schemaVersion":1,"tables":[{"name":"authors","file":"authors.csv","rows":123,"columns":["id","name"]}],"excluded":[{"table":"x","reason":"..."}]}`.
+   `rows` là số dòng dữ liệu (không tính dòng tiêu đề). `excluded` là bảng/cột bị loại có chủ đích kèm lý do (có thể rỗng).
+   Điều phối không chép `_meta.json` vào gói tổng mà gộp vào `manifest.json`.
+
+Điều phối tự tính SHA-256 và số byte của từng CSV khi chép sang gói tổng (exporter không cần tính).
+
+**Lỗi**: lỗi trước khi bắt đầu ghi thân → mã HTTP `401/403` (token sai), `404/501` không dùng; `5xx` (điều phối thử lại tối đa
+3 lần). Lỗi giữa chừng khi đã ghi thân → đóng kết nối/để ZIP cụt, **không** ghi `_meta.json`: điều phối coi thiếu
+`_meta.json` hoặc ZIP không đọc được là lỗi nguồn đó. Thông điệp lỗi của exporter không bao giờ được đưa tới người dùng cuối
+(điều phối chỉ lưu `error_code` chung: `SOURCE_HTTP_<status>`, `SOURCE_UNREACHABLE`, `SOURCE_TRUNCATED`, `SOURCE_INVALID`).
+
+**Giới hạn**: điều phối ngắt nguồn khi tổng byte vượt `lms.tenant-data.export.max-bytes` (`SIZE_LIMIT`). Exporter nên giữ mọi
+entry theo luồng, mỗi lô đọc 500 đến 1000 dòng. Timeout đọc socket của điều phối: 120 giây giữa hai lần nhận dữ liệu
+(exporter nên flush đều).
+
+**Cấu hình nguồn ở identity**: `lms.tenant-data.export.sources.<service>.base-url` (catalog `http://catalog-service:8082`,
+circulation `:8083`, support `:8084`, sales `:8087`, local dev `localhost`). Nguồn không khai base-url thì bị bỏ qua và ghi
+trong manifest là "không cấu hình".
+
+**Phần của identity** do identity tự xuất trong tiến trình (không qua HTTP): `users` (chỉ người có membership trong tenant,
+cột hồ sơ), `tenant_memberships`, `roles`, `role_permissions`, `user_roles`, `departments`, `reader_profiles`, `applications`
+(không secret), `tenant_contracts`.
+
+**Số migration thật**: identity `V41__tenant_data_exports.sql` (V40 đã dùng cho seed khóa quyền hóa đơn/ca/thông báo).
+Chỉ tạo `tenant_data_exports` và `tenant_data_export_parts` ở gói F2; các bảng vòng đời/purge để G1/G2.

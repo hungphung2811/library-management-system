@@ -44,7 +44,10 @@ public final class TenantArchitectureRules {
             "cms_pages", "cms_contact_requests",
             // ADR-0030 D8: danh sách tenant đã từng có thông báo của support-service (chỉ id tenant, không chứa dữ liệu tenant;
             // dispatcher lặp qua đây rồi chạy từng tenant trong TenantContext.runAs, giống sales_tenants/known_tenants)
-            "notification_tenants");
+            "notification_tenants",
+            // ADR-0031 F2: yêu cầu xuất dữ liệu tenant và tiến độ từng nguồn (bảng toàn cục: job nền quét mọi tenant; chống IDOR bằng
+            // lọc (tenant_id, id) tường minh ở use case + test hai tenant). tenant_data_export_parts không có cột tenant_id.
+            "tenant_data_exports", "tenant_data_export_parts");
 
     private static final String SPRING_QUERY = "org.springframework.data.jpa.repository.Query";
 

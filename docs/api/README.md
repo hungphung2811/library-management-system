@@ -72,6 +72,8 @@ Quy tắc chọn nhanh:
 | `dashboard-reports.md` | lms-api (gộp catalog, circulation, sales; tổng quan nền tảng ở identity) | `/api/dashboard/**`, `/api/reports/**`, `GET /api/platform/dashboard/overview` |
 | `storefront-kham-pha.md` | ⚠️ đề xuất, chưa có code (ADR-0019): customer-api + lms-api | `/public/t/{code}/books?sort&inStock`, `/public/t/{code}/books/suggestions`, `/public/t/{code}/banners`, `/api/sales/banners/**` |
 | `notifications.md` (mục "Thông báo theo sự kiện", ADR-0030 gói C) | lms-api → support-service | `/api/notifications/me/{preferences,deliveries}`, `/api/notification-deliveries/**`, `/api/notification-settings/channels`, `/api/notification-templates/**` |
+| `tenant-data-export.md` (ADR-0031 gói F2) | lms-api → identity-service: xuất trọn dữ liệu tenant (yêu cầu, tiến độ, tải ZIP stream; platform admin xuất thay) | `/api/tenant-data/exports/**`, `/api/platform/tenants/{tenantId}/data-exports/**` |
+| `tenant-data-exporters.md` | nội bộ (không qua lms-api, không dành cho FE): exporter dữ liệu tenant của catalog, circulation, support (ADR-0031 gói F1, hợp đồng Phụ lục A) | `GET /internal/tenant-data/export` (`@TenantDataAccess`, token `svc=tenant-data`) |
 | Các file còn lại (`identity-*`, `circulation.md`, `notifications.md`, `menu.md`...) | lms-api | `/api/**` |
 
 ## 7. Chưa kiểm chứng

@@ -19,4 +19,11 @@ public class TenantNameQuery {
         if (tenantId == null) return Optional.empty();
         return tenants.findById(tenantId).map(t -> t.name());
     }
+
+    /** Mã tenant theo id (manifest xuất dữ liệu, ADR-0031); tenant không tồn tại thì rỗng. */
+    @Transactional(readOnly = true)
+    public Optional<String> codeOf(UUID tenantId) {
+        if (tenantId == null) return Optional.empty();
+        return tenants.findById(tenantId).map(t -> t.code());
+    }
 }

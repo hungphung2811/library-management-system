@@ -139,4 +139,37 @@ class IdentityArchitectureTest {
     static final ArchRule userKhongBietCacContextKhac = noClasses()
             .that().resideInAPackage("lms.identity.user..")
             .should().dependOnClassesThat().resideInAnyPackage("lms.identity.auth..", "lms.identity.accesscontrol..");
+
+    /**
+     * tenantdata (ADR-0031, xuất dữ liệu tenant) chỉ được dùng API (tầng application) của tenant và auth (cổng phát token
+     * tenant-data), không đụng domain hay infrastructure của chúng, và không biết các context còn lại.
+     */
+    @ArchTest
+    static final ArchRule tenantdataChiDungTangApplicationCuaContextKhac = noClasses()
+            .that().resideInAPackage("lms.identity.tenantdata..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "lms.identity.tenant.domain..", "lms.identity.tenant.infrastructure..",
+                    "lms.identity.auth.domain..", "lms.identity.auth.infrastructure..",
+                    "lms.identity.accesscontrol..", "lms.identity.user..", "lms.identity.department..",
+                    "lms.identity.contract..", "lms.identity.apiclient..");
+
+    /** Không context nào khác phụ thuộc tenantdata (job và controller tự đứng riêng). */
+    @ArchTest
+    static final ArchRule khongContextNaoPhuThuocTenantdata = noClasses()
+            .that().resideOutsideOfPackage("lms.identity.tenantdata..")
+            .should().dependOnClassesThat().resideInAPackage("lms.identity.tenantdata..");
+
+    /** domain của tenantdata là Java thuần: không Spring, jakarta, jackson. */
+    @ArchTest
+    static final ArchRule tenantdataDomainJavaThuan = noClasses()
+            .that().resideInAPackage("lms.identity.tenantdata.domain..")
+            .should().dependOnClassesThat().resideInAnyPackage("org.springframework..", "jakarta..",
+                    "com.fasterxml.jackson..");
+
+    /** application của tenantdata không dùng infrastructure (chỉ cổng); Spring chỉ được dùng @Transactional. */
+    @ArchTest
+    static final ArchRule tenantdataApplicationKhongBietInfrastructure = noClasses()
+            .that().resideInAPackage("lms.identity.tenantdata.application..")
+            .should().dependOnClassesThat().resideInAnyPackage("lms.identity.tenantdata.infrastructure..",
+                    "com.fasterxml.jackson..", "jakarta..");
 }

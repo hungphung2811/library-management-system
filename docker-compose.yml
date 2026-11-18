@@ -189,6 +189,16 @@ services:
       LMS_CACHE_ENABLED: ${LMS_CACHE_ENABLED:-true}
       # Bí mật riêng của customer-api khi xin token storefront (ADR-0011 2.1); production phải ghi đè.
       STOREFRONT_CLIENT_SECRET: ${STOREFRONT_CLIENT_SECRET:-dev-storefront-secret}
+      # Xuất dữ liệu tenant (ADR-0031 F2): khóa AES-256 = base64 của 32 byte (openssl rand -base64 32), KHÔNG đặt trong repo;
+      # bỏ trống thì tính năng tắt (API 503 EXPORT_NOT_CONFIGURED). Volume chỉ đúng khi identity chạy MỘT instance.
+      TENANT_DATA_ENCRYPTION_KEY: ${TENANT_DATA_ENCRYPTION_KEY:-}
+      TENANT_DATA_EXPORT_DIR: /data/tenant-exports
+      TENANT_DATA_CATALOG_URL: http://catalog-service:8082
+      TENANT_DATA_CIRCULATION_URL: http://circulation-service:8083
+      TENANT_DATA_SUPPORT_URL: http://support-service:8084
+      TENANT_DATA_SALES_URL: http://sales-service:8087
+    volumes:
+      - tenantexports:/data/tenant-exports
     expose:
       - "8081"
 
@@ -482,3 +492,4 @@ services:
 volumes:
   pgdata:
   mongodata:
+  tenantexports:

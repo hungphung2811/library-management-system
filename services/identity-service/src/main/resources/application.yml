@@ -186,3 +186,25 @@ lms:
   # POST /internal/notification-recipients/lookup (KHÔNG dùng INTERNAL_API_KEY). Bỏ trống = từ chối mọi lời gọi.
   notification:
     client-secret: ${NOTIFICATION_CLIENT_SECRET:}
+
+  # Xuất trọn dữ liệu tenant (ADR-0031 F2). Gói xuất được mã hóa AES-256-GCM lúc lưu: TENANT_DATA_ENCRYPTION_KEY là base64
+  # của đúng 32 byte (ví dụ: openssl rand -base64 32), KHÔNG đặt trong repo; rỗng = tính năng tắt (API trả 503
+  # EXPORT_NOT_CONFIGURED). Volume `dir` chỉ đúng khi identity chạy MỘT instance. sources: base-url exporter của từng
+  # service (GET /internal/tenant-data/export); để trống một nguồn = bỏ qua và ghi "chưa cấu hình" vào manifest.
+  tenant-data:
+    export:
+      enabled: ${TENANT_DATA_EXPORT_ENABLED:true}
+      dir: ${TENANT_DATA_EXPORT_DIR:./data/tenant-exports}
+      encryption-key: ${TENANT_DATA_ENCRYPTION_KEY:}
+      max-bytes: 2147483648
+      retention: PT72H
+      rate-limit: PT24H
+      sources:
+        catalog:
+          base-url: ${TENANT_DATA_CATALOG_URL:${CATALOG_SERVICE_URL:http://localhost:8082}}
+        circulation:
+          base-url: ${TENANT_DATA_CIRCULATION_URL:${CIRCULATION_SERVICE_URL:http://localhost:8083}}
+        support:
+          base-url: ${TENANT_DATA_SUPPORT_URL:${SUPPORT_SERVICE_URL:http://localhost:8084}}
+        sales:
+          base-url: ${TENANT_DATA_SALES_URL:${SALES_SERVICE_URL:http://localhost:8087}}
