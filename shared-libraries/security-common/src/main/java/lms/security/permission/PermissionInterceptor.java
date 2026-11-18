@@ -75,11 +75,23 @@ public class PermissionInterceptor implements HandlerInterceptor {
         if (!(handler instanceof HandlerMethod handlerMethod)) return true;
 
         PermissionKeyResolver.Resolved resolved = resolver.resolve(handlerMethod);
-        if (resolved.mode() == PermissionKeyResolver.Mode.PUBLIC) return true;
+        // ADR-0031 D1: @TenantDataAccess thắng @PublicEndpoint (không bao giờ mở cho người chưa xác thực)
+        if (resolved.mode() == PermissionKeyResolver.Mode.PUBLIC && !resolved.tenantDataAccess()) return true;
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated() || authentication instanceof AnonymousAuthenticationToken) {
             reject(response, HttpServletResponse.SC_UNAUTHORIZED, "UNAUTHORIZED", "Cần đăng nhập");
+            return false;
+        }
+        // ADR-0031 D1: token tenant-data chỉ vào @TenantDataAccess và @TenantDataAccess chỉ nhận token tenant-data.
+        // Đặt trước mọi nhánh khác (integration, svc storefront, admin) để không nhánh nào cho token này đi nhầm chỗ.
+        if (resolved.tenantDataAccess() || isTenantDataToken(authentication)) {
+            return handleTenantDataToken(response, resolved, authentication);
+        }
+        // ADR-0031 D4: tenant chỉ đọc chặn mọi request ghi (trừ @AllowedWhenReadOnly); vắng claim thì không đổi gì
+        if (isReadOnlyViolation(request, resolved, authentication)) {
+            reject(response, HttpServletResponse.SC_FORBIDDEN, "TENANT_READ_ONLY",
+                    "Tenant đang ở chế độ chỉ đọc, không thực hiện được thao tác ghi");
             return false;
         }
         TenantModule module = resolved.requiredModule();
@@ -129,6 +141,47 @@ public class PermissionInterceptor implements HandlerInterceptor {
 
         reject(response, HttpServletResponse.SC_FORBIDDEN, "FORBIDDEN", "Thiếu quyền: " + resolved.key());
         return false;
+    }
+
+    /**
+     * ADR-0031 D1. Chỉ cho qua khi: endpoint là {@code @TenantDataAccess}, token có {@code svc = tenant-data} và
+     * {@code aud} chứa {@code lms-tenant-data}, và có {@code tenantId}. Không đăng ký/kiểm khóa, không kiểm module,
+     * không áp chế độ chỉ đọc. Mọi lý do từ chối khác nhau chỉ ở mã; thông điệp không nêu khóa nội bộ.
+     */
+    private boolean handleTenantDataToken(HttpServletResponse response, PermissionKeyResolver.Resolved resolved,
+                                          Authentication authentication) throws Exception {
+        if (!resolved.tenantDataAccess() || !isTenantDataToken(authentication)
+                || !CallerIdentity.hasAudience(((JwtAuthenticationToken) authentication).getToken(),
+                        JwtClaims.AUDIENCE_TENANT_DATA)) {
+            reject(response, HttpServletResponse.SC_FORBIDDEN, "FORBIDDEN", "Không được dùng token này ở endpoint này");
+            return false;
+        }
+        if (!hasTenant(authentication)) {
+            reject(response, HttpServletResponse.SC_FORBIDDEN, "TENANT_REQUIRED", "Token không thuộc tenant nào");
+            return false;
+        }
+        return true;
+    }
+
+    private static boolean isTenantDataToken(Authentication authentication) {
+        return authentication instanceof JwtAuthenticationToken jwt
+                && JwtClaims.SERVICE_TENANT_DATA.equals(jwt.getToken().getClaimAsString(JwtClaims.SERVICE));
+    }
+
+    /**
+     * ADR-0031 D4: true khi token mang {@code tenantAccess} khác {@code FULL} (fail-closed với giá trị lạ), request không
+     * phải GET/HEAD/OPTIONS và endpoint không có {@code @AllowedWhenReadOnly}. Platform admin không tenant (hành động
+     * thay bằng {@code X-Tenant-Id}) không bao giờ bị chặn.
+     */
+    private static boolean isReadOnlyViolation(HttpServletRequest request, PermissionKeyResolver.Resolved resolved,
+                                               Authentication authentication) {
+        if (!(authentication instanceof JwtAuthenticationToken jwt)) return false;
+        Object access = jwt.getToken().getClaim(JwtClaims.TENANT_ACCESS);
+        if (access == null || JwtClaims.TENANT_ACCESS_FULL.equals(access.toString())) return false;
+        if (isPlatformAdmin(authentication) && !hasTenant(authentication)) return false;
+        if (resolved.allowedWhenReadOnly()) return false;
+        String method = request.getMethod();
+        return !("GET".equalsIgnoreCase(method) || "HEAD".equalsIgnoreCase(method) || "OPTIONS".equalsIgnoreCase(method));
     }
 
     /**

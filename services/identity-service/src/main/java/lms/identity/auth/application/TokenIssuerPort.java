@@ -11,11 +11,19 @@ public interface TokenIssuerPort {
      * tenantId: tenant của phiên (null với phiên nền tảng không tenant); platformAdmin: tài khoản có cờ platform_admin;
      * modules: module đang bật của tenant (claim {@code modules}, ADR-0009), null = không ghi claim (phiên nền tảng);
      * audience: giá trị claim {@code aud} (ví dụ {@code lms-storefront} cho kênh storefront), null = để issuer quyết
-     * (kênh nhân viên); sessionId: họ phiên, ghi claim {@code sid} (ADR-0017), null = không ghi.
+     * (kênh nhân viên); sessionId: họ phiên, ghi claim {@code sid} (ADR-0017), null = không ghi; tenantAccess: chế độ
+     * truy cập của tenant (ADR-0031 D4), chỉ {@code READ_ONLY} mới ghi claim {@code tenantAccess}, null/FULL = không ghi.
      */
     record Claims(UUID userId, String username, UUID departmentId, List<String> roles, List<String> permissions,
                   boolean mustChangePassword, boolean admin, UUID tenantId, boolean platformAdmin,
-                  List<String> modules, String audience, UUID sessionId) {
+                  List<String> modules, String audience, UUID sessionId, String tenantAccess) {
+
+        public Claims(UUID userId, String username, UUID departmentId, List<String> roles, List<String> permissions,
+                      boolean mustChangePassword, boolean admin, UUID tenantId, boolean platformAdmin,
+                      List<String> modules, String audience, UUID sessionId) {
+            this(userId, username, departmentId, roles, permissions, mustChangePassword, admin, tenantId,
+                    platformAdmin, modules, audience, sessionId, null);
+        }
 
         public Claims(UUID userId, String username, UUID departmentId, List<String> roles, List<String> permissions,
                       boolean mustChangePassword, boolean admin, UUID tenantId, boolean platformAdmin,

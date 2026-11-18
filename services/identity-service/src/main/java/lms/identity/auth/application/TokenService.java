@@ -46,6 +46,7 @@ public class TokenService {
     private final UserDirectoryPort userDirectory;
     private final TenantAccessPort tenantAccess;
     private final List<String> storefrontPermissions;
+    private final TenantAccessModePort tenantAccessMode;
 
     /**
      * Allowlist mặc định của token kênh STOREFRONT (A19/A5 mở rộng): chỉ khóa "của tôi" của khách và tra cứu catalog.
@@ -74,6 +75,19 @@ public class TokenService {
                         SaveRefreshTokenPort refreshTokens, Clock clock, Duration refreshTokenTtl,
                         UserDirectoryPort userDirectory, TenantAccessPort tenantAccess,
                         Collection<String> storefrontPermissions) {
+        this(userAccessPort, tokenIssuer, codec, refreshTokens, clock, refreshTokenTtl, userDirectory, tenantAccess,
+                storefrontPermissions, TenantAccessModePort.FULL_ALWAYS);
+    }
+
+    /**
+     * tenantAccessMode (ADR-0031 D4): chế độ truy cập của tenant; {@code READ_ONLY} thì access token của phiên tenant
+     * mang claim {@code tenantAccess = READ_ONLY} (không áp cho platform admin), {@code FULL} thì không ghi claim.
+     */
+    public TokenService(UserAccessPort userAccessPort, TokenIssuerPort tokenIssuer, RefreshTokenCodecPort codec,
+                        SaveRefreshTokenPort refreshTokens, Clock clock, Duration refreshTokenTtl,
+                        UserDirectoryPort userDirectory, TenantAccessPort tenantAccess,
+                        Collection<String> storefrontPermissions, TenantAccessModePort tenantAccessMode) {
+        this.tenantAccessMode = tenantAccessMode != null ? tenantAccessMode : TenantAccessModePort.FULL_ALWAYS;
         this.storefrontPermissions = storefrontPermissions == null ? DEFAULT_STOREFRONT_PERMISSIONS
                 : storefrontPermissions.stream().map(String::trim).filter(x -> !x.isEmpty()).toList();
         this.userAccessPort = userAccessPort;
@@ -188,6 +202,10 @@ public class TokenService {
         // Dữ liệu này đã có sẵn trong choice.available() (TenantSummary.modules = module đang bật, cùng nguồn với
         // modules(tenantId)); chỉ đọc lại khi tenant không nằm trong danh sách (vd. platform admin làm thay tenant).
         List<String> modules = tenantId != null ? modulesOf(tenantId, choice) : null;
+        // ADR-0031 D4: tenant ở chế độ chỉ đọc thì token mang tenantAccess=READ_ONLY; platform admin không bị áp
+        String tenantAccessClaim = tenantId != null && !credential.platformAdmin()
+                && tenantAccessMode.modeOf(tenantId) == TenantAccessModePort.Mode.READ_ONLY
+                ? JwtClaims.TENANT_ACCESS_READ_ONLY : null;
         // Họ phiên quyết định MỘT chỗ này: đăng nhập thì phiên mới, xoay vòng thì chép phiên của token cũ
         String rawRefresh = codec.generate();
         String hash = codec.hash(rawRefresh);
@@ -209,7 +227,7 @@ public class TokenService {
                 access.roles(), mustChange ? List.of() : permissionsFor(access.permissions(), storefront), mustChange,
                 !storefront && !mustChange && access.admin(), tenantId,
                 !storefront && !mustChange && credential.platformAdmin(), modules,
-                storefront ? JwtClaims.AUDIENCE_STOREFRONT : null, refresh.sessionId()));
+                storefront ? JwtClaims.AUDIENCE_STOREFRONT : null, refresh.sessionId(), tenantAccessClaim));
 
         if (replacedOrNull != null) replacedOrNull.revoke(RevokeReason.ROTATED, clock.instant());
         refreshTokens.rotate(replacedOrNull, refresh);

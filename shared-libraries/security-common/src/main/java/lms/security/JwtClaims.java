@@ -57,4 +57,20 @@ public final class JwtClaims {
     public static final String CLIENT_ID = "client_id";
     /** Id application (UUID dạng chuỗi) đã xin token tích hợp hoặc site key của token storefront. */
     public static final String APPLICATION_ID = "application_id";
+    /**
+     * Chế độ truy cập của tenant trong token (ADR-0031 D4): {@link #TENANT_ACCESS_READ_ONLY} hoặc
+     * {@link #TENANT_ACCESS_FULL}. Vắng claim = {@code FULL}. Giá trị khác {@code FULL} bị coi là chỉ đọc (fail-closed).
+     */
+    public static final String TENANT_ACCESS = "tenantAccess";
+    /** Giá trị {@link #TENANT_ACCESS}: tenant chỉ đọc, request ghi bị 403 {@code TENANT_READ_ONLY}. */
+    public static final String TENANT_ACCESS_READ_ONLY = "READ_ONLY";
+    /** Giá trị {@link #TENANT_ACCESS} mặc định (identity không ghi claim khi đầy đủ quyền). */
+    public static final String TENANT_ACCESS_FULL = "FULL";
+    /**
+     * Giá trị {@link #SERVICE} của token xuất/xóa dữ liệu tenant do identity cấp cho điều phối (ADR-0031 D1): chỉ vào
+     * được endpoint {@code @TenantDataAccess}, và token này không vào được endpoint nào khác.
+     */
+    public static final String SERVICE_TENANT_DATA = "tenant-data";
+    /** aud của token {@link #SERVICE_TENANT_DATA}. */
+    public static final String AUDIENCE_TENANT_DATA = "lms-tenant-data";
 }

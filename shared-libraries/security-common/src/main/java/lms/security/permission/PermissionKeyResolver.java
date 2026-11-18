@@ -19,7 +19,13 @@ public class PermissionKeyResolver {
 
     /** key và source chỉ có nghĩa khi mode là PERMISSION. */
     public record Resolved(Mode mode, String key, String source, String description, TenantModule requiredModule,
-                           boolean storefrontAccessible, String integrationScope) {
+                           boolean storefrontAccessible, String integrationScope, boolean tenantDataAccess,
+                           boolean allowedWhenReadOnly) {
+        public Resolved(Mode mode, String key, String source, String description, TenantModule requiredModule,
+                        boolean storefrontAccessible, String integrationScope) {
+            this(mode, key, source, description, requiredModule, storefrontAccessible, integrationScope, false, false);
+        }
+
         public Resolved(Mode mode, String key, String source, String description, TenantModule requiredModule,
                         boolean storefrontAccessible) {
             this(mode, key, source, description, requiredModule, storefrontAccessible, null);
@@ -43,8 +49,12 @@ public class PermissionKeyResolver {
         TenantModule module = requiredModule(handler);
         boolean storefront = storefrontAccessible(handler);
         String scope = integrationScope(handler);
-        return module == null && !storefront && scope == null ? base
-                : new Resolved(base.mode(), base.key(), base.source(), base.description(), module, storefront, scope);
+        // ADR-0031: cả hai annotation chỉ đặt trên method (cộng thêm, không đổi chế độ)
+        boolean tenantData = find(handler.getMethod(), TenantDataAccess.class) != null;
+        boolean allowedReadOnly = find(handler.getMethod(), AllowedWhenReadOnly.class) != null;
+        return module == null && !storefront && scope == null && !tenantData && !allowedReadOnly ? base
+                : new Resolved(base.mode(), base.key(), base.source(), base.description(), module, storefront, scope,
+                        tenantData, allowedReadOnly);
     }
 
     /** {@code @IntegrationScope} trên method thắng class; null nếu không có hoặc giá trị trống (cộng thêm, không đổi chế độ). */

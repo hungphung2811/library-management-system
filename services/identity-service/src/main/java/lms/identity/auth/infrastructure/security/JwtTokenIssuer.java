@@ -2,6 +2,7 @@ package lms.identity.auth.infrastructure.security;
 
 import lms.identity.auth.application.ClientTokenIssuerPort;
 import lms.identity.auth.application.ServiceTokenIssuerPort;
+import lms.identity.auth.application.TenantDataTokenIssuerPort;
 import lms.identity.auth.application.TokenIssuerPort;
 import lms.security.JwtClaims;
 import java.time.Clock;
@@ -16,7 +17,8 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 
 /** Phát hành access token RS256 chứa roles, permissions, departmentId, tenantId và platformAdmin (khi có). */
-public class JwtTokenIssuer implements TokenIssuerPort, ServiceTokenIssuerPort, ClientTokenIssuerPort {
+public class JwtTokenIssuer
+        implements TokenIssuerPort, ServiceTokenIssuerPort, ClientTokenIssuerPort, TenantDataTokenIssuerPort {
 
     private final JwtEncoder encoder;
     private final String keyId;
@@ -80,6 +82,10 @@ public class JwtTokenIssuer implements TokenIssuerPort, ServiceTokenIssuerPort, 
             if (claims.modules() != null) {
                 builder.claim(JwtClaims.MODULES, List.copyOf(claims.modules()));
             }
+            // ADR-0031 D4: chỉ ghi khi chỉ đọc; vắng claim = FULL (token cũ/mới không đổi hình dạng)
+            if (JwtClaims.TENANT_ACCESS_READ_ONLY.equals(claims.tenantAccess())) {
+                builder.claim(JwtClaims.TENANT_ACCESS, JwtClaims.TENANT_ACCESS_READ_ONLY);
+            }
         }
         if (claims.sessionId() != null) {
             builder.claim(JwtClaims.SESSION_ID, claims.sessionId().toString());
@@ -110,6 +116,29 @@ public class JwtTokenIssuer implements TokenIssuerPort, ServiceTokenIssuerPort, 
             builder.claim(JwtClaims.APPLICATION_ID, claims.applicationId().toString());
         }
         JwtClaimsSet set = builder.build();
+        JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).keyId(keyId).build();
+        String token = encoder.encode(JwtEncoderParameters.from(header, set)).getTokenValue();
+        return new IssuedToken(token, claims.ttl().toSeconds());
+    }
+
+    /**
+     * Token xuất/xóa dữ liệu tenant (ADR-0031 D1): svc tenant-data, aud lms-tenant-data, tenantId, jti, permissions rỗng.
+     * Không roles, username, admin, platformAdmin, modules, sid, tenantAccess.
+     */
+    @Override
+    public IssuedToken issueTenantData(TenantDataClaims claims) {
+        Instant now = clock.instant();
+        JwtClaimsSet set = JwtClaimsSet.builder()
+                .issuer(issuer)
+                .subject(claims.subject().toString())
+                .audience(List.of(JwtClaims.AUDIENCE_TENANT_DATA))
+                .id(UUID.randomUUID().toString())
+                .issuedAt(now)
+                .expiresAt(now.plus(claims.ttl()))
+                .claim(JwtClaims.SERVICE, JwtClaims.SERVICE_TENANT_DATA)
+                .claim(JwtClaims.TENANT_ID, claims.tenantId().toString())
+                .claim(JwtClaims.PERMISSIONS, List.of())
+                .build();
         JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).keyId(keyId).build();
         String token = encoder.encode(JwtEncoderParameters.from(header, set)).getTokenValue();
         return new IssuedToken(token, claims.ttl().toSeconds());

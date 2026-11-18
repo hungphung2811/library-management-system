@@ -51,3 +51,16 @@ Token storefront không dùng được ở ứng dụng nhân viên (`/api/**` t
 ## Token dịch vụ `svc` cấp theo site key (Public Site Key, pha P2)
 
 `POST /internal/storefront/access-tokens` với `{siteKey}` (thay cho `{tenantCode}`) cấp token `svc` như cũ (TTL 5 phút, `permissions` rỗng, không `aud`) và **thêm claim `application_id`** (id Application kiểu `PUBLIC_SITE`). Token cấp theo `{tenantCode}` không có claim này. Claim chỉ để ghi nhận/truy vết; quyền vẫn do `@StorefrontAccessible` và module quyết. Chi tiết ở `docs/api/public-api-v1.md` mục 7.
+
+## Claim `tenantAccess` (chế độ chỉ đọc, ADR-0031 D4, gói F0)
+
+- Claim tùy chọn `tenantAccess` trong access token gắn tenant: `READ_ONLY` hoặc `FULL`. Vắng claim = `FULL` (hành vi cũ). identity chỉ ghi `READ_ONLY` (không ghi `FULL`) và không ghi cho token phiên nền tảng (không `tenantId`) hay token platform admin. Hiện identity luôn dùng `TenantAccessModePort` mặc định `FULL` nên chưa token nào mang claim; gói G nối với pha hợp đồng.
+- `PermissionInterceptor` (mọi service dùng security-common): token mang `tenantAccess` khác `FULL` (giá trị lạ cũng bị coi là chỉ đọc) thì mọi request không phải `GET`/`HEAD`/`OPTIONS` bị `403 TENANT_READ_ONLY` (thân `{"code":"TENANT_READ_ONLY","message":...}`), kể cả admin của tenant. Không bị chặn: endpoint `@PublicEndpoint` (đăng nhập, làm mới token), endpoint đánh dấu `@AllowedWhenReadOnly` (vẫn kiểm khóa quyền/module như thường), và platform admin không có `tenantId` hành động thay bằng `X-Tenant-Id`.
+- FE: gặp `403 TENANT_READ_ONLY` thì hiển thị băng cảnh báo chỉ đọc và không cho thao tác ghi. Chưa có endpoint nào đổi hợp đồng; chưa đánh dấu `@AllowedWhenReadOnly` ở service nào (việc của gói G1).
+
+## Token dịch vụ `svc = tenant-data` (ADR-0031 D1, gói F0)
+
+- Do identity ký (cùng khóa/JWKS), dành cho điều phối xuất/xóa dữ liệu tenant (gói F2/G2), chưa có endpoint cấp ra ngoài; chỉ có phương thức phát `TenantDataTokenIssuerPort.issueTenantData` ở identity.
+- Claim: `iss`, `sub` = UUID định danh yêu cầu xuất/xóa, `aud = ["lms-tenant-data"]`, `svc = "tenant-data"`, `tenantId`, `permissions = []`, `jti`, `iat`, `exp` (TTL mặc định và tối đa 10 phút). KHÔNG có `admin`, `platformAdmin`, `roles`, `username`, `modules`, `sid`, `tenantAccess`.
+- Ở các service, `PermissionInterceptor` chỉ cho token này vào endpoint `@TenantDataAccess` (cần `aud` đúng và `tenantId`, nếu không `403 FORBIDDEN`/`TENANT_REQUIRED`); không kiểm khóa, không đăng ký khóa, không kiểm module. Ngược lại mọi token khác (người dùng kể cả admin/platform admin, storefront `svc`, integration) ở endpoint `@TenantDataAccess` bị `403 FORBIDDEN`, và token tenant-data ở endpoint không mang annotation cũng `403 FORBIDDEN`. `@TenantDataAccess` thắng `@PublicEndpoint`.
+- `lms-api` và `customer-api` không phục vụ token này (endpoint `/internal/tenant-data/**` chỉ gọi nội bộ giữa identity và service).

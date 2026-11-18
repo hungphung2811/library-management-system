@@ -160,13 +160,23 @@ public class AuthBeanConfiguration {
                 new InProcessSignupRoleAdapter(signupRole), tx, emailVerification);
     }
 
+    /**
+     * Chế độ truy cập của tenant cho claim {@code tenantAccess} (ADR-0031 D4). Mặc định mọi tenant {@code FULL}: chưa
+     * đổi hành vi; gói G (vòng đời dữ liệu) thay bean này bằng adapter đọc pha hợp đồng.
+     */
+    @Bean
+    lms.identity.auth.application.TenantAccessModePort tenantAccessModePort() {
+        return lms.identity.auth.application.TenantAccessModePort.FULL_ALWAYS;
+    }
+
     @Bean
     TokenService tokenService(InProcessUserAccessAdapter accessClient, JwtTokenIssuer issuer, SecureRefreshTokenCodec codec,
                               AuthPersistenceAdapter persistence, Clock clock, UserDirectoryPort userDirectory,
                               InProcessTenantAccessAdapter tenantAccess,
                               @Value("${auth.refresh-token-ttl}") Duration refreshTtl,
                               @Value("${lms.identity.token.storefront-permissions:ShopController/*,TitleController/lookup,ReservationController/mine,ReservationController/cancel}")
-                              List<String> storefrontPermissions) {
+                              List<String> storefrontPermissions,
+                              lms.identity.auth.application.TenantAccessModePort tenantAccessMode) {
         return new TokenService(accessClient, issuer, codec, persistence, clock, refreshTtl, userDirectory, tenantAccess,
                 storefrontPermissions);
     }
