@@ -73,6 +73,8 @@ public class SecurityConfiguration {
             AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/public/t/*/orders/*/cancellation"),
             // Thanh toán online qua SePay (ADR-0029 3.3): xem QR/trạng thái thanh toán của đơn và các phương thức khả dụng
             AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/public/t/*/orders/*/payment"),
+            // Yêu cầu xuất hóa đơn của khách cho đơn của mình (ADR-0030 gói A); sales kiểm sở hữu đơn
+            AntPathRequestMatcher.antMatcher(HttpMethod.PUT, "/public/t/*/orders/*/invoice-request"),
             AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/public/t/*/payment-options"),
             // Liên hệ của khách gửi cửa hàng (ADR-0015); các phương thức khác trên đường dẫn này vẫn denyAll
             AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/public/t/*/contact-requests"),

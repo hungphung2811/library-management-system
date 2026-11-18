@@ -75,7 +75,11 @@ public class PublicExceptionHandler {
             Map.entry("BORROWING_NOT_FOUND", "Không tìm thấy phiếu mượn"),
             Map.entry("RESERVATION_NOT_FOUND", "Không tìm thấy đặt trước"),
             Map.entry("INVALID_RESERVATION", "Đặt trước không thể hủy ở trạng thái hiện tại"),
-            Map.entry("READER_PROFILE_NOT_FOUND", "Bạn chưa có thẻ thư viện"));
+            Map.entry("READER_PROFILE_NOT_FOUND", "Bạn chưa có thẻ thư viện"),
+            // Yêu cầu xuất hóa đơn (ADR-0030 gói A): thông điệp do customer-api viết, không chép thông điệp của sales
+            Map.entry("INVALID_TAX_CODE", "Mã số thuế không hợp lệ"),
+            Map.entry("INVOICE_ALREADY_EXISTS", "Đơn này đã được xuất hóa đơn, vui lòng liên hệ cửa hàng để thay đổi thông tin"),
+            Map.entry("ORDER_NOT_INVOICEABLE", "Không thể gửi yêu cầu xuất hóa đơn cho đơn này"));
 
     /**
      * Mã 400 của service phía sau có tên khác mã công khai: system-service trả VALIDATION_ERROR (body/JSON sai) và
