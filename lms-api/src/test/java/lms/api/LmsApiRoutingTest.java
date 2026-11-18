@@ -104,6 +104,34 @@ class LmsApiRoutingTest {
     }
 
     @Test
+    void applicationsChuyenToiIdentityGiuAuthorizationVaLuonNoStore() throws Exception {
+        identity.expect(requestTo("http://identity/internal/applications/9b1c/credentials"))
+                .andExpect(method(org.springframework.http.HttpMethod.POST))
+                .andExpect(header("Authorization", "Bearer token-admin"))
+                .andRespond(withStatus(HttpStatus.CREATED).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"clientSecret\":\"lms_sk_x\"}"));
+        identity.expect(requestTo("http://identity/internal/applications?x=1"))
+                .andExpect(method(org.springframework.http.HttpMethod.GET))
+                .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
+
+        mvc.perform(post("/api/applications/9b1c/credentials").with(jwt().jwt(j -> j.tokenValue("token-admin"))))
+                .andExpect(status().isCreated())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")))
+                .andExpect(jsonPath("$.clientSecret").value("lms_sk_x"));
+        mvc.perform(get("/api/applications").queryParam("x", "1").with(jwt()))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")));
+        identity.verify();
+    }
+
+    @Test
+    void applicationsKhongTokenBi401() throws Exception {
+        mvc.perform(get("/api/applications")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void meTenantsChuyenToiIdentity() throws Exception {
         identity.expect(requestTo("http://identity/internal/me/tenants"))
                 .andExpect(header("Authorization", "Bearer token-user"))

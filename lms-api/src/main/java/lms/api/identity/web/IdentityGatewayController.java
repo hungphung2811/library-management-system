@@ -56,6 +56,23 @@ public class IdentityGatewayController {
         return identity.forward(HttpMethod.GET, "/internal/storefront-origins", request.getQueryString(), null, null);
     }
 
+    /**
+     * Application, scope, domain allowlist và credential của chính tenant (SaaS API Authentication P1, ADR-0027). Chuyển
+     * nguyên sang {@code /internal/applications/**}; identity kiểm khóa động {@code ApplicationController/<method>} trên
+     * token được chuyển tiếp và tenant lấy từ token. Phản hồi luôn gắn {@code Cache-Control: no-store} (phản hồi tạo
+     * credential chứa secret một lần). Không log thân request/phản hồi. Platform admin dùng
+     * {@code /api/platform/tenants/{tenantId}/applications} (chuyển nguyên, không sửa gì).
+     */
+    @RequestMapping({"/api/applications", "/api/applications/**"})
+    public ResponseEntity<byte[]> applications(HttpServletRequest request) throws IOException {
+        String rest = request.getRequestURI().substring("/api/applications".length());
+        ResponseEntity<byte[]> response = identity.forward(HttpMethod.valueOf(request.getMethod()),
+                "/internal/applications" + rest, request.getQueryString(), request.getInputStream().readAllBytes(),
+                request.getContentType());
+        return ResponseEntity.status(response.getStatusCode()).headers(response.getHeaders())
+                .cacheControl(org.springframework.http.CacheControl.noStore()).body(response.getBody());
+    }
+
     @GetMapping("/api/contracts/current")
     public ResponseEntity<byte[]> myCurrentContract(HttpServletRequest request) {
         return identity.forward(HttpMethod.GET, "/internal/contracts/current", request.getQueryString(), null, null);
