@@ -19,6 +19,8 @@ public class ServiceClients {
     public static final String IDENTITY = "identity";
     public static final String SYSTEM = "system";
     public static final String SALES = "sales";
+    public static final String CIRCULATION = "circulation";
+    public static final String CATALOG = "catalog";
 
     private final ServicesProperties properties;
     private final ResilienceProperties resilience;

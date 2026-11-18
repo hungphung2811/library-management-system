@@ -205,7 +205,7 @@ class PublicApiControllerTest {
     // ---------- Storefront / đăng nhập ----------
 
     @Test
-    void thongTinTenantChiCoCodeVaName() throws Exception {
+    void thongTinTenantChiCoCodeNameVaHaiCoTinhNang() throws Exception {
         when(storefronts.resolve("shop-a")).thenReturn(
                 new StorefrontAccess(UUID.randomUUID(), "shop-a", "Hiệu sách A", "svc-token", 300));
         mvc.perform(get("/public/t/shop-a"))
@@ -213,7 +213,10 @@ class PublicApiControllerTest {
                 .andExpect(header().string("Cache-Control", "max-age=30, public"))
                 .andExpect(jsonPath("$.code").value("shop-a"))
                 .andExpect(jsonPath("$.name").value("Hiệu sách A"))
-                .andExpect(jsonPath("$.length()").value(2))
+                // identity cũ không có modules: coi như chỉ SALES
+                .andExpect(jsonPath("$.shopEnabled").value(true))
+                .andExpect(jsonPath("$.libraryEnabled").value(false))
+                .andExpect(jsonPath("$.length()").value(4))
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("svc-token"))));
     }
 

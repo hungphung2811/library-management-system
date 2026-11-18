@@ -12,7 +12,7 @@ import org.springframework.boot.context.properties.bind.ConstructorBinding;
  */
 @ConfigurationProperties(prefix = "app.services")
 public record ServicesProperties(String identityUrl, String systemUrl, Duration connectTimeout, Duration readTimeout,
-                                 String salesUrl) {
+                                 String salesUrl, String circulationUrl, String catalogUrl) {
 
     public static final Duration DEFAULT_CONNECT_TIMEOUT = Duration.ofSeconds(2);
     public static final Duration DEFAULT_READ_TIMEOUT = Duration.ofSeconds(5);
@@ -20,16 +20,26 @@ public record ServicesProperties(String identityUrl, String systemUrl, Duration 
 
     /** Không khai báo sales-url (test, cấu hình cũ): mặc định cổng sales-service. */
     public static final String DEFAULT_SALES_URL = "http://localhost:8087";
+    /** circulation-url, catalog-url cho cổng độc giả (ADR-0023): mặc định cổng của hai service. */
+    public static final String DEFAULT_CIRCULATION_URL = "http://localhost:8083";
+    public static final String DEFAULT_CATALOG_URL = "http://localhost:8082";
 
     @ConstructorBinding
     public ServicesProperties {
         salesUrl = salesUrl == null || salesUrl.isBlank() ? DEFAULT_SALES_URL : salesUrl;
+        circulationUrl = circulationUrl == null || circulationUrl.isBlank() ? DEFAULT_CIRCULATION_URL : circulationUrl;
+        catalogUrl = catalogUrl == null || catalogUrl.isBlank() ? DEFAULT_CATALOG_URL : catalogUrl;
         connectTimeout = sanitize(connectTimeout, DEFAULT_CONNECT_TIMEOUT);
         readTimeout = sanitize(readTimeout, DEFAULT_READ_TIMEOUT);
     }
 
     public ServicesProperties(String identityUrl, String systemUrl, Duration connectTimeout, Duration readTimeout) {
-        this(identityUrl, systemUrl, connectTimeout, readTimeout, null);
+        this(identityUrl, systemUrl, connectTimeout, readTimeout, null, null, null);
+    }
+
+    public ServicesProperties(String identityUrl, String systemUrl, Duration connectTimeout, Duration readTimeout,
+                              String salesUrl) {
+        this(identityUrl, systemUrl, connectTimeout, readTimeout, salesUrl, null, null);
     }
 
     private static Duration sanitize(Duration value, Duration fallback) {

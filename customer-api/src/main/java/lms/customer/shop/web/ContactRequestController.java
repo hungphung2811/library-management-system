@@ -3,6 +3,7 @@ package lms.customer.shop.web;
 import jakarta.validation.Valid;
 import lms.customer.shop.client.ShopClient;
 import lms.customer.shop.dto.ShopDtos.ContactRequestBody;
+import lms.customer.storefront.Feature;
 import lms.customer.storefront.ShopSessionGuard;
 import lms.customer.storefront.StorefrontAccessCache;
 import lms.customer.storefront.dto.StorefrontDtos.StorefrontAccess;
@@ -40,7 +41,7 @@ public class ContactRequestController {
     @PostMapping
     public ResponseEntity<Void> create(@PathVariable String code, @Valid @RequestBody ContactRequestBody request,
                                        Authentication authentication) {
-        StorefrontAccess access = storefronts.resolve(code);
+        StorefrontAccess access = storefronts.resolve(code).require(Feature.SHOP);
         String token = guard.requireSession(access, authentication).getTokenValue();
         if (!Boolean.TRUE.equals(request.consent())) {
             throw new PublicApiException(HttpStatus.BAD_REQUEST, "CONSENT_REQUIRED",

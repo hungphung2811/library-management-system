@@ -27,6 +27,7 @@ public class ShopController {
     @GetMapping("/{code}")
     public ResponseEntity<ShopView> shop(@PathVariable String code) {
         StorefrontAccess access = storefronts.resolve(code);
-        return PublicCache.publicFor(MAX_AGE, new ShopView(access.code(), access.name()));
+        return PublicCache.publicFor(MAX_AGE, new ShopView(access.code(), access.name(),
+                access.shopEnabled(), access.libraryEnabled()));
     }
 }

@@ -44,6 +44,9 @@ app:
     identity-url: ${IDENTITY_SERVICE_URL:http://localhost:8081}
     system-url: ${SYSTEM_SERVICE_URL:http://localhost:8086}
     sales-url: ${SALES_SERVICE_URL:http://localhost:8087}
+    # Cổng độc giả (ADR-0023): phiếu mượn/phạt/đặt trước (circulation), tên sách của đặt trước (catalog lookup).
+    circulation-url: ${CIRCULATION_SERVICE_URL:http://localhost:8083}
+    catalog-url: ${CATALOG_SERVICE_URL:http://localhost:8082}
     # Luôn hữu hạn: thiếu/0/âm thì dùng mặc định (2s/5s), tối đa 30s (ServicesProperties).
     connect-timeout: 2s
     read-timeout: 5s

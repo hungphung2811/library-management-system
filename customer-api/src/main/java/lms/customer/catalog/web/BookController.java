@@ -9,6 +9,7 @@ import lms.customer.catalog.client.CatalogClient;
 import lms.customer.catalog.dto.BookDtos.BookDetailView;
 import lms.customer.catalog.dto.BookDtos.BookPageView;
 import lms.customer.catalog.dto.BookDtos.BookPreviewView;
+import lms.customer.storefront.Feature;
 import lms.customer.storefront.StorefrontAccessCache;
 import lms.customer.storefront.dto.StorefrontDtos.StorefrontAccess;
 import lms.customer.web.PublicApiException;
@@ -62,7 +63,7 @@ public class BookController {
         String keyword = keyword(query.keyword());
         String sort = sort(query.sort());
         boolean inStock = inStock(query.inStock());
-        StorefrontAccess shop = storefronts.resolve(code);
+        StorefrontAccess shop = storefronts.resolve(code).require(Feature.SHOP);
         int page = query.page() == null || query.page() < 0 ? 0 : query.page();
         int size = query.size() == null || query.size() < 1 ? DEFAULT_SIZE : Math.min(query.size(), MAX_SIZE);
         return PublicCache.publicFor(LIST_MAX_AGE,
@@ -75,19 +76,19 @@ public class BookController {
         String q = suggestionText(query.q());
         int limit = query.limit() == null || query.limit() < 1 ? DEFAULT_SUGGEST_LIMIT
                 : Math.min(query.limit(), MAX_SUGGEST_LIMIT);
-        StorefrontAccess shop = storefronts.resolve(code);
+        StorefrontAccess shop = storefronts.resolve(code).require(Feature.SHOP);
         return PublicCache.publicFor(SUGGEST_MAX_AGE, catalog.suggestions(shop.accessToken(), q, limit));
     }
 
     @GetMapping("/{bookRef}")
     public ResponseEntity<BookDetailView> get(@PathVariable String code, @PathVariable String bookRef) {
-        StorefrontAccess shop = storefronts.resolve(code);
+        StorefrontAccess shop = storefronts.resolve(code).require(Feature.SHOP);
         return PublicCache.publicFor(LIST_MAX_AGE, catalog.get(shop.accessToken(), bookRef(bookRef)));
     }
 
     @GetMapping("/{bookRef}/preview")
     public ResponseEntity<BookPreviewView> preview(@PathVariable String code, @PathVariable String bookRef) {
-        StorefrontAccess shop = storefronts.resolve(code);
+        StorefrontAccess shop = storefronts.resolve(code).require(Feature.SHOP);
         return PublicCache.publicFor(PREVIEW_MAX_AGE, catalog.preview(shop.accessToken(), bookRef(bookRef)));
     }
 

@@ -65,7 +65,14 @@ public class SecurityConfiguration {
             AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/public/t/*/orders/*"),
             AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/public/t/*/orders/*/cancellation"),
             // Liên hệ của khách gửi cửa hàng (ADR-0015); các phương thức khác trên đường dẫn này vẫn denyAll
-            AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/public/t/*/contact-requests"));
+            AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/public/t/*/contact-requests"),
+            // Cổng độc giả (ADR-0023 2.5): danh sách đóng từng mẫu, KHÔNG dùng /public/t/*/me/**. Hủy đặt trước là POST.
+            AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/public/t/*/me/borrowings"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/public/t/*/me/borrowings/*"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/public/t/*/me/fines"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/public/t/*/me/reservations"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/public/t/*/me/reservations/*/cancellation"),
+            AntPathRequestMatcher.antMatcher(HttpMethod.GET, "/public/t/*/me/reader-profile"));
 
     @Bean
     JsonErrorWriter jsonErrorWriter(ObjectMapper mapper) {

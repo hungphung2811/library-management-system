@@ -138,7 +138,9 @@ public class StorefrontAccessCache {
             }
             return issued.get();
         });
-        if (access == null) {
+        // Identity chỉ trả tenant có SALES hoặc LENDING; kết quả không có module nào thì coi như không khả dụng.
+        // Kiểm module theo nhóm route (SHOP/LIBRARY) do controller gọi StorefrontAccess.require(Feature).
+        if (access == null || !access.supports(Feature.ANY)) {
             throw PublicApiException.shopNotAvailable();
         }
         return access;

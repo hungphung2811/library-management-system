@@ -63,7 +63,12 @@ public class PublicExceptionHandler {
             Map.entry("ACCOUNT_DISABLED", "Tài khoản đã bị vô hiệu hóa"),
             Map.entry("UNAUTHORIZED", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn"),
             // ADR-0017: token vừa được làm mới ở nơi khác (tab khác); FE đọc lại token đã lưu rồi thử lại một lần.
-            Map.entry("REFRESH_TOKEN_SUPERSEDED", "Phiên vừa được làm mới ở nơi khác, vui lòng thử lại"));
+            Map.entry("REFRESH_TOKEN_SUPERSEDED", "Phiên vừa được làm mới ở nơi khác, vui lòng thử lại"),
+            // Cổng độc giả (ADR-0023 2.5): đặt trước/phiếu mượn của người khác cũng là 404 cùng thân.
+            Map.entry("BORROWING_NOT_FOUND", "Không tìm thấy phiếu mượn"),
+            Map.entry("RESERVATION_NOT_FOUND", "Không tìm thấy đặt trước"),
+            Map.entry("INVALID_RESERVATION", "Đặt trước không thể hủy ở trạng thái hiện tại"),
+            Map.entry("READER_PROFILE_NOT_FOUND", "Bạn chưa có thẻ thư viện"));
 
     /**
      * Mã 400 của service phía sau có tên khác mã công khai: system-service trả VALIDATION_ERROR (body/JSON sai) và
@@ -75,7 +80,9 @@ public class PublicExceptionHandler {
             // sales: dữ liệu đơn sai (gồm clientRequestId không phải UUID) và mặt hàng không có/chưa đưa vào bán.
             "INVALID_REQUEST", "VALIDATION_FAILED",
             "STOCK_ITEM_NOT_FOUND", "BOOK_NOT_FOUND",
-            "STOCK_ITEM_NOT_REGISTERED", "TITLE_NOT_AVAILABLE");
+            "STOCK_ITEM_NOT_REGISTERED", "TITLE_NOT_AVAILABLE",
+            // identity trả READER_NOT_FOUND khi người dùng chưa có thẻ; đổi tên để FE phân biệt với lỗi tài khoản.
+            "READER_NOT_FOUND", "READER_PROFILE_NOT_FOUND");
 
     /**
      * Mã được phép kèm {@code details}, và chỉ các mục {@code titleId=<uuid>} (id đầu sách vốn công khai). Mọi mục khác

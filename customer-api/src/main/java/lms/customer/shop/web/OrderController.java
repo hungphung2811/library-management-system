@@ -8,6 +8,7 @@ import lms.customer.shop.dto.ShopDtos.CancelOrderRequest;
 import lms.customer.shop.dto.ShopDtos.OrderPageView;
 import lms.customer.shop.dto.ShopDtos.OrderView;
 import lms.customer.shop.dto.ShopDtos.PlaceOrderRequest;
+import lms.customer.storefront.Feature;
 import lms.customer.storefront.ShopSessionGuard;
 import lms.customer.storefront.StorefrontAccessCache;
 import lms.customer.storefront.dto.StorefrontDtos.StorefrontAccess;
@@ -88,7 +89,7 @@ public class OrderController {
 
     /** Phân giải storefront rồi kiểm phiên; trả access token của khách để chuyển tiếp. */
     private String token(String code, Authentication authentication) {
-        StorefrontAccess access = storefronts.resolve(code);
+        StorefrontAccess access = storefronts.resolve(code).require(Feature.SHOP);
         return guard.requireSession(access, authentication).getTokenValue();
     }
 

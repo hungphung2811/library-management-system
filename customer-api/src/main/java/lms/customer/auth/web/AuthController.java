@@ -7,6 +7,7 @@ import lms.customer.auth.dto.AuthDtos.LoginRequest;
 import lms.customer.auth.dto.AuthDtos.RefreshRequest;
 import lms.customer.auth.dto.AuthDtos.SessionView;
 import lms.customer.auth.dto.AuthDtos.SignupRequest;
+import lms.customer.storefront.Feature;
 import lms.customer.storefront.StorefrontAccessCache;
 import lms.customer.storefront.dto.StorefrontDtos.StorefrontAccess;
 import lms.customer.web.PublicApiException;
@@ -46,7 +47,7 @@ public class AuthController {
 
     @PostMapping("/t/{code}/auth/signup")
     public ResponseEntity<Void> signup(@PathVariable String code, @Valid @RequestBody SignupRequest request) {
-        StorefrontAccess shop = storefronts.resolve(code);
+        StorefrontAccess shop = storefronts.resolve(code).require(Feature.SHOP);
         auth.signup(shop.code(), request);
         return ResponseEntity.status(HttpStatus.CREATED).cacheControl(CacheControl.noStore()).build();
     }

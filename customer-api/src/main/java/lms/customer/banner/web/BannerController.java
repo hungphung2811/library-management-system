@@ -5,6 +5,7 @@ import java.util.List;
 import lms.customer.banner.BannerCache;
 import lms.customer.banner.client.BannerClient;
 import lms.customer.banner.dto.BannerDtos.BannerView;
+import lms.customer.storefront.Feature;
 import lms.customer.storefront.StorefrontAccessCache;
 import lms.customer.storefront.dto.StorefrontDtos.StorefrontAccess;
 import lms.customer.web.PublicCache;
@@ -33,7 +34,7 @@ public class BannerController {
 
     @GetMapping
     public ResponseEntity<List<BannerView>> list(@PathVariable String code) {
-        StorefrontAccess shop = storefronts.resolve(code);
+        StorefrontAccess shop = storefronts.resolve(code).require(Feature.SHOP);
         return PublicCache.publicFor(MAX_AGE, cache.get(shop.tenantId(), () -> banners.list(shop.accessToken())));
     }
 }

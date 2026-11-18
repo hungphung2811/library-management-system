@@ -76,6 +76,34 @@ class CustomerApiArchitectureTest {
             .that().resideInAnyPackage("lms.customer.site..", "lms.customer.auth..", "lms.customer.storefront..")
             .should().dependOnClassesThat().resideInAnyPackage("lms.customer.catalog.web..", "lms.customer.shop.web..");
 
+    /** Cổng độc giả (reader, ADR-0023) chỉ dùng web của chính nó; các nhóm khác không dùng web của reader. */
+    @ArchTest
+    static final ArchRule readerKhongDungWebNhomKhac = noClasses()
+            .that().resideInAPackage("lms.customer.reader..")
+            .should().dependOnClassesThat().resideInAnyPackage("lms.customer.site.web..", "lms.customer.auth.web..",
+                    "lms.customer.storefront.web..", "lms.customer.catalog.web..", "lms.customer.shop.web..",
+                    "lms.customer.banner.web..");
+
+    @ArchTest
+    static final ArchRule nhomKhacKhongDungWebCuaReader = noClasses()
+            .that().resideInAnyPackage("lms.customer.site..", "lms.customer.auth..", "lms.customer.storefront..",
+                    "lms.customer.catalog..", "lms.customer.shop..", "lms.customer.banner..")
+            .should().dependOnClassesThat().resideInAPackage("lms.customer.reader.web..");
+
+    /** reader chỉ biết interface client của chính nó + storefront (phân giải tenant, guard), không biết client nhóm khác. */
+    @ArchTest
+    static final ArchRule readerKhongDungClientNhomKhac = noClasses()
+            .that().resideInAPackage("lms.customer.reader..")
+            .should().dependOnClassesThat().resideInAnyPackage("lms.customer.shop.client..", "lms.customer.catalog.client..",
+                    "lms.customer.auth.client..", "lms.customer.site.client..", "lms.customer.banner.client..");
+
+    /** Tầng client của reader không phụ thuộc security-common/tenant-common (đã có luật chung, luật này nêu rõ cho nhóm mới). */
+    @ArchTest
+    static final ArchRule readerKhongDungSecurityVaTenantCommon = noClasses()
+            .that().resideInAPackage("lms.customer.reader..")
+            .should().dependOnClassesThat().resideInAnyPackage("lms.security..", "lms.tenant..", "lms.circulation..",
+                    "lms.identity..", "lms.catalog..", "jakarta.persistence..");
+
     /**
      * Controller công khai chỉ trả record trong package {@code ..dto..} (không entity/DTO nội bộ của service khác): mọi
      * kiểu liên quan tới kiểu trả về (kể cả tham số generic của ResponseEntity/List) phải thuộc {@code lms.customer..dto},
