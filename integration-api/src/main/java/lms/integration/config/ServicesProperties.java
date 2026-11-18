@@ -9,9 +9,12 @@ import org.springframework.boot.context.properties.bind.ConstructorBinding;
  * mặc định (connect 2s, read 5s); giá trị quá lớn bị chặn ở 30 giây, để một service phía sau treo không giữ thread vô hạn.
  */
 @ConfigurationProperties(prefix = "app.services")
-public record ServicesProperties(String identityUrl, Duration connectTimeout, Duration readTimeout) {
+public record ServicesProperties(String identityUrl, String catalogUrl, String salesUrl, Duration connectTimeout,
+                                 Duration readTimeout) {
 
     public static final String DEFAULT_IDENTITY_URL = "http://localhost:8081";
+    public static final String DEFAULT_CATALOG_URL = "http://localhost:8082";
+    public static final String DEFAULT_SALES_URL = "http://localhost:8087";
     public static final Duration DEFAULT_CONNECT_TIMEOUT = Duration.ofSeconds(2);
     public static final Duration DEFAULT_READ_TIMEOUT = Duration.ofSeconds(5);
     static final Duration MAX_TIMEOUT = Duration.ofSeconds(30);
@@ -19,6 +22,8 @@ public record ServicesProperties(String identityUrl, Duration connectTimeout, Du
     @ConstructorBinding
     public ServicesProperties {
         identityUrl = identityUrl == null || identityUrl.isBlank() ? DEFAULT_IDENTITY_URL : identityUrl;
+        catalogUrl = catalogUrl == null || catalogUrl.isBlank() ? DEFAULT_CATALOG_URL : catalogUrl;
+        salesUrl = salesUrl == null || salesUrl.isBlank() ? DEFAULT_SALES_URL : salesUrl;
         connectTimeout = sanitize(connectTimeout, DEFAULT_CONNECT_TIMEOUT);
         readTimeout = sanitize(readTimeout, DEFAULT_READ_TIMEOUT);
     }

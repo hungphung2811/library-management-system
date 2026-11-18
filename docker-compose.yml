@@ -390,7 +390,7 @@ services:
       - "8088"
 
   # BFF tích hợp máy-với-máy cho backend của tenant (SAAS_API_AUTHENTICATION_DESIGN D2, pha I2): hiện chỉ có
-  # POST /api/integration/v1/oauth/token (chuyển tiếp tới identity) và health. Không DB/Redis. KHÔNG bật mặc định: chỉ chạy
+  # POST /api/integration/v1/oauth/token (chuyển tiếp tới identity), endpoint đọc books/inventory/orders (pha I3, tới catalog/sales) và health. Không DB; Redis chỉ cho bộ đếm giới hạn tốc độ. KHÔNG bật mặc định: chỉ chạy
   # khi có profile `integration` (docker compose --profile apps --profile integration up -d --build). Ra ngoài qua nginx
   # (/api/integration/**). Cần identity-service (JWKS + token endpoint).
   integration-api:
@@ -404,6 +404,14 @@ services:
       JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xmx${JVM_XMX:-256m} -XX:MaxMetaspaceSize=${JVM_MAX_METASPACE:-192m} -XX:ReservedCodeCacheSize=${JVM_CODE_CACHE:-64m} -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:CICompilerCount=1 ${JVM_EXTRA_OPTS:-}}
       SERVER_TOMCAT_THREADS_MAX: ${TOMCAT_THREADS_MAX:-20}
       IDENTITY_SERVICE_URL: http://identity-service:8081
+      # Pha I3: endpoint đọc chuyển token integration tới catalog (books) và sales (inventory, orders); các service tự kiểm scope + tenant.
+      CATALOG_SERVICE_URL: http://catalog-service:8082
+      SALES_SERVICE_URL: http://sales-service:8087
+      # Giới hạn tốc độ theo application bằng Redis (fail-open khi Redis lỗi). Tắt bằng INTEGRATION_RATE_LIMIT_ENABLED=false.
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      INTEGRATION_RATE_LIMIT_ENABLED: ${INTEGRATION_RATE_LIMIT_ENABLED:-true}
+      INTEGRATION_RATE_LIMIT_PER_MINUTE: ${INTEGRATION_RATE_LIMIT_PER_MINUTE:-600}
       JWT_JWK_SET_URI: http://identity-service:8081/.well-known/jwks.json
       # iss bắt buộc khớp identity (auth.jwt.issuer, mặc định library-auth-service).
       JWT_ISSUER: ${JWT_ISSUER:-library-auth-service}

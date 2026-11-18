@@ -1,6 +1,10 @@
 package lms.integration.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lms.integration.ratelimit.ApiRateLimiter;
+import lms.integration.ratelimit.RateLimitFilter;
+import lms.integration.web.AccessLogFilter;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,6 +17,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
@@ -24,8 +29,11 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
  * Chỉ xác thực JWT (phân quyền theo scope do pha I3 và service phía sau). Danh sách đường dẫn là DANH SÁCH ĐÓNG:
  * công khai chỉ health và {@code POST /api/integration/v1/oauth/token} (client_credentials, xác thực bằng client_id +
  * secret ở identity); {@code /api/integration/v1/**} còn lại cần token integration (decoder bắt buộc aud
- * lms-integration, {@link IntegrationJwtConfiguration}), hiện chưa có endpoint nào nên đã đăng nhập cũng chỉ gặp 404;
- * MỌI thứ khác denyAll. Không CORS (API cho backend, không dùng trình duyệt), không session, không CSRF.
+ * lms-integration, {@link IntegrationJwtConfiguration}). Pha I3: các endpoint đọc books/inventory/orders còn cần scope
+ * tương ứng trong claim {@code scope} (lớp phòng thủ đầu, quyết định cuối vẫn ở catalog/sales); đường dẫn khác dưới
+ * {@code /api/integration/v1/**} (kể cả {@code /orders/{id}/contact}) đã xác thực chỉ gặp 404; MỌI thứ khác denyAll.
+ * Không CORS (API cho backend, không dùng trình duyệt), không session, không CSRF. Log truy cập đặt trước bước xác
+ * thực (ghi cả 401); giới hạn tốc độ đặt sau bước xác thực (cần claim tenant/application).
  */
 @Configuration
 public class SecurityConfiguration {
@@ -34,6 +42,10 @@ public class SecurityConfiguration {
 
     static final RequestMatcher TOKEN_ENDPOINT = AntPathRequestMatcher.antMatcher(HttpMethod.POST, TOKEN_PATH);
     static final RequestMatcher API = AntPathRequestMatcher.antMatcher("/api/integration/v1/**");
+
+    public static final String SCOPE_BOOKS_READ = "SCOPE_books:read";
+    public static final String SCOPE_INVENTORY_READ = "SCOPE_inventory:read";
+    public static final String SCOPE_ORDERS_READ = "SCOPE_orders:read";
 
     @Bean
     JsonErrorWriter jsonErrorWriter(ObjectMapper mapper) {
@@ -49,7 +61,8 @@ public class SecurityConfiguration {
     }
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http, JsonErrorWriter writer) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, JsonErrorWriter writer,
+                                            ObjectProvider<ApiRateLimiter> rateLimiter) throws Exception {
         DefaultBearerTokenResolver defaultResolver = new DefaultBearerTokenResolver();
         // Ở token endpoint header Authorization là Basic của client, không phải Bearer: bỏ qua để token cũ/hỏng
         // không làm hỏng yêu cầu xin token.
@@ -63,9 +76,16 @@ public class SecurityConfiguration {
                 writer.write(response, HttpStatus.FORBIDDEN, "FORBIDDEN", "Không được phép truy cập");
             }
         };
-        AccessDeniedHandler denied = (request, response, ex) ->
+        AccessDeniedHandler denied = (request, response, ex) -> {
+            if (API.matches(request)) {
+                // Đã xác thực nhưng thiếu scope. Tên scope là hợp đồng công khai nên không có gì nội bộ bị lộ.
+                writer.write(response, HttpStatus.FORBIDDEN, "INSUFFICIENT_SCOPE",
+                        "Token thiếu scope cần thiết cho tài nguyên này");
+            } else {
                 writer.write(response, HttpStatus.FORBIDDEN, "FORBIDDEN", "Không được phép truy cập");
-        return http.csrf(AbstractHttpConfigurer::disable)
+            }
+        };
+        HttpSecurity configured = http.csrf(AbstractHttpConfigurer::disable)
                 .cors(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .headers(h -> h
@@ -75,10 +95,22 @@ public class SecurityConfiguration {
                 .authorizeHttpRequests(a -> a
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         .requestMatchers(TOKEN_ENDPOINT).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/integration/v1/books/*").hasAuthority(SCOPE_BOOKS_READ)
+                        .requestMatchers(HttpMethod.POST, "/api/integration/v1/books/lookup",
+                                "/api/integration/v1/books/lookup-by-isbn").hasAuthority(SCOPE_BOOKS_READ)
+                        .requestMatchers(HttpMethod.GET, "/api/integration/v1/inventory",
+                                "/api/integration/v1/inventory/*").hasAuthority(SCOPE_INVENTORY_READ)
+                        .requestMatchers(HttpMethod.GET, "/api/integration/v1/orders",
+                                "/api/integration/v1/orders/*").hasAuthority(SCOPE_ORDERS_READ)
                         .requestMatchers(API).authenticated()
                         .anyRequest().denyAll())
                 .oauth2ResourceServer(o -> o.bearerTokenResolver(resolver).authenticationEntryPoint(entryPoint)
                         .accessDeniedHandler(denied).jwt(j -> { }))
-                .build();
+                .addFilterBefore(new AccessLogFilter(), BearerTokenAuthenticationFilter.class);
+        ApiRateLimiter limiter = rateLimiter.getIfAvailable();
+        if (limiter != null) {
+            configured.addFilterAfter(new RateLimitFilter(limiter, writer), BearerTokenAuthenticationFilter.class);
+        }
+        return configured.build();
     }
 }

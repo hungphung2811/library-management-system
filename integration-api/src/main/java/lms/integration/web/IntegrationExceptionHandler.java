@@ -8,7 +8,10 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.BindException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -27,6 +30,13 @@ public class IntegrationExceptionHandler {
     @ExceptionHandler(IntegrationApiException.class)
     ResponseEntity<ErrorResponse> handle(IntegrationApiException e) {
         return body(e.status(), e.code(), e.getMessage());
+    }
+
+    /** Thân/tham số sai hình dạng hoặc vi phạm ràng buộc: thông điệp chung, không phản chiếu giá trị client gửi. */
+    @ExceptionHandler({BindException.class, HttpMessageNotReadableException.class,
+            MethodArgumentTypeMismatchException.class})
+    ResponseEntity<ErrorResponse> invalidInput(Exception e) {
+        return body(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Dữ liệu gửi lên không hợp lệ");
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

@@ -21,10 +21,18 @@ class IntegrationApiArchitectureTest {
     static final ArchRule khongDungDbKafkaRedisVaCodeCuaService = noClasses()
             .that().resideInAPackage("lms.integration..")
             .should().dependOnClassesThat().resideInAnyPackage(
-                    "jakarta.persistence..", "org.springframework.jdbc..", "org.springframework.data..",
+                    "jakarta.persistence..", "org.springframework.jdbc..", "org.springframework.data.jpa..",
+                    "org.springframework.data.jdbc..", "org.springframework.data.mongodb..",
+                    "org.springframework.data.repository..",
                     "org.springframework.kafka..", "org.apache.kafka..", "lms.api..", "lms.customer..",
                     "lms.sales..", "lms.catalog..", "lms.identity..", "lms.system..", "lms.circulation..",
                     "lms.support..", "lms.security..", "lms.tenant..", "lms.cache..");
+
+    /** Redis chỉ dùng cho bộ đếm giới hạn tốc độ (D6): ngoài package ratelimit không ai biết Redis. */
+    @ArchTest
+    static final ArchRule redisChiODoanRateLimit = noClasses()
+            .that().resideInAPackage("lms.integration..").and().resideOutsideOfPackage("lms.integration.ratelimit..")
+            .should().dependOnClassesThat().resideInAPackage("org.springframework.data.redis..");
 
     /** Controller chỉ biết interface client và DTO, không biết RestClient hay cài đặt HTTP. */
     @ArchTest

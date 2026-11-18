@@ -13,8 +13,9 @@
     <artifactId>integration-api</artifactId>
     <name>integration-api</name>
 
-    <!-- BFF tích hợp máy-với-máy cho backend của tenant (SAAS_API_AUTHENTICATION_DESIGN D2, pha I2: khung + /oauth/token).
-         Không DB, không JPA/Kafka/Redis, không security-common/tenant-common. -->
+    <!-- BFF tích hợp máy-với-máy cho backend của tenant (SAAS_API_AUTHENTICATION_DESIGN D2). Pha I2: khung + /oauth/token;
+         pha I3: endpoint đọc books/inventory/orders + giới hạn tốc độ theo application bằng Redis (D6).
+         Không DB, không JPA/Kafka, không security-common/tenant-common/cache-common. Redis chỉ dùng cho bộ đếm. -->
     <dependencies>
         <dependency>
             <groupId>com.company</groupId>
@@ -30,6 +31,10 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
         <dependency>
@@ -39,6 +44,10 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

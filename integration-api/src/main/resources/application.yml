@@ -14,6 +14,15 @@ server:
 spring:
   application:
     name: integration-api
+  # Redis chỉ cho bộ đếm giới hạn tốc độ/sử dụng (pha I3). Timeout ngắn: Redis chậm không được giữ request (fail-open).
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 200ms
+      connect-timeout: 200ms
+      repositories:
+        enabled: false
   profiles:
     # Như các service khác (CLAUDE.md): mặc định dev. Ngoài dev (profile prod) cấu hình không an toàn là fail-fast,
     # xem StartupConfigurationCheck. docker-compose chọn profile bằng INTEGRATION_API_PROFILE.
@@ -28,6 +37,9 @@ spring:
           jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8081/.well-known/jwks.json}
 
 management:
+  health:
+    redis:
+      enabled: false
   endpoints:
     web:
       exposure:
@@ -45,6 +57,8 @@ logging:
 app:
   services:
     identity-url: ${IDENTITY_SERVICE_URL:http://localhost:8081}
+    catalog-url: ${CATALOG_SERVICE_URL:http://localhost:8082}
+    sales-url: ${SALES_SERVICE_URL:http://localhost:8087}
     # Luôn hữu hạn: thiếu/0/âm thì dùng mặc định (2s/5s), tối đa 30s (ServicesProperties).
     connect-timeout: 2s
     read-timeout: 5s
@@ -52,7 +66,9 @@ app:
     jwt:
       # iss bắt buộc khớp với identity (auth.jwt.issuer, mặc định library-auth-service). Rỗng ngoài dev là lỗi khởi động.
       issuer: ${JWT_ISSUER:library-auth-service}
-    # Khung cho pha I3 (giới hạn tốc độ theo application bằng Redis, D6): CHƯA có tác dụng ở pha I2, chưa cần Redis.
+    # Giới hạn tốc độ theo application bằng Redis (D6, pha I3): cửa sổ cố định 60 giây theo (tenant, application, nhóm
+    # endpoint books|inventory|orders). Mặc định TẮT (cần Redis); dev bật bằng INTEGRATION_RATE_LIMIT_ENABLED=true,
+    # docker-compose bật sẵn. Redis lỗi thì fail-open (không chặn request), cũng tạm bỏ qua Redis 5 giây.
     rate-limit:
-      enabled: false
-      default-per-minute: 600
+      enabled: ${INTEGRATION_RATE_LIMIT_ENABLED:false}
+      default-per-minute: ${INTEGRATION_RATE_LIMIT_PER_MINUTE:600}
