@@ -286,7 +286,7 @@ class StorefrontOriginUseCasesTest {
     @Test
     void tenantKhongKhaDungVanRongMotKetQua() {
         InMemoryTenantModules modules = new InMemoryTenantModules();
-        modules.give(a.id(), ModuleCode.LENDING); // không SALES
+        modules.give(a.id()); // không module nào (LENDING-only nay khả dụng, ADR-0023)
         when(tenants.findByCode("shop-a")).thenReturn(Optional.of(a));
         add().execute(a.id(), "https://on.vn", admin);
 

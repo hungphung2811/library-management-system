@@ -12,7 +12,7 @@ import lms.identity.tenant.domain.TenantRepository;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Tra mã tenant cho storefront công khai (ADR-0011 2.1, 2.5). Chỉ trả tenant tồn tại, ACTIVE và có module SALES bật;
+ * Tra mã tenant cho storefront công khai (ADR-0011 2.1, 2.5). Chỉ trả tenant tồn tại, ACTIVE và có module SALES hoặc LENDING bật (ADR-0023 2.1);
  * mọi trường hợp khác trả rỗng (không phân biệt lý do để chống dò tenant). Luôn đọc tenant theo mã trước rồi mới kiểm
  * trạng thái và module; truy vấn module và origin luôn chạy đúng một lần ở mọi nhánh. allowedOrigins là origin đang bật
  * của tenant (đã chuẩn hóa) để customer-api quyết CORS (ADR-0013).
@@ -47,7 +47,7 @@ public class ResolveStorefrontTenantUseCase {
         List<ModuleCode> enabled = modules.enabledOf(List.of(lookupId)).getOrDefault(lookupId, List.of());
         // Origin cũng truy vấn đúng một lần ở mọi nhánh (cùng lý do); chỉ origin ĐANG BẬT (ADR-0013 2.3).
         List<String> allowedOrigins = origins == null ? List.of() : origins.findEnabledOrigins(lookupId);
-        if (found.isEmpty() || !found.get().isActive() || !enabled.contains(ModuleCode.SALES)) {
+        if (found.isEmpty() || !found.get().isActive() || !(enabled.contains(ModuleCode.SALES) || enabled.contains(ModuleCode.LENDING))) {
             return Optional.empty();
         }
         Tenant t = found.get();

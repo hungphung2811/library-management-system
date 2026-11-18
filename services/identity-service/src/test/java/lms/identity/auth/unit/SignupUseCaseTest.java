@@ -32,6 +32,7 @@ class SignupUseCaseTest {
     private final List<UUID> tenantSeenByCalls = new ArrayList<>();
 
     private boolean tenantAvailable = true;
+    private List<String> tenantModules = List.of("SALES");
     private boolean roleAvailable = true;
     private RuntimeException registerFails;
     private RuntimeException assignFails;
@@ -39,7 +40,7 @@ class SignupUseCaseTest {
     private final StorefrontTenantPort tenants = code -> {
         calls.add("resolve:" + code);
         return tenantAvailable
-                ? Optional.of(new StorefrontTenant(tenantId, "shop", "Shop", List.of("SALES")))
+                ? Optional.of(new StorefrontTenant(tenantId, "shop", "Shop", tenantModules))
                 : Optional.empty();
     };
 
@@ -79,6 +80,22 @@ class SignupUseCaseTest {
                 "assign:newUser");
         assertThat(tenantSeenByCalls).containsOnly(tenantId); // roles/user_roles chịu RLS: mọi bước trong tenant của cửa hàng
         assertThat(TenantContext.current()).isEmpty();          // và không rò TenantContext ra ngoài
+    }
+
+    @Test
+    void tenantChiCoLendingKhongDuocTuDangKy() {
+        tenantModules = List.of("LENDING"); // resolver nay trả cả tenant LENDING-only, signup phải tự kiểm SALES
+
+        assertThatThrownBy(() -> useCase.execute(command())).isInstanceOf(SignupNotAvailableException.class);
+
+        assertThat(calls).containsExactly("resolve:shop");
+    }
+
+    @Test
+    void tenantCoCaLendingVaSalesDuocTuDangKy() {
+        tenantModules = List.of("LENDING", "SALES");
+
+        assertThat(useCase.execute(command())).isEqualTo(newUser);
     }
 
     @Test

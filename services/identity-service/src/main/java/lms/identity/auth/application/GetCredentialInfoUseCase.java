@@ -28,6 +28,12 @@ public class GetCredentialInfoUseCase {
         return repository.findByUsername(normalized).map(GetCredentialInfoUseCase::info);
     }
 
+    /** Tên đăng nhập (đã chuẩn hóa) đã có credential, một truy vấn cho cả lô (nhập hàng loạt). */
+    public java.util.Set<String> existingUsernames(java.util.Collection<String> usernames) {
+        if (usernames.isEmpty()) return java.util.Set.of();
+        return repository.existingUsernames(usernames);
+    }
+
     /** Thời điểm hết khóa của những người đang bị khóa tại {@code now} (người không bị khóa không có trong map). */
     public java.util.Map<UUID, java.time.Instant> activeLocks(java.util.Collection<UUID> userIds, java.time.Instant now) {
         java.util.Map<UUID, java.time.Instant> result = new java.util.HashMap<>();

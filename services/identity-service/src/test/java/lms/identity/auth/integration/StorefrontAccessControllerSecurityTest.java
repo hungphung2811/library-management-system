@@ -51,7 +51,7 @@ class StorefrontAccessControllerSecurityTest {
     @Test
     void dungBiMatKhongCanJwtTra200VoiThanDungHopDong() throws Exception {
         when(issue.execute("shop-a")).thenReturn(Optional.of(new StorefrontAccess(
-                new StorefrontTenant(TENANT_ID, "shop-a", "Hiệu sách A", List.of("SALES")), "jwt.token.value", 300)));
+                new StorefrontTenant(TENANT_ID, "shop-a", "Hiệu sách A", List.of("LENDING", "SALES")), "jwt.token.value", 300)));
 
         mvc.perform(post(PATH).header("X-Storefront-Client-Secret", "shop-secret-123")
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
@@ -60,7 +60,9 @@ class StorefrontAccessControllerSecurityTest {
                 .andExpect(jsonPath("$.code").value("shop-a"))
                 .andExpect(jsonPath("$.name").value("Hiệu sách A"))
                 .andExpect(jsonPath("$.accessToken").value("jwt.token.value"))
-                .andExpect(jsonPath("$.expiresIn").value(300));
+                .andExpect(jsonPath("$.expiresIn").value(300))
+                .andExpect(jsonPath("$.modules[0]").value("LENDING"))
+                .andExpect(jsonPath("$.modules[1]").value("SALES"));
     }
 
     @Test

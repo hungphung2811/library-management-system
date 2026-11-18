@@ -17,4 +17,11 @@ public interface UserCredentialRepository {
     }
 
     boolean existsByUsername(String username);
+
+    /** Tên đăng nhập trong {@code usernames} đã có credential, một truy vấn cho cả lô. */
+    default java.util.Set<String> existingUsernames(java.util.Collection<String> usernames) {
+        java.util.Set<String> found = new java.util.HashSet<>();
+        for (String u : usernames) if (existsByUsername(u)) found.add(u);
+        return found;
+    }
 }

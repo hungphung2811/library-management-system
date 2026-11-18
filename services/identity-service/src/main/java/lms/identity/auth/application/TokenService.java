@@ -53,7 +53,8 @@ public class TokenService {
      * {@code lms.identity.token.storefront-permissions}.
      */
     public static final List<String> DEFAULT_STOREFRONT_PERMISSIONS =
-            List.of("ShopController/*", "TitleController/lookup");
+            List.of("ShopController/*", "TitleController/lookup", "ReservationController/mine",
+                    "ReservationController/cancel");
 
     public TokenService(UserAccessPort userAccessPort, TokenIssuerPort tokenIssuer, RefreshTokenCodecPort codec,
                         SaveRefreshTokenPort refreshTokens, Clock clock, Duration refreshTokenTtl,

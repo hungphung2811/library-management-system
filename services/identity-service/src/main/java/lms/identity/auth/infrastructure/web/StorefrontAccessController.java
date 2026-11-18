@@ -43,7 +43,7 @@ public class StorefrontAccessController {
 
     /** allowedOrigins: origin ĐANG BẬT của tenant, đã chuẩn hóa (ADR-0013); không nằm trong claim JWT. Rỗng nếu chưa khai báo. */
     public record AccessTokenResponse(UUID tenantId, String code, String name, String accessToken, long expiresIn,
-                                      List<String> allowedOrigins) {
+                                      List<String> allowedOrigins, List<String> modules) {
     }
 
     @PostMapping("/access-tokens")
@@ -57,7 +57,7 @@ public class StorefrontAccessController {
         return issue.execute(body.tenantCode())
                 .<ResponseEntity<?>>map(a -> ResponseEntity.ok(new AccessTokenResponse(a.tenant().id(),
                         a.tenant().code(), a.tenant().name(), a.accessToken(), a.expiresIn(),
-                        a.tenant().allowedOrigins())))
+                        a.tenant().allowedOrigins(), a.tenant().modules())))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(ErrorResponse.of("SHOP_NOT_AVAILABLE", "Cửa hàng không khả dụng")));
     }

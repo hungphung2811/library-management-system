@@ -48,6 +48,11 @@ public class InProcessAccountCredentialAdapter implements AccountCredentialPort 
     }
 
     @Override
+    public java.util.Set<String> existingUsernames(java.util.Collection<String> usernames) {
+        return info.existingUsernames(usernames);
+    }
+
+    @Override
     public boolean exists(UUID userId) {
         return info.byUserId(userId).isPresent();
     }

@@ -198,7 +198,9 @@ class TokenChannelTest {
 
     private static final List<String> MIXED = List.of("ShopController/placeOrder", "ShopController/myOrders",
             "TitleController/lookup", "StorefrontController/list", "SalesOrderController/markPaid",
-            "RefundController/markRefunded", "AccessControlController/grantPermission");
+            "RefundController/markRefunded", "AccessControlController/grantPermission",
+            "ReservationController/mine", "ReservationController/cancel", "ReservationController/reserve",
+            "ReservationController/fulfill");
 
     @Test
     void tokenStorefrontChiMangKhoaTrongAllowlistMacDinh() {
@@ -207,8 +209,10 @@ class TokenChannelTest {
         serviceWith(MIXED, TokenService.DEFAULT_STOREFRONT_PERMISSIONS)
                 .issueFor(credential(false), "shop", TokenChannel.STOREFRONT);
 
+        // ADR-0023 2.3: thêm xem/hủy đặt trước; KHÔNG có đặt trước mới hay thao tác thủ thư
         assertThat(issued.get(0).permissions()).containsExactly("ShopController/placeOrder",
-                "ShopController/myOrders", "TitleController/lookup");
+                "ShopController/myOrders", "TitleController/lookup", "ReservationController/mine",
+                "ReservationController/cancel");
     }
 
     @Test
@@ -249,7 +253,8 @@ class TokenChannelTest {
                 .execute("raw-old", TokenChannel.STOREFRONT);
 
         assertThat(issued.get(0).permissions()).containsExactly("ShopController/placeOrder",
-                "ShopController/myOrders", "TitleController/lookup");
+                "ShopController/myOrders", "TitleController/lookup", "ReservationController/mine",
+                "ReservationController/cancel");
     }
 
     // ---- đăng nhập ----

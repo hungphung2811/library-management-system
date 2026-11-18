@@ -14,7 +14,7 @@ import lms.identity.tenant.domain.TenantRepository;
 import lms.identity.tenant.domain.TenantStatus;
 import org.junit.jupiter.api.Test;
 
-/** Tra mã tenant cho storefront: chỉ ACTIVE và có SALES; mọi trường hợp khác cùng một kết quả rỗng (ADR-0011 2.5). */
+/** Tra mã tenant cho storefront: chỉ ACTIVE và có SALES hoặc LENDING; mọi trường hợp khác cùng một kết quả rỗng (ADR-0011 2.5). */
 class ResolveStorefrontTenantUseCaseTest {
 
     private final TenantRepository tenants = mock(TenantRepository.class);
@@ -57,9 +57,23 @@ class ResolveStorefrontTenantUseCaseTest {
     }
 
     @Test
-    void chiCoLendingThiRong() {
+    void chiCoLendingTraTenantVoiModulesLending() {
         tenant("shop-c", TenantStatus.ACTIVE, ModuleCode.LENDING);
-        assertThat(resolve.execute("shop-c")).isEmpty();
+        var found = resolve.execute("shop-c");
+        assertThat(found).isPresent();
+        assertThat(found.get().modules()).containsExactly("LENDING");
+    }
+
+    @Test
+    void chiCoSalesTraTenantVoiModulesSales() {
+        tenant("shop-s", TenantStatus.ACTIVE, ModuleCode.SALES);
+        assertThat(resolve.execute("shop-s").orElseThrow().modules()).containsExactly("SALES");
+    }
+
+    @Test
+    void lendingNhungBiNgungThiRong() {
+        tenant("shop-l", TenantStatus.SUSPENDED, ModuleCode.LENDING);
+        assertThat(resolve.execute("shop-l")).isEmpty();
     }
 
     @Test

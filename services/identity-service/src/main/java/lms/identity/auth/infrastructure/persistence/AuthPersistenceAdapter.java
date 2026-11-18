@@ -70,6 +70,16 @@ public class AuthPersistenceAdapter implements UserCredentialRepository, SaveCre
         return credentials.existsByUsername(username);
     }
 
+    @Override
+    public java.util.Set<String> existingUsernames(java.util.Collection<String> usernames) {
+        java.util.Set<String> found = new java.util.HashSet<>();
+        java.util.List<String> all = new java.util.ArrayList<>(usernames);
+        for (int i = 0; i < all.size(); i += 1000) {
+            found.addAll(credentials.findUsernamesIn(all.subList(i, Math.min(all.size(), i + 1000))));
+        }
+        return found;
+    }
+
     // ---- RefreshToken ----
 
     @Override

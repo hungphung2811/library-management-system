@@ -8,7 +8,7 @@ import lms.identity.tenant.application.StorefrontTenant;
 import lms.security.JwtClaims;
 
 /**
- * Cấp token dịch vụ storefront cho customer-api (ADR-0011 2.1): tenant tồn tại, ACTIVE và bật SALES thì phát token
+ * Cấp token dịch vụ storefront cho customer-api (ADR-0011 2.1): tenant tồn tại, ACTIVE và bật SALES hoặc LENDING (theo resolver) thì phát token
  * theo tenant, sống ngắn; ngược lại trả rỗng (một kết quả chung, không lộ lý do).
  */
 public class IssueStorefrontTokenUseCase {

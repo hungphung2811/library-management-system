@@ -139,7 +139,7 @@ public class AuthBeanConfiguration {
                               AuthPersistenceAdapter persistence, Clock clock, UserDirectoryPort userDirectory,
                               InProcessTenantAccessAdapter tenantAccess,
                               @Value("${auth.refresh-token-ttl}") Duration refreshTtl,
-                              @Value("${lms.identity.token.storefront-permissions:ShopController/*,TitleController/lookup}")
+                              @Value("${lms.identity.token.storefront-permissions:ShopController/*,TitleController/lookup,ReservationController/mine,ReservationController/cancel}")
                               List<String> storefrontPermissions) {
         return new TokenService(accessClient, issuer, codec, persistence, clock, refreshTtl, userDirectory, tenantAccess,
                 storefrontPermissions);

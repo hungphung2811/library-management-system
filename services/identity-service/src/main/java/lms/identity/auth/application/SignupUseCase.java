@@ -10,7 +10,7 @@ import lms.tenant.TenantContext;
  * Tự đăng ký của khách (ADR-0010 B2.1, ADR-0011): endpoint công khai nên KHÔNG tin đầu vào nào ngoài mã tenant công
  * khai. Quy tắc:
  * <ol>
- *   <li>Tenant tồn tại, ACTIVE và bật SALES ({@link StorefrontTenantPort}, cùng nguồn với token storefront), nếu không
+ *   <li>Tenant tồn tại, ACTIVE và bật SALES (tự kiểm, vì resolver nay cũng nhận tenant chỉ LENDING; {@link StorefrontTenantPort}, cùng nguồn với token storefront), nếu không
  *       thì {@link SignupNotAvailableException}.</li>
  *   <li>Tenant có role mang cờ signup_default và role đó không phải admin, nếu không thì cùng
  *       {@link SignupNotAvailableException} (một mã, không lộ tenant).</li>
@@ -49,6 +49,7 @@ public class SignupUseCase {
     /** Trả id người dùng mới tạo (không đưa ra ngoài API). */
     public UUID execute(Command command) {
         StorefrontTenant tenant = tenants.resolve(command.tenantCode()).orElseThrow(SignupNotAvailableException::new);
+        if (!tenant.modules().contains("SALES")) throw new SignupNotAvailableException();
         return TenantContext.callAs(tenant.id(), () -> tx.inTransaction(() -> {
             if (!roles.available()) throw new SignupNotAvailableException();
             UUID userId = accounts.register(command.username(), command.password(), command.fullName(),
