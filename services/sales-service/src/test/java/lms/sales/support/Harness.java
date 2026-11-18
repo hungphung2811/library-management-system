@@ -38,7 +38,12 @@ import lms.sales.stock.application.StorefrontQueryUseCases;
 import lms.sales.stock.application.StorefrontRow;
 import lms.sales.stock.application.StorefrontSort;
 import lms.sales.ordering.domain.SalesOrder;
+import lms.sales.ordering.application.ExpireOnlineReservationsUseCase;
+import lms.sales.ordering.application.OnlineReservationExpiry;
 import lms.sales.settings.application.GetSalesSettingsUseCase;
+import lms.sales.settings.application.OrderAbusePolicyPort;
+import lms.sales.settings.application.OrderAbusePolicyUseCases;
+import lms.sales.settings.domain.OrderAbusePolicy;
 import lms.sales.settings.application.SalesSettingsPort;
 import lms.sales.settings.application.UpdateSalesSettingsUseCase;
 import lms.sales.settings.domain.SalesSettings;
@@ -96,6 +101,9 @@ public final class Harness {
     // ADR-0019: bản sao giá bìa + ngày đưa vào bán của mặt hàng (StockItem domain không mang hai giá trị này)
     public final Map<UUID, Long> coverSnapshots = new HashMap<>();
     public final Map<UUID, Instant> listedAt = new HashMap<>();
+    /** ADR-0026: snapshot stock_items.work_id (giả lập). */
+    public final Map<UUID, UUID> workSnapshots = new HashMap<>();
+    public final List<Map<UUID, UUID>> workWrites = new ArrayList<>();
     public final List<Map<UUID, Long>> snapshotWrites = new ArrayList<>();
     public boolean failSnapshotWrites;
     public int storefrontListCalls;
@@ -198,12 +206,57 @@ public final class Harness {
         }
     };
     public final OrderQueryUseCases orderQueries = new OrderQueryUseCases(orderRepo);
+    // Chống lạm dụng đặt hàng: chính sách mặc định (15 phút, 5 đơn chờ, 20 đơn/ngày, 50/dòng, 100/đơn), lưu trong bộ nhớ
+    public OrderAbusePolicy policyStored;
+    public final OrderAbusePolicyPort abusePolicyPort = new OrderAbusePolicyPort() {
+        public Optional<OrderAbusePolicy> find(UUID t) {
+            return Optional.ofNullable(policyStored);
+        }
+
+        public OrderAbusePolicy save(OrderAbusePolicy p) {
+            policyStored = OrderAbusePolicy.restore(p.tenantId(), p.values(), p.version() + 1, p.updatedAt(),
+                    p.updatedBy());
+            return policyStored;
+        }
+    };
+    public final OrderAbusePolicyUseCases abusePolicies = new OrderAbusePolicyUseCases(abusePolicyPort,
+            new OrderAbusePolicy.Values(15, 5, 20, 50, 100, 5, 300), auditPort, clock);
+    /** Giới hạn tốc độ giả: đặt {@code rateLimitedBuckets} để từ chối bucket tương ứng, ghi lại các lần gọi. */
+    public final java.util.Set<String> rateLimitedBuckets = new java.util.HashSet<>();
+    public final List<String> rateLimitCalls = new ArrayList<>();
+    public final lms.cache.RateLimiter rateLimiter = new lms.cache.RateLimiter() {
+        public boolean tryAcquire(String bucket, String subject, int limit, java.time.Duration window) {
+            rateLimitCalls.add(bucket + "|" + subject + "|" + limit);
+            return !rateLimitedBuckets.contains(bucket);
+        }
+
+        public boolean isEnabled() {
+            return true;
+        }
+    };
+
+    /** Đặt chính sách chống lạm dụng của tenant test (tăng version như lúc lưu thật). */
+    public void setAbusePolicy(int minutes, int pending, int perDay, int perLine, int total) {
+        long version = policyStored == null ? 0 : policyStored.version();
+        abusePolicies.update(tenant, user, new OrderAbusePolicy.Values(minutes, pending, perDay, perLine, total, 5,
+                300), version);
+    }
+
     public final PlaceOnlineOrderUseCase placeOnline = new PlaceOnlineOrderUseCase(orderRepo, catalog,
             new CommitOnlineOrderUseCase(orderRepo, stockService, getSettings, numbers, auditPort, tenantDirectory,
-                    clock));
+                    clock, abusePolicies, (t, c) -> { },
+                    new lms.sales.ordering.application.AntiAbuseService(
+                            new lms.sales.ordering.application.AntiAbuseService.Thresholds(5, 30, 50, 80))),
+            abusePolicies);
+    public final OnlineReservationExpiry reservationExpiry;
+    public final ExpireOnlineReservationsUseCase expireReservations;
     public final OrderWorkflowUseCases workflow = new OrderWorkflowUseCases(orderRepo, refundRepo, stockService,
             getSettings, auditPort, clock);
     public final ShopOrderUseCases shopOrders = new ShopOrderUseCases(orderRepo, workflow);
+    {
+        reservationExpiry = new OnlineReservationExpiry(orderRepo, workflow, clock);
+        expireReservations = new ExpireOnlineReservationsUseCase(orderRepo, reservationExpiry, clock, 100);
+    }
     public final CommitReturnUseCase commitReturn = new CommitReturnUseCase(orderRepo, returnRepo, refundRepo,
             stockService, getSettings, numbers, auditPort, clock);
     public final CreateReturnUseCase createReturn = new CreateReturnUseCase(commitReturn, returnRepo);
@@ -360,7 +413,7 @@ public final class Harness {
 
         private StorefrontRow row(StockItem i) {
             return new StorefrontRow(i.titleId(), i.sellingPrice(), coverSnapshots.get(i.titleId()),
-                    i.available() > 0, listedAt.getOrDefault(i.titleId(), Instant.EPOCH));
+                    i.available() > 0, listedAt.getOrDefault(i.titleId(), Instant.EPOCH), workSnapshots.get(i.titleId()));
         }
 
         private Long effective(StorefrontRow r) {
@@ -394,6 +447,60 @@ public final class Harness {
                 }
             });
             return out;
+        }
+
+        public PageResult<WorkGroup> listStorefrontByWork(UUID t, StorefrontSort sort, boolean inStockOnly, int page,
+                                                          int size) {
+            storefrontListCalls++;
+            Map<UUID, List<StorefrontRow>> groups = new java.util.LinkedHashMap<>();
+            items.values().stream().filter(StockItem::active).map(this::row)
+                    .filter(r -> !sort.byPrice() || effective(r) != null)
+                    .forEach(r -> groups.computeIfAbsent(r.workId() != null ? r.workId() : r.titleId(),
+                            k -> new ArrayList<>()).add(r));
+            java.util.Comparator<StorefrontRow> pick = java.util.Comparator
+                    .comparing((StorefrontRow r) -> r.inStock() ? 0 : 1)
+                    .thenComparing(this::effective, java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder()))
+                    .thenComparing(StorefrontRow::listedAt, java.util.Comparator.reverseOrder())
+                    .thenComparing(StorefrontRow::titleId);
+            List<Map.Entry<UUID, WorkGroup>> built = new ArrayList<>();
+            for (var e : groups.entrySet()) {
+                List<StorefrontRow> m = e.getValue();
+                if (inStockOnly && m.stream().noneMatch(StorefrontRow::inStock)) {
+                    continue;
+                }
+                Long from = m.stream().map(this::effective).filter(java.util.Objects::nonNull)
+                        .min(java.util.Comparator.naturalOrder()).orElse(null);
+                built.add(Map.entry(e.getKey(), new WorkGroup(m.stream().min(pick).orElseThrow(), m.size(), from,
+                        m.stream().anyMatch(StorefrontRow::inStock),
+                        m.stream().map(StorefrontRow::listedAt).max(java.util.Comparator.naturalOrder()).orElse(null))));
+            }
+            java.util.Comparator<Map.Entry<UUID, WorkGroup>> byKey = java.util.Map.Entry.comparingByKey();
+            java.util.Comparator<Map.Entry<UUID, WorkGroup>> byFrom = java.util.Comparator
+                    .comparing((Map.Entry<UUID, WorkGroup> e) -> e.getValue().priceFrom());
+            switch (sort) {
+                case NEWEST -> built.sort(java.util.Comparator
+                        .comparing((Map.Entry<UUID, WorkGroup> e) -> e.getValue().listedAt()).reversed()
+                        .thenComparing(byKey));
+                case PRICE_ASC -> built.sort(byFrom.thenComparing(byKey));
+                case PRICE_DESC -> built.sort(byFrom.thenComparing(byKey).reversed());
+            }
+            int from = Math.min(built.size(), page * size);
+            return new PageResult<>(built.subList(from, Math.min(built.size(), from + size)).stream()
+                    .map(Map.Entry::getValue).toList(), built.size(), page, size);
+        }
+
+        public List<StorefrontRow> findStorefrontRowsByWork(UUID t, UUID workId) {
+            return items.values().stream().filter(StockItem::active).map(this::row)
+                    .filter(r -> workId.equals(r.workId())).toList();
+        }
+
+        public void refreshWorkIds(UUID t, Map<UUID, UUID> works) {
+            workWrites.add(Map.copyOf(works));
+            works.forEach((id, w) -> {
+                if (items.containsKey(id)) {
+                    workSnapshots.put(id, w);
+                }
+            });
         }
 
         public List<UUID> titleIdsMissingCoverPrice(UUID t, int limit) {
@@ -458,6 +565,35 @@ public final class Harness {
 
         public void lockLines(UUID t, UUID orderId) {
             lockedOrders.add(lockedOrders.size());
+        }
+
+        public List<UUID> findExpiredReservationIds(UUID t, Instant now, int limit) {
+            return orders.values().stream().filter(o -> o.isReservationExpiredAt(now))
+                    .sorted(java.util.Comparator.comparing(SalesOrder::reservationExpiresAt))
+                    .limit(limit).map(SalesOrder::id).toList();
+        }
+
+        public Optional<SalesOrder> findByIdSkipLocked(UUID t, UUID id) {
+            return Optional.ofNullable(orders.get(id));
+        }
+
+        public long countPendingOnline(UUID t, UUID customer) {
+            return orders.values().stream().filter(o -> customer.equals(o.customerUserId())
+                    && o.channel() == lms.sales.ordering.domain.OrderChannel.ONLINE
+                    && o.status() == lms.sales.ordering.domain.OrderStatus.PENDING_CONFIRMATION).count();
+        }
+
+        public long countCancelledOnlineSince(UUID t, UUID customer, Instant since) {
+            return orders.values().stream().filter(o -> customer.equals(o.customerUserId())
+                    && o.channel() == lms.sales.ordering.domain.OrderChannel.ONLINE
+                    && o.status() == lms.sales.ordering.domain.OrderStatus.CANCELLED
+                    && !o.createdAt().isBefore(since)).count();
+        }
+
+        public long countOnlineSince(UUID t, UUID customer, Instant since) {
+            return orders.values().stream().filter(o -> customer.equals(o.customerUserId())
+                    && o.channel() == lms.sales.ordering.domain.OrderChannel.ONLINE
+                    && !o.createdAt().isBefore(since)).count();
         }
 
         public PageResult<SalesOrder> search(UUID t, Criteria c, int page, int size) {
@@ -598,6 +734,10 @@ public final class Harness {
 
         MutableClock(Instant now) {
             this.now = now;
+        }
+
+        public void advance(java.time.Duration d) {
+            advanceSeconds(d.toSeconds());
         }
 
         public void advanceSeconds(long s) {

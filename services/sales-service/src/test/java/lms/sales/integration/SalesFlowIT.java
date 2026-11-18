@@ -95,6 +95,7 @@ class SalesFlowIT {
     @Autowired ObjectMapper json;
     @Autowired PlacePosOrderUseCase placePos;
     @Autowired lms.sales.ordering.application.PaymentIntentUseCases intentUseCases;
+    @Autowired lms.sales.ordering.application.OrderQueryUseCases orderQueries;
     @Autowired RegisterStockItemUseCase registerItem;
     @Autowired AdjustStockUseCase adjust;
     @Autowired ReconcileStockUseCase reconcile;
@@ -157,8 +158,15 @@ class SalesFlowIT {
     private lms.sales.ordering.application.OrderResponse paid(UUID tenant, UUID actor,
             lms.sales.ordering.application.PosOrderResult r) {
         if (r.paymentIntent() != null) {
-            intentUseCases.confirm(tenant, actor, r.paymentIntent().id(),
-                    new lms.sales.ordering.application.PaymentIntentUseCases.ConfirmCommand(null, "IT-REF"));
+            try {
+                intentUseCases.confirm(tenant, actor, r.paymentIntent().id(),
+                        new lms.sales.ordering.application.PaymentIntentUseCases.ConfirmCommand(null, "IT-REF"));
+            } catch (SalesException e) {
+                // Nhiều luồng cùng clientRequestId cùng xác nhận một lệnh: luồng thua gặp xung đột phiên bản,
+                // lệnh đã được luồng thắng thu xong. Kiểm lại trạng thái đơn bên dưới.
+            }
+            // Phản hồi tạo đơn là trạng thái trước khi xác nhận thu tiền: nạp lại đơn đã hoàn tất
+            return orderQueries.get(tenant, r.order().id());
         }
         return r.order();
     }
@@ -360,7 +368,7 @@ class SalesFlowIT {
                 .isEqualTo(o.grandTotal());
         assertThat(scalar("select on_hand from stock_items where title_id = '" + x + "'")).isEqualTo(8);
         assertThat(scalar("select on_hand from stock_items where title_id = '" + y + "'")).isEqualTo(7);
-        assertThat(scalar("select count(*) from stock_ledger where type = 'SALE' and ref_id = '" + o.id() + "'"))
+        assertThat(scalar("select count(*) from stock_ledger where type = 'FULFIL' and ref_id = '" + o.id() + "'"))
                 .isEqualTo(2);
         assertThat(scalar("select count(*) from payment_records where order_id = '" + o.id()
                 + "' and amount = 335000")).isEqualTo(1);
@@ -464,7 +472,7 @@ class SalesFlowIT {
         assertThat(outOfStock).isEqualTo(threads - 1);
         assertThat(scalar("select on_hand from stock_items where title_id = '" + t + "'")).isZero();
         assertThat(scalar("select count(*) from sales_order_lines where title_id = '" + t + "'")).isEqualTo(1);
-        assertThat(scalar("select count(*) from stock_ledger where type = 'SALE' and stock_item_id = "
+        assertThat(scalar("select count(*) from stock_ledger where type = 'FULFIL' and stock_item_id = "
                 + "(select id from stock_items where title_id = '" + t + "')")).isEqualTo(1);
         assertReconciled(tenantA, t);
     }

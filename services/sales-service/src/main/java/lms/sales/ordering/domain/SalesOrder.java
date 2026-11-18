@@ -36,7 +36,27 @@ public final class SalesOrder {
                            Instant confirmedAt, UUID confirmedBy, Instant paidAt, Instant completedAt,
                            Instant cancelledAt, UUID cancelledBy, String cancelReason, Instant piiAnonymizedAt,
                            List<OrderLine> lines, List<PaymentRecord> payments, long version,
-                           String customerNote, String staffNote, LocalDate expectedDeliveryDate) {
+                           String customerNote, String staffNote, LocalDate expectedDeliveryDate,
+                           Instant reservationExpiresAt, String requestHash) {
+        /** Đơn chưa có hạn giữ hàng và mã băm nội dung (đơn POS, đơn cũ, dữ liệu demo). */
+        public Snapshot(UUID id, UUID tenantId, String orderNo, OrderChannel channel, OrderStatus status,
+                        PaymentStatus paymentStatus, PaymentMethod paymentMethod, UUID customerUserId,
+                        String walkInName, String walkInPhone, Fulfilment fulfilment, Recipient recipient,
+                        int vatRateBps, boolean pricesIncludeVat, Money subtotal, Money discountTotal,
+                        Money vatTotal, Money shippingFee, Money grandTotal, Discount orderDiscount,
+                        UUID clientRequestId, UUID exchangeOfReturnId, UUID createdBy, Instant createdAt,
+                        Instant confirmedAt, UUID confirmedBy, Instant paidAt, Instant completedAt,
+                        Instant cancelledAt, UUID cancelledBy, String cancelReason, Instant piiAnonymizedAt,
+                        List<OrderLine> lines, List<PaymentRecord> payments, long version,
+                        String customerNote, String staffNote, LocalDate expectedDeliveryDate) {
+            this(id, tenantId, orderNo, channel, status, paymentStatus, paymentMethod, customerUserId, walkInName,
+                    walkInPhone, fulfilment, recipient, vatRateBps, pricesIncludeVat, subtotal, discountTotal,
+                    vatTotal, shippingFee, grandTotal, orderDiscount, clientRequestId, exchangeOfReturnId, createdBy,
+                    createdAt, confirmedAt, confirmedBy, paidAt, completedAt, cancelledAt, cancelledBy, cancelReason,
+                    piiAnonymizedAt, lines, payments, version, customerNote, staffNote, expectedDeliveryDate, null,
+                    null);
+        }
+
         /** Đơn không có ghi chú và ngày giao dự kiến. */
         public Snapshot(UUID id, UUID tenantId, String orderNo, OrderChannel channel, OrderStatus status,
                         PaymentStatus paymentStatus, PaymentMethod paymentMethod, UUID customerUserId,
@@ -95,6 +115,8 @@ public final class SalesOrder {
     private String customerNote;
     private String staffNote;
     private LocalDate expectedDeliveryDate;
+    private Instant reservationExpiresAt;
+    private String requestHash;
     private List<OrderLine> lines;
     private final List<PaymentRecord> payments;
     private final long version;
@@ -135,6 +157,8 @@ public final class SalesOrder {
         this.customerNote = s.customerNote();
         this.staffNote = s.staffNote();
         this.expectedDeliveryDate = s.expectedDeliveryDate();
+        this.reservationExpiresAt = s.reservationExpiresAt();
+        this.requestHash = s.requestHash();
         this.lines = List.copyOf(s.lines());
         this.payments = new ArrayList<>(s.payments());
         this.version = s.version();
@@ -374,6 +398,7 @@ public final class SalesOrder {
         this.status = OrderStatus.CONFIRMED;
         this.confirmedAt = now;
         this.confirmedBy = by;
+        this.reservationExpiresAt = null; // đã được nhân viên nhận: hết giữ hàng có hạn
     }
 
     /** Đánh dấu đã thu: chỉ khi CONFIRMED, READY_FOR_PICKUP hoặc SHIPPING và đang UNPAID; số tiền = grandTotal. */
@@ -451,6 +476,23 @@ public final class SalesOrder {
         this.cancelledBy = by;
         this.cancelReason = reason.trim();
         return effect;
+    }
+
+    /**
+     * Gắn hạn giữ hàng và mã băm nội dung cho đơn online vừa đặt (chỉ khi còn PENDING_CONFIRMATION). {@code expiresAt}
+     * null nghĩa là không hết hạn (chính sách tenant đặt 0 phút).
+     */
+    public void placeHold(Instant expiresAt, String hash) {
+        requireOnline();
+        requireStatus(OrderStatus.PENDING_CONFIRMATION);
+        this.reservationExpiresAt = expiresAt;
+        this.requestHash = hash;
+    }
+
+    /** Đơn còn chờ xác nhận và đã quá hạn giữ hàng tại thời điểm {@code now} (hạn là mốc loại trừ: now >= hạn). */
+    public boolean isReservationExpiredAt(Instant now) {
+        return channel == OrderChannel.ONLINE && status == OrderStatus.PENDING_CONFIRMATION
+                && reservationExpiresAt != null && !now.isBefore(reservationExpiresAt);
     }
 
     /** Số tiền phải hoàn khi hủy: đơn đã thu thì hoàn toàn bộ grandTotal, chưa thu thì không có hoàn tiền (null). */
@@ -594,6 +636,8 @@ public final class SalesOrder {
     /** Ghi chú nội bộ: chỉ qua endpoint khóa riêng của nhân viên, không bao giờ ra storefront/log/audit. */
     public String staffNote() { return staffNote; }
     public LocalDate expectedDeliveryDate() { return expectedDeliveryDate; }
+    public Instant reservationExpiresAt() { return reservationExpiresAt; }
+    public String requestHash() { return requestHash; }
     public List<OrderLine> lines() { return lines; }
     public List<PaymentRecord> payments() { return List.copyOf(payments); }
     public long version() { return version; }

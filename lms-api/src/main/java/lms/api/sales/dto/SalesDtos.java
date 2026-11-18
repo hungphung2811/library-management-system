@@ -46,6 +46,24 @@ public final class SalesDtos {
             long version) {
     }
 
+    // ---- Chính sách chống lạm dụng đặt hàng online (docs/security/ORDER_ABUSE_AUDIT.md) ----
+
+    public record OrderAbusePolicyView(int reservationMinutes, int maxPendingOrders, int maxOrdersPerDay,
+                                       int maxQuantityPerLine, int maxTotalQuantity, int ordersPerMinutePerUser,
+                                       int ordersPerMinuteTenant, long version, java.time.Instant updatedAt) {
+    }
+
+    public record UpdateOrderAbusePolicyRequest(
+            @Min(0) @Max(10080) int reservationMinutes,
+            @Min(1) @Max(1000) int maxPendingOrders,
+            @Min(1) @Max(10000) int maxOrdersPerDay,
+            @Min(1) @Max(10000) int maxQuantityPerLine,
+            @Min(1) @Max(100000) int maxTotalQuantity,
+            @Min(1) @Max(600) int ordersPerMinutePerUser,
+            @Min(1) @Max(100000) int ordersPerMinuteTenant,
+            long version) {
+    }
+
     // ---- Mặt hàng, kho ----
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -149,7 +167,7 @@ public final class SalesDtos {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record PosOrderRequest(
             @NotEmpty @Size(max = 100) List<@Valid PosOrderLineRequest> lines,
-            @NotNull @Pattern(regexp = "CASH|BANK_TRANSFER|CARD|QR|MOMO") String paymentMethod,
+            @NotNull @Pattern(regexp = "CASH|BANK_TRANSFER|CARD|QR|MOMO|SEPAY") String paymentMethod,
             UUID customerUserId,
             @Valid WalkInRequest walkIn,
             @Valid DiscountRequest orderDiscount,

@@ -137,6 +137,13 @@ class SalesOrderJpaEntity {
     @Column(name = "expected_delivery_date")
     private java.time.LocalDate expectedDeliveryDate;
 
+    /** V13: hạn giữ hàng của đơn online chờ xác nhận (NULL = không hết hạn) và mã băm nội dung lúc đặt (idempotency). */
+    @Column(name = "reservation_expires_at")
+    private Instant reservationExpiresAt;
+
+    @Column(name = "request_hash", length = 64, updatable = false)
+    private String requestHash;
+
     @Version
     @Column(name = "version", nullable = false)
     private Long version;
@@ -164,6 +171,7 @@ class SalesOrderJpaEntity {
         this.exchangeOfReturnId = o.exchangeOfReturnId();
         this.createdBy = o.createdBy();
         this.createdAt = o.createdAt();
+        this.requestHash = o.requestHash();
         apply(o);
         // version để null: Hibernate khởi tạo 0 khi persist (version khác null bị coi là entity detached)
     }
@@ -193,6 +201,7 @@ class SalesOrderJpaEntity {
         this.customerNote = o.customerNote();
         this.staffNote = o.staffNote();
         this.expectedDeliveryDate = o.expectedDeliveryDate();
+        this.reservationExpiresAt = o.reservationExpiresAt();
     }
 
     UUID getId() { return id; }
@@ -233,6 +242,8 @@ class SalesOrderJpaEntity {
     String getCustomerNote() { return customerNote; }
     String getStaffNote() { return staffNote; }
     java.time.LocalDate getExpectedDeliveryDate() { return expectedDeliveryDate; }
+    Instant getReservationExpiresAt() { return reservationExpiresAt; }
+    String getRequestHash() { return requestHash; }
     long getVersion() { return version; }
 
     /** Không in dữ liệu cá nhân. */

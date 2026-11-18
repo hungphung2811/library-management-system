@@ -1,6 +1,7 @@
 package lms.sales.ordering.application;
 
 import java.time.Instant;
+import java.util.List;
 import lms.sales.ordering.domain.OrderChannel;
 import lms.sales.ordering.domain.OrderStatus;
 import lms.sales.ordering.domain.PaymentStatus;
@@ -29,6 +30,27 @@ public interface SalesOrderRepository {
      * cùng đơn trước khi tính "đã mua trừ đã trả".
      */
     void lockLines(UUID tenantId, UUID orderId);
+
+    /**
+     * Id đơn online chờ xác nhận đã quá hạn giữ hàng (reservation_expires_at <= now), cũ nhất trước, tối đa
+     * {@code limit}. Chỉ đọc id: từng đơn được khóa và xử lý riêng bằng {@link #findByIdSkipLocked}.
+     */
+    List<UUID> findExpiredReservationIds(UUID tenantId, Instant now, int limit);
+
+    /**
+     * Đọc đơn kèm khóa ghi (FOR UPDATE SKIP LOCKED): đơn đang bị giao dịch khác khóa thì trả rỗng, để nhiều worker chạy
+     * đồng thời không xử lý trùng một đơn. Khóa giữ đến hết transaction.
+     */
+    Optional<SalesOrder> findByIdSkipLocked(UUID tenantId, UUID id);
+
+    /** Số đơn ONLINE của khách đang PENDING_CONFIRMATION. */
+    long countPendingOnline(UUID tenantId, UUID customerUserId);
+
+    /** Số đơn ONLINE khách đã đặt từ {@code since} (kể cả đã hủy: hủy rồi đặt lại vẫn tính). */
+    long countOnlineSince(UUID tenantId, UUID customerUserId, Instant since);
+
+    /** Số đơn ONLINE của khách đã bị hủy với createdAt từ {@code since}. */
+    long countCancelledOnlineSince(UUID tenantId, UUID customerUserId, Instant since);
 
     PageResult<SalesOrder> search(UUID tenantId, Criteria criteria, int page, int size);
 

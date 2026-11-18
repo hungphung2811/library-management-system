@@ -14,6 +14,10 @@ public interface SalesClient {
 
     SalesSettingsView updateSettings(UpdateSalesSettingsRequest request);
 
+    OrderAbusePolicyView getOrderAbusePolicy();
+
+    OrderAbusePolicyView updateOrderAbusePolicy(UpdateOrderAbusePolicyRequest request);
+
     StockItemView registerStockItem(RegisterStockItemRequest request);
 
     SalesPage<StockItemView> searchStockItems(StockItemSearchQuery query);

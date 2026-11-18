@@ -91,6 +91,16 @@ app:
       secret-key: ${PAYMENTS_MOMO_SECRET_KEY:}
       redirect-url: ${PAYMENTS_MOMO_REDIRECT_URL:https://example.com/momo/return}
       ipn-url: ${PAYMENTS_MOMO_IPN_URL:https://example.com/momo/ipn}
+    # Cổng SePay Test mode (ADR-0028): mặc định tắt, dò sổ giao dịch bằng API sandbox khi FE thăm dò (không webhook). Token
+    # Test mode (my.sepay.vn > Test mode > API Access) và tài khoản chỉ lấy từ biến môi trường, KHÔNG commit giá trị thật.
+    sepay:
+      enabled: ${PAYMENTS_SEPAY_ENABLED:false}
+      endpoint: ${PAYMENTS_SEPAY_ENDPOINT:https://userapi-sandbox.sepay.vn}
+      token: ${PAYMENTS_SEPAY_TOKEN:}
+      bank-bin: ${PAYMENTS_SEPAY_BANK_BIN:}
+      account-no: ${PAYMENTS_SEPAY_ACCOUNT_NO:}
+      account-name: ${PAYMENTS_SEPAY_ACCOUNT_NAME:LMS SEPAY TEST}
+      bank-account-id: ${PAYMENTS_SEPAY_BANK_ACCOUNT_ID:}
     # Thu tay tại quầy (CASH, CARD, BANK_TRANSFER, ADR-0021): lệnh chờ thu ngân xác nhận, hết hạn thì nhả tồn
     manual:
       intent-ttl-minutes: ${PAYMENTS_MANUAL_INTENT_TTL_MINUTES:10}
@@ -119,6 +129,26 @@ lms:
     contact:
       max-per-user-per-day: 5
       duplicate-window: PT10M
+    # Chống lạm dụng đặt hàng online (docs/security/ORDER_ABUSE_AUDIT.md). defaults.* là giá trị cho tenant chưa cấu hình
+    # (tenant tự đổi qua PUT /internal/sales/settings/order-abuse-policy); reservation-minutes 0 = không hết hạn.
+    abuse:
+      reservation-expiry-job-enabled: true
+      reservation-expiry-delay-ms: 30000
+      reservation-expiry-batch-size: 100
+      # Ngưỡng chấm rủi ro (AntiAbuseService): tỷ lệ hủy % trong 30 ngày, chỉ xét khi có từ min-orders đơn
+      risk:
+        min-orders: 5
+        cancel-percent-medium: 30
+        cancel-percent-high: 50
+        cancel-percent-critical: 80
+      defaults:
+        reservation-minutes: ${LMS_ABUSE_RESERVATION_MINUTES:15}
+        max-pending-orders: ${LMS_ABUSE_MAX_PENDING_ORDERS:5}
+        max-orders-per-day: ${LMS_ABUSE_MAX_ORDERS_PER_DAY:20}
+        max-quantity-per-line: ${LMS_ABUSE_MAX_QUANTITY_PER_LINE:50}
+        max-total-quantity: ${LMS_ABUSE_MAX_TOTAL_QUANTITY:100}
+        orders-per-minute-per-user: ${LMS_ABUSE_ORDERS_PER_MINUTE_PER_USER:5}
+        orders-per-minute-tenant: ${LMS_ABUSE_ORDERS_PER_MINUTE_TENANT:300}
   # Che dữ liệu cá nhân ở API nhân viên (đơn, liên hệ): true = che (mặc định, bắt buộc ở prod); dev tắt ở application-dev.yml
   privacy:
     mask-personal-data: ${LMS_PRIVACY_MASK_PERSONAL_DATA:true}

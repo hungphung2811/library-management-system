@@ -44,6 +44,17 @@ public class HarnessBeans {
         return new Harness();
     }
 
+    /** Giới hạn tốc độ giả của Harness (mặc định cho qua; test đặt rateLimitedBuckets để từ chối). */
+    @Bean
+    lms.cache.RateLimiter rateLimiter(Harness h) {
+        return h.rateLimiter;
+    }
+
+    @Bean
+    lms.sales.settings.application.OrderAbusePolicyUseCases orderAbusePolicyUseCases(Harness h) {
+        return h.abusePolicies;
+    }
+
     @Bean
     GetSalesSettingsUseCase getSalesSettingsUseCase(Harness h) {
         return h.getSettings;

@@ -2,12 +2,16 @@ package lms.sales.ordering.infrastructure.config;
 
 import java.time.Clock;
 import lms.sales.ordering.application.AnonymizeWalkInBatchUseCase;
+import lms.sales.ordering.application.AntiAbuseService;
 import lms.sales.ordering.application.AnonymizeWalkInContactsUseCase;
 import lms.sales.ordering.application.CommitOnlineOrderUseCase;
 import lms.sales.ordering.application.CommitPosOrderUseCase;
 import lms.sales.ordering.application.CommitPosPendingOrderUseCase;
 import lms.sales.ordering.application.CommitReturnUseCase;
 import lms.sales.ordering.application.CreateReturnUseCase;
+import lms.sales.ordering.application.CustomerOrderLockPort;
+import lms.sales.ordering.application.ExpireOnlineReservationsUseCase;
+import lms.sales.ordering.application.OnlineReservationExpiry;
 import lms.sales.ordering.application.OrderQueryUseCases;
 import lms.sales.ordering.application.OrderWorkflowUseCases;
 import lms.sales.ordering.application.PlaceOnlineOrderUseCase;
@@ -20,6 +24,7 @@ import lms.sales.ordering.application.SalesReturnRepository;
 import lms.sales.ordering.application.ShopOrderUseCases;
 import lms.sales.ordering.application.WalkInAnonymizationPort;
 import lms.sales.settings.application.GetSalesSettingsUseCase;
+import lms.sales.settings.application.OrderAbusePolicyUseCases;
 import lms.sales.shared.application.DocumentNumberPort;
 import lms.sales.shared.application.SalesAuditPort;
 import lms.sales.shared.application.TenantDirectoryPort;
@@ -62,14 +67,41 @@ public class OrderingBeanConfiguration {
     CommitOnlineOrderUseCase commitOnlineOrderUseCase(SalesOrderRepository orders, StockService stockService,
                                                       GetSalesSettingsUseCase settings, DocumentNumberPort numbers,
                                                       SalesAuditPort audit, TenantDirectoryPort tenants,
-                                                      Clock clock) {
-        return new CommitOnlineOrderUseCase(orders, stockService, settings, numbers, audit, tenants, clock);
+                                                      Clock clock, OrderAbusePolicyUseCases policies,
+                                                      CustomerOrderLockPort customerLock,
+                                                      AntiAbuseService antiAbuse) {
+        return new CommitOnlineOrderUseCase(orders, stockService, settings, numbers, audit, tenants, clock, policies,
+                customerLock, antiAbuse);
+    }
+
+    /** Ngưỡng tỷ lệ hủy (%) của AntiAbuseService, cấu hình nền tảng (lms.sales.abuse.risk.*). */
+    @Bean
+    AntiAbuseService antiAbuseService(
+            @Value("${lms.sales.abuse.risk.min-orders:5}") int minOrders,
+            @Value("${lms.sales.abuse.risk.cancel-percent-medium:30}") int medium,
+            @Value("${lms.sales.abuse.risk.cancel-percent-high:50}") int high,
+            @Value("${lms.sales.abuse.risk.cancel-percent-critical:80}") int critical) {
+        return new AntiAbuseService(new AntiAbuseService.Thresholds(minOrders, medium, high, critical));
     }
 
     @Bean
     PlaceOnlineOrderUseCase placeOnlineOrderUseCase(SalesOrderRepository orders, CatalogLookupPort catalog,
-                                                    CommitOnlineOrderUseCase commit) {
-        return new PlaceOnlineOrderUseCase(orders, catalog, commit);
+                                                    CommitOnlineOrderUseCase commit,
+                                                    OrderAbusePolicyUseCases policies) {
+        return new PlaceOnlineOrderUseCase(orders, catalog, commit, policies);
+    }
+
+    @Bean
+    OnlineReservationExpiry onlineReservationExpiry(SalesOrderRepository orders, OrderWorkflowUseCases workflow,
+                                                    Clock clock) {
+        return new OnlineReservationExpiry(orders, workflow, clock);
+    }
+
+    @Bean
+    ExpireOnlineReservationsUseCase expireOnlineReservationsUseCase(
+            SalesOrderRepository orders, OnlineReservationExpiry expiry, Clock clock,
+            @Value("${lms.sales.abuse.reservation-expiry-batch-size:100}") int batchSize) {
+        return new ExpireOnlineReservationsUseCase(orders, expiry, clock, batchSize);
     }
 
     @Bean

@@ -12,6 +12,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import lms.demo.plan.DemoIds;
 import lms.demo.plan.DemoPlan;
 import lms.demo.runner.DemoSeedProperties;
 import lms.demo.runner.DemoSeedRunner;
@@ -191,7 +192,14 @@ class SalesDemoSeedIT {
         assertThat(count("select count(*) from suppliers")).isEqualTo(2);
         assertThat(count("select count(*) from goods_receipts where status = 'CONFIRMED' and confirmed_at is not null"))
                 .isEqualTo(2);
-        assertThat(count("select count(*) from stock_items")).isEqualTo(32);
+        DemoPlan plan = DemoPlan.generate(LocalDate.now(DemoTimes.BUSINESS_ZONE));
+        assertThat(count("select count(*) from stock_items")).isEqualTo(plan.stockItems().size());
+        // mô hình tác phẩm (ADR-0026): mọi mặt hàng có snapshot work_id; 64 ấn bản gốc khớp công thức backfill md5; có tác phẩm nhiều ấn bản
+        assertThat(count("select count(*) from stock_items where work_id is null")).isZero();
+        assertThat(count("select count(*) from stock_items where work_id = md5('lms-work:' || title_id::text)::uuid"))
+                .isEqualTo(plan.stockItems().stream().filter(i -> i.workId().equals(DemoIds.legacyWork(i.titleId()))).count());
+        assertThat(count("select count(*) from (select work_id from stock_items group by work_id having count(*) >= 2) g"))
+                .isGreaterThanOrEqualTo(2);
         assertThat(count("select count(*) from sales_orders where order_no like 'DEMO-%'")).isEqualTo(42);
         assertThat(count("select count(*) from sales_orders")).isEqualTo(42);
         assertThat(count("select count(*) from sales_returns")).isEqualTo(3);

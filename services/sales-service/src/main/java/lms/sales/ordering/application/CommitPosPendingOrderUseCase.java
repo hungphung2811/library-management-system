@@ -85,8 +85,11 @@ public class CommitPosPendingOrderUseCase {
         boolean viaGateway = cmd.paymentMethod().isGateway();
         PaymentGatewayPort gateway = viaGateway ? gatewayFor(cmd.paymentMethod()) : null;
         if (viaGateway && gateway == null) {
-            throw new SalesException(ErrorCode.PAYMENT_NOT_ENABLED, cmd.paymentMethod() == PaymentMethod.MOMO
-                    ? "Thanh toán MoMo chưa được bật" : "Thanh toán QR chưa được bật");
+            throw new SalesException(ErrorCode.PAYMENT_NOT_ENABLED, switch (cmd.paymentMethod()) {
+                case MOMO -> "Thanh toán MoMo chưa được bật";
+                case SEPAY -> "Thanh toán SePay chưa được bật";
+                default -> "Thanh toán QR chưa được bật";
+            });
         }
         if (cmd.exchangeOfReturnId() != null
                 && returns.findById(cmd.tenantId(), cmd.exchangeOfReturnId()).isEmpty()) {
@@ -150,7 +153,11 @@ public class CommitPosPendingOrderUseCase {
     }
 
     private PaymentGatewayPort gatewayFor(PaymentMethod method) {
-        String provider = method == PaymentMethod.MOMO ? PaymentIntent.PROVIDER_MOMO : PaymentIntent.PROVIDER_SIMULATED;
+        String provider = switch (method) {
+            case MOMO -> PaymentIntent.PROVIDER_MOMO;
+            case SEPAY -> PaymentIntent.PROVIDER_SEPAY;
+            default -> PaymentIntent.PROVIDER_SIMULATED;
+        };
         return gateways.stream().filter(g -> provider.equals(g.provider())).findFirst().orElse(null);
     }
 

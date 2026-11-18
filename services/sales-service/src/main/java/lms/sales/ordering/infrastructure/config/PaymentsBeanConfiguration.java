@@ -13,6 +13,7 @@ import lms.sales.ordering.application.SalesOrderRepository;
 import lms.sales.ordering.application.SalesReturnRepository;
 import lms.sales.ordering.application.SyncGatewayPaymentUseCase;
 import lms.sales.ordering.infrastructure.client.MomoPaymentGateway;
+import lms.sales.ordering.infrastructure.client.SepayPaymentGateway;
 import lms.sales.ordering.infrastructure.client.SimulatedPaymentGateway;
 import lms.sales.settings.application.GetSalesSettingsUseCase;
 import lms.sales.shared.application.DocumentNumberPort;
@@ -74,6 +75,27 @@ public class PaymentsBeanConfiguration {
             @Value("${app.payments.momo.redirect-url:https://example.com/momo/return}") String redirectUrl,
             @Value("${app.payments.momo.ipn-url:https://example.com/momo/ipn}") String ipnUrl) {
         return new MomoPaymentGateway(json, endpoint, partnerCode, accessKey, secretKey, redirectUrl, ipnUrl);
+    }
+
+    /**
+     * Cổng SePay Test mode (ADR-0028): chỉ có khi {@code app.payments.sepay.enabled=true}; token Test mode và tài khoản
+     * lấy từ biến môi trường PAYMENTS_SEPAY_*, không có giá trị mặc định thật. Kết quả lấy bằng dò sổ giao dịch khi FE thăm dò.
+     */
+    @Bean
+    @ConditionalOnProperty(name = "app.payments.sepay.enabled", havingValue = "true")
+    PaymentGatewayPort sepayPaymentGateway(
+            ObjectMapper json,
+            @Value("${app.payments.sepay.endpoint:https://userapi-sandbox.sepay.vn}") String endpoint,
+            @Value("${app.payments.sepay.token}") String token,
+            @Value("${app.payments.sepay.bank-bin}") String bankBin,
+            @Value("${app.payments.sepay.account-no}") String accountNo,
+            @Value("${app.payments.sepay.account-name:LMS SEPAY TEST}") String accountName,
+            @Value("${app.payments.sepay.bank-account-id:}") String bankAccountId) {
+        if (token.isBlank() || bankBin.isBlank() || accountNo.isBlank()) {
+            throw new IllegalStateException("Bật app.payments.sepay thì phải đặt PAYMENTS_SEPAY_TOKEN, "
+                    + "PAYMENTS_SEPAY_BANK_BIN và PAYMENTS_SEPAY_ACCOUNT_NO");
+        }
+        return new SepayPaymentGateway(json, endpoint, token, bankBin, accountNo, accountName, bankAccountId);
     }
 
     @Bean

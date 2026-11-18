@@ -29,6 +29,12 @@ public enum ErrorCode {
     RETURN_QUANTITY_EXCEEDED(409),
     ORDER_NOT_PAID(409),
     CLIENT_REQUEST_CONFLICT(409),
+    /** Cùng clientRequestId nhưng nội dung đơn khác (docs/security/ORDER_ABUSE_AUDIT.md, A5). */
+    IDEMPOTENCY_KEY_REUSED(422),
+    /** Vượt trần chống lạm dụng đặt hàng (số đơn chờ, số đơn/ngày, số lượng). */
+    ORDER_LIMIT_EXCEEDED(429),
+    /** Đặt đơn quá nhanh (giới hạn tốc độ theo khách hoặc tenant). */
+    ORDER_RATE_LIMITED(429),
     SETTINGS_VERSION_CONFLICT(409),
     DISCOUNT_NOT_ALLOWED(400),
     DISCOUNT_EXCEEDS_AMOUNT(400),

@@ -4,6 +4,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.PersistenceException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -155,6 +156,53 @@ class SalesOrderPersistenceAdapter implements SalesOrderRepository {
 
     @Override
     @Transactional(readOnly = true)
+    public List<UUID> findExpiredReservationIds(UUID tenantId, Instant now, int limit) {
+        return em.createQuery("select o.id from SalesOrderJpaEntity o where o.tenantId = :t "
+                                + "and o.status = 'PENDING_CONFIRMATION' and o.reservationExpiresAt is not null "
+                                + "and o.reservationExpiresAt <= :now order by o.reservationExpiresAt, o.id",
+                        UUID.class)
+                .setParameter("t", tenantId).setParameter("now", now).setMaxResults(limit).getResultList();
+    }
+
+    @Override
+    @Transactional
+    public Optional<SalesOrder> findByIdSkipLocked(UUID tenantId, UUID id) {
+        return em.createQuery("select o from SalesOrderJpaEntity o where o.tenantId = :t and o.id = :id",
+                        SalesOrderJpaEntity.class).setParameter("t", tenantId).setParameter("id", id)
+                .setLockMode(LockModeType.PESSIMISTIC_WRITE)
+                .setHint("jakarta.persistence.lock.timeout", org.hibernate.LockOptions.SKIP_LOCKED)
+                .getResultList().stream().findFirst().map(e -> assemble(List.of(e)).get(0));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long countPendingOnline(UUID tenantId, UUID customerUserId) {
+        return em.createQuery("select count(o) from SalesOrderJpaEntity o where o.tenantId = :t "
+                        + "and o.customerUserId = :c and o.channel = 'ONLINE' and o.status = 'PENDING_CONFIRMATION'",
+                Long.class).setParameter("t", tenantId).setParameter("c", customerUserId).getSingleResult();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long countOnlineSince(UUID tenantId, UUID customerUserId, Instant since) {
+        return em.createQuery("select count(o) from SalesOrderJpaEntity o where o.tenantId = :t "
+                        + "and o.customerUserId = :c and o.channel = 'ONLINE' and o.createdAt >= :since",
+                Long.class).setParameter("t", tenantId).setParameter("c", customerUserId)
+                .setParameter("since", since).getSingleResult();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long countCancelledOnlineSince(UUID tenantId, UUID customerUserId, Instant since) {
+        return em.createQuery("select count(o) from SalesOrderJpaEntity o where o.tenantId = :t "
+                        + "and o.customerUserId = :c and o.channel = 'ONLINE' and o.status = 'CANCELLED' "
+                        + "and o.createdAt >= :since",
+                Long.class).setParameter("t", tenantId).setParameter("c", customerUserId)
+                .setParameter("since", since).getSingleResult();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public PageResult<SalesOrder> search(UUID tenantId, Criteria c, int page, int size) {
         boolean hasKeyword = c.keyword() != null && !c.keyword().isBlank();
         String where = "from SalesOrderJpaEntity o where o.tenantId = :t"
@@ -232,6 +280,6 @@ class SalesOrderPersistenceAdapter implements SalesOrderRepository {
                 e.getCreatedBy(), e.getCreatedAt(), e.getConfirmedAt(), e.getConfirmedBy(), e.getPaidAt(),
                 e.getCompletedAt(), e.getCancelledAt(), e.getCancelledBy(), e.getCancelReason(),
                 e.getPiiAnonymizedAt(), lines, payments, e.getVersion(), e.getCustomerNote(), e.getStaffNote(),
-                e.getExpectedDeliveryDate()));
+                e.getExpectedDeliveryDate(), e.getReservationExpiresAt(), e.getRequestHash()));
     }
 }

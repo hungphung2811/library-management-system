@@ -53,6 +53,17 @@ public class HttpSalesClient implements SalesClient {
     }
 
     @Override
+    public OrderAbusePolicyView getOrderAbusePolicy() {
+        return client.get().uri(BASE + "/settings/order-abuse-policy").retrieve().body(OrderAbusePolicyView.class);
+    }
+
+    @Override
+    public OrderAbusePolicyView updateOrderAbusePolicy(UpdateOrderAbusePolicyRequest request) {
+        return client.put().uri(BASE + "/settings/order-abuse-policy").body(request).retrieve()
+                .body(OrderAbusePolicyView.class);
+    }
+
+    @Override
     public StockItemView registerStockItem(RegisterStockItemRequest request) {
         return client.post().uri(BASE + "/stock-items").body(request).retrieve().body(StockItemView.class);
     }

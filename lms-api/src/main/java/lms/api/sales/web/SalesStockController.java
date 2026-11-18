@@ -38,6 +38,16 @@ public class SalesStockController {
         return sales.updateSettings(request);
     }
 
+    @GetMapping("/settings/order-abuse-policy")
+    public OrderAbusePolicyView getOrderAbusePolicy() {
+        return sales.getOrderAbusePolicy();
+    }
+
+    @PutMapping("/settings/order-abuse-policy")
+    public OrderAbusePolicyView updateOrderAbusePolicy(@Valid @RequestBody UpdateOrderAbusePolicyRequest request) {
+        return sales.updateOrderAbusePolicy(request);
+    }
+
     @PostMapping("/stock-items")
     public ResponseEntity<StockItemView> registerStockItem(@Valid @RequestBody RegisterStockItemRequest request) {
         StockItemView created = sales.registerStockItem(request);

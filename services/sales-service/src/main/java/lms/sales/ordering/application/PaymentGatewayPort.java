@@ -24,6 +24,15 @@ public interface PaymentGatewayPort {
         return Optional.empty();
     }
 
+    /**
+     * Như {@link #queryPayment(String)} nhưng cho cổng không tra được theo mã lệnh mà phải dò sổ giao dịch (SePay): cần
+     * thêm số tiền kỳ vọng và mốc {@code notBefore} (thời điểm tạo lệnh) để không khớp nhầm giao dịch cũ hoặc sai tiền.
+     * Mặc định gọi bản theo mã tham chiếu.
+     */
+    default Optional<GatewayPayment> queryPayment(String reference, long amount, Instant notBefore) {
+        return queryPayment(reference);
+    }
+
     /** Kết quả truy vấn: {@code paid} khi cổng báo thành công, kèm mã giao dịch và số tiền (đồng) của cổng. */
     record GatewayPayment(boolean paid, String providerTxnId, long amount) {
     }

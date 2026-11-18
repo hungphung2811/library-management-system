@@ -48,6 +48,7 @@ public class ProcessPaymentWebhookUseCase {
     }
 
     /** Webhook của cổng giả lập (chỉ lệnh SIMULATED). */
+    @Transactional
     public Result execute(UUID tenantId, Command cmd) {
         return execute(tenantId, cmd, PaymentIntent.PROVIDER_SIMULATED);
     }

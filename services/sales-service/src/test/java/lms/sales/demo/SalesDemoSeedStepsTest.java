@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import lms.demo.plan.DemoIds;
 import lms.demo.plan.DemoPlan;
 import lms.demo.runner.DemoSeedContext;
 import lms.demo.runner.DemoSeedStep;
@@ -64,6 +65,8 @@ class SalesDemoSeedStepsTest {
     private final Map<UUID, SalesSettings> settings = new HashMap<>();
     private final Set<UUID> touched = new HashSet<>();
 
+    private StockPort stockPort;
+
     private final List<DemoSeedStep> steps = buildSteps();
 
     @SuppressWarnings("unchecked")
@@ -96,6 +99,7 @@ class SalesDemoSeedStepsTest {
         }).when(directory).touch(any());
 
         StockPort stock = mock(StockPort.class);
+        stockPort = stock;
         when(stock.find(any(), any())).thenAnswer(a -> Optional.ofNullable(items.get(a.<UUID>getArgument(1))));
         when(stock.insert(any())).thenAnswer(a -> {
             StockItem i = a.getArgument(0);
@@ -161,14 +165,16 @@ class SalesDemoSeedStepsTest {
             assertThat(r.status()).isEqualTo(ReceiptStatus.CONFIRMED);
             assertThat(r.confirmedAt()).isNotNull();
         });
-        assertThat(items).hasSize(32);
+        int itemCount = DemoPlan.generate(LocalDate.of(2026, 11, 17)).stockItems().size();
+        assertThat(itemCount).isGreaterThan(32);
+        assertThat(items).hasSize(itemCount);
         assertThat(orders).hasSize(42);
         assertThat(returns).hasSize(3);
         assertThat(refunds).hasSize(4);
         assertThat(touched).containsExactly(TENANT);
-        // 1 cấu hình; 2 NCC + 2 phiếu nhập + 32 mặt hàng; 42 đơn + 3 phiếu trả + 4 khoản hoàn
+        // 1 cấu hình; 2 NCC + 2 phiếu nhập + mọi mặt hàng (32 gốc + ấn bản bổ sung); 42 đơn + 3 phiếu trả + 4 khoản hoàn
         assertThat(results[0].created()).isEqualTo(1);
-        assertThat(results[1].created()).isEqualTo(2 + 2 + 32);
+        assertThat(results[1].created()).isEqualTo(2 + 2 + itemCount);
         assertThat(results[2].created()).isEqualTo(42 + 3 + 4);
         assertThat(orders.values()).allSatisfy(o -> assertThat(o.orderNo()).startsWith("DEMO-"));
     }
@@ -183,12 +189,12 @@ class SalesDemoSeedStepsTest {
         for (SeedResult[] run : List.of(again, nextDay)) {
             assertThat(run).allSatisfy(r -> assertThat(r.created()).isZero());
             assertThat(run[0].skipped()).isEqualTo(1);
-            assertThat(run[1].skipped()).isEqualTo(2 + 2 + 32);
+            assertThat(run[1].skipped()).isEqualTo(2 + 2 + items.size());
             assertThat(run[2].skipped()).isEqualTo(42 + 3 + 4);
         }
         assertThat(orders).hasSize(orderCount);
         assertThat(ledger).hasSize(ledgerCount);
-        assertThat(items).hasSize(32);
+        assertThat(items).hasSize(DemoPlan.generate(LocalDate.of(2026, 11, 17)).stockItems().size());
     }
 
     @Test
@@ -376,6 +382,28 @@ class SalesDemoSeedStepsTest {
         // chạy lần nữa: không còn gì để làm
         SeedResult[] third = seed(clockAt("2026-11-17T15:45:00"));
         assertThat(third).allSatisfy(r -> assertThat(r.created()).isZero());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void ghiSnapshotWorkIdTheoKeHoachMoiLanChay() {
+        seed(clockAt("2026-11-17T15:00:00"));
+        seed(clockAt("2026-11-17T15:30:00"));
+
+        org.mockito.ArgumentCaptor<Map<UUID, UUID>> captor = org.mockito.ArgumentCaptor.forClass(Map.class);
+        org.mockito.Mockito.verify(stockPort, org.mockito.Mockito.times(2)).refreshWorkIds(org.mockito.ArgumentMatchers.eq(TENANT),
+                captor.capture());
+        DemoPlan plan = DemoPlan.generate(LocalDate.of(2026, 11, 17));
+        for (Map<UUID, UUID> written : captor.getAllValues()) {
+            assertThat(written).hasSameSizeAs(plan.stockItems());
+            plan.stockItems().forEach(s -> assertThat(written).containsEntry(s.titleId(), s.workId()));
+        }
+        // 64 ấn bản gốc có mặt hàng: work_id là tác phẩm 1:1 md5 (khớp backfill V14); ấn bản bổ sung dùng chung tác phẩm với bản gốc
+        Map<UUID, UUID> written = captor.getValue();
+        plan.stockItems().stream().filter(s -> s.index() < 32)
+                .forEach(s -> assertThat(written.get(s.titleId())).isEqualTo(DemoIds.legacyWork(s.titleId())));
+        assertThat(plan.stockItems().stream().map(DemoPlan.StockItemPlan::workId).distinct().count())
+                .isLessThan(plan.stockItems().size());
     }
 
     @Test

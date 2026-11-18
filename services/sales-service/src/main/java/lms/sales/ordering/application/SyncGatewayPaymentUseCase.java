@@ -35,7 +35,7 @@ public class SyncGatewayPaymentUseCase {
             return current;
         }
         try {
-            return gateway.queryPayment(current.reference())
+            return gateway.queryPayment(current.reference(), current.amount(), current.createdAt())
                     .filter(PaymentGatewayPort.GatewayPayment::paid)
                     .map(p -> processor.execute(tenantId, new ProcessPaymentWebhookUseCase.Command(current.reference(),
                             p.amount(), p.providerTxnId(), "PAID"), current.provider()).intent())

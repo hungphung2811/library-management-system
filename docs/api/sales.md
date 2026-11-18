@@ -21,6 +21,8 @@ Khóa quyền = `TênController/tênMethod` của sales-service (không đổi t
 | Method, đường dẫn (BFF) | Khóa quyền | Body / query | Kết quả |
 |---|---|---|---|
 | GET `/api/sales/settings` | `SalesSettingsController/get` | | `{vatRateBps, pricesIncludeVat, returnWindowDays, fixedShippingFee, lowStockThreshold, walkInPiiRetentionMonths, currency, version, updatedAt}`; chưa lưu thì trả mặc định với `version` 0, `updatedAt` null |
+| GET `/api/sales/settings/order-abuse-policy` | `OrderAbusePolicyController/get` | | Chính sách chống lạm dụng đặt hàng online của tenant: `{reservationMinutes, maxPendingOrders, maxOrdersPerDay, maxQuantityPerLine, maxTotalQuantity, ordersPerMinutePerUser, ordersPerMinuteTenant, version, updatedAt}`; chưa lưu thì trả mặc định (`lms.sales.abuse.defaults.*`: 15 phút, 5 đơn chờ, 20 đơn/24 giờ, 50 mỗi dòng, 100 mỗi đơn, 5 đơn/phút/khách, 300 đơn/phút/tenant) với `version` 0. Không cache |
+| PUT `/api/sales/settings/order-abuse-policy` | `OrderAbusePolicyController/update` | Mọi trường bắt buộc kèm `version` đã đọc. `reservationMinutes` 0..10080 (0 = đơn chờ xác nhận không tự hết hạn), `maxPendingOrders` 1..1000, `maxOrdersPerDay` 1..10000, `maxQuantityPerLine` 1..10000, `maxTotalQuantity` 1..100000, `ordersPerMinutePerUser` 1..600, `ordersPerMinuteTenant` 1..100000 | chính sách mới (version tăng), audit `SETTINGS_CHANGED`; `409 SETTINGS_VERSION_CONFLICT`, `400 INVALID_SETTINGS` |
 | PUT `/api/sales/settings` | `SalesSettingsController/update` | `{vatRateBps 0..10000, pricesIncludeVat, returnWindowDays 0..365, fixedShippingFee 0..100000000, lowStockThreshold 0..100000, walkInPiiRetentionMonths 1..120, version}` (mọi trường bắt buộc; `version` = giá trị đã đọc, 0 nếu chưa từng lưu) | cấu hình mới (version tăng); `409 SETTINGS_VERSION_CONFLICT`, `400 INVALID_SETTINGS` |
 | POST `/api/sales/stock-items` | `StockItemController/register` | `{titleId, sellingPrice?, lowStockThreshold?}` | `201` mặt hàng tồn 0; `409 STOCK_ITEM_EXISTS`, `409 TITLE_NOT_AVAILABLE` (catalog không có đầu sách), `503 CATALOG_UNAVAILABLE` |
 | GET `/api/sales/stock-items` | `StockItemController/search` | `lowStockOnly?, page?, size?` (`keyword` nhận nhưng chưa dùng: tên đầu sách nằm ở catalog) | trang mặt hàng (xem dưới) |
@@ -148,7 +150,7 @@ cancel: PENDING_CONFIRMATION, CONFIRMED, READY_FOR_PICKUP (nhả hàng giữ) | 
 
 | Method, đường dẫn (service) | Khóa quyền | Body / query | Kết quả |
 |---|---|---|---|
-| POST `/internal/sales/shop/orders` | `ShopController/placeOrder` | `{lines[{titleId, quantity}], fulfilment (PICKUP/DELIVERY), paymentMethod, recipient{name, phone, address?}, clientRequestId}`; `address` bắt buộc khi `DELIVERY` | `201` + `Location`, `ShopOrderView`; `409 INSUFFICIENT_STOCK`, `409 STOCK_ITEM_NOT_REGISTERED`, `409 TITLE_NOT_AVAILABLE`, `400 INVALID_REQUEST` (gồm `clientRequestId` không phải UUID), `409 CLIENT_REQUEST_CONFLICT` |
+| POST `/internal/sales/shop/orders` | `ShopController/placeOrder` | `{lines[{titleId, quantity}], fulfilment (PICKUP/DELIVERY), paymentMethod, recipient{name, phone, address?}, clientRequestId}`; `address` bắt buộc khi `DELIVERY` | `201` + `Location`, `ShopOrderView`; `409 INSUFFICIENT_STOCK`, `409 STOCK_ITEM_NOT_REGISTERED`, `409 TITLE_NOT_AVAILABLE`, `400 INVALID_REQUEST` (gồm `clientRequestId` không phải UUID), `409 CLIENT_REQUEST_CONFLICT`, `422 IDEMPOTENCY_KEY_REUSED` (cùng khóa, cùng khách, khác nội dung), `429 ORDER_LIMIT_EXCEEDED` (vượt trần đơn chờ hoặc đơn trong 24 giờ), `429 ORDER_RATE_LIMITED`, `400 INVALID_QUANTITY` (vượt trần số lượng của tenant). Đơn mới có hạn giữ hàng `reservationMinutes` (mặc định 15 phút): quá hạn mà nhân viên chưa xác nhận thì job hủy đơn ("Hết hạn giữ hàng") và nhả tồn; đơn đã xác nhận không bị hết hạn |
 | GET `/internal/sales/shop/orders` | `ShopController/myOrders` | `page?, size?` (size mặc định 20, **tối đa 50**) | trang `ShopOrderView` của chính mình |
 | GET `/internal/sales/shop/orders/{id}` | `ShopController/myOrder` | | một đơn của mình; `404 ORDER_NOT_FOUND` |
 | POST `/internal/sales/shop/orders/{id}/cancellation` | `ShopController/cancelMyOrder` | tùy chọn `{reason?}` | `CANCELLED` nếu còn `PENDING_CONFIRMATION`, ngược lại `409 ORDER_STATE_CONFLICT` |
@@ -173,6 +175,32 @@ Không có `ShopController/listItems` (thiết kế gốc 5.3): danh mục sách
 Chỉ mặt hàng `active`; `price` = `sellingPrice` hoặc giá bìa làm tròn đồng; `inStock = available > 0`. KHÔNG bao giờ trả `onHand`, `reserved`, `available`, giá nhập, ngưỡng tồn, `tenant_id`, ISBN. Mặt hàng không có/không active: `404 STOCK_ITEM_NOT_FOUND`. `keyword` lọc theo tên/tác giả bằng `GET /internal/books/lookup?keyword=` của catalog (tối đa 200 đầu sách) rồi giao với mặt hàng đang bán. Lỗi catalog: `503 CATALOG_UNAVAILABLE`. Không có endpoint BFF `lms-api` cho nhóm này: `customer-api` gọi thẳng.
 
 ⚠️ Đề xuất, chưa có code (ADR-0019, hợp đồng ở `storefront-kham-pha.md`): `items` thêm `sort` (`newest|price_asc|price_desc`) và `inStock`; thêm `GET /internal/sales/storefront/suggestions` (`StorefrontController/suggestions`), `GET /internal/sales/storefront/banners` (`StorefrontBannerController/list`) và nhóm quản trị banner `/internal/sales/banners/**` ↔ `/api/sales/banners/**` (`SalesBannerController/{list,get,create,update,delete}`, không `@StorefrontAccessible`). Migration sales `V6` (snapshot giá bìa để sắp theo giá), `V7` (`storefront_banners`), identity `V26` (seed khóa).
+
+### Storefront gộp biến thể theo tác phẩm (ADR-0026, pha 2b; migration sales `V14`)
+
+Chỉ THÊM, tương thích ngược: mọi trường mới tùy chọn ở phía đọc, mặc định `group=EDITION` giữ hành vi cũ. Khóa quyền không đổi (`StorefrontController/list|get`). Hợp đồng đặt hàng KHÔNG đổi: khách chọn một biến thể rồi đặt bằng `titleId` của biến thể đó (`lines[].titleId`). Tồn kho, giá, giỏ hàng vẫn theo ấn bản; `stock_items.title_id`, UNIQUE `(tenant_id, title_id)` không đổi.
+
+`GET /internal/sales/storefront/items` thêm query `group`:
+
+| `group` | Hành vi |
+|---|---|
+| vắng hoặc `EDITION` | Như cũ: mỗi ấn bản một thẻ |
+| `WORK` | Gộp các ấn bản cùng tác phẩm thành một thẻ. Giá trị khác (kể cả rỗng, `work`, `WORK `) là `400 INVALID_REQUEST`, kiểm trước khi chạm DB. Phân biệt hoa thường |
+
+`ItemView` thêm (luôn có khóa, có thể null): `workId` (tác phẩm của ấn bản, lấy từ catalog rồi snapshot), `workTitle`, `variantCount`, `priceFrom`. Ở `EDITION`: `variantCount` và `priceFrom` là `null`. Ở `WORK`:
+- thẻ mang ấn bản đại diện của nhóm (còn hàng trước, rồi giá hiệu lực thấp nhất, rồi mới nhất): `titleId`, `name`, `price`, ảnh... là của đại diện; `inStock` là của CẢ NHÓM (có ít nhất một ấn bản còn hàng);
+- `variantCount` = số ấn bản đang bán của nhóm, `priceFrom` = giá thấp nhất trong nhóm (VND; nếu snapshot giá chưa có thì bằng giá của đại diện);
+- `sort=newest` theo ấn bản mới đưa vào bán nhất của nhóm; `price_asc|price_desc` theo `priceFrom`; `inStock=true` giữ nhóm có ít nhất một ấn bản còn hàng; `total` đếm nhóm, không đếm ấn bản;
+- có `keyword`: nhóm gộp trong bộ nhớ từ kết quả tìm của catalog, nên `variantCount`/`priceFrom` chỉ tính các ấn bản KHỚP từ khóa.
+- Số câu SQL không tăng theo số dòng: 1 câu đếm, 1 câu gộp trang, 1 câu nạp ấn bản của các nhóm trong trang, cộng đúng 1 lời gọi lô `POST /internal/books/lookup` cho các ấn bản đại diện.
+
+`GET /internal/sales/storefront/items/{titleId}`: `ItemDetailView` thêm `workId`, `workTitle` và `variants[]`, mỗi phần tử `{titleId, format, language, translator, edition, publicationYear, partNumber, partLabel, coverImageUrl, price, inStock}`. `variants` gồm cả chính ấn bản đang xem, chỉ mặt hàng đang bán có giá hiệu lực, sắp theo `partNumber` (null cuối), `publicationYear`, `language`, `format`, `titleId`. Ấn bản chưa gắn tác phẩm: `workId = null`, `variants` chỉ có chính nó. Phần của tập là nhãn trên ấn bản (`partNumber`, `partLabel`); bộ hộp là một ấn bản riêng.
+
+Snapshot `stock_items.work_id` (V14, cùng khuôn `cover_price_snapshot` của ADR-0019): chỉ để gộp ở DB, không hiển thị hay dùng để bán. Ghi lúc đưa vào bán (`POST /internal/sales/stock-items` và import Excel `stock-items`, lấy từ `workId` của catalog), và tự sửa (tối đa 50 dòng mỗi lần xem) khi catalog trả `workId` khác, ví dụ sau `merge` tác phẩm. Snapshot lệch làm một ấn bản tạm hiện thành thẻ riêng ở `group=WORK` cho tới lần xem kế tiếp của chính nó hoặc của chi tiết ấn bản đó. Không cache tồn kho. Mặt hàng chưa có snapshot (`work_id` NULL) được coi là nhóm riêng (`COALESCE(work_id, title_id)`).
+
+Migration `V14__stock_items_work_id.sql`: thêm cột `work_id UUID NULL`; backfill `md5('lms-work:' || title_id::text)::uuid` (đúng công thức catalog `V10`) lặp theo tenant với `app.tenant_id` vì `stock_items` FORCE RLS; index `idx_stock_items_work (tenant_id, work_id) WHERE active AND work_id IS NOT NULL`. Số `V13` đã bị `order_abuse_guard` chiếm nên dùng `V14`.
+
+⚠️ Đổi mặc định sang `WORK` chỉ làm sau khi FE storefront chuyển xong (ADR-0026 mục 5).
 
 ### Trả hàng, đổi hàng, hoàn tiền
 
@@ -405,6 +433,8 @@ Trước: `POST /api/sales/pos-orders[/discounted]` với CASH/CARD/BANK_TRANSFE
 |---|---|---|---|
 | `MANUAL` | CASH, CARD, BANK_TRANSFER | `null` | Form xác nhận thu: CASH nhập tiền khách đưa (tùy chọn), CARD/BANK_TRANSFER nhập mã giao dịch (bắt buộc), rồi gọi `confirm` |
 | `SIMULATED` | QR | chuỗi VietQR | Hiện mã QR, thăm dò `GET`; không có `confirm` (409 `PAYMENT_NOT_MANUAL`); dev có nút `simulate-paid` |
+| `MOMO` | MOMO | URL `qrCodeUrl` của MoMo | Hiện mã QR, thăm dò `GET` (BE hỏi MoMo mỗi lần thăm dò), không có nút giả lập |
+| `SEPAY` | SEPAY | chuỗi VietQR | Như `SIMULATED` nhưng không có nút `simulate-paid`: tiền "về" khi mô phỏng giao dịch ở my.sepay.vn (xem dưới) |
 
 Phương thức của đơn có sẵn ở `paymentMethod` của đơn; `provider` quyết định hiển thị form hay mã QR.
 
@@ -439,3 +469,18 @@ Phương thức của đơn có sẵn ở `paymentMethod` của đơn; `provider
 - Đơn đổi hàng chờ thanh toán bị hủy thì phiếu trả được đổi lại (chỉ mục duy nhất bỏ qua đơn `CANCELLED`).
 - Audit: `ORDER_CREATED` (kèm `paymentIntentId`, `provider`), `ORDER_PAID` (kèm người bấm, `changeDue`), `ORDER_CANCELLED` khi hủy/hết hạn.
 - Khóa mới `PaymentIntentController/confirm` (FE phải đồng bộ danh sách quyền màn POS); migration identity V29 đã gán cho Thu ngân và Quản lý cửa hàng.
+
+## Thanh toán SePay Test mode cho POS (ADR-0028, migration sales `V15`)
+
+Thêm phương thức POS `paymentMethod = "SEPAY"` (POST `/api/sales/pos-orders[/discounted]`), tương thích ngược: FE cũ không bị ảnh hưởng. Chọn cổng bằng đúng trường `paymentMethod` như `MOMO` (không có trường `provider` ở request). Response `201` có `paymentIntent` với `provider = "SEPAY"` và `qrPayload` là **chuỗi VietQR/EMVCo** (không phải URL; FE dựng thành ảnh QR như với `SIMULATED`), số tiền và nội dung chuyển khoản = `reference` (`LMS` + 10 ký tự). Đơn và lệnh theo cùng máy trạng thái QR (`AWAITING_PAYMENT` đến `COMPLETED` + `PAID`, hết hạn mặc định 10 phút). Tắt cổng thì `400 PAYMENT_NOT_ENABLED` ("Thanh toán SePay chưa được bật").
+
+Không webhook, không cần địa chỉ công khai: mỗi lần FE gọi `GET /api/sales/payments/intents/{id}` mà lệnh còn PENDING, BE gọi `GET https://userapi-sandbox.sepay.vn/v2/transactions` tìm giao dịch tiền vào có nội dung chứa `reference`, đúng số tiền, xảy ra sau lúc tạo lệnh (dung sai 10 giây), rồi ghi nhận PAID. FE chỉ cần thăm dò như với QR/MoMo (khuyến nghị cách nhau hơn 3 giây; SePay giới hạn 3 yêu cầu/giây theo IP, vượt thì BE giữ PENDING và FE thăm dò lại). Nút/endpoint `simulate-paid` chỉ cho lệnh `SIMULATED` (SEPAY trả 409 `PAYMENT_NOT_SIMULATED`).
+
+### Cách thử bằng "Mô phỏng giao dịch"
+
+1. my.sepay.vn: bật **Test mode**, tạo tài khoản ngân hàng Test mode, và **API Access** (token Test mode, chỉ hiện một lần).
+2. Đặt biến môi trường cho sales-service rồi khởi động lại: `PAYMENTS_SEPAY_ENABLED=true`, `PAYMENTS_SEPAY_TOKEN` (token Test mode), `PAYMENTS_SEPAY_BANK_BIN` (BIN 6 số của ngân hàng tài khoản test, in vào QR), `PAYMENTS_SEPAY_ACCOUNT_NO` (số tài khoản test), tùy chọn `PAYMENTS_SEPAY_ACCOUNT_NAME`, `PAYMENTS_SEPAY_BANK_ACCOUNT_ID` (UUID tài khoản Test mode để chỉ đọc giao dịch của tài khoản đó), `PAYMENTS_SEPAY_ENDPOINT` (mặc định `https://userapi-sandbox.sepay.vn`). Không có giá trị mặc định thật; prod phải tắt.
+3. POS tạo đơn thanh toán SEPAY, ghi lại mã `reference` hiện trên màn hình.
+4. my.sepay.vn (Test mode) > Mô phỏng giao dịch: chọn tài khoản test, **Tiền vào**, số tiền **đúng bằng** số tiền đơn (tối thiểu 1.000), **nội dung chứa `reference`** (không phân biệt hoa thường). Lần thăm dò kế tiếp đơn thành `COMPLETED` + `PAID`.
+
+Không khớp thì lệnh giữ PENDING: sai số tiền, nội dung không chứa `reference`, hoặc giao dịch tạo trước lúc tạo lệnh. Một giao dịch SePay chỉ thanh toán một lệnh (mã `SEPAY-<id giao dịch>`, duy nhất theo tenant).

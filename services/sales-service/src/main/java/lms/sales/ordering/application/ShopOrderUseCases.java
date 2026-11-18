@@ -30,6 +30,22 @@ public class ShopOrderUseCases {
         return orders.search(tenantId, criteria, page, size).map(ShopOrderResponse::from);
     }
 
+    /**
+     * Số đơn ONLINE của chính khách: {@code total} (mọi trạng thái, kể cả đã hủy) và {@code pending} (đang chờ xác nhận).
+     * Chỉ đếm, không đọc dòng đơn; {@code total} lấy từ trang 1 dòng của cùng truy vấn danh sách nên luôn khớp {@code myOrders}.
+     */
+    @Transactional(readOnly = true)
+    public OrderCounts myOrderCounts(UUID tenantId, UUID customerUserId) {
+        requireCustomer(customerUserId);
+        var criteria = new SalesOrderRepository.Criteria(null, null, OrderChannel.ONLINE, null, null, null,
+                customerUserId);
+        long total = orders.search(tenantId, criteria, 0, 1).total();
+        return new OrderCounts(total, orders.countPendingOnline(tenantId, customerUserId));
+    }
+
+    public record OrderCounts(long total, long pending) {
+    }
+
     @Transactional(readOnly = true)
     public ShopOrderResponse myOrder(UUID tenantId, UUID customerUserId, UUID orderId) {
         return ShopOrderResponse.from(own(tenantId, customerUserId, orderId));

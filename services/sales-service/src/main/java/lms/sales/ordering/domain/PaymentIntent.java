@@ -17,6 +17,8 @@ public final class PaymentIntent {
     public static final String PROVIDER_SIMULATED = "SIMULATED";
     /** Cổng sandbox của MoMo (captureWallet); kết quả lấy bằng cách truy vấn MoMo khi FE thăm dò. */
     public static final String PROVIDER_MOMO = "MOMO";
+    /** SePay Test mode (ADR-0028): dò sổ giao dịch tiền vào có nội dung chứa mã tham chiếu khi FE thăm dò, không webhook. */
+    public static final String PROVIDER_SEPAY = "SEPAY";
     /** Thu tay tại quầy (tiền mặt, thẻ, chuyển khoản đã đối soát): thu ngân bấm xác nhận (ADR-0021). */
     public static final String PROVIDER_MANUAL = "MANUAL";
     public static final int MAX_TRANSACTION_REF = 64;
