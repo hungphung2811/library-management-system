@@ -39,7 +39,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 /** ADR-0031 (gói F0): claim tenantAccess ở token người dùng và token dịch vụ tenant-data. */
 class TenantAccessClaimTest {
 
-    private final Clock clock = Clock.fixed(Instant.parse("2026-11-19T00:00:00Z"), ZoneOffset.UTC);
+    private final Clock clock = Clock.fixed(Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS), ZoneOffset.UTC);
     private final UUID userId = UUID.randomUUID();
     private final UUID tenantId = UUID.randomUUID();
     private final TenantSummary summary = new TenantSummary(tenantId, "t", "T", List.of("LENDING"));
