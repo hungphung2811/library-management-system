@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-  Nạp dữ liệu mẫu cho tenant demo (ADR-0018): chạy lần lượt identity -> catalog -> circulation -> sales, mỗi service một tiến trình java -jar
+  Nạp dữ liệu mẫu cho tenant demo (ADR-0018): chạy lần lượt identity -> catalog -> circulation -> sales -> support, mỗi service một tiến trình java -jar
   riêng (profile demo-seed, không web) rồi thoát. Chỉ dùng ở máy dev/demo; mỗi service tự từ chối khi bật profile prod.
 .PARAMETER Password  Mật khẩu chung của các tài khoản demo (mặc định lấy từ biến DEMO_SEED_PASSWORD, nếu không có thì Demo@12345).
 .PARAMETER Only      Chỉ chạy các bước nêu tên, ví dụ -Only catalog,circulation.
@@ -28,7 +28,8 @@ $steps = @(
   @{ name = 'identity';    jar = 'services\identity-service\target\identity-service-0.1.0-SNAPSHOT.jar';       tenant = $false },
   @{ name = 'catalog';     jar = 'services\catalog-service\target\catalog-service-0.1.0-SNAPSHOT.jar';         tenant = $true },
   @{ name = 'circulation'; jar = 'services\circulation-service\target\circulation-service-0.1.0-SNAPSHOT.jar'; tenant = $true },
-  @{ name = 'sales';       jar = 'services\sales-service\target\sales-service-0.1.0-SNAPSHOT.jar';             tenant = $true }
+  @{ name = 'sales';       jar = 'services\sales-service\target\sales-service-0.1.0-SNAPSHOT.jar';             tenant = $true },
+  @{ name = 'support';     jar = 'services\support-service\target\support-service-0.1.0-SNAPSHOT.jar';         tenant = $true }
 )
 if ($Only) { $steps = @($steps | Where-Object { $Only -contains $_.name }) }
 

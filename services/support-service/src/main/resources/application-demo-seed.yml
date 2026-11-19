@@ -1,0 +1,25 @@
+# Profile demo-seed (ADR-0018): tiến trình chạy MỘT LẦN để seed dữ liệu demo rồi thoát. Dùng cùng profile dev (datasource):
+#   java -jar support-service.jar --spring.profiles.active=dev,demo-seed --lms.demo-seed.enabled=true
+#        --lms.demo-seed.tenant-id=<uuid> --lms.demo-seed.password=<mật khẩu>
+spring:
+  main:
+    # Không web: không mở cổng 8084 (không xung đột service đang chạy), không có đường HTTP nào gọi seed
+    web-application-type: none
+  kafka:
+    listener:
+      # Các consumer audit/thông báo không khởi động: không tranh partition, không xử lý event
+      auto-startup: false
+    admin:
+      auto-create: false
+
+lms:
+  security:
+    permission:
+      enabled: false
+  notification:
+    dispatch:
+      # Không chạy job gửi email: dữ liệu seed chỉ ở trạng thái kết thúc, không có gì cần gửi
+      enabled: false
+  demo-seed:
+    # support không tự tạo tenant: tenant-id do identity tạo, truyền vào (DEMO_TENANT_ID)
+    creates-tenant: false

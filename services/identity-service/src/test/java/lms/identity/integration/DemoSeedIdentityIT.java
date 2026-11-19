@@ -93,7 +93,7 @@ class DemoSeedIdentityIT {
 
         // cấu hình profile đúng như thiết kế: tạo tenant, không cần tenant-id
         assertThat(properties.createsTenant()).isTrue();
-        assertThat(steps).hasSize(1);
+        assertThat(steps).extracting(DemoSeedStep::name).containsExactly("identity", "identity.platform");
         assertThat(steps.get(0).order()).isEqualTo(1);
 
         // guard: profile prod bị từ chối (mã 2), không ghi gì
@@ -149,6 +149,19 @@ class DemoSeedIdentityIT {
         long roleRows = count("SELECT count(*) FROM user_roles WHERE tenant_id = ?", tenantId);
         long cards = count("SELECT count(*) FROM reader_profiles");
 
+        // phần nền tảng: thanh toán hợp đồng, storefront origins (một đã tắt), Application (PUBLIC_SITE có domain, INTEGRATION có credential)
+        assertThat(count("SELECT count(*) FROM tenant_contract_payments WHERE tenant_id = ?", tenantId)).isEqualTo(2);
+        assertThat(count("SELECT count(*) FROM tenant_storefront_origins WHERE tenant_id = ? AND NOT enabled", tenantId))
+                .isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM tenant_storefront_origins WHERE tenant_id = ? AND enabled", tenantId))
+                .isGreaterThanOrEqualTo(2);
+        assertThat(count("SELECT count(*) FROM applications WHERE tenant_id = ?", tenantId)).isEqualTo(2);
+        assertThat(count("SELECT count(*) FROM application_credentials WHERE tenant_id = ?", tenantId)).isEqualTo(2);
+        long payments = count("SELECT count(*) FROM tenant_contract_payments WHERE tenant_id = ?", tenantId);
+        long origins = count("SELECT count(*) FROM tenant_storefront_origins WHERE tenant_id = ?", tenantId);
+        long applications = count("SELECT count(*) FROM applications WHERE tenant_id = ?", tenantId);
+        long appCredentials = count("SELECT count(*) FROM application_credentials WHERE tenant_id = ?", tenantId);
+
         // lần 2: không lỗi, không nhân đôi bất cứ thứ gì
         assertThat(runner("demo-seed").execute()).isEqualTo(DemoSeedRunner.EXIT_OK);
         assertThat(count("SELECT count(*) FROM tenants WHERE code = 'demo'")).isEqualTo(1);
@@ -157,5 +170,10 @@ class DemoSeedIdentityIT {
         assertThat(count("SELECT count(*) FROM tenant_contracts WHERE tenant_id = ?", tenantId)).isEqualTo(contracts);
         assertThat(count("SELECT count(*) FROM user_roles WHERE tenant_id = ?", tenantId)).isEqualTo(roleRows);
         assertThat(count("SELECT count(*) FROM reader_profiles")).isEqualTo(cards);
+        assertThat(count("SELECT count(*) FROM tenant_contract_payments WHERE tenant_id = ?", tenantId)).isEqualTo(payments);
+        assertThat(count("SELECT count(*) FROM tenant_storefront_origins WHERE tenant_id = ?", tenantId)).isEqualTo(origins);
+        assertThat(count("SELECT count(*) FROM applications WHERE tenant_id = ?", tenantId)).isEqualTo(applications);
+        assertThat(count("SELECT count(*) FROM application_credentials WHERE tenant_id = ?", tenantId))
+                .isEqualTo(appCredentials);
     }
 }

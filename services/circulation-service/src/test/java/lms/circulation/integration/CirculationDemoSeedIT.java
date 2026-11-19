@@ -79,7 +79,8 @@ class CirculationDemoSeedIT {
     @Test
     void seedGhiDungDuLieuIdempotentVaThongKeDungBatBien() throws Exception {
         assertThat(steps).extracting(DemoSeedStep::name)
-                .containsExactly("circulation.borrowings", "circulation.fines", "circulation.reservations");
+                .containsExactly("circulation.borrowings", "circulation.fines", "circulation.fine-extras",
+                        "circulation.reservations");
 
         assertThat(runSeed("x", List.of("dev", "demo-seed"))).isEqualTo(DemoSeedRunner.EXIT_OK);
 

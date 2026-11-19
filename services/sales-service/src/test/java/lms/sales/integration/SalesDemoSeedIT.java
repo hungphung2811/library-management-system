@@ -17,7 +17,25 @@ import lms.demo.plan.DemoPlan;
 import lms.demo.runner.DemoSeedProperties;
 import lms.demo.runner.DemoSeedRunner;
 import lms.demo.runner.DemoSeedStep;
+import lms.sales.banner.application.BannerRepository;
+import lms.sales.banner.infrastructure.demo.BannerDemoSeedStep;
+import lms.sales.contact.application.ShopContactRepository;
 import lms.sales.contact.infrastructure.config.ShopContactAnonymizationJob;
+import lms.sales.contact.infrastructure.demo.ContactDemoSeedStep;
+import lms.sales.invoicing.application.InvoiceRepository;
+import lms.sales.invoicing.application.InvoiceRequestRepository;
+import lms.sales.invoicing.application.InvoiceRequestUseCases;
+import lms.sales.invoicing.application.InvoiceSettingsPort;
+import lms.sales.invoicing.application.InvoiceSettingsUseCases;
+import lms.sales.invoicing.application.InvoiceUseCases;
+import lms.sales.invoicing.infrastructure.demo.InvoicingDemoSeedStep;
+import lms.sales.ordering.application.PaymentIntentRepository;
+import lms.sales.ordering.infrastructure.demo.PaymentIntentDemoSeedStep;
+import lms.sales.shift.application.CashierShiftRepository;
+import lms.sales.shift.application.ShiftLedgerPort;
+import lms.sales.shift.application.ShiftSettingsPort;
+import lms.sales.shift.infrastructure.demo.ShiftDemoSeedStep;
+import org.springframework.jdbc.core.JdbcTemplate;
 import lms.sales.ordering.application.RefundRepository;
 import lms.sales.ordering.application.SalesOrderRepository;
 import lms.sales.ordering.application.SalesReturnRepository;
@@ -111,6 +129,32 @@ class SalesDemoSeedIT {
     TransactionOperations tx;
     @Autowired
     SalesStatsUseCases stats;
+    @Autowired
+    BannerRepository banners;
+    @Autowired
+    ShopContactRepository contacts;
+    @Autowired
+    InvoiceSettingsPort invoiceSettingsPort;
+    @Autowired
+    InvoiceSettingsUseCases invoiceSettings;
+    @Autowired
+    InvoiceUseCases invoiceUseCases;
+    @Autowired
+    InvoiceRequestUseCases invoiceRequestUseCases;
+    @Autowired
+    InvoiceRequestRepository invoiceRequests;
+    @Autowired
+    InvoiceRepository invoiceRepository;
+    @Autowired
+    PaymentIntentRepository paymentIntents;
+    @Autowired
+    CashierShiftRepository shiftRepository;
+    @Autowired
+    ShiftSettingsPort shiftSettings;
+    @Autowired
+    ShiftLedgerPort shiftLedger;
+    @Autowired
+    JdbcTemplate jdbc;
 
     @BeforeEach
     void stubCatalog() {
@@ -119,7 +163,12 @@ class SalesDemoSeedIT {
 
     private List<DemoSeedStep> steps() {
         return List.of(new OrderingDemoSeedStep(orders, returns, refunds, directory, tx),
-                new StockDemoSeedStep(suppliers, receipts, stock, tx), new SettingsDemoSeedStep(settings, tx));
+                new StockDemoSeedStep(suppliers, receipts, stock, tx), new SettingsDemoSeedStep(settings, tx),
+                new PaymentIntentDemoSeedStep(paymentIntents, tx),
+                new InvoicingDemoSeedStep(invoiceSettingsPort, invoiceSettings, invoiceUseCases,
+                        invoiceRequestUseCases, invoiceRequests, invoiceRepository),
+                new ShiftDemoSeedStep(shiftRepository, shiftSettings, shiftLedger, jdbc, tx),
+                new BannerDemoSeedStep(banners, tx), new ContactDemoSeedStep(contacts, tx));
     }
 
     private DemoSeedRunner runner(List<String> profiles, boolean enabled) {
@@ -208,6 +257,46 @@ class SalesDemoSeedIT {
         assertThat(count("select count(*) from sales_orders where channel = 'POS'")).isPositive();
         assertThat(count("select count(*) from sales_orders where channel = 'ONLINE'")).isPositive();
         assertThat(count("select count(distinct status) from sales_orders")).isEqualTo(6);
+        assertExtras();
+    }
+
+    /** Dữ liệu mở rộng: banner, liên hệ, lệnh thanh toán, hóa đơn, ca thu ngân (cùng số liệu sau lần chạy lại). */
+    private void assertExtras() throws Exception {
+        assertThat(count("select count(*) from storefront_banners")).isEqualTo(5);
+        assertThat(count("select count(*) from storefront_banners where active and starts_at is null and ends_at is null"))
+                .isEqualTo(1);
+        assertThat(count("select count(*) from storefront_banners where not active")).isEqualTo(1);
+        assertThat(count("select count(*) from shop_contact_requests")).isEqualTo(9);
+        assertThat(count("select count(distinct status) from shop_contact_requests")).isEqualTo(3);
+        assertThat(count("select count(*) from shop_contact_requests where pii_anonymized_at is not null")).isEqualTo(1);
+
+        assertThat(count("select count(distinct status) from payment_intents")).isEqualTo(4);
+        assertThat(count("select count(distinct provider) from payment_intents")).isGreaterThanOrEqualTo(3);
+        assertThat(count("select count(*) from payment_intents where status = 'PAID' and (provider_txn_id is null "
+                + "or paid_at is null)")).isZero();
+        assertThat(count("select count(*) from payment_intents where created_at > now() or paid_at > now()")).isZero();
+
+        assertThat(count("select count(*) from invoice_settings where seller_tax_code is not null")).isEqualTo(1);
+        assertThat(count("select count(*) from invoices where status = 'ISSUED'")).isPositive();
+        assertThat(count("select count(*) from invoices where status = 'CANCELLED'")).isGreaterThanOrEqualTo(1);
+        assertThat(count("select count(*) from invoices where kind = 'REPLACEMENT'")).isEqualTo(1);
+        assertThat(count("select count(*) from invoice_requests where status = 'OPEN'")).isPositive();
+        // mỗi đơn tối đa một hóa đơn còn hiệu lực, hóa đơn khớp tổng đơn
+        assertThat(count("select count(*) from (select order_id from invoices where kind in ('ORIGINAL','REPLACEMENT') "
+                + "and status <> 'CANCELLED' group by order_id having count(*) > 1) d")).isZero();
+        assertThat(count("select count(*) from invoices i join sales_orders o on o.id = i.order_id "
+                + "where i.status = 'ISSUED' and i.grand_total <> o.grand_total")).isZero();
+
+        assertThat(count("select count(*) from cashier_shifts")).isEqualTo(6);
+        assertThat(count("select count(*) from cashier_shifts where status = 'OPEN'")).isEqualTo(1);
+        assertThat(count("select count(*) from cashier_shifts where variance_status = 'PENDING_APPROVAL'")).isEqualTo(1);
+        assertThat(count("select count(*) from cashier_shifts where variance_status = 'APPROVED'")).isEqualTo(1);
+        assertThat(count("select count(*) from cashier_shift_events")).isEqualTo(6 + 5 + 1);
+        assertThat(count("select count(*) from cashier_shift_settings")).isEqualTo(1);
+        // tiền mặt dự kiến của ca đã đóng = tiền đầu ca + tiền mặt thu trong ca (không có hoàn nào gắn ca)
+        assertThat(count("select count(*) from cashier_shifts s where s.status = 'CLOSED' and s.expected_cash <> "
+                + "s.opening_float + coalesce((select sum(p.amount) from payment_records p where p.shift_id = s.id "
+                + "and p.method = 'CASH'), 0)")).isZero();
     }
 
     @Test

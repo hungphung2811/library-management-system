@@ -22,6 +22,12 @@ lms:
     events:
       # Không phát sales.events lên Kafka
       enabled: false
+    logs:
+      # Tiến trình một lần: không thu thập log vào DB và không chạy job dọn
+      persist:
+        enabled: false
+      purge:
+        enabled: false
     abuse:
       # Không chạy job hết hạn giữ hàng đơn online trong tiến trình một lần
       reservation-expiry-job-enabled: false
