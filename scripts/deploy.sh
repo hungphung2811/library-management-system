@@ -22,10 +22,11 @@ init_env() {
   if ! grep -qE '^AUTH_JWT_PRIVATE_KEY=.+' .env; then
     openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /tmp/lms-jwt.pem 2>/dev/null
     local priv pub
-    priv=$(awk 'NF{printf "%s\n",$0}' /tmp/lms-jwt.pem)
-    pub=$(openssl pkey -in /tmp/lms-jwt.pem -pubout | awk 'NF{printf "%s\n",$0}')
+    # PEM một dòng, xuống dòng viết thành \n trong dấu nháy kép: .env nhiều dòng không có nháy làm compose không đọc được
+    priv=$(awk 'NF{printf "%s\\n",$0}' /tmp/lms-jwt.pem)
+    pub=$(openssl pkey -in /tmp/lms-jwt.pem -pubout | awk 'NF{printf "%s\\n",$0}')
     rm -f /tmp/lms-jwt.pem
-    set_var AUTH_JWT_PRIVATE_KEY "$priv"; set_var AUTH_JWT_PUBLIC_KEY "$pub"
+    set_var AUTH_JWT_PRIVATE_KEY "\"$priv\""; set_var AUTH_JWT_PUBLIC_KEY "\"$pub\""
   fi
   chmod 600 .env
 }
