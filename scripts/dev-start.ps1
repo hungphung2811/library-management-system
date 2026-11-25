@@ -31,6 +31,18 @@ if (-not $env:INTERNAL_API_KEY) { $env:INTERNAL_API_KEY = 'dev-internal-key' }
 if (-not $env:LMS_CACHE_ENABLED) { $env:LMS_CACHE_ENABLED = 'false' }
 # Bật C1 + SerialGC cho khởi động nhanh hơn (dev, không dùng cho prod).
 $jvm = @('-XX:TieredStopAtLevel=1', '-XX:+UseSerialGC', '-Xshare:auto')
+# Biến môi trường cục bộ (bí mật như token SePay): đọc config\application.properties (KEY=VALUE mỗi dòng, '#' là chú thích; Spring Boot cũng tự nạp file này). File đã nằm trong .gitignore,
+# KHÔNG đưa token vào file được commit. Biến đã đặt sẵn trong shell được ưu tiên hơn file.
+$localEnv = Join-Path $root 'config\application.properties'
+if (Test-Path $localEnv) {
+  foreach ($line in Get-Content $localEnv -Encoding UTF8) {
+    if ($line -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$' -and $line.TrimStart()[0] -ne '#') {
+      if (-not [Environment]::GetEnvironmentVariable($Matches[1])) { [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2]) }
+    }
+  }
+}
+# SePay Test mode (ADR-0028): bật mặc định khi có token; chưa có token thì giữ tắt để POS không hiện lỗi cấu hình.
+if (-not $env:PAYMENTS_SEPAY_ENABLED -and $env:PAYMENTS_SEPAY_TOKEN) { $env:PAYMENTS_SEPAY_ENABLED = 'true' }
 $secure = @('--app.security.enabled=true', '--lms.security.permission.enabled=true')
 
 $services = [ordered]@{
