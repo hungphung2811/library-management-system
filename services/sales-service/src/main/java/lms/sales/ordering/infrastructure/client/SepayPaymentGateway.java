@@ -7,6 +7,7 @@ import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -45,9 +46,17 @@ public class SepayPaymentGateway implements PaymentGatewayPort {
     private final String accountNo;
     private final String accountName;
     private final String bankAccountId;
+    private final GatewayCallLogger calls;
 
     public SepayPaymentGateway(ObjectMapper json, String endpoint, String token, String bankBin, String accountNo,
                                String accountName, String bankAccountId) {
+        this(json, endpoint, token, bankBin, accountNo, accountName, bankAccountId,
+                GatewayCallLogger.standalone(PaymentIntent.PROVIDER_SEPAY));
+    }
+
+    public SepayPaymentGateway(ObjectMapper json, String endpoint, String token, String bankBin, String accountNo,
+                               String accountName, String bankAccountId, GatewayCallLogger calls) {
+        this.calls = calls;
         this.json = json;
         this.http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
         this.endpoint = endpoint.endsWith("/") ? endpoint.substring(0, endpoint.length() - 1) : endpoint;
@@ -65,8 +74,10 @@ public class SepayPaymentGateway implements PaymentGatewayPort {
 
     @Override
     public QrCharge createQr(ChargeRequest request) {
-        return new QrCharge(VietQrPayload.build(bankBin, accountNo, request.amount().amount(), request.reference(),
-                accountName));
+        QrCharge qr = new QrCharge(VietQrPayload.build(bankBin, accountNo, request.amount().amount(),
+                request.reference(), accountName));
+        calls.created(request.reference(), 0, null);
+        return qr;
     }
 
     /** Không có số tiền và mốc thời gian thì không dò (tránh khớp nhầm): luôn rỗng. */
@@ -80,8 +91,13 @@ public class SepayPaymentGateway implements PaymentGatewayPort {
         String url = endpoint + "/v2/transactions?transfer_type=in&amount_in_min=" + amount + "&amount_in_max=" + amount
                 + "&transaction_content=" + enc(reference) + "&transaction_date_sort=desc&per_page=100"
                 + (bankAccountId.isEmpty() ? "" : "&bank_account_id=" + enc(bankAccountId));
-        JsonNode data = get(url).path("data");
+        long start = System.nanoTime();
+        Reply reply = get(url, reference);
+        JsonNode data = reply.body().path("data");
         if (!data.isArray()) {
+            // 2xx nhưng thiếu mảng data: phản hồi lạ (SePay đổi định dạng hoặc trả nội dung không phải sổ giao dịch)
+            calls.failed("queryPayment", reference, millisSince(start), reply.status(), GatewayErrors.PARSE, null,
+                    null, null, true);
             return Optional.empty();
         }
         String needle = reference.toLowerCase(Locale.ROOT);
@@ -99,9 +115,18 @@ public class SepayPaymentGateway implements PaymentGatewayPort {
             if (at == null || (floor != null && at.isBefore(floor))) {
                 continue;
             }
+            calls.matched(reference, millisSince(start), reply.status());
             return Optional.of(new GatewayPayment(true, ID_PREFIX + id, amount, at));
         }
+        calls.noMatch(reference, millisSince(start), reply.status(), null);
         return Optional.empty();
+    }
+
+    private static long millisSince(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000L;
+    }
+
+    private record Reply(int status, JsonNode body) {
     }
 
     static Instant parseDate(String text) {
@@ -112,29 +137,55 @@ public class SepayPaymentGateway implements PaymentGatewayPort {
         }
     }
 
-    private JsonNode get(String url) {
+    /**
+     * Gọi SePay. Mọi lỗi được ghi qua {@link GatewayCallLogger} (chỉ loại lỗi, mã HTTP, tên lớp nguyên nhân; không URL,
+     * không thân, không getMessage()) rồi ném {@link SalesException} giữ nguyên nhân gốc, thông điệp trả FE như cũ.
+     */
+    private Reply get(String url, String reference) {
+        long start = System.nanoTime();
+        HttpResponse<String> res;
         try {
             HttpRequest req = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(10))
                     .header("Authorization", "Bearer " + token).header("Accept", "application/json").GET().build();
-            HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            int status = res.statusCode();
-            if (status == 401 || status == 403) {
-                throw gatewayError("SePay từ chối token (kiểm tra PAYMENTS_SEPAY_TOKEN của Test mode)");
-            }
-            if (status == 429) {
-                throw gatewayError("SePay giới hạn tần suất gọi, sẽ thử lại");
-            }
-            if (status < 200 || status >= 300) {
-                throw gatewayError("SePay trả lỗi HTTP " + status);
-            }
-            return json.readTree(res.body());
-        } catch (SalesException e) {
-            throw e;
+            res = http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw gatewayError("Gọi SePay bị gián đoạn");
+            calls.failed("queryPayment", reference, millisSince(start), null, GatewayErrors.INTERRUPTED, e, null,
+                    null, false);
+            throw gatewayError("Gọi SePay bị gián đoạn", e);
         } catch (Exception e) {
-            throw gatewayError("Không gọi được SePay sandbox");
+            calls.failed("queryPayment", reference, millisSince(start), null, GatewayErrors.kindOf(e), e, null, null,
+                    false);
+            throw gatewayError("Không gọi được SePay sandbox", e);
+        }
+        int status = res.statusCode();
+        if (status < 200 || status >= 300) {
+            String kind = GatewayErrors.kindOfStatus(status);
+            calls.failed("queryPayment", reference, millisSince(start), status, kind, null,
+                    partnerCodeOf(res.body()), res.headers().firstValue("Retry-After").orElse(null), false);
+            if (status == 401 || status == 403) {
+                throw gatewayError("SePay từ chối token (kiểm tra PAYMENTS_SEPAY_TOKEN của Test mode)", null);
+            }
+            if (status == 429) {
+                throw gatewayError("SePay giới hạn tần suất gọi, sẽ thử lại", null);
+            }
+            throw gatewayError("SePay trả lỗi HTTP " + status, null);
+        }
+        try {
+            return new Reply(status, json.readTree(res.body()));
+        } catch (JsonProcessingException | RuntimeException e) {
+            calls.failed("queryPayment", reference, millisSince(start), status, GatewayErrors.PARSE, e, null, null,
+                    true);
+            throw gatewayError("Không gọi được SePay sandbox", e);
+        }
+    }
+
+    /** Mã lỗi của SePay trong thân lỗi (error_code) nếu có và đúng dạng an toàn; mọi lỗi đọc đều bị nuốt. */
+    private String partnerCodeOf(String body) {
+        try {
+            return body == null ? null : json.readTree(body).path("error_code").asText(null);
+        } catch (Exception e) {
+            return null;
         }
     }
 
@@ -142,7 +193,8 @@ public class SepayPaymentGateway implements PaymentGatewayPort {
         return URLEncoder.encode(v, StandardCharsets.UTF_8);
     }
 
-    private static SalesException gatewayError(String message) {
-        return new SalesException(ErrorCode.PAYMENT_GATEWAY_ERROR, message);
+    private static SalesException gatewayError(String message, Throwable cause) {
+        return cause == null ? new SalesException(ErrorCode.PAYMENT_GATEWAY_ERROR, message)
+                : new SalesException(ErrorCode.PAYMENT_GATEWAY_ERROR, message, cause);
     }
 }

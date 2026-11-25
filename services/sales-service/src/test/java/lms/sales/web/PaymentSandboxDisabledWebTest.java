@@ -67,6 +67,16 @@ class PaymentSandboxDisabledWebTest {
         }
 
         @Bean
+        lms.sales.ordering.application.ApplyGatewayPaymentUseCase applyGatewayPaymentUseCase(QrFixture fx) {
+            return fx.apply;
+        }
+
+        @Bean
+        lms.sales.ordering.application.RecordPaymentAnomalyUseCase recordPaymentAnomalyUseCase(QrFixture fx) {
+            return fx.anomalyRecorder;
+        }
+
+        @Bean
         lms.sales.ordering.application.PaymentTenantResolverPort paymentTenantResolverPort(QrFixture fx) {
             return fx.resolver;
         }

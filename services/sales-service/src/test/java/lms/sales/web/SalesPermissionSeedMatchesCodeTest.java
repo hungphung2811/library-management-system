@@ -25,6 +25,10 @@ import lms.sales.ordering.infrastructure.web.RefundController;
 import lms.sales.ordering.infrastructure.web.SalesAuditController;
 import lms.sales.ordering.infrastructure.web.SalesOrderController;
 import lms.sales.ordering.infrastructure.web.SalesReturnController;
+import lms.sales.ordering.infrastructure.web.ShopPaymentController;
+import lms.sales.ordering.application.ShopPaymentUseCases;
+import lms.sales.reporting.application.StorefrontTopSoldUseCase;
+import lms.sales.reporting.infrastructure.web.StorefrontTopSoldController;
 import lms.sales.ordering.infrastructure.web.ShopController;
 import lms.sales.settings.infrastructure.web.SalesSettingsController;
 import lms.sales.stock.infrastructure.web.GoodsReceiptController;
@@ -62,7 +66,7 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
         SupplierController.class, GoodsReceiptController.class, PosOrderController.class, SalesOrderController.class,
         ShopController.class, StorefrontController.class, SalesReturnController.class, RefundController.class,
         SalesAuditController.class, ShopContactController.class, SalesContactController.class, SalesBannerController.class,
-        StorefrontBannerController.class})
+        StorefrontBannerController.class, StorefrontTopSoldController.class, ShopPaymentController.class})
 @Import({SecurityConfiguration.class, PermissionAutoConfiguration.class, TenantAutoConfiguration.class,
         HarnessBeans.class})
 @TestPropertySource(properties = {"app.security.enabled=true", "lms.security.permission.enabled=true"})
@@ -97,11 +101,17 @@ class SalesPermissionSeedMatchesCodeTest {
     @MockitoBean
     PermissionKeyRegistrar permissionKeyRegistrar;
 
+    @MockitoBean
+    StorefrontTopSoldUseCase topSoldUseCase;
+
+    @MockitoBean
+    ShopPaymentUseCases shopPaymentUseCases;
+
     private static String migrationSql() throws IOException {
         Resource[] found = new PathMatchingResourcePatternResolver().getResources(
                 "classpath*:db/migration/identity/V*__sales_*.sql");
-        // V17 (pha 1: 23 khóa), V20 (pha 2: 21 khóa, mẫu Khách hàng) và V22 (liên hệ: 6 khóa) và V26 (banner + gợi ý: 7 khóa) và V28 (chi tiết mặt hàng + ghi chú đơn: 4 khóa); file seed mới sau này tên sales_* cũng được gộp
-        assertThat(found).as("migration seed khóa sales trên classpath (jar system-service)").hasSize(5);
+        // V17 (pha 1: 23 khóa), V20 (pha 2: 21 khóa, mẫu Khách hàng) và V22 (liên hệ: 6 khóa) và V26 (banner + gợi ý: 7 khóa) và V28 (chi tiết mặt hàng + ghi chú đơn: 4 khóa) và V39 (top bán chạy + sách theo id: 2 khóa); file seed mới sau này tên sales_* cũng được gộp
+        assertThat(found).as("migration seed khóa sales trên classpath (jar system-service)").hasSize(6);
         StringBuilder sql = new StringBuilder();
         for (Resource r : found) {
             try (var in = r.getInputStream()) {
@@ -112,13 +122,22 @@ class SalesPermissionSeedMatchesCodeTest {
     }
 
     /** khóa → "METHOD path" theo hợp đồng BFF /api, lấy từ code thật. */
+    /** Handler @AuthenticatedOnly của sales gom được ở lần gọi actual() gần nhất. */
+    private final Set<String> authenticated = new TreeSet<>();
+
     private Map<String, String> actual() {
         PermissionKeyResolver resolver = new PermissionKeyResolver();
         Map<String, String> out = new TreeMap<>();
         for (Map.Entry<RequestMappingInfo, HandlerMethod> e : handlerMapping.getHandlerMethods().entrySet()) {
             HandlerMethod h = e.getValue();
             if (!h.getBeanType().getName().startsWith("lms.sales.")) continue;
-            String key = resolver.resolve(h).key();
+            PermissionKeyResolver.Resolved resolved = resolver.resolve(h);
+            if (resolved.mode() == PermissionKeyResolver.Mode.AUTHENTICATED) {
+                // @AuthenticatedOnly: không có khóa, không nằm trong seed; kiểm riêng ở danh sách đã duyệt
+                authenticated.add(h.getBeanType().getSimpleName() + "#" + h.getMethod().getName());
+                continue;
+            }
+            String key = resolved.key();
             String method = e.getKey().getMethodsCondition().getMethods().iterator().next().name();
             String path = e.getKey().getPathPatternsCondition().getPatternValues().iterator().next();
             // khách (shop) và danh mục công khai (storefront) không đi qua lms-api: seed ghi đường dẫn service nguyên trạng
@@ -138,7 +157,11 @@ class SalesPermissionSeedMatchesCodeTest {
             seeded.put(m.group(1), m.group(2) + " " + m.group(3));
         }
         Map<String, String> actual = actual();
-        assertThat(actual).hasSize(61);
+        assertThat(actual).hasSize(63);
+        // handler không khóa phải được duyệt có chủ đích (chỉ trả dữ liệu của chính người gọi, ADR-0029 mục 2.5):
+        // thêm endpoint @AuthenticatedOnly mới phải khai báo ở đây
+        assertThat(authenticated).containsExactlyInAnyOrder("ShopController#myOrderCounts",
+                "ShopPaymentController#myOrderPayment", "ShopPaymentController#paymentOptions");
         // path-variable có thể đặt tên khác nhau giữa service và seed: so tên biến sau khi chuẩn hóa về {}
         assertThat(normalize(seeded)).isEqualTo(normalize(actual));
     }

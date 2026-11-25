@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 import java.util.UUID;
+import lms.sales.ordering.application.PaymentAnomalySource;
 import lms.sales.ordering.application.PaymentIntentResponse;
 import lms.sales.ordering.application.PaymentIntentUseCases;
 import lms.sales.ordering.application.SyncGatewayPaymentUseCase;
@@ -73,6 +74,6 @@ public class PaymentIntentController {
         PaymentIntentResponse intent = intents.get(RequestSupport.tenant(), id);
         String body = "{\"reference\":\"" + intent.reference() + "\",\"amount\":" + intent.amount()
                 + ",\"providerTxnId\":\"SIM-" + UUID.randomUUID() + "\",\"status\":\"PAID\"}";
-        return webhook.process(body, webhook.sign(body)).intent();
+        return webhook.process(body, webhook.sign(body), PaymentAnomalySource.SIMULATE_BUTTON, null).intent();
     }
 }

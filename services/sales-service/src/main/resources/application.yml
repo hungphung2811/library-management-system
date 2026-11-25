@@ -158,6 +158,19 @@ lms:
         max-total-quantity: ${LMS_ABUSE_MAX_TOTAL_QUANTITY:100}
         orders-per-minute-per-user: ${LMS_ABUSE_ORDERS_PER_MINUTE_PER_USER:5}
         orders-per-minute-tenant: ${LMS_ABUSE_ORDERS_PER_MINUTE_TENANT:300}
+    # Log vận hành lưu DB (ADR-0029): dòng log kênh tích hợp/hệ thống vào bảng integration_log_events để màn hình xem/lọc
+    logs:
+      retention-days: ${LMS_SALES_LOGS_RETENTION_DAYS:30}
+      persist:
+        enabled: ${LMS_SALES_LOGS_PERSIST_ENABLED:true}
+        queue-capacity: 5000
+        batch-size: 200
+        # Kênh SYSTEM chọn lọc: chỉ lưu từ mức này trở lên (hoặc dòng có anomaly)
+        system-min-level: WARN
+      purge:
+        enabled: true
+        cron: "0 15 3 * * *"
+        batch-size: 1000
   # Che dữ liệu cá nhân ở API nhân viên (đơn, liên hệ): true = che (mặc định, bắt buộc ở prod); dev tắt ở application-dev.yml
   privacy:
     mask-personal-data: ${LMS_PRIVACY_MASK_PERSONAL_DATA:true}

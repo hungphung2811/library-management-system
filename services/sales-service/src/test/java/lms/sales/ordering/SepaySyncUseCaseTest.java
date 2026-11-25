@@ -64,7 +64,7 @@ class SepaySyncUseCaseTest {
             new CommitPosOrderUseCase(h.orderRepo, h.stockService, h.getSettings, h.numbers, h.auditPort, h.clock,
                     h.tenantDirectory, h.returnRepo), commit);
     private final SyncGatewayPaymentUseCase sync = new SyncGatewayPaymentUseCase(List.of(fx.gateway, sepay),
-            fx.webhook);
+            fx.apply);
 
     private PosOrderResult place(UUID title, PaymentMethod method) {
         return h.tx(() -> placePos.createWithPayment(new PlacePosOrderCommand(h.tenant, h.user,

@@ -3,18 +3,24 @@ package lms.sales.ordering.infrastructure.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Duration;
+import lms.sales.ordering.application.ApplyGatewayPaymentUseCase;
 import lms.sales.ordering.application.CommitPosPendingOrderUseCase;
 import lms.sales.ordering.application.ExpirePaymentIntentsUseCase;
+import lms.sales.ordering.application.PaymentAnomalyAuditUseCase;
+import lms.sales.ordering.application.PaymentAnomalyLogPort;
 import lms.sales.ordering.application.PaymentGatewayPort;
 import lms.sales.ordering.application.PaymentIntentRepository;
 import lms.sales.invoicing.application.InvoiceAutoIssuePort;
 import lms.sales.ordering.application.PaymentIntentUseCases;
 import lms.sales.ordering.application.ProcessPaymentWebhookUseCase;
+import lms.sales.ordering.application.RecordPaymentAnomalyUseCase;
 import lms.sales.ordering.application.SalesOrderRepository;
 import lms.sales.ordering.application.SalesReturnRepository;
 import lms.sales.ordering.application.ShopPaymentUseCases;
 import lms.sales.ordering.application.SyncGatewayPaymentUseCase;
 import lms.sales.ordering.domain.PaymentIntent;
+import lms.sales.ordering.infrastructure.client.GatewayCallLogger;
+import lms.sales.ordering.infrastructure.client.GatewayHealthTracker;
 import lms.sales.ordering.infrastructure.client.MomoPaymentGateway;
 import lms.sales.ordering.infrastructure.client.SepayPaymentGateway;
 import lms.sales.ordering.infrastructure.client.SimulatedPaymentGateway;
@@ -23,6 +29,7 @@ import lms.sales.settings.application.GetSalesSettingsUseCase;
 import lms.sales.shared.application.DocumentNumberPort;
 import lms.sales.shared.application.SalesAuditPort;
 import lms.sales.shift.application.ShiftAttributionPort;
+import lms.sales.shared.application.SalesAuditQueryPort;
 import lms.sales.shared.application.TenantDirectoryPort;
 import lms.sales.stock.application.StockService;
 import org.springframework.beans.factory.ObjectProvider;
@@ -45,6 +52,40 @@ public class PaymentsBeanConfiguration {
                                                 ShiftAttributionPort shifts, InvoiceAutoIssuePort invoiceAutoIssue) {
         return new PaymentIntentUseCases(intents, orders, stockService, audit, clock).withShiftAttribution(shifts)
                 .withInvoiceAutoIssue(invoiceAutoIssue);
+    }
+
+    /** Log máy cho bất thường thanh toán (ADR-0029): kênh, che dữ liệu, giảm trùng. */
+    @Bean
+    PaymentAnomalyLogPort paymentAnomalyLogPort(Clock clock) {
+        return new PaymentAnomalyLogAdapter(clock);
+    }
+
+    /** Ghi audit PAYMENT_ANOMALY trong transaction riêng (REQUIRES_NEW), sau khi transaction nghiệp vụ đã rollback. */
+    @Bean
+    PaymentAnomalyAuditUseCase paymentAnomalyAuditUseCase(SalesAuditPort audit, SalesAuditQueryPort auditQuery,
+                                                          Clock clock) {
+        return new PaymentAnomalyAuditUseCase(audit, auditQuery, clock);
+    }
+
+    @Bean
+    RecordPaymentAnomalyUseCase recordPaymentAnomalyUseCase(PaymentAnomalyLogPort logPort,
+                                                            PaymentAnomalyAuditUseCase auditUseCase) {
+        return new RecordPaymentAnomalyUseCase(logPort, auditUseCase);
+    }
+
+    /** KHÔNG transactional (ADR-0029 D5): bọc ProcessPaymentWebhookUseCase để ghi bất thường sau khi rollback. */
+    @Bean
+    ApplyGatewayPaymentUseCase applyGatewayPaymentUseCase(ProcessPaymentWebhookUseCase processor,
+                                                          PaymentIntentRepository intents,
+                                                          RecordPaymentAnomalyUseCase recorder,
+                                                          PaymentAnomalyLogPort logPort) {
+        return new ApplyGatewayPaymentUseCase(processor, intents, recorder, logPort);
+    }
+
+    /** Đếm lỗi thăm dò liên tiếp theo cổng, dùng chung cho SePay và MoMo. */
+    @Bean
+    GatewayHealthTracker gatewayHealthTracker(Clock clock, PaymentAnomalyLogPort logPort) {
+        return new GatewayHealthTracker(clock, logPort);
     }
 
     @Bean
@@ -84,8 +125,10 @@ public class PaymentsBeanConfiguration {
             @Value("${app.payments.momo.access-key}") String accessKey,
             @Value("${app.payments.momo.secret-key}") String secretKey,
             @Value("${app.payments.momo.redirect-url:https://example.com/momo/return}") String redirectUrl,
-            @Value("${app.payments.momo.ipn-url:https://example.com/momo/ipn}") String ipnUrl) {
-        return new MomoPaymentGateway(json, endpoint, partnerCode, accessKey, secretKey, redirectUrl, ipnUrl);
+            @Value("${app.payments.momo.ipn-url:https://example.com/momo/ipn}") String ipnUrl,
+            Clock clock, PaymentAnomalyLogPort logPort, GatewayHealthTracker health) {
+        return new MomoPaymentGateway(json, endpoint, partnerCode, accessKey, secretKey, redirectUrl, ipnUrl,
+                new GatewayCallLogger(PaymentIntent.PROVIDER_MOMO, clock, logPort, health));
     }
 
     /**
@@ -104,14 +147,16 @@ public class PaymentsBeanConfiguration {
             @Value("${app.payments.sepay.bank-account-id:}") String bankAccountId,
             Clock clock,
             @Value("${app.payments.sepay.min-query-interval-ms:5000}") long minQueryIntervalMs,
-            @Value("${app.payments.sepay.max-queries-per-second:2}") int maxQueriesPerSecond) {
+            @Value("${app.payments.sepay.max-queries-per-second:2}") int maxQueriesPerSecond,
+            PaymentAnomalyLogPort logPort, GatewayHealthTracker health) {
         if (token.isBlank() || bankBin.isBlank() || accountNo.isBlank()) {
             throw new IllegalStateException("Bật app.payments.sepay thì phải đặt PAYMENTS_SEPAY_TOKEN, "
                     + "PAYMENTS_SEPAY_BANK_BIN và PAYMENTS_SEPAY_ACCOUNT_NO");
         }
         // Bọc bộ hãm (ADR-0029 mục 2.4): SePay giới hạn 3 yêu cầu/giây theo IP của cả máy chủ
         return new ThrottledPaymentGateway(
-                new SepayPaymentGateway(json, endpoint, token, bankBin, accountNo, accountName, bankAccountId),
+                new SepayPaymentGateway(json, endpoint, token, bankBin, accountNo, accountName, bankAccountId,
+                        new GatewayCallLogger(PaymentIntent.PROVIDER_SEPAY, clock, logPort, health)),
                 clock, minQueryIntervalMs, maxQueriesPerSecond);
     }
 
@@ -134,8 +179,8 @@ public class PaymentsBeanConfiguration {
 
     @Bean
     SyncGatewayPaymentUseCase syncGatewayPaymentUseCase(ObjectProvider<PaymentGatewayPort> gateways,
-                                                        ProcessPaymentWebhookUseCase processor) {
-        return new SyncGatewayPaymentUseCase(gateways.orderedStream().toList(), processor);
+                                                        ApplyGatewayPaymentUseCase apply) {
+        return new SyncGatewayPaymentUseCase(gateways.orderedStream().toList(), apply);
     }
 
     /** Luồng POS hai bước cho mọi phương thức (ADR-0021); cổng QR chỉ có khi sandbox bật, thiếu thì đơn QR bị 400. */

@@ -273,15 +273,15 @@ public final class Harness {
     public final ReturnQueryUseCases returnQueries = new ReturnQueryUseCases(returnRepo, refundRepo, orderRepo);
     public final RefundUseCases refundUseCases = new RefundUseCases(refundRepo, orderRepo, auditPort, clock);
     public final StorefrontQueryUseCases storefront = new StorefrontQueryUseCases(stockPort, catalog);
-    public final SalesAuditQueryUseCase auditQueries = new SalesAuditQueryUseCase(
-            (tenant, c, page, size) -> {
-                var all = audits.stream()
-                        .filter(a -> c.action() == null || a.action().equals(c.action()))
-                        .filter(a -> c.aggregateId() == null || c.aggregateId().equals(a.aggregateId()))
-                        .map(a -> new SalesAuditQueryPort.Entry(UUID.randomUUID(), a.action(), a.aggregateType(),
-                                a.aggregateId(), a.actorId(), a.occurredAt(), a.data())).toList();
-                return new PageResult<>(all, all.size(), page, size);
-            });
+    public final SalesAuditQueryPort auditQueryPort = (tenant, c, page, size) -> {
+        var all = audits.stream()
+                .filter(a -> c.action() == null || a.action().equals(c.action()))
+                .filter(a -> c.aggregateId() == null || c.aggregateId().equals(a.aggregateId()))
+                .map(a -> new SalesAuditQueryPort.Entry(UUID.randomUUID(), a.action(), a.aggregateType(),
+                        a.aggregateId(), a.actorId(), a.occurredAt(), a.data())).toList();
+        return new PageResult<>(all, all.size(), page, size);
+    };
+    public final SalesAuditQueryUseCase auditQueries = new SalesAuditQueryUseCase(auditQueryPort);
 
     /** Thêm đầu sách vào catalog giả và đưa vào bán với tồn ban đầu (qua phiếu điều chỉnh để sổ cái khớp). */
     public UUID book(String name, long coverPrice, Long sellingPrice, long initialStock) {

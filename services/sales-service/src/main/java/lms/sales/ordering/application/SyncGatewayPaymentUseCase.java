@@ -38,13 +38,23 @@ public class SyncGatewayPaymentUseCase {
         try {
             return gateway.queryPayment(current.reference(), current.amount(), current.createdAt())
                     .filter(PaymentGatewayPort.GatewayPayment::paid)
-                    .map(p -> processor.execute(tenantId, new ProcessPaymentWebhookUseCase.Command(current.reference(),
-                            p.amount(), p.providerTxnId(), "PAID", p.paidAt()), current.provider()).intent())
+                    .map(p -> {
+                        PaymentIntentResponse paid = apply.apply(tenantId, new ProcessPaymentWebhookUseCase.Command(
+                                current.reference(), p.amount(), p.providerTxnId(), "PAID", p.paidAt()),
+                                current.provider(), PaymentAnomalySource.POLL).intent();
+                        log.info("Đã ghi nhận thanh toán qua thăm dò intentId={} provider={} status={}", paid.id(),
+                                paid.provider(), paid.status());
+                        return paid;
+                    })
                     .orElse(current);
         } catch (RuntimeException e) {
-            // Cổng chậm/lỗi, số tiền lệch hoặc lệnh vừa bị hủy cùng lúc: không làm hỏng lần thăm dò, đọc lại ở lần sau
-            log.warn("Không đồng bộ được thanh toán {} với cổng {}: {}", current.reference(), current.provider(),
-                    e.getMessage());
+            // Cổng chậm/lỗi, số tiền lệch hoặc lệnh vừa bị hủy cùng lúc: không làm hỏng lần thăm dò, đọc lại ở lần sau.
+            // Lỗi cổng đã được kênh OUTBOUND ghi (có errorKind), bất thường tiền đã do ApplyGatewayPaymentUseCase ghi;
+            // KHÔNG log getMessage(): thông điệp lỗi HTTP có thể chứa URL kèm mã tham chiếu (ADR-0029).
+            if (log.isDebugEnabled()) {
+                log.debug("Thăm dò thanh toán chưa ghi nhận intentId={} provider={} errorClass={}", current.id(),
+                        current.provider(), e.getClass().getSimpleName());
+            }
             return current;
         }
     }
@@ -68,13 +78,15 @@ public class SyncGatewayPaymentUseCase {
             return gateway.queryPaymentFinal(intent.reference(), intent.amount().amount(), intent.createdAt())
                     .filter(PaymentGatewayPort.GatewayPayment::paid)
                     .map(p -> {
-                        processor.execute(tenantId, new ProcessPaymentWebhookUseCase.Command(intent.reference(),
-                                p.amount(), p.providerTxnId(), "PAID", p.paidAt()), intent.provider());
+                        apply.apply(tenantId, new ProcessPaymentWebhookUseCase.Command(intent.reference(),
+                                p.amount(), p.providerTxnId(), "PAID", p.paidAt()), intent.provider(),
+                                PaymentAnomalySource.POLL);
                         return true;
                     }).orElse(false);
         } catch (RuntimeException e) {
-            log.warn("Không kiểm được thanh toán {} với cổng {} trước khi đóng lệnh: {}", intent.reference(),
-                    intent.provider(), e.getMessage());
+            // Không log getMessage() (có thể chứa URL kèm mã tham chiếu): chỉ tên lớp lỗi (ADR-0029)
+            log.warn("Không kiểm được thanh toán intentId={} với cổng {} trước khi đóng lệnh: errorClass={}",
+                    intent.id(), intent.provider(), e.getClass().getSimpleName());
             return false;
         }
     }

@@ -1,6 +1,8 @@
 package lms.sales.ordering.infrastructure.web;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
+import lms.sales.ordering.application.PaymentAnomalySource;
 import lms.sales.ordering.application.ProcessPaymentWebhookUseCase;
 import lms.security.permission.PublicEndpoint;
 import lms.security.permission.RequiresModule;
@@ -32,8 +34,9 @@ public class PaymentWebhookController {
     @PostMapping(value = "/simulated", consumes = MediaType.ALL_VALUE)
     public Map<String, Object> simulated(@RequestBody String body,
                                          @RequestHeader(value = SimulatedWebhookProcessor.SIGNATURE_HEADER,
-                                                 required = false) String signature) {
-        var result = processor.process(body, signature);
+                                                 required = false) String signature,
+                                         HttpServletRequest request) {
+        var result = processor.process(body, signature, PaymentAnomalySource.WEBHOOK, request.getRemoteAddr());
         String outcome = result.ignored() ? "IGNORED" : result.duplicate() ? "ALREADY_PROCESSED" : "PROCESSED";
         return Map.of("result", outcome, "reference", result.intent().reference(),
                 "intentStatus", result.intent().status().name());

@@ -45,6 +45,16 @@ public class QrWebBeans {
     }
 
     @Bean
+    lms.sales.ordering.application.ApplyGatewayPaymentUseCase applyGatewayPaymentUseCase(QrFixture fx) {
+        return fx.apply;
+    }
+
+    @Bean
+    lms.sales.ordering.application.RecordPaymentAnomalyUseCase recordPaymentAnomalyUseCase(QrFixture fx) {
+        return fx.anomalyRecorder;
+    }
+
+    @Bean
     PaymentTenantResolverPort paymentTenantResolverPort(QrFixture fx) {
         return fx.resolver;
     }

@@ -8,15 +8,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import lms.sales.ordering.application.ApplyGatewayPaymentUseCase;
 import lms.sales.ordering.application.CommitPosOrderUseCase;
 import lms.sales.ordering.application.CommitPosPendingOrderUseCase;
 import lms.sales.ordering.application.ExpirePaymentIntentsUseCase;
+import lms.sales.ordering.application.PaymentAnomalyAuditUseCase;
 import lms.sales.ordering.application.PaymentGatewayPort;
 import lms.sales.ordering.application.PaymentIntentRepository;
 import lms.sales.ordering.application.PaymentIntentUseCases;
 import lms.sales.ordering.application.PaymentTenantResolverPort;
 import lms.sales.ordering.application.PlacePosOrderUseCase;
 import lms.sales.ordering.application.ProcessPaymentWebhookUseCase;
+import lms.sales.ordering.application.RecordPaymentAnomalyUseCase;
 import lms.sales.ordering.domain.PaymentIntent;
 import lms.sales.ordering.infrastructure.client.SimulatedPaymentGateway;
 import lms.sales.shared.domain.ErrorCode;
@@ -36,6 +39,11 @@ public final class QrFixture {
     public final PaymentIntentUseCases intentUseCases;
     public final ProcessPaymentWebhookUseCase webhook;
     public final lms.sales.ordering.application.SyncGatewayPaymentUseCase gatewaySync;
+    /** Bất thường thanh toán (ADR-0029): log ghi lại trong bộ nhớ, audit qua audit giả của Harness. */
+    public final RecordingAnomalyLog anomalyLog = new RecordingAnomalyLog();
+    public final PaymentAnomalyAuditUseCase anomalyAudit;
+    public final RecordPaymentAnomalyUseCase anomalyRecorder;
+    public final ApplyGatewayPaymentUseCase apply;
     public final ExpirePaymentIntentsUseCase expire;
     public final PaymentTenantResolverPort resolver;
 
@@ -51,7 +59,10 @@ public final class QrFixture {
                         h.tenantDirectory, h.returnRepo), qrCommit);
         this.intentUseCases = h.intentUseCases;
         this.webhook = new ProcessPaymentWebhookUseCase(intents, h.orderRepo, h.stockService, h.auditPort, h.clock);
-        this.gatewaySync = new lms.sales.ordering.application.SyncGatewayPaymentUseCase(java.util.List.of(gateway), webhook);
+        this.anomalyAudit = new PaymentAnomalyAuditUseCase(h.auditPort, h.auditQueryPort, h.clock);
+        this.anomalyRecorder = new RecordPaymentAnomalyUseCase(anomalyLog, anomalyAudit);
+        this.apply = new ApplyGatewayPaymentUseCase(webhook, intents, anomalyRecorder, anomalyLog);
+        this.gatewaySync = new lms.sales.ordering.application.SyncGatewayPaymentUseCase(java.util.List.of(gateway), apply);
         this.expire = new ExpirePaymentIntentsUseCase(intents, intentUseCases, h.clock, 100);
     }
 }

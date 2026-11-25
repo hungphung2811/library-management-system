@@ -19,6 +19,20 @@ class SalesArchitectureTest {
                     "..application..", "..infrastructure..")
             .allowEmptyShould(true);
 
+    /** ADR-0029 (T5): domain thuần Java, không log (slf4j) và không biết thư viện log tích hợp. */
+    @ArchTest
+    static final ArchRule domainKhongPhuThuocSlf4jVaObservability = noClasses()
+            .that().resideInAPackage("..domain..")
+            .should().dependOnClassesThat().resideInAnyPackage("org.slf4j..", "lms.observability..")
+            .allowEmptyShould(true);
+
+    /** ADR-0029 (T5): application chỉ nói "có bất thường" qua port; việc viết log tích hợp ở infrastructure. */
+    @ArchTest
+    static final ArchRule applicationKhongPhuThuocObservability = noClasses()
+            .that().resideInAPackage("..application..")
+            .should().dependOnClassesThat().resideInAPackage("lms.observability..")
+            .allowEmptyShould(true);
+
     @ArchTest
     static final ArchRule applicationKhongPhuThuocInfrastructure = noClasses()
             .that().resideInAPackage("..application..")

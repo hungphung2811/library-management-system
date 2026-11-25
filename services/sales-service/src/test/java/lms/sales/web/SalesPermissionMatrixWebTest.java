@@ -147,6 +147,8 @@ class SalesPermissionMatrixWebTest {
                     "StorefrontController/preview"),
             new Endpoint(HttpMethod.GET, B + "/storefront/suggestions?q=abc", null,
                     "StorefrontController/suggestions"),
+            new Endpoint(HttpMethod.GET, B + "/storefront/items/by-ids?ids=" + ID, null,
+                    "StorefrontController/byIds"),
             new Endpoint(HttpMethod.POST, B + "/returns", RETURN, "SalesReturnController/create"),
             new Endpoint(HttpMethod.POST, B + "/returns/late", RETURN_LATE, "SalesReturnController/createLate"),
             new Endpoint(HttpMethod.GET, B + "/returns/" + ID, null, "SalesReturnController/get"),
@@ -249,9 +251,14 @@ class SalesPermissionMatrixWebTest {
     void tapKhoaThatKhopTapDaCongBo() {
         PermissionKeyResolver resolver = new PermissionKeyResolver();
         Set<String> actual = new TreeSet<>();
+        Set<String> authenticated = new TreeSet<>();
         for (HandlerMethod h : handlerMapping.getHandlerMethods().values()) {
             if (h.getBeanType().getName().startsWith("lms.sales.")) {
                 PermissionKeyResolver.Resolved r = resolver.resolve(h);
+                if (r.mode() == PermissionKeyResolver.Mode.AUTHENTICATED) {
+                    authenticated.add(h.getBeanType().getSimpleName() + "#" + h.getMethod().getName());
+                    continue;
+                }
                 assertThat(r.mode()).as(h.toString()).isEqualTo(PermissionKeyResolver.Mode.PERMISSION);
                 assertThat(r.source()).as(h.toString()).isEqualTo(PermissionKeyResolver.SOURCE_AUTO);
                 assertThat(r.requiredModule()).as(h.toString()).isEqualTo(lms.security.permission.TenantModule.SALES);
@@ -259,6 +266,9 @@ class SalesPermissionMatrixWebTest {
             }
         }
         assertThat(actual).containsExactlyInAnyOrderElementsOf(ENDPOINTS.stream().map(Endpoint::key).toList());
-        assertThat(actual).hasSize(49);
+        assertThat(actual).hasSize(50);
+        // @AuthenticatedOnly không có khóa: chỉ các handler đã duyệt có chủ đích (dữ liệu của chính người gọi, ADR-0029 2.5);
+        // thêm endpoint không khóa mới phải khai báo ở đây (test này chỉ nạp ShopController; danh sách đầy đủ ở SalesPermissionSeedMatchesCodeTest)
+        assertThat(authenticated).containsExactly("ShopController#myOrderCounts");
     }
 }
