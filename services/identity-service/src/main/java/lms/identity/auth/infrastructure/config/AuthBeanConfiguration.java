@@ -178,7 +178,7 @@ public class AuthBeanConfiguration {
                               List<String> storefrontPermissions,
                               lms.identity.auth.application.TenantAccessModePort tenantAccessMode) {
         return new TokenService(accessClient, issuer, codec, persistence, clock, refreshTtl, userDirectory, tenantAccess,
-                storefrontPermissions);
+                storefrontPermissions, tenantAccessMode);
     }
 
     @Bean

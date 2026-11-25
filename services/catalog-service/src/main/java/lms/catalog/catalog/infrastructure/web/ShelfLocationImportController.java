@@ -7,6 +7,7 @@ import lms.imports.web.ImportActorResolver;
 import lms.security.permission.RequiresModule;
 import lms.security.permission.TenantModule;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
  * không đổi tên lớp/method.
  */
 @RestController
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @RequiresModule(TenantModule.LENDING)
 @RequestMapping("/internal/imports/shelf-locations")
 public class ShelfLocationImportController extends AbstractImportController {

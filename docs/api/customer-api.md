@@ -18,6 +18,7 @@ customer-api viết, không chép thông điệp nội bộ.
 | GET | `/public/t/{code}/books` | Danh mục sách đang bán (query `keyword?, page?, size?`, size tối đa 50) | `max-age=30, public` |
 | GET | `/public/t/{code}/books/{bookRef}` | Chi tiết sách | `max-age=30, public` |
 | GET | `/public/t/{code}/books/{bookRef}/preview` | Đoạn đọc thử | `max-age=60, public` |
+| GET | `/public/t/{code}/books/featured` | Sản phẩm nổi bật: mảng `BookSummaryView` (cùng trường phần tử của `books`), tối đa 8 (xem mục dưới) | `max-age=60, public` |
 | GET | `/public/t/{code}/authors/featured` | Tác giả nổi bật `[{name}]`, tối đa 5 (xem mục dưới) | `max-age=60, public` |
 | POST | `/public/t/{code}/auth/signup` | Đăng ký tài khoản khách, 201 không thân | `no-store` |
 | POST | `/public/t/{code}/auth/login` | Đăng nhập khách theo tenant của đường dẫn | `no-store` |
@@ -122,6 +123,8 @@ Phản hồi chỉ có các trường sau (test so tập tên trường); KHÔNG
 đang bán: `404 BOOK_NOT_FOUND`. Văn bản thuần: hiển thị bằng `textContent`, không `innerHTML`.
 
 #### Tác giả nổi bật
+
+`GET /public/t/{code}/books/featured` -> `200 [BookSummaryView]`, tối đa 8 phần tử, `Cache-Control: max-age=60, public`, công khai (bỏ qua `Authorization`). Cửa hàng không khả dụng: `404 SHOP_NOT_AVAILABLE`, không gọi sales. Route literal, không bị hiểu là `{bookRef}`. Thuật toán: lấy tối đa 8 `titleId` đầu của `top-sold` (90 ngày, giữ thứ tự bán chạy), tra thẻ sách bằng MỘT lời gọi sales `GET /internal/sales/storefront/items/by-ids`, chỉ giữ sách `inStock=true`; chưa đủ 8 (hoặc chưa có đơn nào) thì bù bằng sách mới nhất còn hàng (`items?sort=newest&inStock=true`), loại trùng, để carousel trang chủ không trống.
 
 `GET /public/t/{code}/authors/featured` -> `200 [{"name":"..."}]`, tối đa 5 phần tử, `Cache-Control: max-age=60, public`. Chỉ có trường `name` (không số lượng bán, doanh thu hay id). Cửa hàng không khả dụng: `404 SHOP_NOT_AVAILABLE` (module SHOP), không gọi catalog/sales. Thuật toán (cùng khoảng 90 ngày):
 1. Lấy tác giả có ấn bản mới trong 90 ngày từ catalog (`GET /internal/books/new-authors`, mới nhất trước); rỗng thì trả `[]`.

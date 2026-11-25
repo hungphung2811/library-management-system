@@ -4,6 +4,7 @@ import lms.catalog.catalog.application.imports.TitleImportHandler;
 import lms.imports.engine.ImportWorkflow;
 import lms.imports.web.AbstractImportController;
 import lms.imports.web.ImportActorResolver;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
  * {@code TitleImportController/confirm}; không đổi tên lớp/method (đổi khóa).
  */
 @RestController
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @RequestMapping("/internal/imports/titles")
 public class TitleImportController extends AbstractImportController {
 

@@ -5,6 +5,7 @@ import lms.imports.engine.ImportWorkflow;
 import lms.imports.web.AbstractImportController;
 import lms.imports.web.ImportActorResolver;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
  * {@code CategoryImportController/upload} và {@code CategoryImportController/confirm}; không đổi tên lớp/method.
  */
 @RestController
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 @RequestMapping("/internal/imports/categories")
 public class CategoryImportController extends AbstractImportController {
 
