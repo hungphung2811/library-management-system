@@ -1,0 +1,55 @@
+# Build và đẩy image các service BE lên GHCR: ghcr.io/<chủ repo>/lms-<service>
+# Chạy khi push main, tag v*, hoặc chạy tay. Tag: sha ngắn, latest (nhánh main), và tên tag git (v1.2.3).
+name: docker-publish
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: system-service,      dockerfile: services/system-service/Dockerfile }
+          - { name: identity-service,    dockerfile: services/identity-service/Dockerfile }
+          - { name: catalog-service,     dockerfile: services/catalog-service/Dockerfile }
+          - { name: circulation-service, dockerfile: services/circulation-service/Dockerfile }
+          - { name: support-service,     dockerfile: services/support-service/Dockerfile }
+          - { name: sales-service,       dockerfile: services/sales-service/Dockerfile }
+          - { name: lms-api,             dockerfile: lms-api/Dockerfile }
+          - { name: customer-api,        dockerfile: customer-api/Dockerfile }
+          - { name: integration-api,     dockerfile: integration-api/Dockerfile }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/lms-${{ matrix.name }}
+          tags: |
+            type=sha,format=short
+            type=ref,event=tag
+            type=raw,value=latest,enable={{is_default_branch}}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}

@@ -12,3 +12,9 @@ target/
 
 .dev/
 .playwright-mcp/
+
+# Cấu hình cục bộ máy dev (chứa token, bí mật)
+/config/application.properties
+
+# Bí mật gửi DevOps (sinh bởi trợ lý)
+/deployment/devops/
